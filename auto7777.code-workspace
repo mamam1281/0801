@@ -1,0 +1,18 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"github.copilot.chat.scopeSelection": true,
+		"github.copilot.chat.codesearch.enabled": true,
+		"workbench.editor.defaultBinaryEditor": "default",
+		"github.copilot.chat.agent.thinkingTool": true,
+		"github.copilot.chat.editor.temporalContext.enabled": true,
+		"github.copilot.chat.edits.temporalContext.enabled": true,
+		"github.copilot.chat.generateTests.codeLens": true,
+		"github.copilot.chat.notebook.followCellExecution.enabled": true,
+		"chat.edits2.enabled": true
+	}
+}

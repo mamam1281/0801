@@ -1,0 +1,26 @@
+# Development Dockerfile for Next.js Frontend
+FROM node:18-alpine
+
+WORKDIR /app
+
+# 패키지 관리자 최적화
+RUN npm config set fund false
+RUN npm config set audit false
+
+# 의존성 설치 최적화
+COPY package*.json ./
+RUN npm ci --only=production=false --no-optional
+
+# 소스 코드 복사
+COPY . .
+
+# 개발용 환경 변수
+ENV NODE_ENV=development
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV FAST_REFRESH=true
+
+# 포트 노출
+EXPOSE 3000
+
+# 개발 서버 시작 (Hot Reload with Turbopack)
+CMD ["npm", "run", "dev"]

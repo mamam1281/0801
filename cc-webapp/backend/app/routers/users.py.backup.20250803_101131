@@ -1,0 +1,238 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+👤 사용자 관리 API 라우터 (강화된 버전)
+사용자 프로필, 세그먼트, 진행상황 관리를 위한 통합 엔드포인트
+"""
+
+from fastapi import APIRouter, De@router.delete("/account", tags=["Account Management"])
+async def delete_user_account(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """사용자 계정 삭제 (소프트 삭제)"""
+    try:
+        # 간단한 소프트 삭제 - 사용자 비활성화
+        user = db.query(models.User).filter(models.User.id == current_user.id).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다")
+        
+        # 실제로는 is_active 필드를 False로 설정하거나 deleted_at 타임스탬프를 설정
+        # 여기서는 간단하게 rank를 DELETED로 변경
+        user.rank = "DELETED"
+        db.commit()
+        
+        return {"message": "계정이 성공적으로 삭제되었습니다", "user_id": current_user.id}
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"계정 삭제 실패: {str(e)}"
+        )eption, status
+from sqlalchemy.orm import Session
+from typing import List, Optional
+from datetime import datetime
+
+from .. import models
+from ..database import get_db
+from ..services.user_service import UserService
+from ..services.user_segment_service import UserSegmentService
+from ..schemas.user import (
+    UserResponse, 
+    UserProfileResponse, 
+    UserProgressResponse, 
+    UserStatisticsResponse, 
+    UserSegmentResponse,
+    UserUpdateRequest
+)
+from ..dependencies import get_current_user
+
+router = APIRouter()
+
+# Dependency injection
+def get_user_service(db: Session = Depends(get_db)):
+    return UserService(db=db)
+
+def get_segment_service(db: Session = Depends(get_db)):
+    return UserSegmentService(db=db)
+
+@router.get("/profile", response_model=UserProfileResponse, tags=["User Profile"])
+async def get_user_profile(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """현재 사용자의 프로필 정보 조회"""
+    try:
+        user_service = UserService(db)
+        user = user_service.get_user_or_error(current_user.id)
+        
+        # UserProfileResponse 형태로 변환
+        return UserProfileResponse(
+            id=user.id,
+            site_id=user.site_id,
+            nickname=user.nickname,
+            phone_number=user.phone_number,
+            invite_code=user.invite_code,
+            cyber_token_balance=user.cyber_token_balance,
+            created_at=user.created_at,
+            rank=user.rank,
+            total_spent=getattr(user, 'total_spent', 0.0),
+            vip_tier=getattr(user, 'vip_tier', 'STANDARD'),
+            battlepass_level=getattr(user, 'battlepass_level', 1)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"프로필 조회 실패: {str(e)}"
+        )
+
+@router.put("/profile", response_model=UserProfileResponse, tags=["User Profile"])
+async def update_user_profile(
+    update_data: UserUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """사용자 프로필 정보 업데이트"""
+    try:
+        # 간단한 업데이트 로직
+        user = db.query(models.User).filter(models.User.id == current_user.id).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다")
+        
+        if update_data.nickname:
+            user.nickname = update_data.nickname
+        if update_data.phone_number:
+            user.phone_number = update_data.phone_number
+            
+        db.commit()
+        db.refresh(user)
+        
+        # UserProfileResponse 형태로 변환
+        return UserProfileResponse(
+            id=user.id,
+            site_id=user.site_id,
+            nickname=user.nickname,
+            phone_number=user.phone_number,
+            invite_code=user.invite_code,
+            cyber_token_balance=user.cyber_token_balance,
+            created_at=user.created_at,
+            rank=user.rank,
+            total_spent=getattr(user, 'total_spent', 0.0),
+            vip_tier=getattr(user, 'vip_tier', 'STANDARD'),
+            battlepass_level=getattr(user, 'battlepass_level', 1)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"프로필 업데이트 실패: {str(e)}"
+        )
+
+@router.get("/segment", tags=["User Segmentation"])
+async def get_user_segment(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """현재 사용자의 세그먼트 정보 조회"""
+    try:
+        segment_service = UserSegmentService(db)
+        segment_label = segment_service.get_segment_label(current_user.id)
+        return {"user_id": current_user.id, "segment": segment_label}
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"세그먼트 조회 실패: {str(e)}"
+        )
+
+@router.get("/progress", response_model=UserProgressResponse, tags=["User Progress"])
+async def get_user_progress(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """현재 사용자의 진행상황 조회 (레벨, 경험치, 배틀패스 등)"""
+    try:
+        # 임시 진행상황 데이터
+        return UserProgressResponse(
+            user_id=current_user.id,
+            level=1,
+            experience=0,
+            next_level_exp=100,
+            progress_percentage=0.0
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"진행상황 조회 실패: {str(e)}"
+        )
+
+@router.get("/stats", tags=["User Statistics"])
+async def get_user_statistics(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """현재 사용자의 게임 통계 조회"""
+    try:
+        user_service = UserService(db)
+        stats = user_service.get_user_stats(current_user.id)
+        return stats
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"통계 조회 실패: {str(e)}"
+        )
+
+@router.delete("/account", tags=["Account Management"])
+async def delete_user_account(
+    current_user: models.User = Depends(get_current_user),
+    user_service: UserService = Depends(get_user_service)
+):
+    """사용자 계정 삭제 (소프트 삭제)"""
+    try:
+        result = await user_service.soft_delete_user(current_user.id)
+        return {"message": "계정이 성공적으로 삭제되었습니다.", "result": result}
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"계정 삭제 실패: {str(e)}"
+        )
+
+# Admin endpoints (requires admin role)
+@router.get("/admin/users", tags=["Admin - User Management"])
+async def list_all_users(
+    skip: int = 0,
+    limit: int = 100,
+    current_user: models.User = Depends(get_current_user),
+    user_service: UserService = Depends(get_user_service)
+):
+    """모든 사용자 목록 조회 (관리자 전용)"""
+    # TODO: Add admin role check
+    try:
+        users = await user_service.get_all_users(skip=skip, limit=limit)
+        return users
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"사용자 목록 조회 실패: {str(e)}"
+        )
+
+@router.get("/admin/users/{user_id}", tags=["Admin - User Management"])
+async def get_user_by_id(
+    user_id: int,
+    current_user: models.User = Depends(get_current_user),
+    user_service: UserService = Depends(get_user_service)
+):
+    """특정 사용자 정보 조회 (관리자 전용)"""
+    # TODO: Add admin role check
+    try:
+        user = await user_service.get_user_by_id(user_id)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="사용자를 찾을 수 없습니다."
+            )
+        return user
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"사용자 조회 실패: {str(e)}"
+        )

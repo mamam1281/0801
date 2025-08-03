@@ -1,0 +1,339 @@
+from fastapi import FastAPI, HTTPException, Depends, Body
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from typing import Optional
+
+class _DummyScheduler:
+    running = False
+
+    def shutdown(self, wait: bool = False) -> None:  # noqa: D401
+        """No-op shutdown when scheduler is unavailable."""
+
+try:
+    from .apscheduler_jobs import start_scheduler, scheduler
+except Exception:  # noqa: BLE001
+
+    def start_scheduler():
+        print("Scheduler disabled or APScheduler not installed")
+
+    scheduler = _DummyScheduler()
+try:
+    from prometheus_fastapi_instrumentator import Instrumentator
+except ImportError:  # Optional dependency in tests
+    Instrumentator = None
+try:
+    import sentry_sdk
+except Exception:  # noqa: BLE001
+    sentry_sdk = None
+import os  # For Sentry DSN from env var
+
+# Kafka integration
+from app.kafka_client import send_kafka_message
+
+# Define the app first
+# ... (app initialization code) ...
+
+# Then define models and routes
+class UserActionEvent(BaseModel):
+    user_id: str
+    action_type: str
+    payload: Optional[dict] = None
+from pydantic import BaseModel  # For request/response models
+from typing import Optional
+
+# ?�우??import 추�? (?�심 ?�우?�들�?먼�? ?�성??
+from app.routers import (
+    auth,
+    users,
+    admin,
+    actions,
+    gacha,
+    rewards,
+    shop,
+    missions,
+    quiz,
+    dashboard,
+    rps,
+    prize_roulette,
+    notifications,
+)
+
+# JWT ?�증 API ?�포??추�? - ?�용???�구?�항??맞는 auth.py�??�용
+# try:
+#     from app.routers import simple_auth  # PostgreSQL 기반 간단???�증 ?�우??
+#     SIMPLE_AUTH_AVAILABLE = True
+#     print("??Simple Auth API 모듈 로드 ?�공")
+# except ImportError as e:
+#     SIMPLE_AUTH_AVAILABLE = False
+#     print(f"?�️ Warning: Simple Auth API not available: {e}")
+# except Exception as e:
+#     SIMPLE_AUTH_AVAILABLE = False
+#     print(f"??Error loading Simple Auth API: {e}")
+SIMPLE_AUTH_AVAILABLE = False  # 중복 ?�거�??�해 비활?�화
+
+# Kafka API ?�포??추�?
+try:
+    from app.api.v1.kafka import router as kafka_router
+    KAFKA_AVAILABLE = True
+    print("??Kafka API 모듈 로드 ?�공")
+except ImportError as e:
+    KAFKA_AVAILABLE = False
+    print(f"?�️ Warning: Kafka integration not available: {e}")
+except Exception as e:
+    KAFKA_AVAILABLE = False
+    print(f"??Error loading Kafka integration: {e}")
+
+# --- Sentry Initialization (Placeholder - should be configured properly with DSN) ---
+# It's good practice to initialize Sentry as early as possible.
+# The DSN should be configured via an environment variable for security and flexibility.
+SENTRY_DSN = os.getenv("SENTRY_DSN")
+if SENTRY_DSN and sentry_sdk:
+    try:
+        sentry_sdk.init(
+            dsn=SENTRY_DSN,
+            traces_sample_rate=1.0,
+            profiles_sample_rate=1.0,
+            environment=os.getenv("ENVIRONMENT", "development"),
+        )
+        print("Sentry SDK initialized successfully.")
+    except Exception as e:  # noqa: BLE001
+        print(f"Error: Failed to initialize Sentry SDK. {e}")
+else:
+    print(
+        "Warning: SENTRY_DSN not found or sentry_sdk missing. Sentry not initialized."
+    )
+# --- End Sentry Initialization Placeholder ---
+
+# 로깅 ?�스??�??�러 ?�들???�포??
+from app.core.logging import setup_logging, LoggingContextMiddleware
+from app.core.error_handlers import add_exception_handlers, error_handling_middleware
+
+# 로깅 ?�스??초기??
+log_level = "DEBUG" if os.getenv("ENVIRONMENT", "development") != "production" else "INFO"
+setup_logging(level=log_level)
+
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup logic
+    if os.getenv("DISABLE_SCHEDULER") != "1":
+        print("FastAPI startup event: Initializing job scheduler...")
+        start_scheduler()
+    yield
+    # Shutdown logic
+    print("FastAPI shutdown event: Shutting down scheduler...")
+    if scheduler.running:
+        scheduler.shutdown(wait=False)
+
+app = FastAPI(
+    lifespan=lifespan,
+    title="?�� Casino-Club F2P API",
+    description="""
+# ?�️ Casino-Club F2P 종합 백엔??API
+
+??문서??**?�전???�구축되�??�정?�된** Casino-Club F2P ?�로?�트??API 명세?�니??
+
+## ?? ?�심 철학
+- **?�정???�선:** 모든 API??명확???�비??계층�??�위 ?�스?��? ?�해 ?�정?�을 ?�보?�습?�다.
+- **?�용???�정 중심:** API??'?�원가????게임 ?�레????보상'???�연?�러???�용???�름??맞춰 ?�계?�었?�니??
+- **?�장??** ?�규 게임, 미션, ?�벤???�을 ?�게 추�??????�는 모듈??구조�?지?�합?�다.
+
+## ??주요 기능 API
+- **?�증 (`/api/auth`):** `5858` 초�?코드 기반 ?�원가??�?JWT ?�큰 발급
+- **?�용??(`/api/users`):** ?�로??�?보상 ?�역 조회
+- **게임 (`/api/games`):** ?�롯, 룰렛, 가?�바?�보 ???�심 게임 ?�레??
+- **?�점 (`/api/shop`):** ?�이??구매
+- **관리자 (`/api/admin`):** ?�용??관�?�??�이??조회
+- **?�?�보??(`/api/dashboard`):** ?�심 지??�??�계 ?�공
+
+    """,
+    version="1.0.0",
+    docs_url="/docs",
+    redoc_url="/redoc",
+    contact={
+        "name": "Jules - AI Software Engineer",
+        "url": "https://github.com/google/generative-ai-docs",
+    },
+    license_info={
+        "name": "Apache 2.0",
+        "url": "https://www.apache.org/licenses/LICENSE-2.0.html",
+    },
+    tags_metadata=[
+        {
+            "name": "Simple Auth",
+            "description": "?�용???�증 �?계정 관�?API",
+            "externalDocs": {
+                "description": "?�증 ?�스??가?�드",
+                "url": "/docs/auth-guide",
+            },
+        },
+        {
+            "name": "Users", 
+            "description": "사용자 프로필 및 정보 관리 API",
+        },
+        {
+            "name": "Kafka",
+            "description": "실시간 이벤트 발행 및 메시징 서비스",
+        },
+        {
+            "name": "Event",
+            "description": "사용자 행동 이벤트 추적",
+        },
+        {
+            "name": "Authentication",
+            "description": "로그인 및 토큰 기반 인증",
+        },
+        {
+            "name": "System",
+            "description": "?�스???�태 ?�인 �?모니?�링",
+        },
+    ]
+)
+
+# Prometheus Instrumentation
+if Instrumentator:
+    instrumentator = Instrumentator(
+        should_group_status_codes=True,
+        should_instrument_requests_inprogress=True,
+        excluded_handlers=["/metrics"],
+        inprogress_labels=True,
+    )
+    instrumentator.instrument(app)
+    instrumentator.expose(
+        app, include_in_schema=False, endpoint="/metrics", tags=["monitoring"]
+    )
+
+
+# Configure CORS
+origins = [
+    "http://localhost:3000",  # Assuming Next.js runs on port 3000
+    "http://localhost:3001",  # Next.js dev server on port 3001
+    "http://localhost:3002",  # Next.js dev server on port 3002 (?�재 ?�용 �?
+    "http://139.180.155.143:3000",  # ?�로?�션 ?�론?�엔??
+    "https://139.180.155.143:3000",  # HTTPS 지??
+    # Add other origins if needed
+]
+
+# ?�러 ?�들???�록
+add_exception_handlers(app)
+
+# ?�러 ?�들�?미들?�어 ?�록
+app.add_middleware(error_handling_middleware)
+
+# 로깅 컨텍?�트 미들?�어 ?�록
+app.add_middleware(LoggingContextMiddleware)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Register API routers - Core routers first
+app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
+app.include_router(users.router, prefix="/api/users", tags=["Users"])
+app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
+app.include_router(actions.router, prefix="/api/actions", tags=["Game Actions"])
+app.include_router(gacha.router, prefix="/api/gacha", tags=["Gacha"])
+app.include_router(rewards.router, prefix="/api/rewards", tags=["Rewards"])
+app.include_router(shop.router, prefix="/api/shop", tags=["Shop"])
+app.include_router(missions.router, prefix="/api/missions", tags=["Missions"])
+app.include_router(quiz.router, prefix="/api/quiz", tags=["Quiz"])
+app.include_router(dashboard.router, prefix="/api/dashboard", tags=["Dashboard"])
+# Register Core API routers only
+app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
+app.include_router(users.router, prefix="/api/users", tags=["Users"])
+app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
+app.include_router(actions.router, prefix="/api/actions", tags=["Game Actions"])
+app.include_router(gacha.router, prefix="/api/gacha", tags=["Gacha"])
+app.include_router(rewards.router, prefix="/api/rewards", tags=["Rewards"])
+app.include_router(shop.router, prefix="/api/shop", tags=["Shop"])
+app.include_router(missions.router, prefix="/api/missions", tags=["Missions"])
+app.include_router(quiz.router, prefix="/api/quiz", tags=["Quiz"])
+app.include_router(dashboard.router, prefix="/api/dashboard", tags=["Dashboard"])
+app.include_router(prize_roulette.router, prefix="/api/games/roulette", tags=["Prize Roulette"])
+app.include_router(rps.router, prefix="/api/games/rps", tags=["Rock Paper Scissors"])
+app.include_router(notifications.router, prefix="/ws", tags=["Real-time Notifications"])
+
+print("✅ Core API endpoints registered")
+
+# Simple Auth API ?�우???�록
+if SIMPLE_AUTH_AVAILABLE:
+    # app.include_router(simple_auth.router)  # ?��? ?�에??/api prefix�??�록??
+    print("??Simple Auth API endpoints registered (already included above)")
+else:
+    print("?�️ Simple Auth API endpoints not available")
+
+# Simple Auth API ?�우???�록
+if SIMPLE_AUTH_AVAILABLE:
+    # app.include_router(simple_auth.router)  # ?��? ?�에??/api prefix�??�록??
+    print("??Simple Auth API endpoints registered (already included above)")
+else:
+    print("?�️ Simple Auth API endpoints not available")
+
+# Kafka API ?�우???�록 (가?�한 경우?�만)
+if KAFKA_AVAILABLE:
+    app.include_router(kafka_router)
+    print("??Kafka API endpoints registered")
+else:
+    print("?�️ Kafka API endpoints not available")
+
+# Kafka integration route
+@app.post("/api/kafka/publish", tags=["Kafka", "Event"])
+async def publish_user_action_event(event: UserActionEvent = Body(...)):
+    """
+    ?�용???�동 ?�벤?��? Kafka�?발행 (?�플)
+    - topic: user_actions
+    - value: {user_id, action_type, payload}
+    """
+    send_kafka_message("user_actions", event.model_dump())
+    return {"status": "ok", "message": "Event published to Kafka", "event": event.model_dump()}
+
+# Request/Response Models
+class UserLogin(BaseModel):
+    """?�용??로그???�키�?""
+
+    user_id: str
+    password: str
+
+
+class LoginResponse(BaseModel):
+    """Login response schema"""
+    token: str
+    user_id: str
+    message: Optional[str] = None
+
+
+@app.post("/login", response_model=LoginResponse, tags=["Authentication"])
+async def login(user: UserLogin):
+    """
+    ?�용??로그???�드?�인??
+
+    - **user_id**: ?�용??ID
+    - **password**: 비�?번호
+    - ?�공 ??JWT ?�큰 반환
+    """
+    # ?�제 로직?� 추후 구현
+    if user.user_id == "test" and user.password == "password":
+        return {
+            "token": "sample_jwt_token",
+            "user_id": user.user_id,
+            "message": "로그???�공",
+        }
+    raise HTTPException(status_code=401, detail="?�증 ?�패")
+
+
+@app.get("/health", tags=["System"])
+@app.head("/health", tags=["System"])
+async def health_check():
+    """
+    ?�스???�태 ?�인 ?�드?�인??
+
+    - ?�버 ?�상 ?�작 ?��? ?�인
+    - ?�스체크 ?�도
+    - GET �?HEAD 메서??모두 지??
+    """
+    return {"status": "healthy"}

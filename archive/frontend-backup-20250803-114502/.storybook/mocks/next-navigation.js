@@ -1,0 +1,31 @@
+// Next.js navigation 모킹
+module.exports = {
+  useRouter: () => ({
+    push: () => Promise.resolve(true),
+    replace: () => Promise.resolve(true),
+    prefetch: () => Promise.resolve(),
+    back: () => {},
+    forward: () => {},
+    refresh: () => {},
+    pathname: '/',
+    route: '/',
+    query: {},
+    asPath: '/',
+    isFallback: false,
+    basePath: '',
+    locale: undefined,
+    locales: undefined,
+    defaultLocale: undefined,
+    isReady: true,
+    isPreview: false,
+    isLocaleDomain: false,
+    events: {
+      on: () => {},
+      off: () => {},
+      emit: () => {},
+    },
+  }),
+  usePathname: () => '/',
+  useSearchParams: () => new URLSearchParams(),
+  useParams: () => ({}),
+};

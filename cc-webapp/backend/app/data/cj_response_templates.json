@@ -1,0 +1,22 @@
+{
+  "greeting": {
+    "whale": "어서오세요, {nickname}님! 오늘도 큰 승부를 기대하고 있겠어요 💎",
+    "medium": "안녕하세요 {nickname}님! 오늘 운이 좋을 것 같은데요? 😊",
+    "low": "반갑습니다! 오늘도 재미있게 즐겨보세요~ 🎮"
+  },
+  "win_response": {
+    "big_win": "와! {amount}토큰 대박이에요! 🎉 이 기세로 더 큰 승부 어떠세요?",
+    "normal_win": "축하해요! {amount}토큰 획득! 😄 운이 따르고 있네요~",
+    "small_win": "좋아요! {amount}토큰! 🙂 작은 승리도 소중해요!"
+  },
+  "loss_response": {
+    "consecutive_loss": "잠깐 쉬어가는 것도 좋을 것 같아요. 차분하게 다음 기회를 노려봐요 😌",
+    "big_loss": "아쉽네요... 하지만 다음 기회는 분명 있을 거예요! 💪",
+    "normal_loss": "이런 날도 있죠! 다음엔 더 좋은 결과가 기다리고 있을 거예요 😊"
+  },
+  "admin_intervention": {
+    "vip_greeting": "VIP 고객님, 특별 관리사 CJ입니다. 무엇을 도와드릴까요?",
+    "risk_warning": "오늘 많이 플레이하셨네요. 잠시 휴식은 어떠세요? 🤗",
+    "manual_response": "{admin_message}"
+  }
+}

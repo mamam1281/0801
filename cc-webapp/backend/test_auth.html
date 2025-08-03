@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>인증 테스트 페이지</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #0a0a0a;
+            color: #00ff88;
+        }
+        .container {
+            background-color: #1a1a1a;
+            border: 2px solid #00ff88;
+            border-radius: 10px;
+            padding: 30px;
+            margin-bottom: 30px;
+        }
+        h1, h2 {
+            color: #00ff88;
+            text-shadow: 0 0 10px #00ff88;
+        }
+        input, button {
+            padding: 10px;
+            margin: 5px;
+            border: 1px solid #00ff88;
+            border-radius: 5px;
+            background-color: #0a0a0a;
+            color: #00ff88;
+            width: 250px;
+        }
+        button {
+            background-color: #004d2a;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        button:hover {
+            background-color: #00ff88;
+            color: #0a0a0a;
+            box-shadow: 0 0 15px #00ff88;
+        }
+        .result {
+            background-color: #0a0a0a;
+            border: 1px solid #333;
+            padding: 15px;
+            margin-top: 10px;
+            border-radius: 5px;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+        .success {
+            border-color: #00ff88;
+            color: #00ff88;
+        }
+        .error {
+            border-color: #ff4444;
+            color: #ff4444;
+        }
+    </style>
+</head>
+<body>
+    <h1>Casino-Club F2P 인증 시스템 테스트</h1>
+    
+    <div class="container">
+        <h2>1. 회원가입 테스트</h2>
+        <div>
+            <input type="text" id="signupSiteId" placeholder="사용자 ID" value="testuser123">
+            <input type="text" id="signupNickname" placeholder="닉네임" value="테스트유저">
+        </div>
+        <div>
+            <input type="text" id="signupPhone" placeholder="전화번호" value="010-1234-5678">
+            <input type="password" id="signupPassword" placeholder="비밀번호" value="password123">
+        </div>
+        <div>
+            <input type="text" id="signupInvite" placeholder="초대코드 (선택사항)" value="VIP2025">
+            <button onclick="testSignup()">회원가입 테스트</button>
+        </div>
+        <div class="result" id="signupResult"></div>
+    </div>
+
+    <div class="container">
+        <h2>2. 로그인 테스트</h2>
+        <div>
+            <input type="text" id="loginSiteId" placeholder="사용자 ID" value="admin">
+            <input type="password" id="loginPassword" placeholder="비밀번호" value="admin123">
+            <button onclick="testLogin()">로그인 테스트</button>
+        </div>
+        <div class="result" id="loginResult"></div>
+    </div>
+
+    <div class="container">
+        <h2>3. 현재 사용자 정보 테스트</h2>
+        <button onclick="testCurrentUser()">사용자 정보 가져오기</button>
+        <div class="result" id="userInfoResult"></div>
+    </div>
+
+    <div class="container">
+        <h2>4. 초대코드 검증 테스트</h2>
+        <div>
+            <input type="text" id="inviteCode" placeholder="초대코드" value="VIP2025">
+            <button onclick="testInviteCode()">초대코드 검증</button>
+        </div>
+        <div class="result" id="inviteResult"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8001';
+        
+        async function testSignup() {
+            const data = {
+                site_id: document.getElementById('signupSiteId').value,
+                nickname: document.getElementById('signupNickname').value,
+                phone_number: document.getElementById('signupPhone').value,
+                password: document.getElementById('signupPassword').value,
+                invite_code: document.getElementById('signupInvite').value
+            };
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/auth/signup`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                const resultDiv = document.getElementById('signupResult');
+                
+                if (response.ok) {
+                    resultDiv.className = 'result success';
+                    resultDiv.textContent = `✅ 회원가입 성공!\n${JSON.stringify(result, null, 2)}`;
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = `❌ 회원가입 실패: ${result.detail}`;
+                }
+            } catch (error) {
+                const resultDiv = document.getElementById('signupResult');
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `❌ 네트워크 오류: ${error.message}`;
+            }
+        }
+        
+        async function testLogin() {
+            const data = {
+                site_id: document.getElementById('loginSiteId').value,
+                password: document.getElementById('loginPassword').value
+            };
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                const resultDiv = document.getElementById('loginResult');
+                
+                if (response.ok) {
+                    resultDiv.className = 'result success';
+                    resultDiv.textContent = `✅ 로그인 성공!\n${JSON.stringify(result, null, 2)}`;
+                    
+                    // 토큰을 로컬 스토리지에 저장
+                    localStorage.setItem('access_token', result.access_token);
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = `❌ 로그인 실패: ${result.detail}`;
+                }
+            } catch (error) {
+                const resultDiv = document.getElementById('loginResult');
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `❌ 네트워크 오류: ${error.message}`;
+            }
+        }
+        
+        async function testCurrentUser() {
+            try {
+                const response = await fetch(`${API_BASE}/api/auth/me`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('access_token') || 'dummy_token'}`
+                    }
+                });
+                
+                const result = await response.json();
+                const resultDiv = document.getElementById('userInfoResult');
+                
+                if (response.ok) {
+                    resultDiv.className = 'result success';
+                    resultDiv.textContent = `✅ 사용자 정보 조회 성공!\n${JSON.stringify(result, null, 2)}`;
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = `❌ 사용자 정보 조회 실패: ${result.detail}`;
+                }
+            } catch (error) {
+                const resultDiv = document.getElementById('userInfoResult');
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `❌ 네트워크 오류: ${error.message}`;
+            }
+        }
+        
+        async function testInviteCode() {
+            const data = {
+                invite_code: document.getElementById('inviteCode').value
+            };
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/auth/verify-invite`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                const resultDiv = document.getElementById('inviteResult');
+                
+                if (response.ok) {
+                    resultDiv.className = 'result success';
+                    resultDiv.textContent = `✅ 초대코드 검증 완료!\n${JSON.stringify(result, null, 2)}`;
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = `❌ 초대코드 검증 실패: ${result.detail}`;
+                }
+            } catch (error) {
+                const resultDiv = document.getElementById('inviteResult');
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `❌ 네트워크 오류: ${error.message}`;
+            }
+        }
+        
+        // 페이지 로드 시 서버 상태 확인
+        window.onload = async function() {
+            try {
+                const response = await fetch(`${API_BASE}/api/health`);
+                const result = await response.json();
+                
+                if (response.ok) {
+                    console.log('✅ 백엔드 서버 연결 성공:', result);
+                } else {
+                    console.log('❌ 백엔드 서버 연결 실패');
+                }
+            } catch (error) {
+                console.log('❌ 백엔드 서버에 접근할 수 없습니다:', error.message);
+            }
+        };
+    </script>
+</body>
+</html>

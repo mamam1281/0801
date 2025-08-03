@@ -1,0 +1,54 @@
+# cc-webapp/monitoring/prometheus.yml
+
+global:
+  scrape_interval: 15s # How frequently to scrape targets by default.
+  evaluation_interval: 15s # How frequently to evaluate rules.
+
+# Alerting specifies rules for sending alerts to an Alertmanager if configured.
+# alertmanager_config:
+#   static_configs:
+#     - targets: ['alertmanager:9093'] # Example if Alertmanager is also containerized
+
+# Load rules once and periodically evaluate them according to the global 'evaluation_interval'.
+# rule_files:
+#   - "alert.rules.yml"  # Example rule file
+
+# scrape_configs define the targets Prometheus will scrape metrics from.
+scrape_configs:
+  - job_name: 'cc-webapp-backend'
+    # metrics_path defaults to '/metrics' which is what prometheus-fastapi-instrumentator uses.
+    # scheme defaults to 'http'.
+
+    # This configuration assumes Prometheus is running in the same Docker network
+    # as the 'backend' service defined in your main docker-compose.yml.
+    # 'backend' is the service name, and 8000 is the port it listens on within that network.
+    static_configs:
+      - targets: ['backend:8000']
+        # If your backend service in docker-compose.yml has a different name (e.g., cc_backend),
+        # use that name here (e.g., 'cc_backend:8000').
+        # The current docker-compose.yml uses service name 'backend' and container_name 'cc_backend'.
+        # Docker DNS will resolve 'backend' to the backend container's IP.
+
+    # If Prometheus were running outside Docker (e.g., directly on your host) and
+    # the backend's port 8000 is mapped to localhost:8000 on your host, you would use:
+    # static_configs:
+    #   - targets: ['localhost:8000']
+
+    # If Prometheus is running in a Docker container (but not part of the same docker-compose.yml)
+    # and needs to reach a port mapped to your Docker host (e.g., Docker Desktop on Mac/Windows),
+    # you might use:
+    # static_configs:
+    #   - targets: ['host.docker.internal:8000']
+
+    # For this project's context, targeting the service name 'backend:8000' is the most
+    # appropriate if Prometheus is intended to be run as part of the same Docker Compose setup
+    # or on the same Docker network.
+    # The current docker-compose.yml for cc-webapp uses 'backend' as the service name.
+    # So, 'backend:8000' is the correct target.
+
+  # Example for scraping Prometheus itself (optional)
+  # - job_name: 'prometheus'
+  #   static_configs:
+  //     - targets: ['localhost:9090'] # Default Prometheus port
+
+  # Add other jobs here if you have more services to monitor (e.g., Kafka exporter, Redis exporter)

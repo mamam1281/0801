@@ -1,0 +1,292 @@
+"""
+Analytics API Router
+Provides analytics and insights for user behavior, game performance, and business metrics.
+Implements comprehensive reporting for the casino platform.
+"""
+from fastapi import APIRouter, Depends, HTTPException, status, Query
+from typing import Optional, List, Dict, Any
+from sqlalchemy.orm import Session
+from app.database import get_db
+from app.dependencies import get_current_user, get_current_admin
+from app import models
+from datetime import datetime, timedelta
+from sqlalchemy import func, desc
+import json
+
+router = APIRouter(prefix="/api/analytics", tags=["analytics"])
+
+@router.get("/user/{user_id}/summary")
+def get_user_analytics_summary(
+    user_id: int,
+    days: int = Query(30, description="Number of days to analyze"),
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get analytics summary for a specific user
+    Includes activity metrics, spending patterns, and game preferences
+    """
+    # Check permission - users can only view their own analytics unless admin
+    if current_user.id != user_id and not getattr(current_user, 'is_admin', False):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied"
+        )
+    
+    start_date = datetime.now() - timedelta(days=days)
+    
+    # Total actions in period
+    total_actions = db.query(models.UserAction).filter(
+        models.UserAction.user_id == user_id,
+        models.UserAction.created_at >= start_date
+    ).count()
+    
+    # Game type breakdown
+    game_stats = db.query(
+        models.UserAction.action_type,
+        func.count(models.UserAction.id).label('count')
+    ).filter(
+        models.UserAction.user_id == user_id,
+        models.UserAction.created_at >= start_date
+    ).group_by(models.UserAction.action_type).all()
+    
+    # Rewards earned
+    total_rewards = db.query(models.UserReward).filter(
+        models.UserReward.user_id == user_id,
+        models.UserReward.created_at >= start_date
+    ).count()
+    
+    # Daily activity pattern
+    daily_activity = db.query(
+        func.date(models.UserAction.created_at).label('date'),
+        func.count(models.UserAction.id).label('actions')
+    ).filter(
+        models.UserAction.user_id == user_id,
+        models.UserAction.created_at >= start_date
+    ).group_by(func.date(models.UserAction.created_at)).all()
+    
+    return {
+        "user_id": user_id,
+        "period_days": days,
+        "total_actions": total_actions,
+        "total_rewards": total_rewards,
+        "game_breakdown": [{"game_type": stat[0], "count": stat[1]} for stat in game_stats],
+        "daily_activity": [{"date": str(activity[0]), "actions": activity[1]} for activity in daily_activity],
+        "avg_daily_actions": round(total_actions / max(days, 1), 2)
+    }
+
+@router.get("/platform/overview")
+def get_platform_analytics(
+    days: int = Query(7, description="Number of days to analyze"),
+    current_user: models.User = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    """
+    Get platform-wide analytics overview
+    Admin only endpoint for business intelligence
+    """
+    start_date = datetime.now() - timedelta(days=days)
+    
+    # Total users
+    total_users = db.query(models.User).count()
+    new_users = db.query(models.User).filter(
+        models.User.created_at >= start_date
+    ).count()
+    
+    # Active users in period
+    active_users = db.query(models.UserAction.user_id).filter(
+        models.UserAction.created_at >= start_date
+    ).distinct().count()
+    
+    # Total actions and rewards
+    total_actions = db.query(models.UserAction).filter(
+        models.UserAction.created_at >= start_date
+    ).count()
+    
+    total_rewards = db.query(models.UserReward).filter(
+        models.UserReward.created_at >= start_date
+    ).count()
+    
+    # Popular games
+    popular_games = db.query(
+        models.UserAction.action_type,
+        func.count(models.UserAction.id).label('count')
+    ).filter(
+        models.UserAction.created_at >= start_date
+    ).group_by(models.UserAction.action_type).order_by(desc('count')).limit(10).all()
+    
+    # User engagement metrics
+    avg_actions_per_user = round(total_actions / max(active_users, 1), 2)
+    user_retention = round((active_users / max(total_users, 1)) * 100, 2)
+    
+    return {
+        "period_days": days,
+        "user_metrics": {
+            "total_users": total_users,
+            "new_users": new_users,
+            "active_users": active_users,
+            "retention_rate": f"{user_retention}%"
+        },
+        "activity_metrics": {
+            "total_actions": total_actions,
+            "total_rewards": total_rewards,
+            "avg_actions_per_user": avg_actions_per_user
+        },
+        "popular_games": [{"game": game[0], "plays": game[1]} for game in popular_games]
+    }
+
+@router.get("/games/{game_type}/stats")
+def get_game_analytics(
+    game_type: str,
+    days: int = Query(30, description="Number of days to analyze"),
+    current_user: models.User = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    """
+    Get detailed analytics for a specific game type
+    Shows play patterns, win rates, and player behavior
+    """
+    start_date = datetime.now() - timedelta(days=days)
+    
+    # Total plays for this game
+    total_plays = db.query(models.UserAction).filter(
+        models.UserAction.action_type == game_type,
+        models.UserAction.created_at >= start_date
+    ).count()
+    
+    # Unique players
+    unique_players = db.query(models.UserAction.user_id).filter(
+        models.UserAction.action_type == game_type,
+        models.UserAction.created_at >= start_date
+    ).distinct().count()
+    
+    # Top players by play count
+    top_players = db.query(
+        models.UserAction.user_id,
+        models.User.nickname,
+        func.count(models.UserAction.id).label('plays')
+    ).join(
+        models.User, models.UserAction.user_id == models.User.id
+    ).filter(
+        models.UserAction.action_type == game_type,
+        models.UserAction.created_at >= start_date
+    ).group_by(
+        models.UserAction.user_id, models.User.nickname
+    ).order_by(desc('plays')).limit(10).all()
+    
+    # Hourly play distribution
+    hourly_distribution = db.query(
+        func.extract('hour', models.UserAction.created_at).label('hour'),
+        func.count(models.UserAction.id).label('plays')
+    ).filter(
+        models.UserAction.action_type == game_type,
+        models.UserAction.created_at >= start_date
+    ).group_by(func.extract('hour', models.UserAction.created_at)).all()
+    
+    return {
+        "game_type": game_type,
+        "period_days": days,
+        "total_plays": total_plays,
+        "unique_players": unique_players,
+        "avg_plays_per_player": round(total_plays / max(unique_players, 1), 2),
+        "top_players": [
+            {"user_id": player[0], "nickname": player[1], "plays": player[2]} 
+            for player in top_players
+        ],
+        "hourly_distribution": [
+            {"hour": int(hour[0]), "plays": hour[1]} 
+            for hour in hourly_distribution
+        ]
+    }
+
+@router.get("/revenue/summary")
+def get_revenue_analytics(
+    days: int = Query(30, description="Number of days to analyze"),
+    current_user: models.User = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    """
+    Get revenue and monetization analytics
+    Shows spending patterns, conversion rates, and financial metrics
+    """
+    start_date = datetime.now() - timedelta(days=days)
+    
+    # Note: This is a placeholder for future monetization features
+    # Currently returns mock data based on user activity levels
+    
+    # High activity users (potential conversion targets)
+    high_activity_users = db.query(
+        models.UserAction.user_id,
+        func.count(models.UserAction.id).label('activity_score')
+    ).filter(
+        models.UserAction.created_at >= start_date
+    ).group_by(models.UserAction.user_id).having(
+        func.count(models.UserAction.id) > 50
+    ).count()
+    
+    # Total user base for conversion rate calculation
+    total_active_users = db.query(models.UserAction.user_id).filter(
+        models.UserAction.created_at >= start_date
+    ).distinct().count()
+    
+    # Mock revenue metrics (replace with actual payment data when implemented)
+    conversion_rate = round((high_activity_users / max(total_active_users, 1)) * 100, 2)
+    
+    return {
+        "period_days": days,
+        "monetization_metrics": {
+            "total_revenue": 0,  # Placeholder
+            "paying_users": 0,   # Placeholder
+            "conversion_rate": f"{conversion_rate}%",
+            "avg_revenue_per_user": 0,  # Placeholder
+            "high_activity_users": high_activity_users
+        },
+        "note": "Revenue tracking will be implemented with payment system integration"
+    }
+
+@router.get("/trends/daily")
+def get_daily_trends(
+    days: int = Query(14, description="Number of days to analyze"),
+    current_user: models.User = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    """
+    Get daily trend analytics
+    Shows day-over-day changes in key metrics
+    """
+    start_date = datetime.now() - timedelta(days=days)
+    
+    # Daily metrics
+    daily_metrics = db.query(
+        func.date(models.UserAction.created_at).label('date'),
+        func.count(models.UserAction.id).label('total_actions'),
+        func.count(func.distinct(models.UserAction.user_id)).label('active_users')
+    ).filter(
+        models.UserAction.created_at >= start_date
+    ).group_by(func.date(models.UserAction.created_at)).order_by('date').all()
+    
+    # Calculate trends
+    trends = []
+    for i, metric in enumerate(daily_metrics):
+        trend_data = {
+            "date": str(metric[0]),
+            "total_actions": metric[1],
+            "active_users": metric[2],
+            "actions_per_user": round(metric[1] / max(metric[2], 1), 2)
+        }
+        
+        # Calculate change from previous day
+        if i > 0:
+            prev_metric = daily_metrics[i-1]
+            action_change = ((metric[1] - prev_metric[1]) / max(prev_metric[1], 1)) * 100
+            user_change = ((metric[2] - prev_metric[2]) / max(prev_metric[2], 1)) * 100
+            
+            trend_data["action_change_pct"] = round(action_change, 2)
+            trend_data["user_change_pct"] = round(user_change, 2)
+        
+        trends.append(trend_data)
+    
+    return {
+        "period_days": days,
+        "daily_trends": trends
+    }

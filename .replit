@@ -1,0 +1,8 @@
+modules = ["nodejs-18", "python-3.10", "bash", "docker"]
+run = "bash start.sh"
+[nix]
+channel = "stable-24_05"
+packages = ["libxcrypt", "openssl", "postgresql"]
+
+[deployment]
+run = ["sh", "-c", "cd frontend"]
