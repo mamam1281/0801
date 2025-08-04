@@ -1,0 +1,230 @@
+/** @type {import('tailwindcss').Config} */
+module.exports = {
+  darkMode: ['class'],
+  content: [
+    './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
+    './src/components/**/*.{js,ts,jsx,tsx,mdx}',
+    './src/app/**/*.{js,ts,jsx,tsx,mdx}',
+    './src/lib/**/*.{js,ts,jsx,tsx,mdx}',
+  ],
+  theme: {
+    container: {
+      center: true,
+      padding: '2rem',
+      screens: {
+        '2xl': '1400px',
+      },
+    },
+    extend: {
+      // Casino-Club F2P 네온 사이버펑크 테마
+      colors: {
+        // 기본 색상 팔레트
+        background: 'hsl(var(--background))',
+        foreground: 'hsl(var(--foreground))',
+        
+        // 카드 및 UI 요소
+        card: {
+          DEFAULT: 'hsl(var(--card))',
+          foreground: 'hsl(var(--card-foreground))',
+        },
+        popover: {
+          DEFAULT: 'hsl(var(--popover))',
+          foreground: 'hsl(var(--popover-foreground))',
+        },
+        
+        // 메인 브랜드 컬러 - 네온 사이버펑크
+        primary: {
+          DEFAULT: 'hsl(var(--primary))',
+          foreground: 'hsl(var(--primary-foreground))',
+        },
+        secondary: {
+          DEFAULT: 'hsl(var(--secondary))',
+          foreground: 'hsl(var(--secondary-foreground))',
+        },
+        
+        // 상태 색상
+        muted: {
+          DEFAULT: 'hsl(var(--muted))',
+          foreground: 'hsl(var(--muted-foreground))',
+        },
+        accent: {
+          DEFAULT: 'hsl(var(--accent))',
+          foreground: 'hsl(var(--accent-foreground))',
+        },
+        destructive: {
+          DEFAULT: 'hsl(var(--destructive))',
+          foreground: 'hsl(var(--destructive-foreground))',
+        },
+        
+        // 테두리 및 입력
+        border: 'hsl(var(--border))',
+        input: 'hsl(var(--input))',
+        ring: 'hsl(var(--ring))',
+        
+        // 네온 사이버펑크 커스텀 컬러
+        neon: {
+          cyan: '#00FFFF',
+          magenta: '#FF00FF',
+          electric: '#00FF41',
+          purple: '#8B00FF',
+          orange: '#FF6B00',
+          pink: '#FF1493',
+          blue: '#0080FF',
+          yellow: '#FFFF00',
+        },
+        
+        // 카지노 테마 컬러
+        casino: {
+          gold: '#FFD700',
+          silver: '#C0C0C0',
+          bronze: '#CD7F32',
+          red: '#DC143C',
+          green: '#228B22',
+          black: '#000000',
+        },
+        
+        // 그라데이션 색상
+        gradient: {
+          from: '#1a1a2e',
+          via: '#16213e',
+          to: '#0f172a',
+        }
+      },
+      
+      // 커스텀 박스 섀도우 - 네온 글로우 효과
+      boxShadow: {
+        'neon-sm': '0 0 5px currentColor',
+        'neon': '0 0 10px currentColor, 0 0 20px currentColor, 0 0 30px currentColor',
+        'neon-lg': '0 0 20px currentColor, 0 0 40px currentColor, 0 0 60px currentColor',
+        'neon-xl': '0 0 30px currentColor, 0 0 60px currentColor, 0 0 90px currentColor',
+        'glow': '0 0 15px rgba(0, 255, 255, 0.5)',
+        'glow-magenta': '0 0 15px rgba(255, 0, 255, 0.5)',
+        'glow-electric': '0 0 15px rgba(0, 255, 65, 0.5)',
+      },
+      
+      // 커스텀 폰트 패밀리
+      fontFamily: {
+        sans: ['var(--font-geist-sans)', 'system-ui', 'sans-serif'],
+        mono: ['var(--font-geist-mono)', 'monospace'],
+        cyber: ['Orbitron', 'monospace'],
+        casino: ['Bebas Neue', 'sans-serif'],
+      },
+      
+      // 커스텀 애니메이션
+      animation: {
+        'pulse-neon': 'pulse-neon 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+        'glow': 'glow 2s ease-in-out infinite alternate',
+        'float': 'float 3s ease-in-out infinite',
+        'spin-slow': 'spin 3s linear infinite',
+        'bounce-slow': 'bounce 2s infinite',
+        'fade-in': 'fadeIn 0.5s ease-in-out',
+        'slide-up': 'slideUp 0.3s ease-out',
+        'scale-in': 'scaleIn 0.2s ease-out',
+      },
+      
+      // 키프레임 정의
+      keyframes: {
+        'pulse-neon': {
+          '0%, 100%': {
+            textShadow: '0 0 5px currentColor, 0 0 10px currentColor, 0 0 15px currentColor',
+          },
+          '50%': {
+            textShadow: '0 0 10px currentColor, 0 0 20px currentColor, 0 0 30px currentColor',
+          },
+        },
+        glow: {
+          '0%': {
+            boxShadow: '0 0 5px currentColor',
+          },
+          '100%': {
+            boxShadow: '0 0 20px currentColor, 0 0 30px currentColor',
+          },
+        },
+        float: {
+          '0%, 100%': {
+            transform: 'translateY(0px)',
+          },
+          '50%': {
+            transform: 'translateY(-10px)',
+          },
+        },
+        fadeIn: {
+          '0%': {
+            opacity: '0',
+          },
+          '100%': {
+            opacity: '1',
+          },
+        },
+        slideUp: {
+          '0%': {
+            transform: 'translateY(100%)',
+            opacity: '0',
+          },
+          '100%': {
+            transform: 'translateY(0)',
+            opacity: '1',
+          },
+        },
+        scaleIn: {
+          '0%': {
+            transform: 'scale(0.9)',
+            opacity: '0',
+          },
+          '100%': {
+            transform: 'scale(1)',
+            opacity: '1',
+          },
+        },
+      },
+      
+      // 반응형 중단점
+      screens: {
+        'xs': '475px',
+        '3xl': '1600px',
+      },
+      
+      // 간격
+      spacing: {
+        '18': '4.5rem',
+        '88': '22rem',
+        '128': '32rem',
+      },
+      
+      // 테두리 반경
+      borderRadius: {
+        lg: 'var(--radius)',
+        md: 'calc(var(--radius) - 2px)',
+        sm: 'calc(var(--radius) - 4px)',
+      },
+    },
+  },
+  plugins: [
+    require('@tailwindcss/forms'),
+    require('@tailwindcss/typography'),
+    
+    // 커스텀 플러그인 - 네온 효과
+    function({ addUtilities, theme }) {
+      const neonUtilities = {
+        '.text-neon': {
+          textShadow: '0 0 5px currentColor, 0 0 10px currentColor, 0 0 15px currentColor',
+        },
+        '.text-neon-strong': {
+          textShadow: '0 0 10px currentColor, 0 0 20px currentColor, 0 0 30px currentColor, 0 0 40px currentColor',
+        },
+        '.border-neon': {
+          borderColor: 'currentColor',
+          boxShadow: '0 0 5px currentColor',
+        },
+        '.bg-gradient-cyber': {
+          background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f172a 100%)',
+        },
+        '.bg-gradient-neon': {
+          background: 'linear-gradient(45deg, #00FFFF 0%, #FF00FF 50%, #00FF41 100%)',
+        },
+      }
+      
+      addUtilities(neonUtilities)
+    },
+  ],
+}

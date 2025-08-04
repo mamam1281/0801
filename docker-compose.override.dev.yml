@@ -39,7 +39,6 @@ services:
     environment:
       - FAST_REFRESH=true
       - NEXT_TELEMETRY_DISABLED=1
-      - NODE_ENV=development
       - NEXT_PUBLIC_API_URL=http://localhost:${BACKEND_PORT:-8000}
       - NEXT_PUBLIC_WS_URL=ws://localhost:${BACKEND_PORT:-8000}
       # Turbopack 최적화

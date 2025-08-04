@@ -15,7 +15,6 @@ RUN npm ci --only=production=false --no-optional
 COPY . .
 
 # 개발용 환경 변수
-ENV NODE_ENV=development
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV FAST_REFRESH=true
 
