@@ -1,99 +1,23 @@
 @custom-variant dark (&:is(.dark *));
 
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom Properties for Neon Theme */
 :root {
-  /* 🎮 Game App Base Colors */
-  --font-size: 14px;
-  --background: #0a0a0f;
-  --foreground: #ffffff;
-  --card: #1a1a24;
-  --card-foreground: #ffffff;
-  --popover: #1a1a24;
-  --popover-foreground: #ffffff;
+  --neon-pink: #ff006e;
+  --neon-purple: #8338ec;
+  --neon-yellow: #ffbe0b;
+  --neon-cyan: #3a86ff;
+  --dark-bg: #0a0a0a;
+  --dark-surface: #1a1a1a;
+  --dark-border: #2a2a2a;
   
-  /* 🎨 Game Primary Colors - Softer Indie Pink Theme */
-  --primary: #e6005e;
-  --primary-foreground: #ffffff;
-  --primary-hover: #cc0054;
-  --primary-light: #ff4d9a;
-  --primary-dark: #b30048;
-  --primary-soft: rgba(230, 0, 94, 0.08);
-  
-  /* 🔧 Game Secondary Colors */
-  --secondary: #2d2d3a;
-  --secondary-foreground: #ffffff;
-  --secondary-hover: #3d3d4a;
-  
-  /* 💰 Game Gold/Points System Colors */
-  --gold: #e6c200;
-  --gold-foreground: #000000;
-  --gold-light: #f5d700;
-  --gold-dark: #cc9e00;
-  --gold-soft: rgba(230, 194, 0, 0.08);
-  
-  /* ✅ Game Status Colors */
-  --success: #9c4dcc;
-  --success-foreground: #ffffff;
-  --success-soft: rgba(156, 77, 204, 0.08);
-  --warning: #e89900;
-  --warning-foreground: #000000;
-  --warning-soft: rgba(232, 153, 0, 0.08);
-  --error: #e6336b;
-  --error-foreground: #ffffff;
-  --error-soft: rgba(230, 51, 107, 0.08);
-  --info: #4d9fcc;
-  --info-foreground: #ffffff;
-  --info-soft: rgba(77, 159, 204, 0.08);
-  
-  /* 🎯 Game UI Elements */
-  --muted: #2d2d3a;
-  --muted-foreground: #999999;
-  --accent: #e6005e;
-  --accent-foreground: #ffffff;
-  --destructive: #e6336b;
-  --destructive-foreground: #ffffff;
-  
-  /* 🔲 Game Borders and Inputs */
-  --border: rgba(230, 0, 94, 0.12);
-  --border-secondary: rgba(255, 255, 255, 0.06);
-  --input: #1a1a24;
-  --input-background: #2d2d3a;
-  --input-border: rgba(230, 0, 94, 0.15);
-  --switch-background: #2d2d3a;
-  
-  /* ✨ Refined Effects */
-  --soft-glow: 0 0 6px rgba(230, 0, 94, 0.15);
-  --gold-soft-glow: 0 0 6px rgba(230, 194, 0, 0.15);
-  --shadow-soft: 0 2px 10px rgba(0, 0, 0, 0.25);
-  --shadow-colored-soft: 0 2px 10px rgba(230, 0, 94, 0.1);
-  --shadow-elevated: 0 4px 16px rgba(0, 0, 0, 0.35);
-  
-  /* 🔮 Glass + Metal Morphism Effects */
-  --glass-metal-bg: rgba(26, 26, 36, 0.9);
-  --glass-metal-border: rgba(255, 255, 255, 0.1);
-  --glass-metal-backdrop: blur(12px);
-  --metal-shadow-inset: inset 2px 2px 6px rgba(0, 0, 0, 0.3), inset -2px -2px 6px rgba(255, 255, 255, 0.05);
-  --metal-shadow-outset: 4px 4px 12px rgba(0, 0, 0, 0.4), -2px -2px 8px rgba(255, 255, 255, 0.03);
-  --metal-highlight: rgba(255, 255, 255, 0.08);
-  --metal-lowlight: rgba(0, 0, 0, 0.3);
-  
-  /* 📝 Typography */
-  --font-weight-light: 300;
-  --font-weight-normal: 400;
-  --font-weight-medium: 500;
-  --font-weight-semibold: 600;
-  --font-weight-bold: 700;
-  --font-weight-black: 900;
-  
-  /* 🎮 Game Specific */
-  --ring: rgba(230, 0, 94, 0.25);
-  --radius: 0.75rem;
-  --radius-game: 1rem;
-  --radius-button: 0.5rem;
-  
-  /* 🌊 Ultra Refined Glass Effect */
-  --glass-bg: rgba(26, 26, 36, 0.8);
-  --glass-border: rgba(230, 0, 94, 0.08);
-  --glass-backdrop: blur(6px);
+  /* Metal effect variables */
+  --metal-gradient: linear-gradient(135deg, #2a2a2a 0%, #1a1a1a 25%, #2a2a2a 50%, #1a1a1a 75%, #2a2a2a 100%);
+  --metal-shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.1), inset 0 -1px 0 rgba(0, 0, 0, 0.5);
+  --metal-shadow-outset: 0 4px 12px rgba(0, 0, 0, 0.3), 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 .dark {
@@ -485,4 +409,21 @@
 
 html {
   font-size: var(--font-size);
+}
+
+/* Glass Effect Classes */
+@layer components {
+  .glass-effect {
+    @apply bg-black/50 backdrop-blur-md border border-white/10;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%);
+  }
+  
+  .glass-effect-strong {
+    @apply bg-black/70 backdrop-blur-lg border border-white/20;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%);
+  }
+  
+  .shadow-game {
+    box-shadow: 0 10px 30px rgba(255, 0, 110, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.1);
+  }
 }

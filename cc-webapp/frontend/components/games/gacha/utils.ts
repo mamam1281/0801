@@ -1,4 +1,4 @@
-import { User } from '../../../types';
+import { User } from '../../../App';
 import { GachaItem, GachaBanner, GACHA_ITEMS, ANIMATION_DURATIONS } from './constants';
 
 export interface Particle {

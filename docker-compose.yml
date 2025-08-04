@@ -133,20 +133,22 @@ services:
     build:
       context: ./cc-webapp/frontend
       dockerfile: Dockerfile
-    depends_on:
-      - backend
-    environment:
-      NEXT_PUBLIC_API_URL: http://localhost:8000
-      NEXT_PUBLIC_WS_URL: ws://localhost:8000
-      NODE_ENV: ${NODE_ENV:-development}
-    ports:
-      - "${FRONTEND_PORT:-3000}:3000"
+    container_name: cc-frontend
     volumes:
       - ./cc-webapp/frontend:/app
       - /app/node_modules
       - /app/.next
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NEXT_PUBLIC_WS_URL=ws://localhost:8000
+      - NODE_ENV=development
+    depends_on:
+      - backend
     networks:
-      - ccnet
+      - ccnet  # cc-network에서 ccnet으로 변경
+    command: npm run dev
 
   # Celery Worker (백그라운드 작업)
   celery-worker:
@@ -201,3 +203,4 @@ volumes:
 
 networks:
   ccnet:
+    driver: bridge

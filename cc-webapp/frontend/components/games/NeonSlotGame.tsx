@@ -78,8 +78,8 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
   
   // Jackpot calculation
   useEffect(() => {
-    setCurrentJackpot(50000 + (user.gameStats.slot.totalSpins * 50));
-  }, [user.gameStats.slot.totalSpins]);
+    setCurrentJackpot(50000 + (user.gameStats.slot.spins * 50));
+  }, [user.gameStats.slot.spins]);
 
   // Auto spin logic
   useEffect(() => {
@@ -283,10 +283,11 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
             ...user.gameStats,
             slot: {
               ...user.gameStats.slot,
-              totalSpins: user.gameStats.slot.totalSpins + 1,
+              spins: user.gameStats.slot.spins + 1,
               totalWinnings: user.gameStats.slot.totalWinnings + result.winAmount,
               biggestWin: Math.max(user.gameStats.slot.biggestWin, result.winAmount),
-              jackpotHits: result.isJackpot ? user.gameStats.slot.jackpotHits + 1 : user.gameStats.slot.jackpotHits
+              jackpots: result.isJackpot ? user.gameStats.slot.jackpots + 1 : user.gameStats.slot.jackpots,
+              wins: user.gameStats.slot.wins + 1
             }
           },
           stats: {
@@ -317,7 +318,7 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
             ...user.gameStats,
             slot: {
               ...user.gameStats.slot,
-              totalSpins: user.gameStats.slot.totalSpins + 1
+              spins: user.gameStats.slot.spins + 1
             }
           },
           stats: {
@@ -616,7 +617,7 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
               <div className="flex items-center gap-4 mb-3">
                 <Slider
                   value={[betAmount]}
-                  onValueChange={(value: number[]) => setBetAmount(value[0])}
+                  onValueChange={(value) => setBetAmount(value[0])}
                   max={Math.min(user.goldBalance, 10000)}
                   min={50}
                   step={50}
@@ -711,13 +712,13 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
         >
           <div className="glass-effect rounded-xl p-4 text-center card-hover-float">
             <div className="text-xl font-bold text-primary">
-              {user.gameStats.slot.totalSpins}
+              {user.gameStats.slot.spins}
             </div>
             <div className="text-sm text-muted-foreground">총 스핀</div>
           </div>
           <div className="glass-effect rounded-xl p-4 text-center card-hover-float">
             <div className="text-xl font-bold text-gold">
-              {user.gameStats.slot.jackpotHits}
+              {user.gameStats.slot.jackpots}
             </div>
             <div className="text-sm text-muted-foreground">잭팟 횟수</div>
           </div>

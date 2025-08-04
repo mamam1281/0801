@@ -24,8 +24,8 @@ export interface User {
 export interface GameItem {
   id: string;
   name: string;
-  type: 'powerup' | 'skin' | 'currency' | 'collectible' | 'weapon' | 'character' | 'premium' | 'special';
-  rarity: 'common' | 'rare' | 'epic' | 'legendary' | 'mythic';
+  type: 'powerup' | 'skin' | 'currency' | 'collectible';
+  rarity: 'common' | 'rare' | 'epic' | 'legendary';
   quantity: number;
   description: string;
   icon: string;
@@ -60,21 +60,12 @@ export interface GameStatsDetail {
     totalPulls: number;
     legendaryPulls: number;
     totalValue: number;
-    pulls: number;
-    totalSpent: number;
-    epicCount: number;
-    legendaryCount: number;
   };
   crash: {
     totalGames: number;
     highestMultiplier: number;
     totalCashedOut: number;
     averageMultiplier: number;
-  };
-  roulette: {
-    spins: number;
-    wins: number;
-    biggestWin: number;
   };
 }
 
@@ -102,45 +93,6 @@ export interface GameDashboardGame {
   cost: number;
 }
 
-// � 보상 아이템 타입
-export interface RewardItem {
-  type: 'gold' | 'exp' | 'item';
-  amount: number;
-  name?: string; // 아이템인 경우 이름
-}
-
-// �🎯 미션 타입
-export interface Mission {
-  id: string;
-  title: string;
-  description: string;
-  type: 'daily' | 'weekly' | 'special' | 'achievement';
-  status: 'active' | 'completed' | 'locked';
-  progress: number;
-  maxProgress: number;
-  rewards: RewardItem[];
-  difficulty: 'easy' | 'medium' | 'hard' | 'extreme';
-  icon: string;
-  expiresAt?: Date;
-  requirements?: string[];
-}
-
-// 🎪 이벤트 타입
-export interface Event {
-  id: string;
-  title: string;
-  description: string;
-  type: 'limited' | 'seasonal' | 'special';
-  status: 'active' | 'scheduled' | 'ended';
-  startDate: Date;
-  endDate: Date;
-  rewards: RewardItem[];
-  participants: number;
-  maxParticipants?: number;
-  requirements?: string[];
-  icon: string;
-}
-
 // 📱 앱 화면 타입
 export type AppScreen = 
   | 'loading'
@@ -156,81 +108,7 @@ export type AppScreen =
   | 'admin-panel'
   | 'event-mission-panel'
   | 'neon-slot'
-  | 'rps'
-  | 'gacha'
-  | 'crash'
+  | 'rock-paper-scissors'
+  | 'gacha-system'
+  | 'neon-crash'
   | 'streaming';
-
-// 🎲 Gacha 관련 타입들
-export interface GachaItem extends GameItem {
-  rate: number; // Pull rate percentage
-  isNew?: boolean;
-  sexiness?: number; // 키치/섹시 레벨 (1-5)
-}
-
-export interface GachaBanner {
-  id: string;
-  name: string;
-  description: string;
-  theme: string;
-  featuredItems: GachaItem[];
-  cost: number;
-  guaranteedRarity?: 'epic' | 'legendary';
-  bonusMultiplier: number;
-  bgGradient: string;
-}
-
-export const ANIMATION_DURATIONS = {
-  SPIN: 2000,
-  REVEAL: 800,
-  PARTICLE_LIFE: 1500,
-  MULTI_PULL_DELAY: 150,
-  particle: 1500,
-  opening: 1000,
-  heartFloat: 1200
-} as const;
-
-// 🔧 관리자 전용 타입들
-export interface UserImportData {
-  nickname: string;
-  email?: string;
-  goldBalance?: number;
-  level?: number;
-  isAdmin?: boolean;
-}
-
-export interface AdminLog {
-  id: string;
-  adminId: string;
-  adminName: string;
-  action: string;
-  target: string;
-  details: string;
-  timestamp: Date;
-  ipAddress: string;
-  userAgent: string;
-}
-
-export interface SystemBackup {
-  id: string;
-  name: string;
-  description: string;
-  size: number;
-  createdAt: Date;
-  type: 'full' | 'users' | 'shop' | 'logs';
-  status: 'creating' | 'completed' | 'failed';
-}
-
-export interface PushNotification {
-  id: string;
-  title: string;
-  message: string;
-  type: 'general' | 'event' | 'maintenance' | 'promotion';
-  targetUsers: 'all' | 'active' | 'specific';
-  userIds?: string[];
-  scheduledAt?: Date;
-  sentAt?: Date;
-  status: 'draft' | 'scheduled' | 'sent' | 'failed';
-  readCount?: number;
-  clickCount?: number;
-}

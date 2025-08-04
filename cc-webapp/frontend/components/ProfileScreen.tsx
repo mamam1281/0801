@@ -169,7 +169,7 @@ export function ProfileScreen({
                     </div>
                     <div className="text-right">
                       <div className="text-lg font-bold text-primary">
-                        {user?.gameStats?.slot?.totalSpins || 0}회
+                        {user?.gameStats?.slot?.spins || 0}회
                       </div>
                       <div className="text-xs text-gold">
                         최고: {user?.gameStats?.slot?.biggestWin?.toLocaleString() || 0}G
@@ -187,10 +187,10 @@ export function ProfileScreen({
                     </div>
                     <div className="text-right">
                       <div className="text-lg font-bold text-success">
-                        {user?.gameStats?.rps?.totalGames || 0}회
+                        {user?.gameStats?.rps?.matches || 0}회
                       </div>
                       <div className="text-xs text-primary">
-                        연승: {user?.gameStats?.rps?.currentStreak || 0}회
+                        연승: {user?.gameStats?.rps?.winStreak || 0}회
                       </div>
                     </div>
                   </div>
@@ -205,10 +205,10 @@ export function ProfileScreen({
                     </div>
                     <div className="text-right">
                       <div className="text-lg font-bold text-error">
-                        {user?.gameStats?.crash?.totalGames || 0}회
+                        {user?.gameStats?.crash?.games || 0}회
                       </div>
                       <div className="text-xs text-gold">
-                        최고: {user?.gameStats?.crash?.highestMultiplier?.toLocaleString() || 0}x
+                        최고: {user?.gameStats?.crash?.biggestWin?.toLocaleString() || 0}G
                       </div>
                     </div>
                   </div>
@@ -223,10 +223,10 @@ export function ProfileScreen({
                     </div>
                     <div className="text-right">
                       <div className="text-lg font-bold text-warning">
-                        {user?.gameStats?.gacha?.totalPulls || 0}회
+                        {user?.gameStats?.gacha?.pulls || 0}회
                       </div>
                       <div className="text-xs text-error">
-                        전설: {user?.gameStats?.gacha?.legendaryPulls || 0}개
+                        전설: {user?.gameStats?.gacha?.legendaryCount || 0}개
                       </div>
                     </div>
                   </div>

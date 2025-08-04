@@ -1,7 +1,11 @@
-﻿{
+{
     "compilerOptions": {
         "target": "ES2017",
-        "lib": ["dom", "dom.iterable", "esnext"],
+        "lib": [
+            "dom",
+            "dom.iterable",
+            "esnext"
+        ],
         "allowJs": true,
         "skipLibCheck": true,
         "strict": false,
@@ -23,8 +27,19 @@
         "noImplicitOverride": false,
         "noPropertyAccessFromIndexSignature": false,
         "noUncheckedIndexedAccess": false,
-        "plugins": [{"name": "next"}]
+        "plugins": [
+            {
+                "name": "next"
+            }
+        ]
     },
-    "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-    "exclude": ["node_modules"]
+    "include": [
+        "next-env.d.ts",
+        "**/*.ts",
+        "**/*.tsx",
+        ".next/types/**/*.ts"
+    ],
+    "exclude": [
+        "node_modules"
+    ]
 }

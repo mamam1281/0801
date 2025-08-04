@@ -14,7 +14,7 @@ import {
   Trash2,
   Save
 } from 'lucide-react';
-import { UserImportData } from '../../types';
+import { UserImportData } from '../../types/admin';
 import { validateFileUpload, validateNickname, validateEmail } from '../../utils/securityUtils';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
@@ -100,7 +100,7 @@ export function UserBulkManager({ onAddNotification, onUsersImported }: UserBulk
     if (lines.length < 2) return [];
 
     const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
-    const data: any[] = [];
+    const data = [];
 
     for (let i = 1; i < lines.length; i++) {
       const values = lines[i].split(',').map(v => v.trim());
@@ -157,7 +157,7 @@ export function UserBulkManager({ onAddNotification, onUsersImported }: UserBulk
         }
 
         // Validate numeric fields
-        if (isNaN(userData.goldBalance ?? 0) || (userData.goldBalance ?? 0) < 0) {
+        if (isNaN(userData.goldBalance) || userData.goldBalance < 0) {
           errors.push({
             row: row._rowNumber,
             error: '골드: 유효한 숫자여야 합니다 (0 이상)',
@@ -166,7 +166,7 @@ export function UserBulkManager({ onAddNotification, onUsersImported }: UserBulk
           continue;
         }
 
-        if (isNaN(userData.level ?? 0) || (userData.level ?? 0) < 1) {
+        if (isNaN(userData.level) || userData.level < 1) {
           errors.push({
             row: row._rowNumber,
             error: '레벨: 유효한 숫자여야 합니다 (1 이상)',

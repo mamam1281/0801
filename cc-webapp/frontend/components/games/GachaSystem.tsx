@@ -10,9 +10,9 @@ import {
   Heart,
   Crown
 } from 'lucide-react';
-import { User, GachaItem, GachaBanner, ANIMATION_DURATIONS } from '../../types';
+import { User } from '../../App';
 import { Button } from '../ui/button';
-import { GACHA_BANNERS } from './gacha/constants';
+import { GACHA_BANNERS, ANIMATION_DURATIONS } from './gacha/constants';
 import { 
   generateParticles,
   generateHeartParticles,
@@ -29,6 +29,7 @@ import {
   SexyInventoryModal,
   BackgroundEffects
 } from './gacha/components';
+import type { GachaItem, GachaBanner } from './gacha/constants';
 
 interface GachaSystemProps {
   user: User;

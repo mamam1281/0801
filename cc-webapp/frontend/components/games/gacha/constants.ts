@@ -1,4 +1,4 @@
-import { GameItem } from '../../../types';
+import { GameItem } from '../../../App';
 
 export interface GachaItem extends GameItem {
   rate: number; // Pull rate percentage

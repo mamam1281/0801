@@ -366,7 +366,7 @@ export function NeonCrashGame({ user, onBack, onUpdateUser, onAddNotification }:
               <div className="flex items-center gap-4">
                 <Slider
                   value={[betAmount]}
-                  onValueChange={(value: number[]) => setBetAmount(value[0])}
+                  onValueChange={(value) => setBetAmount(value[0])}
                   max={Math.min(user.goldBalance, 5000)}
                   min={10}
                   step={10}
@@ -408,7 +408,7 @@ export function NeonCrashGame({ user, onBack, onUpdateUser, onAddNotification }:
               <div className="flex items-center gap-4">
                 <Slider
                   value={[autoCashOut]}
-                  onValueChange={(value: number[]) => setAutoCashOut(value[0])}
+                  onValueChange={(value) => setAutoCashOut(value[0])}
                   max={20}
                   min={1.1}
                   step={0.1}

@@ -277,20 +277,19 @@ export function NeonRouletteGame({ user, onBack, onUpdateUser, onAddNotification
 
     // 최종 골드 업데이트
     updatedUser.goldBalance += finalReward;
-    // TODO: 룰렛 기능 삭제됨 - 추후 재구현 시 활성화
-    // updatedUser.gameStats.roulette.spins += 1;
+    updatedUser.gameStats.roulette.spins += 1;
     
     if (finalReward > 0) {
-      // updatedUser.gameStats.roulette.wins += 1;
+      updatedUser.gameStats.roulette.wins += 1;
       updatedUser.stats.gamesWon += 1;
       updatedUser.stats.winStreak += 1;
     } else {
       updatedUser.stats.winStreak = 0;
     }
     
-    // if (finalReward > updatedUser.gameStats.roulette.biggestWin) {
-    //   updatedUser.gameStats.roulette.biggestWin = finalReward;
-    // }
+    if (finalReward > updatedUser.gameStats.roulette.biggestWin) {
+      updatedUser.gameStats.roulette.biggestWin = finalReward;
+    }
     
     updatedUser.stats.gamesPlayed += 1;
     updatedUser.stats.totalEarnings += (finalReward - spinCost);

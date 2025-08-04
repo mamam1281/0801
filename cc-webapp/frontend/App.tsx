@@ -202,7 +202,7 @@ export default function App() {
             onNavigateToSlot={navigationHandlers.toSlot}
             onNavigateToRPS={navigationHandlers.toRPS}
             onNavigateToGacha={navigationHandlers.toGacha}
-            onNavigateToCrash={() => navigationHandlers.navigate('crash')}
+            onNavigateToCrash={() => navigationHandlers.navigate('neon-crash')}
             onUpdateUser={updateUser}
             onAddNotification={addNotification}
             onToggleSideMenu={toggleSideMenu}
@@ -282,9 +282,9 @@ export default function App() {
           />
         )}
 
-        {currentScreen === 'rps' && user && (
+        {currentScreen === 'rock-paper-scissors' && user && (
           <RockPaperScissorsGame
-            key="rps"
+            key="rock-paper-scissors"
             user={user}
             onBack={navigationHandlers.backToGames}
             onUpdateUser={updateUser}
@@ -292,9 +292,9 @@ export default function App() {
           />
         )}
 
-        {currentScreen === 'gacha' && user && (
+        {currentScreen === 'gacha-system' && user && (
           <GachaSystem
-            key="gacha"
+            key="gacha-system"
             user={user}
             onBack={navigationHandlers.backToGames}
             onUpdateUser={updateUser}
@@ -302,9 +302,9 @@ export default function App() {
           />
         )}
 
-        {currentScreen === 'crash' && user && (
+        {currentScreen === 'neon-crash' && user && (
           <NeonCrashGame
-            key="crash"
+            key="neon-crash"
             user={user}
             onBack={navigationHandlers.backToGames}
             onUpdateUser={updateUser}
