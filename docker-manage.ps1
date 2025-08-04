@@ -27,6 +27,7 @@ function Show-Help {
     Write-ColoredOutput "📋 Core Commands:" "Green"
     Write-ColoredOutput "  check        - Check development environment" "White"
     Write-ColoredOutput "  setup        - Initial environment setup" "White"
+    Write-ColoredOutput "  setup-frontend - Setup frontend for local development" "White"
     Write-ColoredOutput "  start        - Start services" "White"
     Write-ColoredOutput "  stop         - Stop services" "White"
     Write-ColoredOutput "  restart      - Restart services" "White"
@@ -353,11 +354,162 @@ function Reset-Environment {
     Write-ColoredOutput "Restart with: .\docker-manage.ps1 setup" "Yellow"
 }
 
+# Function to setup frontend for local development (Tailwind CSS v4 compatible)
+function Setup-FrontendLocal {
+    Write-ColoredOutput "🚀 Setting up frontend for local development with Tailwind CSS v4..." "Cyan"
+    
+    # Ensure frontend directory exists
+    $frontendDir = "cc-webapp/frontend"
+    if (!(Test-Path $frontendDir)) {
+        Write-ColoredOutput "❌ Frontend directory not found: $frontendDir" "Red"
+        exit 1
+    }
+    
+    # Create .vscode settings directory for Tailwind CSS v4
+    $vscodeDir = "$frontendDir/.vscode"
+    if (!(Test-Path $vscodeDir)) {
+        New-Item -ItemType Directory -Path $vscodeDir -Force | Out-Null
+        Write-ColoredOutput "📁 Created VS Code settings directory" "Green"
+    }
+    
+    # Create VS Code settings.json
+    $settingsFile = "$vscodeDir/settings.json"
+    $settingsContent = @"
+{
+  "tailwindCSS.experimental.configFile": null,
+  "tailwindCSS.experimental.classRegex": [
+    ["cn\\(([^)]*)\\)", "(?:'|\"|`)([^']*)(?:'|\"|`)"],
+    ["cva\\(([^)]*)\\)", "[\"'`]([^\"'`]*).*?[\"'`]"]
+  ],
+  "css.validate": false,
+  "postcss.validate": false,
+  "typescript.preferences.includePackageJsonAutoImports": "off"
+}
+"@
+    Set-Content -Path $settingsFile -Value $settingsContent
+    Write-ColoredOutput "✅ Created VS Code settings for Tailwind CSS v4" "Green"
+    
+    # Check for and delete prohibited files
+    $prohibitedFiles = @(
+        "$frontendDir/tailwind.config.js",
+        "$frontendDir/tailwind.config.ts", 
+        "$frontendDir/postcss.config.js",
+        "$frontendDir/postcss.config.ts"
+    )
+    
+    foreach ($file in $prohibitedFiles) {
+        if (Test-Path $file) {
+            Remove-Item -Path $file -Force
+            Write-ColoredOutput "🗑️ Removed prohibited file: $file" "Yellow"
+        }
+    }
+    
+    # Update globals.css
+    $globalsFile = "$frontendDir/styles/globals.css"
+    if (!(Test-Path $globalsFile)) {
+        # Create styles directory if it doesn't exist
+        if (!(Test-Path "$frontendDir/styles")) {
+            New-Item -ItemType Directory -Path "$frontendDir/styles" -Force | Out-Null
+        }
+        
+        $globalsContent = @"
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --neon-cyan: #00FFFF;
+  --neon-pink: #FF00FF;
+  --casino-gold: #FFD700;
+  --background: #0a0a0f;
+}
+
+@theme inline {
+  --color-neon-cyan: var(--neon-cyan);
+  --color-neon-pink: var(--neon-pink);
+  --color-casino-gold: var(--casino-gold);
+  --color-background: var(--background);
+}
+"@
+        Set-Content -Path $globalsFile -Value $globalsContent
+        Write-ColoredOutput "✅ Created globals.css with Tailwind CSS v4 configuration" "Green"
+    } else {
+        # Backup the existing file
+        Copy-Item -Path $globalsFile -Destination "$globalsFile.bak"
+        Write-ColoredOutput "📋 Backed up existing globals.css" "Yellow"
+        
+        # Update globals.css to use @theme inline
+        $content = Get-Content -Path $globalsFile -Raw
+        if ($content -notmatch "@theme\s+inline") {
+            $updatedContent = @"
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --neon-cyan: #00FFFF;
+  --neon-pink: #FF00FF;
+  --casino-gold: #FFD700;
+  --background: #0a0a0f;
+}
+
+@theme inline {
+  --color-neon-cyan: var(--neon-cyan);
+  --color-neon-pink: var(--neon-pink);
+  --color-casino-gold: var(--casino-gold);
+  --color-background: var(--background);
+}
+"@
+            Set-Content -Path $globalsFile -Value $updatedContent
+            Write-ColoredOutput "✅ Updated globals.css with Tailwind CSS v4 configuration" "Green"
+        } else {
+            Write-ColoredOutput "✅ globals.css already has @theme inline directive" "Green"
+        }
+    }
+    
+    # Create utils.ts with cn function if it doesn't exist
+    $utilsFile = "$frontendDir/components/ui/utils.ts"
+    if (!(Test-Path $utilsFile)) {
+        # Create components/ui directory if it doesn't exist
+        if (!(Test-Path "$frontendDir/components/ui")) {
+            New-Item -ItemType Directory -Path "$frontendDir/components/ui" -Force | Out-Null
+        }
+        
+        $utilsContent = @"
+import { twMerge } from 'tailwind-merge'
+import { clsx, type ClassValue } from 'clsx'
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs))
+}
+"@
+        Set-Content -Path $utilsFile -Value $utilsContent
+        Write-ColoredOutput "✅ Created utils.ts with cn function for Tailwind CSS v4" "Green"
+    }
+    
+    # Install required npm packages for Tailwind CSS v4
+    Push-Location $frontendDir
+    Write-ColoredOutput "📦 Installing required npm packages..." "Yellow"
+    npm install tailwindcss clsx tailwind-merge
+    Pop-Location
+    
+    Write-ColoredOutput "`n🎉 Frontend setup complete for local development with Tailwind CSS v4!" "Green"
+    Write-ColoredOutput "🔖 Key points to remember:" "Cyan"
+    Write-ColoredOutput "  1. No tailwind.config.js or postcss.config.js files allowed" "Yellow"
+    Write-ColoredOutput "  2. Use relative imports, not @/ imports" "Yellow"
+    Write-ColoredOutput "  3. Use cn() function from ./components/ui/utils.ts for class names" "Yellow"
+    Write-ColoredOutput "  4. CSS variables and theme defined in globals.css" "Yellow"
+    Write-ColoredOutput "`n🚀 Next steps:" "Cyan"
+    Write-ColoredOutput "  1. cd cc-webapp/frontend" "White"
+    Write-ColoredOutput "  2. npm run dev" "White"
+}
+
 # Main execution logic
 switch ($Command.ToLower()) {
     "help" { Show-Help }
     "check" { Check-Environment }
     "setup" { Setup-Environment }
+    "setup-frontend" { Setup-FrontendLocal }
     "start" { Start-Services }
     "stop" { Stop-Services }
     "restart" { Restart-Services }
