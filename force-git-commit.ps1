@@ -1,4 +1,8 @@
-#!/usr/bin/env pwsh
+git push -f origin main
+
+git push -f origin maingit add --all
+git commit -m "feat: Force commit all frontend changes"
+git push -f origin main#!/usr/bin/env pwsh
 # Casino-Club F2P - Force Git Commit Script
 # Created: 2025-08-04
 
@@ -9,7 +13,7 @@ $repoRoot = "c:\Users\bdbd\0000"
 
 # 새 파일 및 모든 변경사항 추가
 Write-Host "`n1️⃣ 모든 파일 추적 및 변경사항 스테이징 중..." -ForegroundColor Yellow
-git add -A
+git add --all
 
 # 커밋 메시지 생성
 $timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
@@ -18,7 +22,7 @@ $commitMessage = "feat: Integrate frontend code with complete functionality and 
 # 커밋 실행
 Write-Host "`n2️⃣ 변경사항 커밋 중..." -ForegroundColor Yellow
 Write-Host "커밋 메시지: $commitMessage" -ForegroundColor White
-git commit -m $commitMessage
+git commit -m "feat: Force commit all frontend changes"
 
 # 원격 저장소로 푸시 (선택 사항)
 Write-Host "`n3️⃣ 원격 저장소로 푸시하시겠습니까? (Y/N)" -ForegroundColor Yellow
