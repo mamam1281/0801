@@ -1,0 +1,40 @@
+{
+  "EN": {
+    "SUCCESS_HIGH_JOY_GENERAL": [
+      {"text": "Fantastic job! Your positive energy is contagious!", "animation": "confetti"},
+      {"text": "Wow, you're on a roll! Keep up the amazing work!", "animation": "star_burst"}
+    ],
+    "SUCCESS_NEUTRAL_GENERAL": [
+      {"text": "Good work. Your efforts are paying off.", "animation": "gentle_glow"}
+    ],
+    "FAILURE_LOW_SADNESS_GENERAL": [
+      {"text": "It's okay, setbacks happen. Take a moment and try again when you're ready.", "animation": "calm_breathing"},
+      {"text": "Don't be discouraged. Every attempt is a step forward.", "animation": "gentle_ripple"}
+    ],
+    "NEW_USER_NEUTRAL_WELCOME": [
+      {"text": "Welcome! We're excited to have you here. Explore and have fun!", "animation": "wave"}
+    ],
+    "NEUTRAL_NEUTRAL_GENERAL": [
+      {"text": "Thanks for sharing. How can I help you further?", "animation": "thinking"}
+    ]
+  },
+  "KO": {
+    "SUCCESS_HIGH_JOY_GENERAL": [
+      {"text": "정말 대단해요! 당신의 긍정적인 에너지가 넘쳐요!", "animation": "confetti"},
+      {"text": "와, 상승세네요! 계속해서 멋진 모습 보여주세요!", "animation": "star_burst"}
+    ],
+    "SUCCESS_NEUTRAL_GENERAL": [
+      {"text": "잘 하셨습니다. 노력이 결실을 맺고 있네요.", "animation": "gentle_glow"}
+    ],
+    "FAILURE_LOW_SADNESS_GENERAL": [
+      {"text": "괜찮아요, 실패는 있을 수 있어요. 잠시 쉬었다가 준비되면 다시 도전해 보세요.", "animation": "calm_breathing"},
+      {"text": "낙담하지 마세요. 모든 시도가 한 걸음 나아가는 과정이에요.", "animation": "gentle_ripple"}
+    ],
+    "NEW_USER_NEUTRAL_WELCOME": [
+      {"text": "환영합니다! 함께하게 되어 기쁩니다. 즐겁게 둘러보세요!", "animation": "wave"}
+    ],
+    "NEUTRAL_NEUTRAL_GENERAL": [
+      {"text": "알겠습니다. 무엇을 도와드릴까요?", "animation": "thinking"}
+    ]
+  }
+}
