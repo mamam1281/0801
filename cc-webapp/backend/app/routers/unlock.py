@@ -11,7 +11,7 @@ from ..database import get_db
 from ..services.user_service import UserService
 
 logger = logging.getLogger(__name__)
-router = APIRouter()
+router = APIRouter(prefix="/api/unlock", tags=["Unlock"])
 
 # --- Configuration ---
 MAX_UNLOCK_STAGE = 3 # Define this based on your content stages. Consider making it configurable.

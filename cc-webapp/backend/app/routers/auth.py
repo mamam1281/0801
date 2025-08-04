@@ -27,7 +27,7 @@ oauth2_scheme = HTTPBearer()
 JWT_EXPIRE_MINUTES = settings.jwt_expire_minutes
 INITIAL_CYBER_TOKENS = getattr(settings, 'initial_cyber_tokens', 200)
 
-router = APIRouter(tags=["authentication"])
+router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 
 @router.post("/signup", response_model=Token)
 async def signup(

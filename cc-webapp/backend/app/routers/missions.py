@@ -7,8 +7,8 @@ from ..database import get_db
 # from .auth import get_current_user # Assuming an auth dependency
 
 router = APIRouter(
-    prefix="/missions",
-    tags=["missions"],
+    prefix="/api/missions",
+    tags=["Missions"],
 )
 
 def get_mission_service(db = Depends(get_db)) -> MissionService:

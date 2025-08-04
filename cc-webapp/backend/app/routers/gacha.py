@@ -11,7 +11,7 @@ from ..database import get_db # Original get_db from database.py
 from pydantic import BaseModel, ConfigDict
 
 logger = logging.getLogger(__name__)
-router = APIRouter()
+router = APIRouter(prefix="/api/gacha", tags=["Gacha"])
 
 
 def get_service() -> GachaService:

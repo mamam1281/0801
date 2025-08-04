@@ -6,7 +6,7 @@ from datetime import datetime
 from .. import models
 from ..database import get_db
 
-router = APIRouter()
+router = APIRouter(prefix="/api/shop", tags=["Shop"])
 
 class ShopPurchaseRequest(BaseModel):
     user_id: int

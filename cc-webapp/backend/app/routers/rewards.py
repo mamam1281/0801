@@ -11,7 +11,7 @@ from .. import models  # This should import UserReward and User
 from ..database import get_db
 from ..services.user_service import UserService
 
-router = APIRouter()
+router = APIRouter(prefix="/api/rewards", tags=["Rewards"])
 
 from ..services.reward_service import RewardService
 

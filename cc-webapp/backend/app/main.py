@@ -36,7 +36,7 @@ from app.routers import (
     missions,
     quiz,        # Quiz system enabled
     dashboard,
-    prize_roulette,
+    # prize_roulette,  # ARCHIVED - 룰렛 기능 제거
     rps,
     notifications,
     doc_titles,  # Phase 1 added
@@ -45,15 +45,15 @@ from app.routers import (
     game_api,    # Phase 4 added
     invite_router,  # Phase 5 added
     analyze,     # Phase 6 added
-    roulette,    # Phase 7 added
+    # roulette,    # ARCHIVED - 룰렛 기능 제거
     segments,    # Phase 8 added
     tracking,    # Phase 9 added
     unlock,      # Phase 10 added
     chat,        # Chat system added
+    ai_router,   # AI recommendation system
 )
 
-# AI recommendation system router separate import
-from app.routers import ai_router
+# AI recommendation system router separate import (removed duplicate)
 
 # Scheduler setup
 class _DummyScheduler:
@@ -133,68 +133,60 @@ app.add_middleware(
 
 # ===== Core API Router Registration =====
 
-app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
-app.include_router(users.router, prefix="/api/users", tags=["Users"])
-app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
-app.include_router(actions.router, prefix="/api/actions", tags=["Game Actions"])
-app.include_router(gacha.router, prefix="/api/gacha", tags=["Gacha"])
-app.include_router(rewards.router, prefix="/api/rewards", tags=["Rewards"])
-app.include_router(shop.router, prefix="/api/shop", tags=["Shop"])
-app.include_router(missions.router, prefix="/api/missions", tags=["Missions"])
-# Newly added major features
-app.include_router(quiz.router, prefix="/api/quiz", tags=["Quiz"])  # Quiz system
-app.include_router(chat.router, prefix="/api/chat", tags=["Chat"])  # Chat system
-app.include_router(ai_router.router, prefix="/api/ai", tags=["AI Recommendation"])  # AI recommendation
+# Authentication & User Management (no prefix - routers have their own)
+app.include_router(auth.router, tags=["Authentication"])
+app.include_router(users.router, tags=["Users"])  
+app.include_router(admin.router, tags=["Admin"])
 
-app.include_router(dashboard.router, prefix="/api/dashboard", tags=["Dashboard"])
-app.include_router(prize_roulette.router, prefix="/api/games/roulette", tags=["Prize Roulette"])
-app.include_router(rps.router, prefix="/api/games/rps", tags=["Rock Paper Scissors"])
-app.include_router(notifications.router, prefix="/ws", tags=["Real-time Notifications"])
+# Core Game Systems (no prefix - routers have their own)
+app.include_router(actions.router, tags=["Game Actions"])
+app.include_router(gacha.router, tags=["Gacha"])
+app.include_router(rewards.router, tags=["Rewards"])
+app.include_router(shop.router, tags=["Shop"])
+app.include_router(missions.router, tags=["Missions"])
 
-# ===== Progressive Expansion - Phase 1 =====
-app.include_router(doc_titles.router, prefix="/api/doc-titles", tags=["Document Titles"])
+# Interactive Features (no prefix - routers have their own)
+app.include_router(quiz.router, tags=["Quiz"])
+app.include_router(chat.router, tags=["Chat"])
+app.include_router(ai_router.router, tags=["AI Recommendation"])
 
-# ===== Progressive Expansion - Phase 2 =====
-app.include_router(feedback.router, prefix="/api/feedback", tags=["Feedback"])
+# Management & Monitoring (no prefix - routers have their own)
+app.include_router(dashboard.router, tags=["Dashboard"])
+app.include_router(notifications.router, tags=["Real-time Notifications"])
 
-# ===== Progressive Expansion - Phase 3 =====
-app.include_router(games.router, prefix="/api/games", tags=["Games"])
+# Individual Games (no prefix - routers have their own)
+app.include_router(rps.router, tags=["Rock Paper Scissors"])# ===== Progressive Expansion - Additional Features =====
 
-# ===== Progressive Expansion - Phase 4 =====
-app.include_router(game_api.router, prefix="/api/game-api", tags=["Game API"])
+# Phase 1: Documentation & Content (no prefix - routers have their own)
+app.include_router(doc_titles.router, tags=["Document Titles"])
 
-# ===== Progressive Expansion - Phase 5 =====
-app.include_router(invite_router.router, prefix="/api/invites", tags=["Invite Codes"])
+# Phase 2: Feedback System (no prefix - routers have their own)  
+app.include_router(feedback.router, tags=["Feedback"])
 
-# ===== Progressive Expansion - Phase 6 =====
-app.include_router(analyze.router, prefix="/api/analyze", tags=["Analytics"])
+# Phase 3: Game Collection (no prefix - routers have their own)
+app.include_router(games.router, tags=["Game Collection"])
 
-# ===== Progressive Expansion - Phase 7 =====
-app.include_router(roulette.router, prefix="/api/roulette", tags=["Roulette"])
+# Phase 4: Unified Game API (no prefix - routers have their own)
+app.include_router(game_api.router, tags=["Game API"])
 
-# ===== Progressive Expansion - Phase 8 =====
-app.include_router(segments.router, prefix="/api/segments", tags=["Segments"])
+# Phase 5: Invite System (no prefix - routers have their own)
+app.include_router(invite_router.router, tags=["Invite Codes"])
 
-# ===== Progressive Expansion - Phase 9 =====
-app.include_router(tracking.router, prefix="/api/tracking", tags=["Tracking"])
+# Phase 6: Analytics (no prefix - routers have their own)
+app.include_router(analyze.router, tags=["Analytics"])
 
-# ===== Progressive Expansion - Phase 10 =====
-app.include_router(unlock.router, prefix="/api/unlock", tags=["Unlock"])
+# Phase 8: User Segmentation (no prefix - routers have their own)  
+app.include_router(segments.router, tags=["Segments"])
 
-# ===== New AI & Chat Systems =====
-# AI recommendation system
-app.include_router(ai_router.router, prefix="/api/ai", tags=["AI Recommendations"])
+# Phase 9: User Tracking (no prefix - routers have their own)
+app.include_router(tracking.router, tags=["Tracking"])
 
-# Quiz system (extended)
-from app.routers import quiz_router
-app.include_router(quiz_router.router, prefix="/api/quiz", tags=["Quiz System"])
+# Phase 10: Unlock System (no prefix - routers have their own)
+app.include_router(unlock.router, tags=["Unlock"])
 
-# Chat system
-from app.routers import chat_router
-app.include_router(chat_router.router, prefix="/api/chat", tags=["Chat System"])
-
-print("✅ Core API endpoints registered + Progressive Expansion Phase 1-10 Complete")
-print("✅ New AI Recommendation, Quiz & Chat Systems registered")
+print("✅ Core API endpoints registered")
+print("✅ Progressive Expansion features registered") 
+print("✅ No duplicate API registrations - Clean structure maintained")
 
 # ===== Core API Endpoints =====
 

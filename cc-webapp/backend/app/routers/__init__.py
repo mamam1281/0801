@@ -14,7 +14,7 @@ from . import shop  # Shop transaction API
 from . import missions  # Mission system API
 from . import quiz  # Quiz system API
 from . import dashboard  # Dashboard API
-from . import prize_roulette  # Prize roulette API
+# from . import prize_roulette  # ARCHIVED - Prize roulette API
 from . import rps  # Rock Paper Scissors API
 from . import notifications  # Notification API
 
@@ -25,7 +25,7 @@ from . import games  # Phase 3: Game collection
 from . import game_api  # Phase 4: Unified game API
 from . import invite_router  # Phase 5: Invite code system
 from . import analyze  # Phase 6: Analytics API
-from . import roulette  # Phase 7: Roulette API
+# from . import roulette  # ARCHIVED - Phase 7: Roulette API
 from . import segments  # Phase 8: User segmentation
 from . import tracking  # Phase 9: User tracking
 from . import unlock  # Phase 10: Content unlock system

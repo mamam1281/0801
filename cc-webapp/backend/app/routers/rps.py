@@ -6,7 +6,7 @@ from typing import Literal
 from ..services.rps_service import RPSService, RPSResult
 from ..database import get_db
 
-router = APIRouter()
+router = APIRouter(prefix="/api/games/rps", tags=["Rock Paper Scissors"])
 
 class RPSPlayRequest(BaseModel):
     user_choice: Literal["rock", "paper", "scissors"]

@@ -9,7 +9,7 @@ except ImportError:  # In case library is not installed during lightweight tests
 # from .. import models, schemas, database # Assuming these exist and will be used later
 from datetime import datetime
 
-router = APIRouter()
+router = APIRouter(prefix="/api/actions", tags=["Game Actions"])
 
 # Kafka Producer Configuration
 KAFKA_BROKER = os.getenv("KAFKA_BROKER", "localhost:9092")

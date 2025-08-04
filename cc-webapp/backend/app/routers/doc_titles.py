@@ -2,7 +2,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException
 import re
 
-router = APIRouter()
+router = APIRouter(prefix="/api/doc-titles", tags=["Document Titles"])
 
 @router.get("/docs/titles", response_model=list)
 def get_docs_titles():
