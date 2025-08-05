@@ -74,7 +74,7 @@ export default function ProfileContainer({ className = '' }: ProfileContainerPro
 
   const handleVisitSite = () => {
     console.log('Visiting main site...');
-    window.open('https://casinoclub.com', '_blank');
+    window.open('https://md-01.com', '_blank');
   };
 
   return (

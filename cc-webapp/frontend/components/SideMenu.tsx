@@ -42,7 +42,7 @@ export function SideMenu({
   onAddNotification
 }: SideMenuProps) {
   const handleExternalLink = () => {
-    window.open('https://local.com', '_blank');
+    window.open('https://md-01.com', '_blank');
     onAddNotification('🌟 프리미엄 모델 페이지로 이동합니다!');
     onClose();
   };

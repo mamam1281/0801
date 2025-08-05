@@ -293,7 +293,7 @@ export function SettingsScreen({ user, onBack, onUpdateUser, onAddNotification }
               
               <Button 
                 onClick={() => {
-                  window.open('https://local.com', '_blank');
+                  window.open('https://md-01.com', '_blank');
                   onAddNotification('🌟 프리미엄 모델 페이지로 이동합니다!');
                 }}
                 className="bg-gradient-to-r from-gold to-gold-light text-black font-bold px-8 py-4 text-lg btn-hover-lift relative overflow-hidden"

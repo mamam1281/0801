@@ -51,5 +51,5 @@ export const createGameNavigator = (
 
 // 🌐 외부 링크 네비게이션
 export const handleModelNavigation = () => {
-  window.open('https://local.com', '_blank');
+  window.open('https://md-01.com', '_blank');
 };

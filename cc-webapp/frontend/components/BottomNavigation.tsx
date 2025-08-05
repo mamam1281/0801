@@ -22,7 +22,7 @@ interface BottomNavigationProps {
 export function BottomNavigation({ currentScreen, onNavigate, user }: BottomNavigationProps) {
   const handleModelNavigation = () => {
     // 본사 사이트로 리다이렉트
-    window.open('https://local.com', '_blank');
+    window.open('https://md-01.com', '_blank');
   };
 
   const navItems = [

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Gamepad2, Zap, Star, Crown, Sparkles } from 'lucide-react';
 import dynamic from 'next/dynamic';
@@ -11,37 +11,25 @@ interface LoadingScreenProps {
   gameTitle?: string;
 }
 
+// LoadingScreen 컴포넌트 정의
 function LoadingScreenComponent({
   onComplete,
   duration = 3000,
   gameTitle = 'NEON QUEST',
 }: LoadingScreenProps) {
+  // ⭐ 모든 state 훅을 최상단에 배치 (순서 중요)
   const [progress, setProgress] = useState(0);
   const [currentStep, setCurrentStep] = useState(0);
   const [isComplete, setIsComplete] = useState(false);
-  const [windowDimensions, setWindowDimensions] = useState({ width: 1000, height: 800 });
   const [isMobile, setIsMobile] = useState(false);
 
-  // 클라이언트 사이드에서만 window 크기를 가져오기
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      // 초기 화면 크기 설정 및 모바일 여부 확인
-      const updateDimensions = () => {
-        const width = window.innerWidth;
-        const height = window.innerHeight;
-        setWindowDimensions({ width, height });
-        setIsMobile(width < 640); // 640px 미만은 모바일로 간주
-      };
+  // ⭐ window 객체 접근 시 조건부 로직 사용
+  const [windowDimensions, setWindowDimensions] = useState({
+    width: typeof window !== 'undefined' ? window.innerWidth : 0,
+    height: typeof window !== 'undefined' ? window.innerHeight : 0,
+  });
 
-      // 초기 실행
-      updateDimensions();
-
-      // 화면 크기 변경 이벤트 리스너
-      window.addEventListener('resize', updateDimensions);
-      return () => window.removeEventListener('resize', updateDimensions);
-    }
-  }, []);
-
+  // ⭐ loadingSteps를 컴포넌트 내부로 이동하고 아이콘 정보 추가
   const loadingSteps = [
     { text: '초기화 중...', icon: Gamepad2 },
     { text: '게임 엔진 로딩...', icon: Zap },
@@ -49,72 +37,76 @@ function LoadingScreenComponent({
     { text: '최종 준비 완료!', icon: Crown },
   ];
 
-  // 모바일에서는 애니메이션 요소 수 줄이기
-  const particleCount = isMobile ? 10 : 20;
-
-  // 진행도 업데이트를 위한 useEffect - 초기에 단 한 번만 설정
+  // 모바일 디바이스 감지
   useEffect(() => {
-    // 클라이언트 사이드에서만 실행
-    if (typeof window === 'undefined') return;
+    if (typeof window !== 'undefined') {
+      const checkMobile = () => {
+        setIsMobile(window.innerWidth < 640);
+        setWindowDimensions({
+          width: window.innerWidth,
+          height: window.innerHeight,
+        });
+      };
 
+      // 초기 체크
+      checkMobile();
+
+      // 리사이즈 이벤트 리스너
+      window.addEventListener('resize', checkMobile);
+
+      // 클린업
+      return () => window.removeEventListener('resize', checkMobile);
+    }
+  }, []); // 빈 의존성 배열
+
+  // 로딩 진행 처리
+  useEffect(() => {
     let isMounted = true;
-    // 모바일에서는 더 큰 단계로 빠르게 증가
-    let progressStep = isMobile ? 3 : 2;
 
-    // 진행률 업데이트를 위한 타이머 설정
-    const timer = setTimeout(
-      () => {
-        // 모바일에서는 업데이트 주기를 더 길게 하여 성능 최적화
-        const interval = setInterval(
-          () => {
-            if (!isMounted) return;
+    // 진행바 업데이트
+    const interval = setInterval(() => {
+      if (isMounted && progress < 100) {
+        setProgress((prev) => {
+          const newProgress = Math.min(prev + 1, 100);
 
-            setProgress((prev) => {
-              const newProgress = prev + progressStep;
-              if (newProgress >= 100) {
-                clearInterval(interval);
-                return 100;
+          // 단계 업데이트
+          if (newProgress >= 25 && currentStep < 1) setCurrentStep(1);
+          else if (newProgress >= 60 && currentStep < 2) setCurrentStep(2);
+          else if (newProgress >= 90 && currentStep < 3) setCurrentStep(3);
+
+          // 완료 처리
+          if (newProgress === 100) {
+            setTimeout(() => {
+              if (isMounted) {
+                setIsComplete(true);
+                if (onComplete) onComplete();
               }
-              return newProgress;
-            });
-          },
-          isMobile ? duration / 40 : duration / 50
-        );
+            }, 500);
+          }
 
-        // 클린업 함수
-        return () => {
-          isMounted = false;
-          clearInterval(interval);
-        };
-      },
-      isMobile ? 50 : 10
-    ); // 모바일에서는 지연 시간 더 길게
+          return newProgress;
+        });
+      }
+    }, duration / 100); // 진행 속도 조정
 
+    // 클린업 함수
     return () => {
-      clearTimeout(timer);
+      clearInterval(interval);
       isMounted = false;
     };
-  }, [isMobile, duration]); // 의존성 배열에 사용되는 변수들을 추가
+  }, [progress, currentStep, duration, onComplete]); // ⭐ 모든 의존성 명시적 추가
 
-  // 진행률에 따른 단계 업데이트와 완료 처리
-  useEffect(() => {
-    // 진행률에 따른 단계 업데이트
-    const stepIndex = Math.floor((progress / 100) * loadingSteps.length);
-    setCurrentStep(Math.min(stepIndex, loadingSteps.length - 1));
+  // ⭐ 애니메이션 효과 설정 (useMemo 대신 일반 변수로 전환)
+  const particleCount = isMobile ? 10 : 20;
+  const particles = Array.from({ length: particleCount }).map((_, i) => ({
+    id: i,
+    x: Math.random() * 100,
+    y: Math.random() * 100,
+    size: Math.random() * 4 + 1,
+    duration: Math.random() * 20 + 10,
+  }));
 
-    // 로딩이 완료되면 콜백 실행
-    if (progress >= 100) {
-      const timer = setTimeout(() => {
-        setIsComplete(true);
-        const completeTimer = setTimeout(() => {
-          if (onComplete) onComplete();
-        }, 500);
-        return () => clearTimeout(completeTimer);
-      }, 500);
-      return () => clearTimeout(timer);
-    }
-  }, [progress, loadingSteps.length, onComplete]);
-
+  // 컴포넌트 렌더링
   return (
     <AnimatePresence>
       {!isComplete && (
@@ -130,22 +122,10 @@ function LoadingScreenComponent({
             {[...Array(particleCount)].map((_, i) => {
               // 클라이언트에서만 랜덤값 사용, 서버에서는 고정된 시드값 사용
               // useClientOnlyValue를 직접 사용하는 대신 useMemo로 계산
-              const randomPos = useMemo(() => {
-                if (typeof window === 'undefined') {
-                  // 서버 사이드 렌더링에서는 고정된 값 사용
-                  return {
-                    x: 50 + ((i * 30) % 800),
-                    y: 50 + ((i * 25) % 600),
-                  };
-                } else {
-                  // 클라이언트 사이드에서는 뷰포트에 맞는 랜덤값 사용
-                  // 뷰포트를 약간 넘어가도록 설정하여 화면 끝에서도 효과가 보이도록 함
-                  return {
-                    x: Math.random() * (windowDimensions.width + 100) - 50,
-                    y: Math.random() * (windowDimensions.height + 100) - 50,
-                  };
-                }
-              }, [windowDimensions.width, windowDimensions.height]);
+              const randomPos = {
+                x: Math.random() * (windowDimensions.width + 100) - 50,
+                y: Math.random() * (windowDimensions.height + 100) - 50,
+              };
 
               return (
                 <motion.div
@@ -358,9 +338,10 @@ function LoadingScreenComponent({
   );
 }
 
-// 클라이언트 사이드에서만 로딩화면을 렌더링하기 위해 next/dynamic을 사용
+// 동적 임포트를 위한 컴포넌트 - ssr: false로 클라이언트에서만 렌더링
 const LoadingScreen = dynamic(() => Promise.resolve(LoadingScreenComponent), {
   ssr: false,
 });
 
+// 단일 export 사용 (중복 export 제거)
 export { LoadingScreen };

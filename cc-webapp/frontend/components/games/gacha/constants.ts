@@ -1,5 +1,5 @@
 import { GameItem } from '../../../types';
-import { GachaItem, GachaBanner } from '../../../types/gacha';
+import { GachaBanner, GachaItem } from '../../../types/gacha';
 
 // 키치하고 섹시한 가챠 아이템들
 export const GACHA_ITEMS: GachaItem[] = [
@@ -30,13 +30,16 @@ export const GACHA_ITEMS: GachaItem[] = [
 ];
 
 // 키치하고 섹시한 가챠 배너들
-export const GACHA_BANNERS = [
+export const GACHA_BANNERS: GachaBanner[] = [
   {
     id: 'standard',
     name: '스탠다드 가챠',
     description: '일반적인 아이템을 얻을 수 있는 가챠입니다.',
+    cost: 1000,
     price: 1000,
     image: '/images/gacha/standard-banner.jpg',
+    theme: '기본 컬렉션',
+    featuredItems: [/* 아이템 배열 */]
   },
   {
     id: 'kawaii',
@@ -113,7 +116,7 @@ export const ANIMATION_DURATIONS = {
   heartFloat: 8000
 };
 
-export const SEXY_EMOJIS = ['💋', '💖', '✨', '🌟', '💅', '👠', '💎', '🔥'];
+export const SEXY_EMOJIS = ['💋', '💖', '👄', '💅', '💕', '💘', '💗', '💓', '👙', '💃', '👠', '✨'];
 
 export const BANNER_GRADIENTS = {
   kawaii: 'linear-gradient(135deg, rgba(236, 72, 153, 0.3), rgba(236, 72, 153, 0.4), rgba(219, 39, 119, 0.5))',

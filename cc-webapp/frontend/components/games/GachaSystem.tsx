@@ -69,6 +69,34 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
     return () => clearInterval(interval);
   }, []);
 
+  // 컴포넌트 마운트 시 실행되는 초기화 함수
+  useEffect(() => {
+    // User 객체의 gameStats.gacha 초기화
+    if (!user.gameStats.gacha || 
+        user.gameStats.gacha.pulls === undefined ||
+        user.gameStats.gacha.totalSpent === undefined ||
+        user.gameStats.gacha.epicCount === undefined ||
+        user.gameStats.gacha.legendaryCount === undefined) {
+      
+      onUpdateUser({
+        ...user,
+        gameStats: {
+          ...user.gameStats,
+          gacha: {
+            totalPulls: user.gameStats.gacha?.totalPulls || 0,
+            legendaryPulls: user.gameStats.gacha?.legendaryPulls || 0,
+            totalValue: user.gameStats.gacha?.totalValue || 0,
+            // 누락된 필드 초기화
+            pulls: [],
+            totalSpent: 0,
+            epicCount: 0,
+            legendaryCount: 0
+          }
+        }
+      });
+    }
+  }, []);
+
   // Perform single pull
   const performSinglePull = async () => {
     if (user.goldBalance < selectedBanner.cost) {

@@ -1,43 +1,49 @@
 import { User } from '../../../types';  // App.tsx가 아닌 types에서 import
 import { GachaItem } from '../../../types/gacha';
+import { ANIMATION_DURATIONS, SEXY_EMOJIS } from './constants';
 
-export interface Particle {
-  id: string;
-  x: number;
-  y: number;
-  color: string;
-  size: number;
+/**
+ * 반짝이는 효과를 위한 랜덤 위치의 요소들 생성
+ * @param count 생성할 반짝임 효과 개수
+ * @returns 반짝임 효과 배열
+ */
+export function generateSparkles(count = 5) {
+  return Array.from({ length: count }).map((_, index) => ({
+    id: `sparkle-${index}`,
+    size: Math.random() * 10 + 5, // 5-15px
+    left: `${Math.random() * 100}%`,
+    top: `${Math.random() * 100}%`,
+    animationDelay: `${Math.random() * 2}s`,
+    emoji: SEXY_EMOJIS[Math.floor(Math.random() * SEXY_EMOJIS.length)],
+  }));
 }
 
-export interface HeartParticle {
-  id: string;
-  x: number;
-  y: number;
+/**
+ * 애니메이션 딜레이 계산 (순차적 애니메이션 효과용)
+ * @param index 요소의 인덱스
+ * @param baseDelay 기본 딜레이 값 (초)
+ * @param stagger 요소 간 간격 (초)
+ * @returns 계산된 딜레이 값
+ */
+export function getAnimationDelay(index: number, baseDelay = 0, stagger = 0.1) {
+  return baseDelay + index * stagger;
 }
 
-// 고유 ID 생성기
-let idCounter = 0;
-const generateUniqueId = (prefix: string): string => {
-  return `${prefix}-${Date.now()}-${++idCounter}-${Math.random().toString(36).substr(2, 9)}`;
-};
-
-// Generate particles based on rarity
-export const generateParticles = (rarity: string): Particle[] => {
-  const colors = {
-    common: ['#ec4899', '#f472b6'],
-    rare: ['#8b5cf6', '#a78bfa'],
-    epic: ['#f59e0b', '#fbbf24'],
-    legendary: ['#ef4444', '#f87171'],
-    mythic: ['#22d3ee', '#67e8f9', '#ffd700']
-  };
-  
-  const particleCount = rarity === 'mythic' ? 30 : rarity === 'legendary' ? 20 : 15;
-  return Array.from({ length: particleCount }, (_, i) => ({
-    id: generateUniqueId(`particle-${rarity}`),
-    x: Math.random() * 100,
-    y: Math.random() * 100,
-    color: colors[rarity as keyof typeof colors]?.[Math.floor(Math.random() * colors[rarity as keyof typeof colors].length)] || '#ec4899',
-    size: rarity === 'mythic' ? 6 : rarity === 'legendary' ? 4 : 3
+/**
+ * 가챠 결과에 따른 파티클 효과 생성
+ * @param rarity 아이템 희귀도
+ * @param count 생성할 파티클 개수
+ * @returns 파티클 효과 배열
+ */
+export function generateParticles(rarity: string, count = 20) {
+  return Array.from({ length: count }).map((_, index) => ({
+    id: `particle-${index}`,
+    size: Math.random() * 15 + 5,
+    left: `${Math.random() * 100}%`,
+    top: `${Math.random() * 100}%`,
+    animationDuration: `${Math.random() * 2 + 1}s`,
+    animationDelay: `${Math.random() * 0.5}s`,
+    rarity,
   }));
 };
 
@@ -47,16 +53,6 @@ export const generateHeartParticles = (): HeartParticle[] => {
     id: generateUniqueId('heart'),
     x: Math.random() * 100,
     y: Math.random() * 100
-  }));
-};
-
-// Generate sparkle effects for banners
-export const generateSparkles = (count: number = 8) => {
-  return Array.from({ length: count }, (_, i) => ({
-    id: generateUniqueId('sparkle'),
-    top: `${20 + (i * 10)}%`,
-    left: `${10 + (i * 12)}%`,
-    delay: i * 0.4
   }));
 };
 
@@ -167,10 +163,6 @@ export const getBannerStyle = (banner: GachaBanner, isSelected: boolean) => {
 };
 
 // Animation timing helpers
-export const getAnimationDelay = (index: number, baseDelay: number = 0.1): number => {
-  return baseDelay + (index * 0.1);
-};
-
 export const createAnimationSequence = async (steps: (() => Promise<void>)[]): Promise<void> => {
   for (const step of steps) {
     await step();

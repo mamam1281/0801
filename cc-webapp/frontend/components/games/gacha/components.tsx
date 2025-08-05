@@ -1,8 +1,8 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { User } from '../../../types';  // App.tsx가 아닌 types에서 import
-import { GachaItem } from '../../../types/gacha';
-import { RARITY_COLORS } from './constants';
+import { GachaBanner } from '../../../types/gacha';
+import { generateSparkles, generateParticles } from './utils';
 
 interface SexyBannerSelectorProps {
   banners: GachaBanner[];

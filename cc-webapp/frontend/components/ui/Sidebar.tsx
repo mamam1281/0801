@@ -25,6 +25,9 @@ import {
   TooltipTrigger,
 } from "./tooltip";
 
+// 타입 정의 추가
+type ComponentWithAsChild<T, P = {}> = React.ComponentProps<T> & { asChild?: boolean } & P;
+
 const SIDEBAR_COOKIE_NAME = "sidebar_state";
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
 const SIDEBAR_WIDTH = "16rem";
@@ -397,7 +400,7 @@ function SidebarGroupLabel({
   className,
   asChild = false,
   ...props
-}: React.ComponentProps<"div"> & { asChild?: boolean }) {
+}: ComponentWithAsChild<"div">) {
   const Comp = asChild ? Slot : "div";
 
   return (
@@ -418,7 +421,7 @@ function SidebarGroupAction({
   className,
   asChild = false,
   ...props
-}: React.ComponentProps<"button"> & { asChild?: boolean }) {
+}: ComponentWithAsChild<"button">) {
   const Comp = asChild ? Slot : "button";
 
   return (
@@ -503,8 +506,7 @@ function SidebarMenuButton({
   tooltip,
   className,
   ...props
-}: React.ComponentProps<"button"> & {
-  asChild?: boolean;
+}: ComponentWithAsChild<"button", {
   isActive?: boolean;
   tooltip?: string | React.ComponentProps<typeof TooltipContent>;
 } & VariantProps<typeof sidebarMenuButtonVariants>) {
@@ -550,10 +552,7 @@ function SidebarMenuAction({
   asChild = false,
   showOnHover = false,
   ...props
-}: React.ComponentProps<"button"> & {
-  asChild?: boolean;
-  showOnHover?: boolean;
-}) {
+}: ComponentWithAsChild<"button", { showOnHover?: boolean }>) {
   const Comp = asChild ? Slot : "button";
 
   return (
@@ -672,11 +671,10 @@ function SidebarMenuSubButton({
   isActive = false,
   className,
   ...props
-}: React.ComponentProps<"a"> & {
-  asChild?: boolean;
+}: ComponentWithAsChild<"a", {
   size?: "sm" | "md";
   isActive?: boolean;
-}) {
+}>) {
   const Comp = asChild ? Slot : "a";
 
   return (
