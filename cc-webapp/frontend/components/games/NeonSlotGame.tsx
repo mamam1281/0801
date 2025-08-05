@@ -78,15 +78,15 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
   
   // Jackpot calculation
   useEffect(() => {
-    setCurrentJackpot(50000 + (user.gameStats.slot.spins * 50));
-  }, [user.gameStats.slot.spins]);
+    setCurrentJackpot(50000 + user.gameStats.slot.totalSpins * 50);
+  }, [user.gameStats.slot.totalSpins]);
 
   // Auto spin logic
   useEffect(() => {
     if (isAutoSpinning && autoSpinCount > 0 && !isSpinning) {
       const timer = setTimeout(() => {
         handleSpin();
-        setAutoSpinCount(prev => prev - 1);
+        setAutoSpinCount((prev) => prev - 1);
       }, 1500);
       return () => clearTimeout(timer);
     } else if (autoSpinCount === 0) {
@@ -101,7 +101,7 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
       id: Date.now() + i,
       x: Math.random() * 100,
       y: Math.random() * 100,
-      type
+      type,
     }));
     setParticles(newParticles);
     setTimeout(() => setParticles([]), 3000);
@@ -111,8 +111,8 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
   const generateCoinDrops = useCallback(() => {
     const newCoins = Array.from({ length: 8 }, (_, i) => ({
       id: Date.now() + i,
-      x: 20 + (i * 10) + Math.random() * 5,
-      delay: i * 100
+      x: 20 + i * 10 + Math.random() * 5,
+      delay: i * 100,
     }));
     setCoinDrops(newCoins);
     setTimeout(() => setCoinDrops([]), 2000);
@@ -120,9 +120,10 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
 
   // Generate spinning reel symbols (for animation)
   const generateSpinningReels = (): SlotSymbol[][] => {
-    return Array.from({ length: 3 }, () => 
-      Array.from({ length: 20 }, () => 
-        SLOT_SYMBOLS[Math.floor(Math.random() * SLOT_SYMBOLS.length)]
+    return Array.from({ length: 3 }, () =>
+      Array.from(
+        { length: 20 },
+        () => SLOT_SYMBOLS[Math.floor(Math.random() * SLOT_SYMBOLS.length)]
       )
     );
   };
@@ -133,17 +134,17 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
       common: 50,
       rare: 30,
       epic: 15,
-      legendary: 5
+      legendary: 5,
     };
-    
+
     const totalWeight = Object.values(weights).reduce((sum, weight) => sum + weight, 0);
     let random = Math.random() * totalWeight;
-    
+
     for (const symbol of SLOT_SYMBOLS) {
       random -= weights[symbol.rarity];
       if (random <= 0) return symbol;
     }
-    
+
     return SLOT_SYMBOLS[0];
   };
 
@@ -151,26 +152,26 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
   const generateSpinResult = (): SpinResult => {
     const finalReels: SlotSymbol[] = [getRandomSymbol(), getRandomSymbol(), getRandomSymbol()];
     const spinningReelsData = generateSpinningReels();
-    
+
     // Ensure final symbols are at the end of each reel
     spinningReelsData.forEach((reel, index) => {
       reel[reel.length - 1] = finalReels[index];
     });
-    
+
     let totalWinAmount = 0;
     let hasWilds = false;
     let currentMultiplier = multiplier;
     const winPositions = [false, false, false];
 
     // Check for wilds
-    const wildCount = finalReels.filter(symbol => symbol.isWild).length;
+    const wildCount = finalReels.filter((symbol) => symbol.isWild).length;
     hasWilds = wildCount > 0;
 
     // Check for matching symbols
     let matchCount = 1;
     let matchingSymbol = finalReels[0];
     winPositions[0] = true;
-    
+
     // Count consecutive matches from left
     for (let i = 1; i < finalReels.length; i++) {
       if (finalReels[i].id === matchingSymbol.id || finalReels[i].isWild || matchingSymbol.isWild) {
@@ -183,13 +184,13 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
 
     // Calculate win only if 2 or more matches
     if (matchCount >= 2) {
-      const baseSymbol = finalReels.find(s => !s.isWild) || finalReels[0];
+      const baseSymbol = finalReels.find((s) => !s.isWild) || finalReels[0];
       totalWinAmount = betAmount * baseSymbol.value * matchCount;
-      
+
       // Wild multiplier
       if (hasWilds) {
-        currentMultiplier *= (1 + wildCount);
-        totalWinAmount *= (1 + wildCount);
+        currentMultiplier *= 1 + wildCount;
+        totalWinAmount *= 1 + wildCount;
       }
     } else {
       // Reset win positions if no win
@@ -197,7 +198,7 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
     }
 
     // Jackpot check (3 sevens or wilds)
-    const isJackpot = finalReels.every(symbol => symbol.id === 'seven' || symbol.isWild);
+    const isJackpot = finalReels.every((symbol) => symbol.id === 'seven' || symbol.isWild);
     if (isJackpot) {
       totalWinAmount = currentJackpot;
       winPositions.fill(true);
@@ -213,7 +214,7 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
       isBigWin,
       hasWilds,
       multiplier: currentMultiplier,
-      winningPositions: winPositions
+      winningPositions: winPositions,
     };
   };
 
@@ -247,12 +248,12 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
     // Stop reels one by one
     for (let i = 0; i < stopOrder.length; i++) {
       setTimeout(() => {
-        setReels(prev => {
+        setReels((prev) => {
           const newReels = [...prev];
           newReels[stopOrder[i]] = result.finalReels[stopOrder[i]];
           return newReels;
         });
-        setReelStopOrder(prev => [...prev, stopOrder[i]]);
+        setReelStopOrder((prev) => [...prev, stopOrder[i]]);
       }, reelStopTimes[i]);
     }
 
@@ -262,8 +263,8 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
         setIsWin(true);
         setWinAmount(result.winAmount);
         setWinningPositions(result.winningPositions);
-        setConsecutiveWins(prev => prev + 1);
-        
+        setConsecutiveWins((prev) => prev + 1);
+
         // Enhanced particle effects based on win type
         if (result.isJackpot) {
           generateParticles('jackpot');
@@ -272,9 +273,9 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
         } else {
           generateParticles('win');
         }
-        
+
         generateCoinDrops();
-        
+
         // Update user stats
         const updatedUser = {
           ...user,
@@ -283,20 +284,21 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
             ...user.gameStats,
             slot: {
               ...user.gameStats.slot,
-              totalSpins: user.gameStats.slot.totalSpins + 1,  // spins -> totalSpins
+              totalSpins: user.gameStats.slot.totalSpins + 1,
               totalWinnings: user.gameStats.slot.totalWinnings + result.winAmount,
               biggestWin: Math.max(user.gameStats.slot.biggestWin, result.winAmount),
-              jackpotHits: result.isJackpot ? user.gameStats.slot.jackpotHits + 1 : user.gameStats.slot.jackpotHits,  // jackpots -> jackpotHits
-              wins: user.gameStats.slot.wins + 1
-            }
+              jackpotHits: result.isJackpot
+                ? user.gameStats.slot.jackpotHits + 1
+                : user.gameStats.slot.jackpotHits,
+            },
           },
           stats: {
             ...user.stats,
             gamesPlayed: user.stats.gamesPlayed + 1,
             gamesWon: user.stats.gamesWon + 1,
             totalEarnings: user.stats.totalEarnings + (result.winAmount - costAmount),
-            winStreak: user.stats.winStreak + 1
-          }
+            winStreak: user.stats.winStreak + 1,
+          },
         };
 
         onUpdateUser(updatedUser);
@@ -310,7 +312,7 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
         }
       } else {
         setConsecutiveWins(0);
-        
+
         const updatedUser = {
           ...user,
           goldBalance: user.goldBalance - costAmount,
@@ -318,14 +320,14 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
             ...user.gameStats,
             slot: {
               ...user.gameStats.slot,
-              totalSpins: user.gameStats.slot.totalSpins + 1  // spins -> totalSpins
-            }
+              totalSpins: user.gameStats.slot.totalSpins + 1, // spins -> totalSpins
+            },
           },
           stats: {
             ...user.stats,
             gamesPlayed: user.stats.gamesPlayed + 1,
-            winStreak: 0
-          }
+            winStreak: 0,
+          },
         };
 
         onUpdateUser(updatedUser);
@@ -343,24 +345,26 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
         {particles.map((particle) => (
           <motion.div
             key={particle.id}
-            initial={{ 
+            initial={{
               opacity: 0,
               scale: 0,
               x: `${particle.x}vw`,
-              y: `${particle.y}vh`
+              y: `${particle.y}vh`,
             }}
-            animate={{ 
+            animate={{
               opacity: [0, 1, 0],
               scale: particle.type === 'jackpot' ? [0, 2, 0] : [0, 1.5, 0],
               y: `${particle.y - 20}vh`,
-              rotate: 360
+              rotate: 360,
             }}
             exit={{ opacity: 0 }}
-            transition={{ duration: particle.type === 'jackpot' ? 3 : 2, ease: "easeOut" }}
+            transition={{ duration: particle.type === 'jackpot' ? 3 : 2, ease: 'easeOut' }}
             className={`fixed w-4 h-4 rounded-full pointer-events-none z-30 ${
-              particle.type === 'jackpot' ? 'bg-gradient-gold' : 
-              particle.type === 'bigwin' ? 'bg-gradient-to-r from-primary to-gold' :
-              'bg-gradient-to-r from-primary to-primary-light'
+              particle.type === 'jackpot'
+                ? 'bg-gradient-gold'
+                : particle.type === 'bigwin'
+                  ? 'bg-gradient-to-r from-primary to-gold'
+                  : 'bg-gradient-to-r from-primary to-primary-light'
             }`}
           />
         ))}
@@ -371,22 +375,22 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
         {coinDrops.map((coin) => (
           <motion.div
             key={coin.id}
-            initial={{ 
+            initial={{
               opacity: 0,
               y: -50,
               x: `${coin.x}vw`,
-              rotate: 0
+              rotate: 0,
             }}
-            animate={{ 
+            animate={{
               opacity: [0, 1, 1, 0],
               y: 50,
-              rotate: 180
+              rotate: 180,
             }}
             exit={{ opacity: 0 }}
-            transition={{ 
-              duration: 1.5, 
+            transition={{
+              duration: 1.5,
               delay: coin.delay / 1000,
-              ease: "easeOut" 
+              ease: 'easeOut',
             }}
             className="fixed w-6 h-6 bg-gradient-gold rounded-full pointer-events-none z-30 flex items-center justify-center text-black text-xs font-bold"
           >
@@ -411,10 +415,8 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
               <ArrowLeft className="w-4 h-4 mr-2" />
               뒤로가기
             </Button>
-            
-            <h1 className="text-xl lg:text-2xl font-bold text-gradient-primary">
-              네온 슬롯
-            </h1>
+
+            <h1 className="text-xl lg:text-2xl font-bold text-gradient-primary">네온 슬롯</h1>
           </div>
 
           <div className="flex items-center gap-4">
@@ -426,7 +428,7 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
             >
               {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
             </Button>
-            
+
             <div className="glass-effect rounded-xl p-3 border border-gold/20">
               <div className="text-right">
                 <div className="text-sm text-muted-foreground">보유 골드</div>
@@ -479,8 +481,8 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
                 className="absolute inset-0 pointer-events-none z-10 rounded-3xl"
               >
                 <motion.div
-                  animate={{ 
-                    opacity: [0.3, 0.7, 0.3]
+                  animate={{
+                    opacity: [0.3, 0.7, 0.3],
                   }}
                   transition={{ duration: 1, repeat: Infinity }}
                   className="absolute inset-0 bg-gradient-to-r from-gold/10 via-transparent to-gold/10 rounded-3xl"
@@ -495,7 +497,9 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
               <div
                 key={index}
                 className={`aspect-square glass-effect rounded-2xl relative overflow-hidden ${
-                  winningPositions[index] ? 'border-2 border-gold soft-glow' : 'border border-border-secondary'
+                  winningPositions[index]
+                    ? 'border-2 border-gold soft-glow'
+                    : 'border border-border-secondary'
                 }`}
               >
                 {/* 🎰 개별 릴 회전 컨테이너 */}
@@ -507,19 +511,21 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
                         key={`spinning-${index}`}
                         initial={{ y: '100%' }}
                         animate={{ y: '-100%' }}
-                        transition={{ 
-                          duration: 0.1, 
-                          repeat: Infinity, 
-                          ease: "linear" 
+                        transition={{
+                          duration: 0.1,
+                          repeat: Infinity,
+                          ease: 'linear',
                         }}
                         className="absolute inset-0 flex flex-col justify-center"
                       >
                         {spinningReels[index]?.slice(0, 3).map((spinSymbol, spinIndex) => (
-                          <div 
+                          <div
                             key={`spin-${index}-${spinIndex}`}
                             className="h-full flex items-center justify-center reel-blur"
                           >
-                            <spinSymbol.icon className={`text-4xl lg:text-5xl ${spinSymbol.color}`} />
+                            <spinSymbol.icon
+                              className={`text-4xl lg:text-5xl ${spinSymbol.color}`}
+                            />
                           </div>
                         )) || []}
                       </motion.div>
@@ -530,20 +536,23 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
                   <motion.div
                     key={`final-${index}-${symbol.id}`}
                     animate={
-                      reelStopOrder.includes(index) ? {
-                        scale: [0.8, 1.2, 1],
-                        y: [30, -10, 0]
-                      } : 
-                      winningPositions[index] ? { 
-                        scale: [1, 1.2, 1],
-                        rotate: [0, 5, -5, 0]
-                      } : {}
+                      reelStopOrder.includes(index)
+                        ? {
+                            scale: [0.8, 1.2, 1],
+                            y: [30, -10, 0],
+                          }
+                        : winningPositions[index]
+                          ? {
+                              scale: [1, 1.2, 1],
+                              rotate: [0, 5, -5, 0],
+                            }
+                          : {}
                     }
-                    transition={{ 
-                      duration: winningPositions[index] ? 0.6 : 0.5, 
+                    transition={{
+                      duration: winningPositions[index] ? 0.6 : 0.5,
                       repeat: winningPositions[index] ? 3 : 0,
-                      type: "spring",
-                      stiffness: 300
+                      type: 'spring',
+                      stiffness: 300,
                     }}
                     className={`text-5xl lg:text-6xl ${symbol.color} z-20 relative ${
                       winningPositions[index] ? 'pulse-win' : ''
@@ -552,7 +561,7 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
                     <symbol.icon />
                   </motion.div>
                 </div>
-                
+
                 {/* Symbol name */}
                 <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 text-xs text-muted-foreground">
                   {symbol.name}
@@ -585,13 +594,13 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
                 className="text-center mb-6"
               >
                 <motion.div
-                  animate={{ 
+                  animate={{
                     scale: [1, 1.1, 1],
                     textShadow: [
-                      '0 0 10px rgba(255,215,0,0.3)', 
-                      '0 0 20px rgba(255,215,0,0.6)', 
-                      '0 0 10px rgba(255,215,0,0.3)'
-                    ]
+                      '0 0 10px rgba(255,215,0,0.3)',
+                      '0 0 20px rgba(255,215,0,0.6)',
+                      '0 0 10px rgba(255,215,0,0.3)',
+                    ],
                   }}
                   transition={{ duration: 0.8, repeat: 3 }}
                   className="text-4xl lg:text-5xl font-black text-gradient-gold mb-2"
@@ -602,9 +611,7 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
                   +{winAmount.toLocaleString()}G
                 </div>
                 {multiplier > 1 && (
-                  <div className="text-lg text-primary font-bold">
-                    {multiplier}x 멀티플라이어!
-                  </div>
+                  <div className="text-lg text-primary font-bold">{multiplier}x 멀티플라이어!</div>
                 )}
               </motion.div>
             )}
@@ -628,7 +635,7 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
                   {betAmount.toLocaleString()}G
                 </div>
               </div>
-              
+
               <div className="grid grid-cols-4 gap-2">
                 {[100, 500, 1000, 5000].map((amount) => (
                   <Button
@@ -662,7 +669,7 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
                 <>
                   <motion.div
                     animate={{ rotate: 360 }}
-                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                    transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
                   >
                     <RefreshCw className="w-6 h-6 mr-2" />
                   </motion.div>
@@ -711,15 +718,11 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
           className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6"
         >
           <div className="glass-effect rounded-xl p-4 text-center card-hover-float">
-            <div className="text-xl font-bold text-primary">
-              {user.gameStats.slot.spins}
-            </div>
+            <div className="text-xl font-bold text-primary">{user.gameStats.slot.totalSpins}</div>
             <div className="text-sm text-muted-foreground">총 스핀</div>
           </div>
           <div className="glass-effect rounded-xl p-4 text-center card-hover-float">
-            <div className="text-xl font-bold text-gold">
-              {user.gameStats.slot.jackpots}
-            </div>
+            <div className="text-xl font-bold text-gold">{user.gameStats.slot.jackpotHits}</div>
             <div className="text-sm text-muted-foreground">잭팟 횟수</div>
           </div>
           <div className="glass-effect rounded-xl p-4 text-center card-hover-float">
@@ -746,7 +749,10 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
           <h3 className="text-lg font-bold text-foreground mb-4">상금표</h3>
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
             {SLOT_SYMBOLS.map((symbol) => (
-              <div key={symbol.id} className="flex items-center gap-3 p-3 rounded-lg bg-secondary/30 card-hover-float">
+              <div
+                key={symbol.id}
+                className="flex items-center gap-3 p-3 rounded-lg bg-secondary/30 card-hover-float"
+              >
                 <symbol.icon className={`w-8 h-8 ${symbol.color}`} />
                 <div className="flex-1">
                   <div className="text-sm font-medium text-foreground">{symbol.name}</div>
