@@ -35,13 +35,8 @@ def delivery_report(err, msg):
     else:
         print(f'Message delivered to {msg.topic()} [{msg.partition()}] at offset {msg.offset()}')
 
-# Example placeholder for a database session dependency - to be implemented later
-# def get_db():
-#     db = database.SessionLocal()
-#     try:
-#         yield db
-#     finally:
-#         db.close()
+# Database session dependency
+from ..db.session import get_db
 
 @router.post("/actions", tags=["actions"])
 # async def create_action(action: schemas.ActionCreate, db = Depends(get_db)): # Full version with Pydantic and DB

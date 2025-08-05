@@ -1,4 +1,4 @@
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, Field
 
 class SlotSpinRequest(BaseModel):
@@ -15,4 +15,4 @@ class SlotSpinResponse(BaseModel):
     multiplier: int
     remaining_spins: int
     streak_count: int
-    special_event: str = None
+    special_event: Optional[str] = None

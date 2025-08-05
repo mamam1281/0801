@@ -73,33 +73,46 @@ MAX_DAILY_SPINS = 30
 
 class SlotMachineEnhancedService:
     @staticmethod
-    def get_remaining_spins(user_id: str) -> int:
+    def get_remaining_spins(user_id: str, db_session=None) -> int:
         """Get the number of remaining spins for a user"""
-        # Get from Redis if exists
-        current_date = datetime.now().strftime("%Y-%m-%d")
-        key = f"user:{user_id}:spins:{current_date}"
-        
-        spins_used = redis_client.get(key)
-        if spins_used is None:
-            # Reset daily spins
-            redis_client.set(key, "0", ex=86400)  # Expires in 24 hours
-            return MAX_DAILY_SPINS
-        
-        return MAX_DAILY_SPINS - int(spins_used)
+        if db_session:
+            # Use database if session is provided
+            from app.services.game_limit_service import GameLimitService
+            limit = GameLimitService.get_user_limit(db_session, user_id, "slot")
+            return limit.remaining
+        else:
+            # Fallback to Redis for backward compatibility
+            current_date = datetime.now().strftime("%Y-%m-%d")
+            key = f"user:{user_id}:spins:{current_date}"
+            
+            spins_used = redis_client.get(key)
+            if spins_used is None:
+                # Reset daily spins
+                redis_client.set(key, "0", ex=86400)  # Expires in 24 hours
+                return MAX_DAILY_SPINS
+            
+            return MAX_DAILY_SPINS - int(spins_used)
 
     @staticmethod
-    def increment_spins_used(user_id: str) -> int:
+    def increment_spins_used(user_id: str, db_session=None) -> int:
         """Increment the number of spins used by a user today and return remaining"""
-        current_date = datetime.now().strftime("%Y-%m-%d")
-        key = f"user:{user_id}:spins:{current_date}"
-        
-        # Increment spins used
-        spins_used = redis_client.incr(key)
-        
-        # Ensure key has expiry
-        redis_client.expire(key, 86400)  # 24 hours
-        
-        return MAX_DAILY_SPINS - int(spins_used)
+        if db_session:
+            # Use database if session is provided
+            from app.services.game_limit_service import GameLimitService
+            result = GameLimitService.use_game_play(db_session, user_id, "slot")
+            return result.get("remaining", 0)
+        else:
+            # Fallback to Redis for backward compatibility
+            current_date = datetime.now().strftime("%Y-%m-%d")
+            key = f"user:{user_id}:spins:{current_date}"
+            
+            # Increment spins used
+            spins_used = redis_client.incr(key)
+            
+            # Ensure key has expiry
+            redis_client.expire(key, 86400)  # 24 hours
+            
+            return MAX_DAILY_SPINS - int(spins_used)
 
     @staticmethod
     def get_streak_count(user_id: str) -> int:
