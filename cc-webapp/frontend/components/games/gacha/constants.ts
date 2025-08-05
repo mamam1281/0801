@@ -30,7 +30,14 @@ export const GACHA_ITEMS: GachaItem[] = [
 ];
 
 // 키치하고 섹시한 가챠 배너들
-export const GACHA_BANNERS: GachaBanner[] = [
+export const GACHA_BANNERS = [
+  {
+    id: 'standard',
+    name: '스탠다드 가챠',
+    description: '일반적인 아이템을 얻을 수 있는 가챠입니다.',
+    price: 1000,
+    image: '/images/gacha/standard-banner.jpg',
+  },
   {
     id: 'kawaii',
     name: '🌸 카와이 컬렉션',

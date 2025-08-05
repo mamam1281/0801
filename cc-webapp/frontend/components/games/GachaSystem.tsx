@@ -556,3 +556,15 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
     </div>
   );
 }
+
+export interface GachaStats {
+  totalPulls: number;
+  legendaryPulls: number;
+  totalValue: number;
+  pulls: number[];
+  totalSpent: number;
+  epicCount: number;
+  legendaryCount: number;
+}
+
+export type GachaRarity = "common" | "rare" | "epic" | "legendary" | "mythic";

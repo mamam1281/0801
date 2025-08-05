@@ -78,8 +78,8 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
   
   // Jackpot calculation
   useEffect(() => {
-    setCurrentJackpot(50000 + (user.gameStats.slot.spins * 50));
-  }, [user.gameStats.slot.spins]);
+    setCurrentJackpot(50000 + user.gameStats.slot.totalSpins * 50);
+  }, [user.gameStats.slot.totalSpins]);
 
   // Auto spin logic
   useEffect(() => {

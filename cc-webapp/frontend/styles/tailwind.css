@@ -13,4 +13,3 @@
     @apply bg-transparent border border-[var(--primary)] border-opacity-30 text-primary hover:bg-[var(--primary)] hover:bg-opacity-10;
   }
 }
-}

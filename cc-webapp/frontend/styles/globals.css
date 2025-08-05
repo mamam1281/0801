@@ -28,32 +28,32 @@
   --secondary-hover: #3d3d4a;
   
   /* 💰 Game Gold/Points System Colors */
-  --gold: #e6c200;
+  --gold: #dab904;
   --gold-foreground: #000000;
-  --gold-light: #f5d700;
+  --gold-light: #e48ac6;
   --gold-dark: #cc9e00;
   --gold-soft: rgba(230, 194, 0, 0.08);
   
   /* ✅ Game Status Colors */
-  --success: #9c4dcc;
+  --success: #c216a5;
   --success-foreground: #ffffff;
-  --success-soft: rgba(156, 77, 204, 0.08);
-  --warning: #e89900;
+  --success-soft: rgba(204, 77, 166, 0.08);
+  --warning: #e82300;
   --warning-foreground: #000000;
   --warning-soft: rgba(232, 153, 0, 0.08);
   --error: #e6336b;
   --error-foreground: #ffffff;
   --error-soft: rgba(230, 51, 107, 0.08);
-  --info: #4d9fcc;
+  --info: #803e7a;
   --info-foreground: #ffffff;
   --info-soft: rgba(77, 159, 204, 0.08);
   
   /* 🎯 Game UI Elements */
-  --muted: #2d2d3a;
+  --muted: #292930;
   --muted-foreground: #999999;
-  --accent: #e6005e;
+  --accent: #db0b62;
   --accent-foreground: #ffffff;
-  --destructive: #e6336b;
+  --destructive: #f36e98;
   --destructive-foreground: #ffffff;
   
   /* 🔲 Game Borders and Inputs */
@@ -89,7 +89,7 @@
   --font-weight-black: 900;
   
   /* 🎮 Game Specific */
-  --ring: rgba(230, 0, 94, 0.25);
+  --ring: rgba(226, 26, 109, 0.25);
   --radius: 0.75rem;
   --radius-game: 1rem;
   --radius-button: 0.5rem;
