@@ -171,6 +171,32 @@ services:
     networks:
       - ccnet
 
+  # Frontend Next.js
+  frontend:
+    build:
+      context: ./cc-webapp/frontend
+      dockerfile: Dockerfile
+    container_name: cc-frontend
+    depends_on:
+      - backend
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+      NODE_ENV: ${NODE_ENV:-development}
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    volumes:
+      - ./cc-webapp/frontend:/app
+      - /app/node_modules
+      - /app/.next
+    healthcheck:
+      test: wget --no-verbose --tries=1 --spider http://localhost:3000 || exit 1
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - ccnet
+
 volumes:
   pgdata:
   redis_data:

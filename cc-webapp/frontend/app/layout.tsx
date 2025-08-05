@@ -1,22 +1,14 @@
-import './globals.css';
-import type { Metadata } from 'next';
-import { Providers } from './providers';
+import '../styles/globals.css';
 
-export const metadata: Metadata = {
-  title: 'Casino-Club F2P',
-  description: 'Casino-Club Free-to-Play Web Application',
+export const metadata = {
+  title: '카지노 클럽 F2P',
+  description: '환영합니다! 카지노 클럽 F2P에서 게임을 즐겨보세요.',
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="ko" suppressHydrationWarning>
-      <body className="bg-zinc-950 text-white">
-        <Providers>{children}</Providers>
-      </body>
+    <html lang="ko" className="dark">
+      <body className="min-h-screen bg-background text-foreground">{children}</body>
     </html>
   );
 }

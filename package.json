@@ -6,6 +6,7 @@
     "lint": "cd cc-webapp/frontend && npm run lint"
   },
   "dependencies": {
+    "@radix-ui/react": "^2.1.6",
     "@radix-ui/react-select": "^2.1.6",
     "@radix-ui/react-separator": "^1.1.2",
     "@reduxjs/toolkit": "^2.8.2",

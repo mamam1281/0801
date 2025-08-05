@@ -149,21 +149,18 @@ export function RockPaperScissorsGame({
 
     // 🤖 AI와 플레이어 동시에 선택 공개 (동시성 보장)
     const ai = calculateAiChoice();
-    
-    // 동시에 선택 공개
     setPlayerChoice(choice);
     setAiChoice(ai);
-    
-    // Sound effects
-    playSoundEffect('playerAttack');
-    await new Promise(resolve => setTimeout(resolve, 200));
-    playSoundEffect('aiAttack');
-    await new Promise(resolve => setTimeout(resolve, 300));
-    playSoundEffect('clash');
 
-    // Determine result
-    const result = determineWinner(choice, ai);
-    setGameResult(result);
+    // Calculate result
+    const result: GameResult = determineWinner(choice, ai);
+
+    // Game stats for display
+    const totalGames = user.gameStats.rps.totalGames;
+    const wins = user.gameStats.rps.wins;
+    const losses = totalGames - wins;
+    const draws = totalGames - wins - losses; // draws가 별도 집계되지 않는다면 항상 0
+    const winRate = totalGames > 0 ? Math.round((wins / totalGames) * 100) : 0;
 
     // Check for special moves
     const isSpecial = streak >= 2 && result === 'win';
@@ -172,22 +169,19 @@ export function RockPaperScissorsGame({
     // Calculate winnings with bonuses
     let winnings = 0;
     let comboMultiplier = 1;
-    
+
     if (result === 'win') {
       winnings = betAmount * 2;
-      
       // Streak bonuses
       if (streak >= 2) {
         comboMultiplier = 1 + (streak * 0.2);
         setComboCount(streak + 1);
         playSoundEffect('combo');
       }
-      
       if (streak >= 4) {
         comboMultiplier *= 1.5;
         playSoundEffect('perfect');
       }
-      
       winnings = Math.floor(winnings * comboMultiplier);
     } else if (result === 'draw') {
       winnings = betAmount; // Return bet
@@ -201,10 +195,9 @@ export function RockPaperScissorsGame({
         ...user.gameStats,
         rps: {
           ...user.gameStats.rps,
-          matches: user.gameStats.rps.matches + 1,
+          totalGames: user.gameStats.rps.totalGames + 1,
           wins: result === 'win' ? user.gameStats.rps.wins + 1 : user.gameStats.rps.wins,
-          draws: result === 'draw' ? user.gameStats.rps.draws + 1 : user.gameStats.rps.draws,
-          winStreak: result === 'win' ? user.gameStats.rps.winStreak + 1 : 0
+          currentStreak: result === 'win' ? user.gameStats.rps.currentStreak + 1 : 0
         }
       },
       stats: {
@@ -226,7 +219,6 @@ export function RockPaperScissorsGame({
 
     // Generate visual effects
     generateParticles(result);
-    
     // Play result sound
     playSoundEffect(result);
 
@@ -241,7 +233,7 @@ export function RockPaperScissorsGame({
     setRoundHistory(prev => [round, ...prev.slice(0, 9)]);
 
     onUpdateUser(updatedUser);
-    
+
     // 🎯 중요한 알림만
     if (result === 'win' && (comboMultiplier > 1.5 || winnings - betAmount >= 200)) {
       const baseMessage = `🎉 승리! +${(winnings - betAmount).toLocaleString()}G`;
@@ -273,11 +265,9 @@ export function RockPaperScissorsGame({
     ? Math.round((user.gameStats.rps.wins / user.gameStats.rps.totalGames) * 100)
     : 0;
 
-  // draws는 계산해서 사용
+  // losses 변수 정의 추가
+  const losses = user.gameStats.rps.totalGames - user.gameStats.rps.wins;
   const draws = user.gameStats.rps.totalGames - user.gameStats.rps.wins - losses;
-
-  // winStreak -> currentStreak 또는 bestStreak
-  <div>Current Streak: {user.gameStats.rps.currentStreak}</div>
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-black to-success/10 relative overflow-hidden">
@@ -712,12 +702,12 @@ export function RockPaperScissorsGame({
               </div>
               <div className="text-center p-3 rounded-lg bg-error/10 border border-error/20">
                 <div className="text-xl font-bold text-error">
-                  {user.gameStats.rps.matches - user.gameStats.rps.wins - user.gameStats.rps.draws}
+                  {losses}
                 </div>
                 <div className="text-sm text-muted-foreground">패배</div>
               </div>
               <div className="text-center p-3 rounded-lg bg-warning/10 border border-warning/20">
-                <div className="text-xl font-bold text-warning">{user.gameStats.rps.draws}</div>
+                <div className="text-xl font-bold text-warning">{draws}</div>
                 <div className="text-sm text-muted-foreground">무승부</div>
               </div>
               <div className="text-center p-3 rounded-lg bg-success/10 border border-success/20">
@@ -766,7 +756,8 @@ export function RockPaperScissorsGame({
                       {Math.abs(round.winnings).toLocaleString()}G
                     </div>
                   </div>
-                ))}
+                ))
+              )}
             </div>
           </motion.div>
         </div>
