@@ -5,6 +5,73 @@
 
 const API_BASE_URL = 'http://localhost:8000'; // 백엔드 API 주소 (필요에 따라 수정)
 
+// 개발 모드 여부 확인
+const IS_DEV = process.env.NODE_ENV === 'development';
+
+/**
+ * API 로깅 유틸리티
+ * 개발 단계에서만 동작하며, 프로덕션 빌드에서는 자동으로 제거됨
+ */
+export const apiLogger = {
+  /**
+   * API 요청 시작 로깅
+   * @param method HTTP 메소드
+   * @param endpoint API 엔드포인트
+   * @param data 요청 데이터
+   */
+  request: (method: string, endpoint: string, data?: any): void => {
+    if (IS_DEV) {
+      const timestamp = new Date().toLocaleTimeString('ko-KR');
+      console.group(`%c🚀 API 요청 [${timestamp}]`, 'color: #e6005e; font-weight: bold;');
+      console.log(`%c📍 ${method} ${endpoint}`, 'color: #ff69b4;');
+      if (data) console.log('%c📦 요청 데이터:', 'color: #666;', data);
+      console.groupEnd();
+    }
+  },
+
+  /**
+   * API 응답 로깅
+   * @param method HTTP 메소드
+   * @param endpoint API 엔드포인트
+   * @param status HTTP 상태 코드
+   * @param data 응답 데이터
+   * @param duration 요청-응답 소요 시간(ms)
+   */
+  response: (method: string, endpoint: string, status: number, data: any, duration: number): void => {
+    if (IS_DEV) {
+      const timestamp = new Date().toLocaleTimeString('ko-KR');
+      const isSuccess = status >= 200 && status < 400;
+      
+      console.group(
+        `%c${isSuccess ? '✅' : '❌'} API 응답 [${timestamp}]`, 
+        `color: ${isSuccess ? '#4CAF50' : '#F44336'}; font-weight: bold;`
+      );
+      console.log(`%c📍 ${method} ${endpoint}`, 'color: #ff69b4;');
+      console.log(`%c📊 상태: ${status}`, `color: ${isSuccess ? '#4CAF50' : '#F44336'};`);
+      console.log(`%c⏱️ 소요 시간: ${duration}ms`, 'color: #666;');
+      console.log('%c📦 응답 데이터:', 'color: #666;', data);
+      console.groupEnd();
+    }
+  },
+
+  /**
+   * API 에러 로깅
+   * @param method HTTP 메소드
+   * @param endpoint API 엔드포인트
+   * @param error 에러 객체
+   */
+  error: (method: string, endpoint: string, error: any): void => {
+    if (IS_DEV) {
+      const timestamp = new Date().toLocaleTimeString('ko-KR');
+      
+      console.group('%c❌ API 에러 [' + timestamp + ']', 'color: #F44336; font-weight: bold;');
+      console.log(`%c📍 ${method} ${endpoint}`, 'color: #ff69b4;');
+      console.error('%c💥 에러 내용:', 'color: #F44336;', error);
+      console.groupEnd();
+    }
+  }
+};
+
 // 토큰 관리
 export const getTokens = () => {
   const accessToken = localStorage.getItem('access_token');
@@ -24,7 +91,14 @@ export const clearTokens = () => {
 
 // 기본 API 요청 함수
 const apiRequest = async (endpoint: string, options: RequestInit = {}) => {
+  const method = options.method || 'GET';
+  const requestData = options.body ? JSON.parse(options.body as string) : undefined;
+  const startTime = Date.now();
+  
   try {
+    // 요청 로깅
+    apiLogger.request(method, endpoint, requestData);
+    
     const { accessToken } = getTokens();
     
     const headers = {
@@ -40,8 +114,11 @@ const apiRequest = async (endpoint: string, options: RequestInit = {}) => {
 
     // 401 에러 시 토큰 리프레시 시도
     if (response.status === 401) {
+      apiLogger.error(method, endpoint, '인증 토큰이 만료되었습니다. 토큰 갱신 시도 중...');
+      
       const refreshed = await refreshAccessToken();
       if (refreshed) {
+        apiLogger.request(method, endpoint, requestData);
         return apiRequest(endpoint, options); // 토큰 갱신 후 원래 요청 재시도
       } else {
         clearTokens(); // 리프레시 실패 시 토큰 제거
@@ -50,6 +127,10 @@ const apiRequest = async (endpoint: string, options: RequestInit = {}) => {
     }
 
     const data = await response.json();
+    const duration = Date.now() - startTime;
+    
+    // 응답 로깅
+    apiLogger.response(method, endpoint, response.status, data, duration);
     
     if (!response.ok) {
       throw new Error(data.detail || '요청 처리 중 오류가 발생했습니다.');
@@ -57,30 +138,47 @@ const apiRequest = async (endpoint: string, options: RequestInit = {}) => {
     
     return data;
   } catch (error) {
-    console.error('API 요청 오류:', error);
+    // 에러 로깅
+    apiLogger.error(method, endpoint, error);
     throw error;
   }
 };
 
 // 토큰 갱신 함수
 export const refreshAccessToken = async (): Promise<boolean> => {
+  const startTime = Date.now();
+  const endpoint = '/auth/refresh';
+  const method = 'POST';
+  
   try {
+    apiLogger.request(method, endpoint, { message: '토큰 갱신 시도 중...' });
+    
     const { refreshToken } = getTokens();
-    if (!refreshToken) return false;
+    if (!refreshToken) {
+      apiLogger.error(method, endpoint, '리프레시 토큰이 없습니다.');
+      return false;
+    }
 
-    const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
-      method: 'POST',
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      method,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ refresh_token: refreshToken })
     });
 
-    if (!response.ok) return false;
-
     const data = await response.json();
+    const duration = Date.now() - startTime;
+    
+    if (!response.ok) {
+      apiLogger.error(method, endpoint, '토큰 갱신 실패: 서버 응답 에러');
+      return false;
+    }
+
+    apiLogger.response(method, endpoint, response.status, { message: '토큰 갱신 성공' }, duration);
+    
     setTokens(data.access_token, refreshToken); // 리프레시 토큰은 유지
     return true;
   } catch (error) {
-    console.error('토큰 갱신 실패:', error);
+    apiLogger.error(method, endpoint, error);
     return false;
   }
 };
