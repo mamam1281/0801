@@ -1,34 +1,7 @@
 {
-	"folders": [
-		{
-			"path": "../../../.."
-		}
-  ],
-  "settings": {
-    "typescript.preferences.includePackageJsonAutoImports": "off",
-    "files.associations": {
-      "*.css": "tailwindcss"
-    },
-    "tailwindCSS.experimental.configFile": null,
-    "tailwindCSS.files.exclude": [
-      "**/.git/**",
-      "**/node_modules/**",
-      "**/.hg/**",
-      "**/.svn/**"
-    ],
-    "emmet.includeLanguages": {
-      "typescript": "html",
-      "typescriptreact": "html"
-    },
-    "tailwindCSS.includeLanguages": {
-      "typescript": "javascript",
-      "typescriptreact": "javascript"
-    },
-    "errorLens.enabledDiagnosticLevels": [
-      "error",
-      "warning",
-      "info"
-    ],
-    "errorLens.fontSize": "12px"
-  }
+    "folders": [
+        {
+            "path": "../../../.."
+        }
+    ]
 }

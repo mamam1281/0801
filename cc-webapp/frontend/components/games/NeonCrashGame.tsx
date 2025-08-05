@@ -251,9 +251,9 @@ export function NeonCrashGame({ user, onBack, onUpdateUser, onAddNotification }:
 
       {/* 간소화된 헤더 */}
       <motion.header
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="glass-effect rounded-xl p-6"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="glass-effect rounded-xl p-6">
         <div className="flex items-center justify-between max-w-6xl mx-auto">
           <div className="flex items-center gap-4">
             <Button
@@ -499,6 +499,12 @@ export function NeonCrashGame({ user, onBack, onUpdateUser, onAddNotification }:
             animate={{ opacity: 1, y: 0 }}
             </div>
           </motion.div>
+          
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+            className="glass-effect rounded-xl p-6"
           >
             <h3 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
               <Timer className="w-5 h-5 text-primary" />
