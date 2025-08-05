@@ -1,10 +1,10 @@
 {
   "compilerOptions": {
-    "target": "es5",
+    "target": "ES2022",
     "lib": [
       "dom",
       "dom.iterable",
-      "esnext"
+      "ES6"
     ],
     "allowJs": true,
     "skipLibCheck": true,
@@ -23,7 +23,13 @@
         "name": "next"
       }
     ],
+    "baseUrl": ".",
     "paths": {
+      "@/*": ["./*"],
+      "@/components/*": ["./components/*"],
+      "@/hooks/*": ["./hooks/*"],
+      "@/utils/*": ["./utils/*"],
+      "@/types/*": ["./types/*"],
       "components/*": [
         "./components/*"
       ],
@@ -52,7 +58,7 @@
     "**/*.ts",
     "**/*.tsx",
     ".next/types/**/*.ts"
-  ],
+, "components/ui/alert-dialog.tsx"  ],
   "exclude": [
     "node_modules"
   ]
