@@ -251,10 +251,9 @@ export function NeonCrashGame({ user, onBack, onUpdateUser, onAddNotification }:
 
       {/* 간소화된 헤더 */}
       <motion.header
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="relative z-10 p-4 lg:p-6 border-b border-border-secondary/50 backdrop-blur-xl bg-card/80"
-      >
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="glass-effect rounded-xl p-6"
         <div className="flex items-center justify-between max-w-6xl mx-auto">
           <div className="flex items-center gap-4">
             <Button
@@ -490,8 +489,7 @@ export function NeonCrashGame({ user, onBack, onUpdateUser, onAddNotification }:
                   >
                     <div className="text-sm font-bold">{crash.toFixed(2)}x</div>
                   </div>
-                ))
-              }
+                ))}
             </div>
           </motion.div>
 
@@ -499,8 +497,8 @@ export function NeonCrashGame({ user, onBack, onUpdateUser, onAddNotification }:
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5 }}
-            className="glass-effect rounded-xl p-6"
+            </div>
+          </motion.div>
           >
             <h3 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
               <Timer className="w-5 h-5 text-primary" />

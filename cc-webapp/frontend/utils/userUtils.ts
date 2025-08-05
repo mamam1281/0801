@@ -1,32 +1,29 @@
-import { User, GameSpecific} from '../types';
+import { User, GameSpecific } from '../types';
 
-export function createDefaultGameStats(): GameSpecificStats {
+export function createDefaultGameStats(): GameSpecific {
   return {
     slot: {
-      spins: 0,
-      jackpots: 0,
+      totalSpins: 0,
+      jackpotHits: 0,
       biggestWin: 0,
-      totalWinnings: 0,
-      wins: 0
+      totalWinnings: 0
     },
     rps: {
-      matches: 0,
+      totalGames: 0,
       wins: 0,
-      draws: 0,
-      winStreak: 0
+      currentStreak: 0,
+      bestStreak: 0
     },
     gacha: {
-      pulls: 0,
-      legendaryCount: 0,
-      epicCount: 0,
-      totalSpent: 0
+      totalPulls: 0,
+      legendaryPulls: 0,
+      totalValue: 0
     },
     crash: { // 🚀 새로운 크래시 게임 기본 통계
-      games: 0,
-      totalWinnings: 0,
-      biggestWin: 0,
-      biggestMultiplier: 0,
-      cashOutCount: 0
+      totalGames: 0,
+      highestMultiplier: 0,
+      totalCashedOut: 0,
+      averageMultiplier: 0
     }
     // 🚫 룰렛 통계 완전 제거
   };
@@ -40,40 +37,37 @@ export function ensureUserCompatibility(userData: any): User {
     // 각 게임 통계가 없으면 기본값으로 초기화
     if (!userData.gameStats.slot) {
       userData.gameStats.slot = {
-        spins: 0,
-        jackpots: 0,
+        totalSpins: 0,
+        jackpotHits: 0,
         biggestWin: 0,
-        totalWinnings: 0,
-        wins: 0
+        totalWinnings: 0
       };
     }
     
     if (!userData.gameStats.rps) {
       userData.gameStats.rps = {
-        matches: 0,
+        totalGames: 0,
         wins: 0,
-        draws: 0,
-        winStreak: 0
+        currentStreak: 0,
+        bestStreak: 0
       };
     }
     
     if (!userData.gameStats.gacha) {
       userData.gameStats.gacha = {
-        pulls: 0,
-        legendaryCount: 0,
-        epicCount: 0,
-        totalSpent: 0
+        totalPulls: 0,
+        legendaryPulls: 0,
+        totalValue: 0
       };
     }
     
     // 🚀 크래시 게임 통계 추가
     if (!userData.gameStats.crash) {
       userData.gameStats.crash = {
-        games: 0,
-        totalWinnings: 0,
-        biggestWin: 0,
-        biggestMultiplier: 0,
-        cashOutCount: 0
+        totalGames: 0,
+        highestMultiplier: 0,
+        totalCashedOut: 0,
+        averageMultiplier: 0
       };
     }
 

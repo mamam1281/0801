@@ -766,8 +766,7 @@ export function RockPaperScissorsGame({
                       {Math.abs(round.winnings).toLocaleString()}G
                     </div>
                   </div>
-                ))
-              }
+                ))}
             </div>
           </motion.div>
         </div>
