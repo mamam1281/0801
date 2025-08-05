@@ -392,3 +392,132 @@ export function BackgroundEffects() {
     </div>
   );
 }
+
+// 가챠 결과 모달 컴포넌트
+export function SexyPullResultsModal({
+  results,
+  showResults,
+  currentIndex = 0,
+  onNext,
+  onClose,
+  isAnimationComplete,
+}: {
+  results: GachaItem[];
+  showResults: boolean;
+  currentIndex?: number;
+  onNext?: () => void;
+  onClose?: () => void;
+  isAnimationComplete?: boolean;
+}) {
+  const [localIndex, setLocalIndex] = useState(currentIndex);
+  const [heartParticles, setHeartParticles] = useState<HeartParticle[]>([]);
+  
+  // props로 currentIndex가 전달되면 그것을 사용하고, 아니면 local state 사용
+  const displayIndex = currentIndex !== undefined ? currentIndex : localIndex;
+  
+  // 하트 파티클 생성 효과
+  const generateHearts = () => {
+    setHeartParticles(generateHeartParticles(20));
+    setTimeout(() => {
+      setHeartParticles([]);
+    }, 3000);
+  };
+  
+  // 다음 아이템으로 넘기기
+  const handleNext = () => {
+    if (onNext) {
+      // 부모 컴포넌트에서 제공한 onNext 함수 호출
+      onNext();
+      generateHearts();
+    } else if (localIndex < results.length - 1) {
+      // 내부 상태로 관리
+      setLocalIndex(prev => prev + 1);
+      generateHearts();
+    } else if (onClose) {
+      onClose();
+    }
+  };
+  
+  // 현재 표시할 아이템
+  const currentItem = results[displayIndex];
+  const isLastItem = displayIndex === results.length - 1;
+  
+  // 획득한 아이템의 레어도에 따른 스타일 설정
+  const getBgClass = () => {
+    if (!currentItem) return 'bg-gray-900';
+    
+    switch (currentItem.rarity) {
+      case 'mythic': return 'bg-gradient-to-br from-gold via-gold/80 to-gold/50';
+      case 'legendary': return 'bg-gradient-to-br from-purple-500 via-purple-400 to-purple-300';
+      case 'epic': return 'bg-gradient-to-br from-blue-500 via-blue-400 to-blue-300';
+      case 'rare': return 'bg-gradient-to-br from-green-500 via-green-400 to-green-300';
+      case 'common': return 'bg-gradient-to-br from-gray-500 via-gray-400 to-gray-300';
+      default: return 'bg-gradient-to-br from-gray-500 via-gray-400 to-gray-300';
+    }
+  };
+  
+  return (
+    <div className="fixed inset-0 flex items-center justify-center z-50 bg-black/80 backdrop-blur-sm">
+      <div className="relative w-full max-w-md rounded-xl overflow-hidden glass-effect shadow-xl p-6">
+        <div className={`absolute inset-0 opacity-20 ${getBgClass()}`}></div>
+        
+        {/* 현재 아이템 표시 */}
+        <div className="relative z-10">
+          <div className="text-center mb-4">
+            <h3 className="text-lg font-bold text-white">
+              {results.length > 1 ? `아이템 획득! (${displayIndex + 1}/${results.length})` : '아이템 획득!'}
+            </h3>
+            <p className={`text-sm ${RARITY_COLORS[currentItem?.rarity || 'N']}`}>
+              {currentItem?.rarity || 'N'} 등급
+            </p>
+          </div>
+          
+          <div className="flex justify-center mb-6">
+            <SexyItemCard item={currentItem} isNew={true} animate={true} showDetails={true} />
+          </div>
+          
+          <div className="text-center mb-6">
+            <h4 className="text-xl font-bold text-white mb-1">{currentItem?.name}</h4>
+            <p className="text-sm text-gray-300">{currentItem?.description}</p>
+          </div>
+          
+          <Button 
+            onClick={handleNext} 
+            className="w-full bg-gradient-game"
+          >
+            {isLastItem ? '닫기' : '다음'}
+          </Button>
+        </div>
+        
+        {/* 하트 파티클 효과 */}
+        {heartParticles.map((particle, index) => (
+          <motion.div
+            key={`heart_${index}`}
+            initial={{ 
+              x: particle.x, 
+              y: particle.y, 
+              scale: 0,
+              opacity: 0.8
+            }}
+            animate={{ 
+              y: particle.y - 100,
+              scale: particle.scale,
+              opacity: 0
+            }}
+            transition={{ 
+              duration: 2, 
+              ease: "easeOut" 
+            }}
+            className="absolute pointer-events-none"
+          >
+            <Heart 
+              size={particle.size} 
+              className="text-primary/80"
+              fill="currentColor"
+            />
+          </motion.div>
+        ))}
+      </div>
+    </div>
+  );
+}

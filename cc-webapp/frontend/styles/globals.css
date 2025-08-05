@@ -11,26 +11,26 @@
   --foreground: #ffffff;
   --card: #1a1a24;
   --card-foreground: #ffffff;
-  --popover: #1a1a24;
+  --popover: #292628;
   --popover-foreground: #ffffff;
   
   /* 🎨 Game Primary Colors - Softer Indie Pink Theme */
-  --primary: #e6005e;
+  --primary: #FF1493;
   --primary-foreground: #ffffff;
-  --primary-hover: #cc0054;
-  --primary-light: #ff4d9a;
+  --primary-hover: #FFB6C1;
+  --primary-light: #FF69B4;
   --primary-dark: #b30048;
   --primary-soft: rgba(230, 0, 94, 0.08);
   
   /* 🔧 Game Secondary Colors */
-  --secondary: #2d2d3a;
+  --secondary: #FFC0CB;
   --secondary-foreground: #ffffff;
   --secondary-hover: #3d3d4a;
   
   /* 💰 Game Gold/Points System Colors */
-  --gold: #dab904;
+  --gold: #FFD700;
   --gold-foreground: #000000;
-  --gold-light: #e48ac6;
+  --gold-light: #FFC0CB;
   --gold-dark: #cc9e00;
   --gold-soft: rgba(230, 194, 0, 0.08);
   
@@ -44,14 +44,14 @@
   --error: #e6336b;
   --error-foreground: #ffffff;
   --error-soft: rgba(230, 51, 107, 0.08);
-  --info: #803e7a;
+  --info: #ffb6c1
   --info-foreground: #ffffff;
   --info-soft: rgba(77, 159, 204, 0.08);
   
   /* 🎯 Game UI Elements */
   --muted: #292930;
   --muted-foreground: #999999;
-  --accent: #db0b62;
+  --accent: #FF1493;
   --accent-foreground: #ffffff;
   --destructive: #f36e98;
   --destructive-foreground: #ffffff;
@@ -61,7 +61,7 @@
   --border-secondary: rgba(255, 255, 255, 0.06);
   --input: #1a1a24;
   --input-background: #2d2d3a;
-  --input-border: rgba(230, 0, 94, 0.15);
+  --input-border: D3D3D3
   --switch-background: #2d2d3a;
   
   /* ✨ Refined Effects */
@@ -327,7 +327,7 @@
   }
   
   .text-gradient-gold {
-    background: linear-gradient(135deg, #e6c200, #f5d700);
+    background: linear-gradient(135deg, #a77518, #f5b400);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;

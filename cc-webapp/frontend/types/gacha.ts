@@ -18,6 +18,8 @@ export interface HeartParticle {
   id: string;
   x: number;
   y: number;
+  size?: number;
+  scale?: number;
 }
 
 export interface GachaBanner {

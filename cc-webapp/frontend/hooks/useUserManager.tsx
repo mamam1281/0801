@@ -90,6 +90,9 @@ export function useUserManager() {
   const logout = useCallback(() => {
     setUser(null);
     localStorage.removeItem('game-user');
+    // 토큰도 제거
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
   }, []);
 
   // 📊 공용 사용자 정보 (메모이제이션)

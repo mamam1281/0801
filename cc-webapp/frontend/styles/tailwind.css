@@ -1,5 +1,4 @@
-@tailwind base;
-@tailwind components;
+@tailwind preflight;
 @tailwind utilities;
 
 /* Tailwind 전용 컴포넌트는 여기에 정의 */

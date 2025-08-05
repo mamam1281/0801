@@ -15,7 +15,7 @@ interface LoadingScreenProps {
 function LoadingScreenComponent({
   onComplete,
   duration = 3000,
-  gameTitle = 'NEON QUEST',
+  gameTitle = 'MODEL',
 }: LoadingScreenProps) {
   // ⭐ 모든 state 훅을 최상단에 배치 (순서 중요)
   const [progress, setProgress] = useState(0);
@@ -31,10 +31,10 @@ function LoadingScreenComponent({
 
   // ⭐ loadingSteps를 컴포넌트 내부로 이동하고 아이콘 정보 추가
   const loadingSteps = [
-    { text: '초기화 중...', icon: Gamepad2 },
-    { text: '게임 엔진 로딩...', icon: Zap },
+    { text: '조금만...', icon: Gamepad2 },
+    { text: '기다려주세요...', icon: Zap },
     { text: '사용자 데이터 동기화...', icon: Star },
-    { text: '최종 준비 완료!', icon: Crown },
+    { text: '이제 시작합니다!!', icon: Crown },
   ];
 
   // 모바일 디바이스 감지
@@ -304,7 +304,7 @@ function LoadingScreenComponent({
               transition={{ delay: 1 }}
               className="text-[10px] sm:text-xs text-muted-foreground"
             >
-              Version 1.0.0 • Made with ❤️
+              Version 1.0.0 • Made with JM
             </motion.div>
           </div>
 
