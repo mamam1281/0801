@@ -1,13 +1,16 @@
 import os
 import json
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Body
 #  # Will be needed later
 try:
     from confluent_kafka import Producer
 except ImportError:  # In case library is not installed during lightweight tests
     Producer = None
+from .. import schemas
 # from .. import models, schemas, database # Assuming these exist and will be used later
 from datetime import datetime
+from ..schemas.slot_enhanced import SlotSpinRequest, SlotSpinResponse
+from ..services.slot_enhanced_service import SlotMachineEnhancedService
 
 router = APIRouter(prefix="/api/actions", tags=["Game Actions"])
 
@@ -84,6 +87,58 @@ async def create_action(user_id: int, action_type: str): # Simplified for now, m
 
     # return db_action # Or a schema.Action if returning DB object
     return {"message": "Action logged and potentially published to Kafka", "data": payload}
+
+@router.post("/SLOT_SPIN", response_model=SlotSpinResponse, tags=["games"])
+async def slot_spin(request: SlotSpinRequest):
+    """
+    Slot machine spin endpoint.
+    
+    Handles a slot machine spin request and returns the result.
+    
+    - **user_id**: User identifier
+    - **bet_amount**: Amount to bet (5,000-10,000 coins)
+    - **lines**: Number of active lines (default: 3)
+    - **vip_mode**: Whether VIP benefits should be applied
+    
+    Returns the spin result including win/loss information.
+    """
+    try:
+        # Log action to Kafka if enabled
+        if producer:
+            payload = {
+                "user_id": request.user_id,
+                "action_type": "SLOT_SPIN",
+                "bet_amount": request.bet_amount,
+                "vip_mode": request.vip_mode,
+                "action_timestamp": datetime.utcnow().isoformat()
+            }
+            
+            try:
+                producer.produce(
+                    TOPIC_USER_ACTIONS,
+                    key=str(request.user_id),
+                    value=json.dumps(payload).encode("utf-8"),
+                    callback=delivery_report,
+                )
+                producer.poll(0)
+            except Exception as e:
+                print(f"Kafka error: {e}")
+        
+        # Execute the slot machine spin
+        result = SlotMachineEnhancedService.spin(
+            user_id=request.user_id,
+            bet_amount=request.bet_amount,
+            lines=request.lines,
+            vip_mode=request.vip_mode
+        )
+        
+        return result
+        
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        print(f"Error in slot_spin: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 # Ensure this router is included in app/main.py:
 # from .routers import actions

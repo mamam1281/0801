@@ -6,6 +6,7 @@ from app.schemas.site_visit import SiteVisit, SiteVisitCreate, SiteVisitBase
 from app.schemas.user_action import UserAction, UserActionCreate, UserActionBase
 from app.schemas.invite_code import InviteCode, InviteCodeCreate, InviteCodeBase, InviteCodeResponse, InviteCodeList
 from app.schemas.feedback import FeedbackResponse, FeedbackRequest, FeedbackLog
+from app.schemas.slot_enhanced import SlotSpinRequest, SlotSpinResponse
 from app.schemas.adult_content import AdultContentDetail
 from app.schemas.adult_content import AdultContentGalleryItem
 from app.schemas.adult_content import AdultContentStageBase
