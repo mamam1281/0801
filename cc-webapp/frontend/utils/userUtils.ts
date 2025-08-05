@@ -1,4 +1,4 @@
-import { User, GameSpecificStats } from '../types';
+import { User, GameSpecific} from '../types';
 
 export function createDefaultGameStats(): GameSpecificStats {
   return {
