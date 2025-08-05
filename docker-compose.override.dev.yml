@@ -42,6 +42,9 @@ services:
       - NEXT_PUBLIC_API_URL=http://localhost:8000
       - NEXT_PUBLIC_WS_URL=ws://localhost:8000
       - NEXT_PUBLIC_INTERNAL_API_URL=http://backend:8000
+      # 로딩 타임아웃 설정 (3초 후 로그인 페이지로 이동)
+      - NEXT_PUBLIC_LOADING_TIMEOUT=3000
+      - NEXT_PUBLIC_AUTH_FALLBACK=true
       # Turbopack 최적화
       - TURBOPACK=1
       - NEXT_EXPERIMENTAL_APP_DIR=true

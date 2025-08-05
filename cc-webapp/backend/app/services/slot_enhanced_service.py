@@ -183,13 +183,25 @@ class SlotMachineEnhancedService:
                 win_lines.append(row_idx + 1)  # Lines are 1-indexed
                 total_multiplier += WIN_MULTIPLIERS.get(row[0], 0)
         
+        # Check diagonal from top-left to bottom-right (line 4)
+        diagonal1 = [result[i][i] for i in range(3)]
+        if diagonal1[0] == diagonal1[1] == diagonal1[2]:
+            win_lines.append(4)  # Diagonal line index
+            total_multiplier += WIN_MULTIPLIERS.get(diagonal1[0], 0)
+            
+        # Check diagonal from top-right to bottom-left (line 5)
+        diagonal2 = [result[i][2-i] for i in range(3)]
+        if diagonal2[0] == diagonal2[1] == diagonal2[2]:
+            win_lines.append(5)  # Diagonal line index
+            total_multiplier += WIN_MULTIPLIERS.get(diagonal2[0], 0)
+        
         return win_lines, total_multiplier
 
     @staticmethod
-    def spin(user_id: str, bet_amount: int, lines: int, vip_mode: bool) -> Dict[str, Any]:
+    def spin(user_id: str, bet_amount: int, lines: int, vip_mode: bool, db_session=None) -> Dict[str, Any]:
         """Execute a slot machine spin"""
         # Check remaining spins
-        remaining_spins = SlotMachineEnhancedService.get_remaining_spins(user_id)
+        remaining_spins = SlotMachineEnhancedService.get_remaining_spins(user_id, db_session)
         if remaining_spins <= 0:
             raise ValueError("Daily spin limit reached")
         
@@ -256,10 +268,33 @@ class SlotMachineEnhancedService:
         streak = SlotMachineEnhancedService.update_streak_count(user_id, is_win)
         
         # Decrement remaining spins
-        remaining_spins = SlotMachineEnhancedService.increment_spins_used(user_id)
+        remaining_spins = SlotMachineEnhancedService.increment_spins_used(user_id, db_session)
         
         # Generate spin ID
         spin_id = f"spin_{uuid.uuid4().hex[:6]}"
+        
+        # Grant reward if the user won
+        if is_win and win_amount > 0 and db_session:
+            from app.services.reward_service import RewardService
+            
+            # 보상 정보 준비
+            details = {
+                "spin_id": spin_id,
+                "bet_amount": bet_amount,
+                "multiplier": multiplier,
+                "win_lines": win_lines,
+                "vip_mode": vip_mode,
+                "streak": streak
+            }
+            
+            # RewardService 인스턴스 생성 및 보상 지급
+            reward_service = RewardService(db_session)
+            reward_result = reward_service.distribute_reward(
+                user_id=int(user_id),  # 타입 변환 필요할 수 있음
+                reward_type="COIN",
+                amount=win_amount,
+                source_description=f"Slot machine win: {len(win_lines)} lines, {multiplier}x multiplier"
+            )
         
         # Handle special events (rare random events)
         special_event = None

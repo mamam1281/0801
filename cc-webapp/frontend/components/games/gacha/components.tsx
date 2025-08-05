@@ -12,6 +12,65 @@ import {
 } from './utils';
 import { SEXY_EMOJIS, RARITY_COLORS } from './constants';
 
+// 인벤토리 모달 컴포넌트
+export function SexyInventoryModal({
+  isOpen,
+  onClose,
+  items,
+  user,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  items: GachaItem[];
+  user: User;
+}) {
+  if (!isOpen) return null;
+  
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+    >
+      <motion.div 
+        initial={{ scale: 0.9, y: 20 }}
+        animate={{ scale: 1, y: 0 }}
+        className="relative w-full max-w-4xl h-[80vh] overflow-y-auto bg-card rounded-xl shadow-2xl border border-pink-500/20"
+      >
+        <div className="sticky top-0 z-10 flex justify-between items-center p-4 bg-card/90 backdrop-blur-sm border-b border-pink-500/20">
+          <h2 className="text-2xl font-bold bg-gradient-to-r from-pink-400 to-purple-600 bg-clip-text text-transparent">
+            {user.nickname}의 럭키 아이템 컬렉션
+          </h2>
+          <Button variant="ghost" onClick={onClose}>닫기</Button>
+        </div>
+        
+        <div className="p-6 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          {items.length > 0 ? (
+            items.map((item) => (
+              <motion.div
+                key={item.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className={`p-4 rounded-lg border ${RARITY_COLORS[(item.rarity as keyof typeof RARITY_COLORS) || 'common']} shadow-lg`}
+              >
+                <div className="text-4xl mb-2">{item.icon || '🎁'}</div>
+                <h3 className="font-bold text-white">{item.name}</h3>
+                <p className="text-sm text-muted-foreground">{item.description}</p>
+              </motion.div>
+            ))
+          ) : (
+            <div className="col-span-full flex flex-col items-center justify-center p-12 text-center">
+              <p className="text-xl mb-4">아직 수집한 아이템이 없습니다</p>
+              <p className="text-muted-foreground">가챠를 돌려 아이템을 수집해보세요!</p>
+            </div>
+          )}
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
 // 배너 선택 컴포넌트
 export function SexyBannerSelector({
   banners,

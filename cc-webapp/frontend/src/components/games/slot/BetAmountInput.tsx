@@ -14,7 +14,7 @@ const BetAmountInput: React.FC<BetAmountInputProps> = ({
   onChange,
   min = 5000,
   max = 10000,
-  disabled = false
+  disabled = false,
 }) => {
   const { toast } = useToast();
   const [inputValue, setInputValue] = useState<string>(value.toString());
@@ -28,44 +28,44 @@ const BetAmountInput: React.FC<BetAmountInputProps> = ({
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
     setInputValue(newValue);
-    
+
     // Allow empty string for typing
     if (newValue === '') {
       setError('금액을 입력해주세요');
       return;
     }
-    
+
     const numValue = parseInt(newValue, 10);
-    
+
     // Validate number
     if (isNaN(numValue)) {
       setError('숫자만 입력해주세요');
       return;
     }
-    
+
     // Validate range
     if (numValue < min) {
       setError(`최소 베팅 금액은 ${min.toLocaleString()}코인입니다`);
       return;
     }
-    
+
     if (numValue > max) {
       setError(`최대 베팅 금액은 ${max.toLocaleString()}코인입니다`);
       return;
     }
-    
+
     // Clear error and update parent
     setError(null);
     onChange(numValue);
   };
-  
+
   // Quick bet amount buttons
   const quickBetOptions = [
     { label: '최소', value: min },
     { label: '중간', value: Math.floor((min + max) / 2) },
-    { label: '최대', value: max }
+    { label: '최대', value: max },
   ];
-  
+
   return (
     <div className="w-full space-y-2">
       <label className="block text-sm font-medium text-white">베팅 금액</label>
@@ -84,11 +84,9 @@ const BetAmountInput: React.FC<BetAmountInputProps> = ({
         />
         <div className="absolute right-2 top-2 text-gray-400">코인</div>
       </div>
-      
-      {error && (
-        <p className="text-sm text-red-500">{error}</p>
-      )}
-      
+
+      {error && <p className="text-sm text-red-500">{error}</p>}
+
       <div className="flex gap-2 mt-2">
         {quickBetOptions.map((option) => (
           <button

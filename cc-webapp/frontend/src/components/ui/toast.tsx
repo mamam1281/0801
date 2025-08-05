@@ -15,7 +15,7 @@ interface ToastContextType {
 
 const ToastContext = createContext<ToastContextType | undefined>(undefined);
 
-export const ToastProvider: React.FC<{children: React.ReactNode}> = ({ children }) => {
+export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
   const toast = (message: string, type: Toast['type'] = 'info', duration = 5000) => {
@@ -27,7 +27,7 @@ export const ToastProvider: React.FC<{children: React.ReactNode}> = ({ children 
         removeToast(id);
       }, duration);
     }
-    
+
     return id;
   };
 
@@ -45,27 +45,28 @@ export const ToastProvider: React.FC<{children: React.ReactNode}> = ({ children 
 
 const ToastContainer: React.FC = () => {
   const context = useContext(ToastContext);
-  
+
   if (!context) return null;
-  
+
   const { toasts, removeToast } = context;
-  
+
   return (
     <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-md">
       {toasts.map((toast) => (
-        <div 
+        <div
           key={toast.id}
           className={`p-4 rounded-lg shadow-lg flex items-start gap-2 animate-fade-in ${
-            toast.type === 'error' ? 'bg-red-600 text-white' :
-            toast.type === 'success' ? 'bg-green-600 text-white' :
-            toast.type === 'warning' ? 'bg-yellow-500 text-black' :
-            'bg-blue-600 text-white'
+            toast.type === 'error'
+              ? 'bg-red-600 text-white'
+              : toast.type === 'success'
+                ? 'bg-green-600 text-white'
+                : toast.type === 'warning'
+                  ? 'bg-yellow-500 text-black'
+                  : 'bg-blue-600 text-white'
           }`}
         >
-          <div className="flex-1">
-            {toast.message}
-          </div>
-          <button 
+          <div className="flex-1">{toast.message}</div>
+          <button
             onClick={() => removeToast(toast.id)}
             className="text-lg opacity-70 hover:opacity-100"
           >
@@ -79,10 +80,10 @@ const ToastContainer: React.FC = () => {
 
 export const useToast = () => {
   const context = useContext(ToastContext);
-  
+
   if (context === undefined) {
     throw new Error('useToast must be used within a ToastProvider');
   }
-  
+
   return context;
 };

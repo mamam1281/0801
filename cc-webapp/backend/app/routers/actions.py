@@ -84,7 +84,7 @@ async def create_action(user_id: int, action_type: str): # Simplified for now, m
     return {"message": "Action logged and potentially published to Kafka", "data": payload}
 
 @router.post("/SLOT_SPIN", response_model=SlotSpinResponse, tags=["games"])
-async def slot_spin(request: SlotSpinRequest):
+async def slot_spin(request: SlotSpinRequest, db = Depends(get_db)):
     """
     Slot machine spin endpoint.
     
@@ -98,6 +98,13 @@ async def slot_spin(request: SlotSpinRequest):
     Returns the spin result including win/loss information.
     """
     try:
+        # Check if user has reached daily limit
+        from app.services.game_limit_service import GameLimitService
+        limit_check = GameLimitService.use_game_play(db, request.user_id, "slot", request.vip_mode)
+        
+        if not limit_check["success"]:
+            raise ValueError(f"Daily limit reached. Resets at {limit_check['reset_time']}")
+        
         # Log action to Kafka if enabled
         if producer:
             payload = {
@@ -124,7 +131,8 @@ async def slot_spin(request: SlotSpinRequest):
             user_id=request.user_id,
             bet_amount=request.bet_amount,
             lines=request.lines,
-            vip_mode=request.vip_mode
+            vip_mode=request.vip_mode,
+            db_session=db
         )
         
         return result
