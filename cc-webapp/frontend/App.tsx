@@ -12,7 +12,7 @@ import { SettingsScreen } from './components/SettingsScreen';
 import { ShopScreen } from './components/ShopScreen';
 import { InventoryScreen } from './components/InventoryScreen';
 import { ProfileScreen } from './components/ProfileScreen';
-import { SideMenu } from './components/SideMenu';
+import { SideMenu } from './components/ui/skeleton';
 import { AdminPanel } from './components/AdminPanel';
 import { EventMissionPanel } from './components/EventMissionPanel';
 import { BottomNavigation } from './components/BottomNavigation';
