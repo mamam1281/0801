@@ -491,7 +491,7 @@ export function NeonCrashGame({ user, onBack, onUpdateUser, onAddNotification }:
                     <div className="text-sm font-bold">{crash.toFixed(2)}x</div>
                   </div>
                 ))
-              )}
+              }
             </div>
           </motion.div>
 

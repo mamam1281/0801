@@ -1,5 +1,5 @@
-import { User } from '../../../App';
-import { GachaItem, GachaBanner, GACHA_ITEMS, ANIMATION_DURATIONS } from './constants';
+import { User } from '../../../types';  // App.tsx가 아닌 types에서 import
+import { GachaItem } from '../../../types/gacha';
 
 export interface Particle {
   id: string;

@@ -1,22 +1,5 @@
-import { GameItem } from '../../../App';
-
-export interface GachaItem extends GameItem {
-  rate: number; // Pull rate percentage
-  isNew?: boolean;
-  sexiness?: number; // 키치/섹시 레벨 (1-5)
-}
-
-export interface GachaBanner {
-  id: string;
-  name: string;
-  description: string;
-  theme: string;
-  featuredItems: GachaItem[];
-  cost: number;
-  guaranteedRarity?: 'epic' | 'legendary';
-  bonusMultiplier: number;
-  bgGradient: string;
-}
+import { GameItem } from '../../../types';
+import { GachaItem, GachaBanner } from '../../../types/gacha';
 
 // 키치하고 섹시한 가챠 아이템들
 export const GACHA_ITEMS: GachaItem[] = [

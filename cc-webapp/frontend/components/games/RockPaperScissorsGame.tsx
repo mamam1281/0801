@@ -268,6 +268,17 @@ export function RockPaperScissorsGame({
     setParticles([]);
   };
 
+  // gameStats 속성 이름 수정
+  const winRate = user.gameStats.rps.totalGames > 0   // matches -> totalGames
+    ? Math.round((user.gameStats.rps.wins / user.gameStats.rps.totalGames) * 100)
+    : 0;
+
+  // draws는 계산해서 사용
+  const draws = user.gameStats.rps.totalGames - user.gameStats.rps.wins - losses;
+
+  // winStreak -> currentStreak 또는 bestStreak
+  <div>Current Streak: {user.gameStats.rps.currentStreak}</div>
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-black to-success/10 relative overflow-hidden">
       {/* Particle Effects */}
@@ -756,7 +767,7 @@ export function RockPaperScissorsGame({
                     </div>
                   </div>
                 ))
-              )}
+              }
             </div>
           </motion.div>
         </div>

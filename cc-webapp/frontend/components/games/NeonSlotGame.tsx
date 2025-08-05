@@ -283,10 +283,10 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
             ...user.gameStats,
             slot: {
               ...user.gameStats.slot,
-              spins: user.gameStats.slot.spins + 1,
+              totalSpins: user.gameStats.slot.totalSpins + 1,  // spins -> totalSpins
               totalWinnings: user.gameStats.slot.totalWinnings + result.winAmount,
               biggestWin: Math.max(user.gameStats.slot.biggestWin, result.winAmount),
-              jackpots: result.isJackpot ? user.gameStats.slot.jackpots + 1 : user.gameStats.slot.jackpots,
+              jackpotHits: result.isJackpot ? user.gameStats.slot.jackpotHits + 1 : user.gameStats.slot.jackpotHits,  // jackpots -> jackpotHits
               wins: user.gameStats.slot.wins + 1
             }
           },
@@ -318,7 +318,7 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
             ...user.gameStats,
             slot: {
               ...user.gameStats.slot,
-              spins: user.gameStats.slot.spins + 1
+              totalSpins: user.gameStats.slot.totalSpins + 1  // spins -> totalSpins
             }
           },
           stats: {

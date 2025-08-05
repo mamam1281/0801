@@ -112,3 +112,10 @@ export type AppScreen =
   | 'gacha-system'
   | 'neon-crash'
   | 'streaming';
+
+// GameSpecific 타입 추가 (GameSpecificStats 대신 GameStatsDetail 사용)
+export type GameSpecific = GameStatsDetail;
+
+// Event 타입이 이미 추가되어 있는지 확인하고, 없으면 추가
+// Mission 타입도 이미 추가됨
+

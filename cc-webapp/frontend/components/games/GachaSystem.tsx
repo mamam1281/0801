@@ -10,7 +10,8 @@ import {
   Heart,
   Crown
 } from 'lucide-react';
-import { User } from '../../App';
+import { User } from '../../types';  // App.tsx가 아닌 types에서 import
+import { GachaItem } from '../../types/gacha';
 import { Button } from '../ui/button';
 import { GACHA_BANNERS, ANIMATION_DURATIONS } from './gacha/constants';
 import { 
@@ -29,7 +30,7 @@ import {
   SexyInventoryModal,
   BackgroundEffects
 } from './gacha/components';
-import type { GachaItem, GachaBanner } from './gacha/constants';
+import type { GachaBanner } from './gacha/constants';
 
 interface GachaSystemProps {
   user: User;

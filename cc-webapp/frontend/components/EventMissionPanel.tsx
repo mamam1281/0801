@@ -411,7 +411,7 @@ export function EventMissionPanel({ user, onBack, onUpdateUser, onAddNotificatio
                   <div className="mb-4">
                     <div className="text-sm font-medium text-foreground mb-2">보상:</div>
                     <div className="flex flex-wrap gap-2">
-                      {event.rewards.map((reward, idx) => (
+                      {event.rewards.map((reward: any, idx: number) => (
                         <Badge key={idx} variant="secondary" className="text-xs">
                           {reward.type === 'gold' ? `${reward.amount.toLocaleString()}G` :
                            reward.type === 'exp' ? `${reward.amount.toLocaleString()}XP` :
@@ -426,7 +426,7 @@ export function EventMissionPanel({ user, onBack, onUpdateUser, onAddNotificatio
                     <div className="mb-4">
                       <div className="text-sm font-medium text-foreground mb-2">조건:</div>
                       <div className="space-y-1">
-                        {event.requirements.map((req, idx) => (
+                        {event.requirements.map((req: string, idx: number) => (
                           <div key={idx} className="text-xs text-muted-foreground flex items-center gap-2">
                             <CheckCircle className="w-3 h-3 text-success" />
                             {req}

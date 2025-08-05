@@ -1,10 +1,8 @@
 import React from 'react';
-import { motion } from 'framer-motion';
-import { Package, Star, Crown, Heart, Sparkles } from 'lucide-react';
-import { Button } from '../../ui/button';
-import { GachaItem, GachaBanner, RARITY_COLORS, SEXY_EMOJIS } from './constants';
-import { getBannerStyle, generateSparkles, getAnimationDelay } from './utils';
-import { User } from '../../../App';
+import { motion, AnimatePresence } from 'framer-motion';
+import { User } from '../../../types';  // App.tsx가 아닌 types에서 import
+import { GachaItem } from '../../../types/gacha';
+import { RARITY_COLORS } from './constants';
 
 interface SexyBannerSelectorProps {
   banners: GachaBanner[];
