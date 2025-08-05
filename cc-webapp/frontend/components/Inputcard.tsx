@@ -1,8 +1,8 @@
 import React from 'react';
 import { BaseCard } from './Basecard';
 import Button from './Button';
-import { Input } from './Input';
-import { Label } from './Label';
+import { Input } from './ui/Input';
+import { Label } from './ui/Label';
 import { User, Lock, LogIn } from 'lucide-react';
 
 interface InputCardProps {

@@ -4,7 +4,7 @@ import React from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { Provider } from 'react-redux';
 import { store } from '../store/store';
-import AppHeader from '../components/AppHeader';
+import AppHeader from '../components/ui/dropdown-menu';
 import BottomNavigationBar from '../components/BottomNavigationBar';
 
 export interface LayoutWrapperProps {

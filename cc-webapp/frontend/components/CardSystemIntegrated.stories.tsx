@@ -6,7 +6,7 @@ import { BaseCard } from './Basecard';
 import { FeedbackCard } from './Feedbackcard';
 import { GameStatsCard } from './Gamestatscard';
 import { InputCard } from './Inputcard';
-import { NotificationCard } from './NotificationCard';
+import { NotificationCard } from './ui/navigation-menu';
 import { PointsCard } from './PointsCard';
 import { RecentActivityCard } from './RecentActivityCard';
 
