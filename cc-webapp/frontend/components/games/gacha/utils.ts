@@ -1,6 +1,15 @@
-import { User } from '../../../types';  // App.tsx가 아닌 types에서 import
-import { GachaItem } from '../../../types/gacha';
-import { ANIMATION_DURATIONS, SEXY_EMOJIS } from './constants';
+import { User } from '../../../types';
+import { GachaItem, GachaBanner, HeartParticle } from '../../../types/gacha';
+import { ANIMATION_DURATIONS, SEXY_EMOJIS, GACHA_ITEMS } from './constants';
+
+/**
+ * 고유 ID 생성 함수
+ * @param prefix ID 앞에 붙일 접두사
+ * @returns 랜덤 ID 문자열
+ */
+export function generateUniqueId(prefix: string = ''): string {
+  return `${prefix}_${Math.random().toString(36).substring(2, 9)}_${Date.now()}`;
+}
 
 /**
  * 반짝이는 효과를 위한 랜덤 위치의 요소들 생성
@@ -45,7 +54,7 @@ export function generateParticles(rarity: string, count = 20) {
     animationDelay: `${Math.random() * 0.5}s`,
     rarity,
   }));
-};
+}
 
 // Generate floating heart particles
 export const generateHeartParticles = (): HeartParticle[] => {
@@ -83,7 +92,7 @@ export const getRandomItem = (banner: GachaBanner, user: User): GachaItem => {
   for (const item of adjustedItems) {
     random -= item.rate;
     if (random <= 0) {
-      return { ...item, isNew: !user.inventory.some(inv => inv.id === item.id) };
+      return { ...item, isNew: !user.inventory?.some(inv => inv.id === item.id) };
     }
   }
   
@@ -92,7 +101,7 @@ export const getRandomItem = (banner: GachaBanner, user: User): GachaItem => {
 
 // Update user inventory with new item
 export const updateUserInventory = (user: User, item: GachaItem): User => {
-  const updatedInventory = [...user.inventory];
+  const updatedInventory = [...(user.inventory || [])];
   const existingItemIndex = updatedInventory.findIndex(inv => inv.id === item.id);
   
   if (existingItemIndex !== -1) {
@@ -109,7 +118,7 @@ export const updateUserInventory = (user: User, item: GachaItem): User => {
 
 // Get rarity notification message
 export const getRarityMessage = (item: GachaItem): string => {
-  const rarityMessages = {
+  const rarityMessages: { [key: string]: string } = {
     common: `💋 카와이 아이템: ${item.name}`,
     rare: `💎 레어 아이템: ${item.name}!`,
     epic: `🔥 에픽 아이템: ${item.name}!!`,
@@ -117,7 +126,7 @@ export const getRarityMessage = (item: GachaItem): string => {
     mythic: `🌟 미식 아이템: ${item.name}!!!!`
   };
   
-  return rarityMessages[item.rarity as keyof typeof rarityMessages];
+  return rarityMessages[item.rarity] || rarityMessages['common'];
 };
 
 // Count rarities in items array
@@ -142,7 +151,7 @@ export const getTenPullMessage = (items: GachaItem[]): string => {
 
 // Get banner background style
 export const getBannerStyle = (banner: GachaBanner, isSelected: boolean) => {
-  const colorMaps = {
+  const colorMaps: { [key: string]: string } = {
     'pink-400': '236, 72, 153, 0.3',
     'pink-500': '236, 72, 153, 0.4', 
     'pink-600': '219, 39, 119, 0.5',
@@ -152,8 +161,7 @@ export const getBannerStyle = (banner: GachaBanner, isSelected: boolean) => {
   };
 
   const gradient = banner.bgGradient.replace(/from-|via-|to-/g, '').split(' ').map(color => {
-    const rgbaValue = colorMaps[color as keyof typeof colorMaps] || '255, 255, 255, 0.1';
-    return `rgba(${rgbaValue})`;
+    return colorMaps[color] || '255, 255, 255, 0.1';
   }).join(', ');
 
   return {
@@ -175,12 +183,12 @@ export const getSexinessLevel = (item: GachaItem): number => {
 };
 
 export const getSexinessColor = (level: number): string => {
-  const colors = {
+  const colors: { [key: number]: string } = {
     1: '#ec4899', // Pink
     2: '#8b5cf6', // Purple  
     3: '#f59e0b', // Orange
     4: '#ef4444', // Red
     5: '#22d3ee'  // Cyan
   };
-  return colors[level as keyof typeof colors] || colors[1];
+  return colors[level] || colors[1];
 };
