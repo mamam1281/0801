@@ -1,16 +1,13 @@
 import os
 import json
-from fastapi import APIRouter, Depends, HTTPException, Body
+from fastapi import APIRouter, Depends, HTTPException
 #  # Will be needed later
 try:
     from confluent_kafka import Producer
 except ImportError:  # In case library is not installed during lightweight tests
     Producer = None
-from .. import schemas
 # from .. import models, schemas, database # Assuming these exist and will be used later
 from datetime import datetime
-from ..schemas.slot_enhanced import SlotSpinRequest, SlotSpinResponse
-from ..services.slot_enhanced_service import SlotMachineEnhancedService
 
 router = APIRouter(prefix="/api/actions", tags=["Game Actions"])
 
@@ -35,8 +32,13 @@ def delivery_report(err, msg):
     else:
         print(f'Message delivered to {msg.topic()} [{msg.partition()}] at offset {msg.offset()}')
 
-# Database session dependency
-from ..db.session import get_db
+# Example placeholder for a database session dependency - to be implemented later
+# def get_db():
+#     db = database.SessionLocal()
+#     try:
+#         yield db
+#     finally:
+#         db.close()
 
 @router.post("/actions", tags=["actions"])
 # async def create_action(action: schemas.ActionCreate, db = Depends(get_db)): # Full version with Pydantic and DB
@@ -82,66 +84,6 @@ async def create_action(user_id: int, action_type: str): # Simplified for now, m
 
     # return db_action # Or a schema.Action if returning DB object
     return {"message": "Action logged and potentially published to Kafka", "data": payload}
-
-@router.post("/SLOT_SPIN", response_model=SlotSpinResponse, tags=["games"])
-async def slot_spin(request: SlotSpinRequest, db = Depends(get_db)):
-    """
-    Slot machine spin endpoint.
-    
-    Handles a slot machine spin request and returns the result.
-    
-    - **user_id**: User identifier
-    - **bet_amount**: Amount to bet (5,000-10,000 coins)
-    - **lines**: Number of active lines (default: 3)
-    - **vip_mode**: Whether VIP benefits should be applied
-    
-    Returns the spin result including win/loss information.
-    """
-    try:
-        # Check if user has reached daily limit
-        from app.services.game_limit_service import GameLimitService
-        limit_check = GameLimitService.use_game_play(db, request.user_id, "slot", request.vip_mode)
-        
-        if not limit_check["success"]:
-            raise ValueError(f"Daily limit reached. Resets at {limit_check['reset_time']}")
-        
-        # Log action to Kafka if enabled
-        if producer:
-            payload = {
-                "user_id": request.user_id,
-                "action_type": "SLOT_SPIN",
-                "bet_amount": request.bet_amount,
-                "vip_mode": request.vip_mode,
-                "action_timestamp": datetime.utcnow().isoformat()
-            }
-            
-            try:
-                producer.produce(
-                    TOPIC_USER_ACTIONS,
-                    key=str(request.user_id),
-                    value=json.dumps(payload).encode("utf-8"),
-                    callback=delivery_report,
-                )
-                producer.poll(0)
-            except Exception as e:
-                print(f"Kafka error: {e}")
-        
-        # Execute the slot machine spin
-        result = SlotMachineEnhancedService.spin(
-            user_id=request.user_id,
-            bet_amount=request.bet_amount,
-            lines=request.lines,
-            vip_mode=request.vip_mode,
-            db_session=db
-        )
-        
-        return result
-        
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        print(f"Error in slot_spin: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
 
 # Ensure this router is included in app/main.py:
 # from .routers import actions

@@ -57,13 +57,11 @@ export function generateParticles(rarity: string, count = 20) {
 }
 
 // Generate floating heart particles
-export const generateHeartParticles = (count: number = 3): HeartParticle[] => {
-  return Array.from({ length: count }, (_, i) => ({
+export const generateHeartParticles = (): HeartParticle[] => {
+  return Array.from({ length: 3 }, (_, i) => ({
     id: generateUniqueId('heart'),
     x: Math.random() * 100,
-    y: Math.random() * 100,
-    size: Math.random() * 20 + 10,  // 10-30px
-    scale: Math.random() * 0.5 + 0.5  // 0.5-1
+    y: Math.random() * 100
   }));
 };
 

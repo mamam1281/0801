@@ -78,8 +78,8 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
   
   // Jackpot calculation
   useEffect(() => {
-    setCurrentJackpot(50000 + user.gameStats.slot.totalSpins * 50);
-  }, [user.gameStats.slot.totalSpins]);
+    setCurrentJackpot(50000 + (user.gameStats.slot.spins * 50));
+  }, [user.gameStats.slot.spins]);
 
   // Auto spin logic
   useEffect(() => {
@@ -450,13 +450,8 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
         >
           <div className="glass-effect rounded-2xl p-6 border-2 border-gold/20 gold-soft-glow">
             <motion.div
-              animate={{ scale: 1.05 }}
-              transition={{ 
-                duration: 1.5, 
-                repeat: Infinity, 
-                repeatType: "reverse",
-                ease: "easeInOut" 
-              }}
+              animate={{ scale: [1, 1.05, 1] }}
+              transition={{ duration: 3, repeat: Infinity }}
               className="text-3xl lg:text-4xl font-black text-gradient-gold mb-2"
             >
               💰 JACKPOT 💰
@@ -484,9 +479,10 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
                 className="absolute inset-0 pointer-events-none z-10 rounded-3xl"
               >
                 <motion.div
-                  animate={{ opacity: 0.7 }}
-                  initial={{ opacity: 0.3 }}
-                  transition={{ duration: 0.5, repeat: Infinity, repeatType: "reverse" }}
+                  animate={{ 
+                    opacity: [0.3, 0.7, 0.3]
+                  }}
+                  transition={{ duration: 1, repeat: Infinity }}
                   className="absolute inset-0 bg-gradient-to-r from-gold/10 via-transparent to-gold/10 rounded-3xl"
                 />
               </motion.div>
@@ -535,25 +531,18 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
                     key={`final-${index}-${symbol.id}`}
                     animate={
                       reelStopOrder.includes(index) ? {
-                        scale: 1,
-                        y: 0
+                        scale: [0.8, 1.2, 1],
+                        y: [30, -10, 0]
                       } : 
                       winningPositions[index] ? { 
-                        scale: 1.2,
-                        rotate: 5
-                      } : {}
-                    }
-                    initial={
-                      reelStopOrder.includes(index) ? {
-                        scale: 0.8,
-                        y: 30
+                        scale: [1, 1.2, 1],
+                        rotate: [0, 5, -5, 0]
                       } : {}
                     }
                     transition={{ 
                       duration: winningPositions[index] ? 0.6 : 0.5, 
                       repeat: winningPositions[index] ? 3 : 0,
-                      repeatType: "reverse",
-                      type: winningPositions[index] ? "tween" : "spring",
+                      type: "spring",
                       stiffness: 300
                     }}
                     className={`text-5xl lg:text-6xl ${symbol.color} z-20 relative ${
@@ -572,9 +561,8 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
                 {/* Wild effect */}
                 {symbol.isWild && (
                   <motion.div
-                    animate={{ opacity: 0.7 }}
-                    initial={{ opacity: 0.3 }}
-                    transition={{ duration: 0.5, repeat: Infinity, repeatType: "reverse" }}
+                    animate={{ opacity: [0.3, 0.7, 0.3] }}
+                    transition={{ duration: 1, repeat: Infinity }}
                     className="absolute inset-0 bg-gradient-to-r from-primary/10 to-primary-light/10 rounded-2xl pointer-events-none"
                   />
                 )}
@@ -598,20 +586,14 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
               >
                 <motion.div
                   animate={{ 
-                    scale: 1.1,
-                    textShadow: '0 0 20px rgba(255,215,0,0.6)'
+                    scale: [1, 1.1, 1],
+                    textShadow: [
+                      '0 0 10px rgba(255,215,0,0.3)', 
+                      '0 0 20px rgba(255,215,0,0.6)', 
+                      '0 0 10px rgba(255,215,0,0.3)'
+                    ]
                   }}
-                  initial={{
-                    scale: 1,
-                    textShadow: '0 0 10px rgba(255,215,0,0.3)'
-                  }}
-                  transition={{ 
-                    duration: 0.4, 
-                    repeat: 6, 
-                    repeatType: "reverse",
-                    ease: "easeInOut",
-                    type: "tween"
-                  }}
+                  transition={{ duration: 0.8, repeat: 3 }}
                   className="text-4xl lg:text-5xl font-black text-gradient-gold mb-2"
                 >
                   {winAmount >= betAmount * 10 ? '🔥 BIG WIN! 🔥' : '🎉 WIN! 🎉'}
@@ -730,13 +712,13 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
         >
           <div className="glass-effect rounded-xl p-4 text-center card-hover-float">
             <div className="text-xl font-bold text-primary">
-              {user.gameStats.slot.totalSpins}
+              {user.gameStats.slot.spins}
             </div>
             <div className="text-sm text-muted-foreground">총 스핀</div>
           </div>
           <div className="glass-effect rounded-xl p-4 text-center card-hover-float">
             <div className="text-xl font-bold text-gold">
-              {user.gameStats.slot.jackpotHits}
+              {user.gameStats.slot.jackpots}
             </div>
             <div className="text-sm text-muted-foreground">잭팟 횟수</div>
           </div>

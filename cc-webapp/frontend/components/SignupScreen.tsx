@@ -36,9 +36,6 @@ interface SignupScreenProps {
   isLoading?: boolean;
 }
 
-// API 클라이언트 가져오기
-import { authApi } from '../utils/api';
-
 export function SignupScreen({ 
   onSignup, 
   onBackToLogin,
@@ -58,34 +55,6 @@ export function SignupScreen({
   const [errors, setErrors] = useState<Partial<SignupFormData>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
-  const [inviteCodeValid, setInviteCodeValid] = useState<boolean | null>(null);
-  const [checkingInviteCode, setCheckingInviteCode] = useState(false);
-
-  // 초대 코드 확인 함수
-  const checkInviteCode = async () => {
-    if (!formData.inviteCode.trim()) {
-      setErrors(prev => ({ ...prev, inviteCode: '초대코드를 입력해주세요.' }));
-      return;
-    }
-    
-    setCheckingInviteCode(true);
-    try {
-      const response = await authApi.checkInviteCode(formData.inviteCode.trim());
-      setInviteCodeValid(response.is_valid);
-      
-      if (!response.is_valid) {
-        setErrors(prev => ({ ...prev, inviteCode: '유효하지 않은 초대코드입니다.' }));
-      } else {
-        setErrors(prev => ({ ...prev, inviteCode: undefined }));
-      }
-    } catch (error) {
-      console.error('초대코드 확인 실패:', error);
-      setInviteCodeValid(false);
-      setErrors(prev => ({ ...prev, inviteCode: '초대코드 확인 중 오류가 발생했습니다.' }));
-    } finally {
-      setCheckingInviteCode(false);
-    }
-  };
 
   const validateForm = (): boolean => {
     const newErrors: Partial<SignupFormData> = {};
@@ -124,13 +93,6 @@ export function SignupScreen({
     if (formData.password !== formData.confirmPassword) {
       newErrors.confirmPassword = '비밀번호가 일치하지 않습니다.';
     }
-    
-    // Invite code validation
-    if (!formData.inviteCode.trim()) {
-      newErrors.inviteCode = '초대코드를 입력해주세요.';
-    } else if (inviteCodeValid === false) {
-      newErrors.inviteCode = '유효하지 않은 초대코드입니다.';
-    }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -140,26 +102,6 @@ export function SignupScreen({
     e.preventDefault();
     
     if (!validateForm()) return;
-
-    // 초대코드를 먼저 확인하지 않았으면 확인
-    if (inviteCodeValid !== true) {
-      setIsSubmitting(true);
-      try {
-        const response = await authApi.checkInviteCode(formData.inviteCode.trim());
-        setInviteCodeValid(response.is_valid);
-        
-        if (!response.is_valid) {
-          setErrors(prev => ({ ...prev, inviteCode: '유효하지 않은 초대코드입니다.' }));
-          setIsSubmitting(false);
-          return;
-        }
-      } catch (error) {
-        console.error('초대코드 확인 실패:', error);
-        setErrors(prev => ({ ...prev, inviteCode: '초대코드 확인 중 오류가 발생했습니다.' }));
-        setIsSubmitting(false);
-        return;
-      }
-    }
 
     setIsSubmitting(true);
     try {
@@ -428,15 +370,8 @@ export function SignupScreen({
 
       {/* Invite Code */}
       <div className="space-y-2">
-        <Label htmlFor="inviteCode" className="text-foreground flex items-center justify-between">
-          <span>초대코드 *</span>
-          <button 
-            type="button" 
-            onClick={checkInviteCode}
-            className="text-xs text-primary hover:underline"
-          >
-            코드 확인
-          </button>
+        <Label htmlFor="inviteCode" className="text-foreground">
+          초대코드 (선택사항)
         </Label>
         <div className="relative">
           <Gift className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
@@ -445,34 +380,13 @@ export function SignupScreen({
             type="text"
             value={formData.inviteCode}
             onChange={handleInputChange('inviteCode')}
-            placeholder="초대코드를 입력하세요"
-            className={`pl-10 bg-input-background border-input-border focus:border-primary focus:ring-primary/20 text-foreground ${
-              errors.inviteCode ? 'border-error focus:border-error' : 
-              inviteCodeValid === true ? 'border-success focus:border-success' : ''
-            }`}
+            placeholder="초대코드가 있다면 입력하세요"
+            className="pl-10 bg-input-background border-input-border focus:border-primary focus:ring-primary/20 text-foreground"
           />
-          {inviteCodeValid === true && (
-            <CheckCircle className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-success" />
-          )}
         </div>
-        {errors.inviteCode ? (
-          <motion.p
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-error text-sm flex items-center gap-1"
-          >
-            <AlertCircle className="w-3 h-3" />
-            {errors.inviteCode}
-          </motion.p>
-        ) : inviteCodeValid === true ? (
-          <p className="text-xs text-success">
-            사용 가능한 초대코드입니다!
-          </p>
-        ) : (
-          <p className="text-xs text-muted-foreground">
-            초대코드는 가입에 필수입니다.
-          </p>
-        )}
+        <p className="text-xs text-muted-foreground">
+          초대코드 입력 시 보너스 골드를 받을 수 있습니다!
+        </p>
       </div>
 
       <div className="flex gap-3">

@@ -47,6 +47,8 @@
 ## 4. 디렉토리 구조 분석
 
 ```
+
+app.tsx가 메인임 
 cc-webapp/frontend/
 ├── .next/               # 빌드 캐시 (일부 불일치 존재)
 ├── .vscode/             # VS Code 설정
@@ -59,9 +61,7 @@ cc-webapp/frontend/
 │   └── ... (다수 컴포넌트)
 ├── contexts/            # React Context 관리
 ├── hooks/               # 커스텀 훅
-├── backup-pages-router/  # 이전 Pages Router 백업 (참조용)
-│   ├── _app.tsx         # 이전 페이지 초기화 (비활성화)
-│   └── index.tsx        # 이전 메인 페이지 (비활성화)
+├
 ├── public/              # 정적 파일
 ├── styles/              # 스타일 시트
 │   └── globals.css      # 전역 스타일 (디자인 토큰 포함)

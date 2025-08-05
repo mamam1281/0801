@@ -4,7 +4,6 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Gamepad2, Zap, Star, Crown, Sparkles } from 'lucide-react';
 import dynamic from 'next/dynamic';
-import { useRouter } from 'next/navigation';
 
 interface LoadingScreenProps {
   onComplete?: () => void;
@@ -18,7 +17,6 @@ function LoadingScreenComponent({
   duration = 3000,
   gameTitle = 'MODEL',
 }: LoadingScreenProps) {
-  const router = useRouter();
   // ⭐ 모든 state 훅을 최상단에 배치 (순서 중요)
   const [progress, setProgress] = useState(0);
   const [currentStep, setCurrentStep] = useState(0);
@@ -81,14 +79,7 @@ function LoadingScreenComponent({
             setTimeout(() => {
               if (isMounted) {
                 setIsComplete(true);
-                console.log('[LoadingScreen] 로딩 100% 완료');
-                if (onComplete) {
-                  console.log('[LoadingScreen] onComplete 콜백 호출');
-                  onComplete();
-                } else {
-                  console.log('[LoadingScreen] router.push(/login)');
-                  router.push('/login');
-                }
+                if (onComplete) onComplete();
               }
             }, 500);
           }
@@ -98,27 +89,12 @@ function LoadingScreenComponent({
       }
     }, duration / 100); // 진행 속도 조정
 
-    // 3초 강제 타임아웃: 로딩이 끝나지 않아도 로그인 페이지로 이동
-    const forceTimeout = setTimeout(() => {
-      if (!isComplete) {
-        console.log('[LoadingScreen] 3초 강제 타임아웃 발생');
-        if (onComplete) {
-          console.log('[LoadingScreen] onComplete 콜백 호출 (타임아웃)');
-          onComplete();
-        } else {
-          console.log('[LoadingScreen] router.push(/login) (타임아웃)');
-          router.push('/login');
-        }
-      }
-    }, 3000);
-
     // 클린업 함수
     return () => {
       clearInterval(interval);
-      clearTimeout(forceTimeout);
       isMounted = false;
     };
-  }, [progress, currentStep, duration, onComplete, isComplete, router]);
+  }, [progress, currentStep, duration, onComplete]); // ⭐ 모든 의존성 명시적 추가
 
   // ⭐ 애니메이션 효과 설정 (useMemo 대신 일반 변수로 전환)
   const particleCount = isMobile ? 10 : 20;
