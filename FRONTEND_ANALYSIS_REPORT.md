@@ -10,8 +10,8 @@
 
 | 문제 영역 | 현재 상태 | 문제점 | 해결 방향 |
 |----------|---------|--------|---------|
-| **라우팅 구조** | `app/` 디렉토리만 존재 (Pages Router 제거 완료) | 라우팅 시스템 통일 완료 | App Router 기반 개발 계속 진행 |
-| **파일 구조** | 일부 백업 파일 존재 (`page.tsx.bak`) | 파일 구조 불일치로 인한 빌드 오류 | 불필요한 백업 파일 제거 및 구조 정리 |
+| **라우팅 구조** | `app/` 디렉토리만 존재 (Pages Router 제거 완료) ✅ | 라우팅 시스템 통일 완료 | App Router 기반 개발 계속 진행 |
+| **파일 구조** | 백업 파일 정리 완료 ✅ | 파일 구조 일관성 확보 | 표준화된 파일 구조로 개발 진행 |
 | **코드 병합** | 여러 소스에서 코드 통합 진행 중 | 통합 과정에서 설정 파일 충돌 및 손실 | 체계적인 통합 스크립트로 일관성 유지 |
 | **백엔드 연동** | API 연결 설정 불완전 | 백엔드 API 호출 실패 가능성 | 환경 변수 및 API 클라이언트 설정 표준화 |
 
@@ -19,9 +19,9 @@
 
 | 설정 파일 | 현재 상태 | 문제점 | 해결 방향 |
 |----------|---------|--------|---------|
-| **postcss.config.js** | 일부 환경에서 ES 모듈 문법 사용 | CommonJS와 ESM 문법 혼용으로 인한 오류 | CommonJS 형식으로 통일 (`module.exports`) |
-| **next.config.js** | 환경마다 다른 설정 | 일관성 없는 웹팩 구성 | 표준화된 구성으로 통일 |
-| **tailwind.config.mjs** | 기본 설정은 존재 | 일부 커스텀 효과 미적용 | 모든 커스텀 디자인 토큰 확인 및 적용 |
+| **postcss.config.js** | CommonJS 형식 및 객체 문법 적용 ✅ | 해결됨 | 문자열 기반 플러그인 형식 적용 |
+| **next.config.js** | 표준화된 웹팩 구성 적용됨 ✅ | 해결됨 | 현재 구성 유지 |
+| **tailwind.config.mjs** | 기본 설정 및 커스텀 확장 존재 ✅ | 일부 커스텀 효과 적용 문제는 설정 형식이 아닌 CSS 구현 문제 | CSS 변수 및 클래스 사용법 확인 |
 | **package.json** | 여러 버전 혼재 | 의존성 충돌 가능성 | 의존성 정리 및 최신화 |
 
 ### 2.3 디자인 및 기능 구현 이슈
@@ -52,8 +52,7 @@ cc-webapp/frontend/
 ├── .vscode/             # VS Code 설정
 ├── app/                 # App Router 구조
 │   ├── layout.tsx       # 기본 레이아웃
-│   ├── page.tsx         # 메인 페이지 (App.tsx 호출)
-│   └── page.tsx.bak     # 백업 파일 (제거 필요)
+│   └── page.tsx         # 메인 페이지 (App.tsx 호출)
 ├── components/          # 컴포넌트 디렉토리
 │   ├── LoadingScreen.tsx
 │   ├── MainScreen.tsx
@@ -65,8 +64,7 @@ cc-webapp/frontend/
 │   └── index.tsx        # 이전 메인 페이지 (비활성화)
 ├── public/              # 정적 파일
 ├── styles/              # 스타일 시트
-│   ├── globals.css      # 전역 스타일 (디자인 토큰 포함)
-│   └── globals.css.bak  # 백업 파일
+│   └── globals.css      # 전역 스타일 (디자인 토큰 포함)
 ├── App.tsx              # 메인 애플리케이션 컴포넌트
 ├── next.config.js       # Next.js 설정
 ├── postcss.config.js    # PostCSS 설정
@@ -127,26 +125,26 @@ cc-webapp/frontend/
    - App Router로 표준화 완료 (Next.js 15 권장 방식)
    - `pages` 디렉토리 제거 및 `app` 디렉토리 구조로 통합 완료
 
-2. **백업 파일 제거**
-   - `.bak` 확장자 파일 및 중복 파일 정리
-   - 명확한 이름 규칙 적용
+2. **백업 파일 제거** ✅
+   - `.bak` 확장자 파일 검사 및 제거 완료 (현재 프로젝트에 .bak 파일 없음)
+   - 백업 관련 파일은 `backups/` 디렉토리에 체계적으로 보관됨
 
 ### 7.2 설정 파일 표준화
 
-1. **PostCSS 설정 수정**
+1. **PostCSS 설정 수정** ✅
 ```javascript
-// postcss.config.js - 표준화 버전
+// postcss.config.js - 표준화 버전 (수정 완료)
 module.exports = {
-  plugins: [
-    require('@tailwindcss/postcss'),
-    require('autoprefixer'),
-  ],
+  plugins: {
+    '@tailwindcss/postcss': {},
+    'autoprefixer': {},
+  },
 }
 ```
 
-2. **Next.js 설정 최적화**
+2. **Next.js 설정 최적화** ✅
 ```javascript
-// next.config.js - 표준화 버전
+// next.config.js - 표준화 버전 (이미 적용됨)
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,

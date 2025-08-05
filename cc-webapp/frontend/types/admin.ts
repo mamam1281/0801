@@ -1,56 +1,87 @@
-// API 응답 타입 정의
-export interface User {
-  id: number;
-  site_id: string;
-  nickname: string;
-  phone_number: string;
-  cyber_token_balance: number;
-  rank: string;
-  created_at: string;
+// 관리자 전용 타입 정의
+export interface ShopItem {
+  id: string;
+  name: string;
+  description: string;
+  price: number;
+  category: 'skin' | 'powerup' | 'currency' | 'collectible' | 'character' | 'weapon';
+  rarity: 'common' | 'rare' | 'epic' | 'legendary' | 'mythic';
+  isActive: boolean;
+  stock?: number;
+  discount?: number;
+  icon: string;
+  previewImage?: string;
+  createdAt: Date;
+  updatedAt: Date;
+  sales: number;
+  tags: string[];
 }
 
-export interface UserActivity {
-  id: number;
-  user_id: number;
-  activity_type: string;
-  timestamp: string;
+export interface AdminLog {
+  id: string;
+  adminId: string;
+  adminName: string;
+  action: string;
+  target: string;
   details: string;
-  user?: User;
+  timestamp: Date;
+  ipAddress: string;
+  userAgent: string;
 }
 
-export interface Reward {
-  id: number;
-  user_id: number;
-  reward_type: string;
-  amount: number;
-  reason: string;
-  admin_id: number;
-  created_at: string;
-  user?: User;
+export interface SystemBackup {
+  id: string;
+  name: string;
+  description: string;
+  size: number;
+  createdAt: Date;
+  type: 'full' | 'users' | 'shop' | 'logs';
+  status: 'creating' | 'completed' | 'failed';
 }
 
-export interface UserDetailResponse extends User {
-  recent_activities: UserActivity[];
-  recent_rewards: Reward[];
+export interface PushNotification {
+  id: string;
+  title: string;
+  message: string;
+  type: 'general' | 'event' | 'maintenance' | 'promotion';
+  targetUsers: 'all' | 'active' | 'specific';
+  userIds?: string[];
+  scheduledAt?: Date;
+  sentAt?: Date;
+  isRead: boolean;
+  clickCount: number;
 }
 
-export interface GiveRewardRequest {
-  user_id: number;
-  reward_type: string;
-  amount: number;
-  reason: string;
-  admin_id: number;
+export interface UserImportData {
+  nickname: string;
+  email?: string;
+  goldBalance?: number;
+  level?: number;
+  isAdmin?: boolean;
 }
 
-export interface ApiResponse<T> {
-  data: T;
-  status: string;
-  message?: string;
+export interface AdminDashboardStats {
+  totalRevenue: number;
+  todayRevenue: number;
+  totalUsers: number;
+  activeUsers: number;
+  newUsersToday: number;
+  totalShopItems: number;
+  topSellingItems: Array<{
+    item: ShopItem;
+    sales: number;
+    revenue: number;
+  }>;
+  recentActivity: AdminLog[];
 }
 
-export interface PaginatedResponse<T> {
-  data: T[];
-  total: number;
-  skip: number;
-  limit: number;
+export interface GameConfiguration {
+  id: string;
+  key: string;
+  value: any;
+  description: string;
+  type: 'string' | 'number' | 'boolean' | 'json';
+  category: 'game' | 'economy' | 'ui' | 'security';
+  updatedAt: Date;
+  updatedBy: string;
 }
