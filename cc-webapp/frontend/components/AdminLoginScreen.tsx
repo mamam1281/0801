@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { apiLogTry, apiLogSuccess, apiLogFail } from '../utils/apiLogger';
 import { 
   Shield, 
   Lock, 
@@ -60,28 +61,29 @@ export function AdminLoginScreen({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-
+    apiLogTry('관리자 로그인');
     if (isLocked) {
       setError(`보안 잠금 상태입니다. ${lockdownTime}초 후 다시 시도하세요.`);
+      apiLogFail('관리자 로그인', '잠금 상태');
       return;
     }
-    
     if (!formData.adminId.trim() || !formData.password.trim()) {
       setError('모든 필드를 입력해주세요.');
+      apiLogFail('관리자 로그인', '필드 누락');
       return;
     }
-
     setIsSubmitting(true);
     try {
       const success = await onAdminLogin?.(
         formData.adminId, 
         formData.password
       ) ?? false;
-      
-      if (!success) {
+      if (success) {
+        apiLogSuccess('관리자 로그인');
+      } else {
+        apiLogFail('관리자 로그인', '잘못된 정보');
         const newAttempts = attempts + 1;
         setAttempts(newAttempts);
-        
         if (newAttempts >= 3) {
           setIsLocked(true);
           setLockdownTime(30);
@@ -91,6 +93,7 @@ export function AdminLoginScreen({
         }
       }
     } catch (err) {
+      apiLogFail('관리자 로그인', err);
       setError('시스템 오류가 발생했습니다.');
     } finally {
       setIsSubmitting(false);

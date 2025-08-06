@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { apiLogTry, apiLogSuccess, apiLogFail } from '../utils/apiLogger';
 import { 
   User, 
   Lock, 
@@ -42,19 +43,23 @@ export function LoginScreen({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    
+    apiLogTry('로그인');
     if (!formData.nickname.trim() || !formData.password.trim()) {
       setError('모든 필드를 입력해주세요.');
+      apiLogFail('로그인', '필드 누락');
       return;
     }
-
     setIsSubmitting(true);
     try {
       const success = await onLogin?.(formData.nickname, formData.password) ?? true;
-      if (!success) {
+      if (success) {
+        apiLogSuccess('로그인');
+      } else {
+        apiLogFail('로그인', '잘못된 정보');
         setError('닉네임 또는 비밀번호가 올바르지 않습니다.');
       }
     } catch (err) {
+      apiLogFail('로그인', err);
       setError('로그인 중 오류가 발생했습니다.');
     } finally {
       setIsSubmitting(false);

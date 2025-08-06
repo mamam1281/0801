@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { apiLogTry, apiLogSuccess, apiLogFail } from '../utils/apiLogger';
 import { 
   User, 
   Lock, 
@@ -100,16 +101,22 @@ export function SignupScreen({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!validateForm()) return;
-
+    apiLogTry('회원가입');
+    if (!validateForm()) {
+      apiLogFail('회원가입', '폼 검증 실패');
+      return;
+    }
     setIsSubmitting(true);
     try {
       const success = await onSignup?.(formData) ?? true;
-      if (!success) {
+      if (success) {
+        apiLogSuccess('회원가입');
+      } else {
+        apiLogFail('회원가입', '잘못된 정보');
         setErrors({ userId: '회원가입 중 오류가 발생했습니다.' });
       }
     } catch (err) {
+      apiLogFail('회원가입', err);
       setErrors({ userId: '회원가입 중 오류가 발생했습니다.' });
     } finally {
       setIsSubmitting(false);
