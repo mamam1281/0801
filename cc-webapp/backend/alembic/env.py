@@ -42,7 +42,16 @@ if config.config_file_name is not None:
 
 def get_database_url():
     """환경에 따른 데이터베이스 URL 반환"""
-    # Docker/Production 환경 - PostgreSQL
+    # Docker/Production environment - PostgreSQL
+    postgres_server = os.getenv('POSTGRES_SERVER')
+    postgres_user = os.getenv('POSTGRES_USER')
+    postgres_password = os.getenv('POSTGRES_PASSWORD')
+    postgres_db = os.getenv('POSTGRES_DB')
+    
+    if postgres_server and postgres_user and postgres_password and postgres_db:
+        return f"postgresql://{postgres_user}:{postgres_password}@{postgres_server}:5432/{postgres_db}"
+    
+    # Fallback to legacy environment variables
     if os.getenv('DB_HOST'):
         db_host = os.getenv('DB_HOST', 'localhost')
         db_port = os.getenv('DB_PORT', '5432')

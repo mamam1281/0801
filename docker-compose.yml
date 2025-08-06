@@ -62,8 +62,6 @@ services:
     image: redis:7
     container_name: cc_redis
     command: redis-server --requirepass ${REDIS_PASSWORD:-redis_password}
-    ports:
-      - "6379:6379"
     networks:
       - ccnet
 

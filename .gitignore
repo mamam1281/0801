@@ -211,3 +211,19 @@ node_modules/
 
 *storybook.log
 storybook-static
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+auth.db
+local_dev.db
+fallback.db
+
+# Data directories
+data/
+logs/
+
+# Docker volumes
+data/postgres/
+data/redis/
