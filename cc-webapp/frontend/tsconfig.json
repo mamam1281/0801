@@ -4,11 +4,10 @@
     "lib": [
       "dom",
       "dom.iterable",
-      "ES6",
-      "esnext"
+      "ES6"
     ],
     "allowJs": true,
-    "skipLibCheck": true, /* 라이브러리 타입 체크 건너뛰기 - aria-query 및 babel__core 오류 해결 */
+    "skipLibCheck": true,
     "strict": true,
     "forceConsistentCasingInFileNames": true,
     "noEmit": true,
@@ -66,9 +65,6 @@
   },
   "include": [
     "next-env.d.ts",
-    "types/**/*.d.ts",
-    "types/react-augmentation.d.ts",
-    "types/react-extensions.d.ts",
     "**/*.ts",
     "**/*.tsx",
     ".next/types/**/*.ts",
