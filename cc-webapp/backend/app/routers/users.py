@@ -113,6 +113,7 @@ async def get_user_stats(
     user_service: UserService = Depends(get_user_service)
 ):
     """Get user statistics"""
+    logger.info(f"API: GET /api/users/stats - user_id={current_user.id}")
     try:
         stats = user_service.get_user_stats(current_user.id)
         return UserStatsResponse(
@@ -129,22 +130,7 @@ async def get_user_stats(
             detail=f"Stats retrieval failed: {str(e)}"
         )
 
-@router.get("/balance")
-async def get_user_balance(
-    current_user = Depends(get_current_user)
-):
-    """Get user token balance"""
-    try:
-        return {
-            "user_id": current_user.id,
-            "cyber_token_balance": current_user.cyber_token_balance,
-            "nickname": current_user.nickname
-        }
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Balance retrieval failed: {str(e)}"
-        )
+
 
 @router.post("/tokens/add")
 async def add_tokens(
