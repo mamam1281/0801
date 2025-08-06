@@ -5,57 +5,73 @@
 ## 📋 사전 준비 단계
 
 ### 1. Docker 환경 설정
-- [ ] Docker와 Docker Compose가 올바르게 설치됨
-- [ ] 필요한 디렉토리 구조가 존재함
-  - [ ] `logs/backend`
-  - [ ] `logs/frontend`
-  - [ ] `logs/postgres`
-  - [ ] `logs/celery`
-  - [ ] `data/init`
-  - [ ] `data/backup`
-  - [ ] `data/postgres`
-- [ ] `docker-manage.ps1 setup` 명령 실행으로 초기 환경 설정 완료
+- [x] Docker와 Docker Compose가 올바르게 설치됨
+  - Docker version 28.3.2
+  - Docker Compose version v2.38.2-desktop.1
+- [x] 필요한 디렉토리 구조가 존재함
+  - [x] `logs/backend`
+  - [x] `logs/frontend`
+  - [x] `logs/postgres`
+  - [x] `logs/celery`
+  - [x] `data/init`
+  - [x] `data/backup`
+  - [x] `data/postgres`
+- [x] `docker-manage.ps1 setup` 명령 실행으로 초기 환경 설정 완료
+  - 성공: "Environment setup complete!"
 
 ### 2. 서비스 시작
-- [ ] `docker-manage.ps1 start --tools` 명령으로 모든 서비스 및 도구 시작
-- [ ] Docker 컨테이너 상태 확인 (`docker-manage.ps1 status`)
-- [ ] 모든 컨테이너가 "healthy" 또는 "running" 상태인지 확인
-  - [ ] cc_backend (Backend API)
-  - [ ] cc_frontend (Frontend)
-  - [ ] cc_postgres (PostgreSQL)
-  - [ ] cc_redis (Redis)
+- [x] `docker-manage.ps1 start --tools` 명령으로 모든 서비스 및 도구 시작
+- [x] Docker 컨테이너 상태 확인 (`docker-manage.ps1 status`)
+- [x] 모든 컨테이너가 "healthy" 또는 "running" 상태인지 확인
+  - [x] cc_backend (Backend API) - 정상 실행 중
+  - [x] cc_frontend (Frontend) - 실행 중이나 오류 발생
+    - 오류: `Error: Cannot find module '../lightningcss.linux-x64-musl.node'`
+    - 원인: Next.js 15.3.3에서 native 모듈 호환성 문제
+    - 대응: 프론트엔드는 Docker 대신 로컬 개발 환경에서 진행
+  - [x] cc_postgres (PostgreSQL) - 정상 실행 중
+  - [x] cc_redis (Redis) - 정상 실행 중
 
 ## 🔍 인프라 및 기본 기능 검증
 
 ### 1. 데이터베이스 연결 확인
-- [ ] PostgreSQL 연결 테스트 (pgAdmin 또는 직접 접속)
-  - [ ] 호스트: localhost
-  - [ ] 포트: 5432
-  - [ ] 데이터베이스: cc_webapp
-  - [ ] 사용자: cc_user
-  - [ ] 비밀번호: cc_password
-- [ ] Redis 연결 테스트 (Redis Commander)
-  - [ ] 호스트: localhost
-  - [ ] 포트: 6379
+- [x] PostgreSQL 연결 테스트 (명령줄에서 확인)
+  - [x] 호스트: localhost
+  - [x] 포트: 5432 (외부 포트 매핑 확인됨)
+  - [x] 데이터베이스: cc_webapp
+  - [x] 사용자: cc_user
+  - [x] 비밀번호: password123 (IDE 연결용)
+  - [ ] 참고: 내부 Docker 컨테이너 연결시에는 cc_password 사용
+- [x] Redis 연결 테스트 (명령줄에서 확인)
+  - [x] 호스트: localhost
+  - [ ] 포트: 6379 (외부 포트 매핑 없음 - IDE 연결 불가)
+  - [ ] 인증 필요 (비밀번호 확인 필요)
 
 ### 2. 백엔드 API 기본 기능
-- [ ] 백엔드 서버 연결 확인 (http://localhost:8000)
-- [ ] API 문서 접속 가능 (http://localhost:8000/docs)
-- [ ] 헬스 체크 엔드포인트 응답 확인 (`/api/auth/health`)
+- [x] 백엔드 서버 연결 확인 (http://localhost:8000)
+- [x] API 문서 접속 가능 (http://localhost:8000/docs)
+- [x] 백엔드 API 스키마 확인 (http://localhost:8000/openapi.json)
+- [x] 헬스 체크 엔드포인트 응답 확인 (`/health`)
 
 ### 3. 프론트엔드 기본 기능
-- [ ] 프론트엔드 서버 연결 확인 (http://localhost:3000)
-- [ ] 메인 페이지 로딩 정상 여부
-- [ ] 기본 UI 컴포넌트 표시 확인
+- [x] 프론트엔드 서버 연결 확인 (http://localhost:3000) - 로컬 개발 환경
+- [x] 메인 페이지 로딩 정상 여부
+- [x] 기본 UI 컴포넌트 표시 확인
+- [x] 로컬-Docker 백엔드 간 통신 검증 (CORS 설정 확인됨)
 
 ## 🔐 인증 시스템 테스트
 
 ### 1. 회원가입
 - [ ] 초대 코드 확인 기능 검증
+  - 유효한 초대 코드: `5858` (무한 재사용 가능)
+  - 잘못된 초대 코드 입력 시 오류 메시지 표시
 - [ ] 회원가입 폼 작동 확인
+  - 필수 필드: 아이디, 비밀번호, 닉네임, 초대 코드
 - [ ] 유효한 초대 코드로 회원가입 성공
+  - 초대 코드 `5858` 사용
 - [ ] 중복 아이디 검사 기능
+  - 이미 등록된 아이디로 가입 시도 시 적절한 오류 메시지
 - [ ] 비밀번호 강도 검사
+  - 요구사항: 4자리 이상
 
 ### 2. 로그인
 - [ ] 아이디/비밀번호 로그인 정상 작동
@@ -208,7 +224,7 @@
 
 | 테스트 카테고리 | 통과 수 | 실패 수 | 미실행 수 | 메모 |
 |--------------|-------|-------|--------|------|
-| 사전 준비      |       |       |        |      |
+| 사전 준비      |       |       |        | 프론트엔드는 Docker 환경 대신 로컬 개발 환경 사용     |
 | 인프라 검증     |       |       |        |      |
 | 인증 시스템     |       |       |        |      |
 | 사용자 관리     |       |       |        |      |
@@ -230,7 +246,7 @@
 ## 🔧 실행 명령어 참조
 
 ```powershell
-# 개발환경 시작
+# Docker 개발환경 시작
 .\docker-manage.ps1 start --tools
 
 # 상태 확인
@@ -238,7 +254,11 @@
 
 # 로그 확인
 .\docker-manage.ps1 logs backend
-.\docker-manage.ps1 logs frontend
+# 프론트엔드는 로컬 환경에서 실행
+
+# 로컬 프론트엔드 실행 (별도 터미널에서)
+cd cc-webapp/frontend
+npm run dev
 
 # 데이터베이스 마이그레이션
 .\docker-manage.ps1 migrate
@@ -498,3 +518,29 @@ Kafka를 활용한 이벤트 기반 시스템 확장
 자동화된 테스트 및 배포 파이프라인 개선
 환경별 구성 관리 체계화
 이러한 분석과 권장사항을 바탕으로 Casino-Club F2P 프로젝트의 백엔드, 데이터베이스, API, 프론트엔드의 유기적 연결을 개선하면 시스템의 안정성과 확장성이 크게 향상될 것입니다.
+
+ 진행 방향
+1. 하이브리드 접근 방식 채택
+현재 상황에서는 하이브리드 접근법이 가장 효율적입니다:
+
+백엔드/데이터베이스: Docker 환경에서 계속 개발
+프론트엔드: 로컬 개발 환경에서 개발 진행
+2. 프론트엔드 로컬-Docker 통합
+로컬 프론트엔드와 Docker 백엔드 간의 통신이 원활해야 합니다
+API URL 설정을 적절히 구성하고, CORS 설정이 로컬 개발 서버를 허용하는지 확인해야 합니다
+3. Docker 환경 문제 해결은 병행적으로 진행
+다음 방법 중 하나를 선택하여 Docker 문제를 해결할 수 있습니다:
+
+기존 방식 유지: 개발은 로컬에서, 테스트와 배포는 별도 프로세스로 진행
+Next.js 버전 다운그레이드: 13.x 또는 14.x LTS 버전으로 다운그레이드하여 Docker 호환성 확보
+Docker 구성 변경: node:20-bullseye 등 다른 베이스 이미지를 사용하거나 필요한 네이티브 의존성 설치 스크립트 추가
+Next.js App Router 마이그레이션: Pages Router에서 App Router로 마이그레이션하며 Docker 호환성 문제 해결
+결론
+지금 당장은 로컬 프론트엔드 + Docker 백엔드 방식으로 개발을 계속 진행하는 것이 가장 효율적입니다. 이 접근법은:
+
+개발 지연을 최소화합니다
+백엔드 및 데이터베이스 환경의 일관성을 유지합니다
+프론트엔드 개발의 유연성을 제공합니다
+장기적으로는 Docker 환경 문제를 해결하여 전체 스택을 Docker로 통합하는 것을 목표로 하되, 현재는 개발 생산성을 우선시하는 하이브리드 접근법을 취하는 것이 좋습니다.
+
+작성된 FRONTEND_LOCAL_DEVELOPMENT_GUIDE.md 문서에서 상세한 로컬 개발 환경 설정 및 Docker 백엔드와의 통합 방법을 확인하실 수 있습니다.
