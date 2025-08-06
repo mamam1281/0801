@@ -144,13 +144,13 @@ export default function App() {
       {/* 📱 메인 화면들 */}
       <AnimatePresence mode="wait">
         {currentScreen === 'loading' && (
-          <LoadingScreen 
-            key="loading" 
-            onComplete={navigationHandlers.toLogin} 
-            gameTitle={APP_CONFIG.GAME_TITLE} 
+          <LoadingScreen
+            key="loading"
+            onComplete={navigationHandlers.toLogin}
+            gameTitle={APP_CONFIG.GAME_TITLE}
           />
         )}
-        
+
         {currentScreen === 'login' && (
           <LoginScreen
             key="login"
@@ -160,7 +160,7 @@ export default function App() {
             isLoading={isLoading}
           />
         )}
-        
+
         {currentScreen === 'signup' && (
           <SignupScreen
             key="signup"
@@ -169,7 +169,7 @@ export default function App() {
             isLoading={isLoading}
           />
         )}
-        
+
         {currentScreen === 'admin-login' && (
           <AdminLoginScreen
             key="admin-login"
@@ -178,7 +178,7 @@ export default function App() {
             isLoading={isLoading}
           />
         )}
-        
+
         {currentScreen === 'home-dashboard' && user && (
           <HomeDashboard
             key="home-dashboard"
@@ -193,7 +193,7 @@ export default function App() {
             onToggleSideMenu={toggleSideMenu}
           />
         )}
-        
+
         {currentScreen === 'game-dashboard' && user && (
           <GameDashboard
             key="game-dashboard"
@@ -234,9 +234,7 @@ export default function App() {
         {currentScreen === 'profile' && user && (
           <ProfileScreen
             key="profile"
-            user={user}
             onBack={navigationHandlers.backToHome}
-            onUpdateUser={updateUser}
             onAddNotification={addNotification}
           />
         )}
@@ -325,7 +323,7 @@ export default function App() {
 
       {/* 📱 하단 네비게이션 */}
       {showBottomNavigation && (
-        <BottomNavigation 
+        <BottomNavigation
           currentScreen={currentScreen}
           onNavigate={handleBottomNavigation}
           user={user}

@@ -31,7 +31,7 @@ from app.routers import (
     users,  # Re-enabled
     admin,
     actions,
-    gacha,
+    # gacha,  # 중복 제거: games.router에 포함됨
     rewards,
     shop,
     missions,
@@ -42,8 +42,8 @@ from app.routers import (
     notifications,
     doc_titles,  # Phase 1 added
     feedback,    # Phase 2 added
-    games,       # Phase 3 added
-    game_api,    # Phase 4 added
+    games,       # Phase 3 added - 통합된 게임 API
+    # game_api,    # 중복 제거: games.router에 통합됨
     invite_router,  # Phase 5 added
     analyze,     # Phase 6 added
     # roulette,    # ARCHIVED - 룰렛 기능 제거
@@ -144,7 +144,7 @@ app.include_router(admin.router, tags=["Admin"])
 
 # Core Game Systems (no prefix - routers have their own)
 app.include_router(actions.router, tags=["Game Actions"])
-app.include_router(gacha.router, tags=["Gacha"])
+# app.include_router(gacha.router, tags=["Gacha"])  # 중복 제거: games.router에 포함됨
 app.include_router(rewards.router, tags=["Rewards"])
 app.include_router(shop.router, tags=["Shop"])
 app.include_router(missions.router, tags=["Missions"])
@@ -169,11 +169,11 @@ app.include_router(doc_titles.router, tags=["Document Titles"])
 # Phase 2: Feedback System (no prefix - routers have their own)  
 app.include_router(feedback.router, tags=["Feedback"])
 
-# Phase 3: Game Collection (no prefix - routers have their own)
+# Phase 3: Game Collection (no prefix - routers have their own) - 통합된 게임 API
 app.include_router(games.router, tags=["Game Collection"])
 
-# Phase 4: Unified Game API (no prefix - routers have their own)
-app.include_router(game_api.router, tags=["Game API"])
+# Phase 4: Unified Game API (no prefix - routers have their own) - 중복 제거
+# app.include_router(game_api.router, tags=["Game API"])  # 중복 제거: games.router에 통합됨
 
 # Phase 5: Invite System (no prefix - routers have their own)
 app.include_router(invite_router.router, tags=["Invite Codes"])

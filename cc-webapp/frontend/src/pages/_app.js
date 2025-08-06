@@ -1,6 +1,6 @@
 // src/pages/_app.js
 import { useEffect } from 'react';
-import '../styles/globals.css';
+import '../../styles/globals.css';
 
 function MyApp({ Component, pageProps }) {
   useEffect(() => {
@@ -15,7 +15,7 @@ function MyApp({ Component, pageProps }) {
             });
             console.log('[MSW] 모의 API 서버가 활성화되었습니다.');
           };
-          
+
           initMocks();
         }
       }

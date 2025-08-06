@@ -90,6 +90,12 @@ export const clearTokens = () => {
   localStorage.removeItem('refresh_token');
 };
 
+// 인증 상태 확인
+export const isAuthenticated = () => {
+  const { accessToken } = getTokens();
+  return !!accessToken;
+};
+
 // 기본 API 요청 함수
 const apiRequest = async (endpoint, options = {}) => {
   const method = options.method || 'GET';
