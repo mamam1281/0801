@@ -74,14 +74,19 @@ class AuthService:
         try:
             from ..models.auth_models import User, InviteCode
             
-            # 초대코드 유효성 검사
-            invite = db.query(InviteCode).filter(
-                InviteCode.code == invite_code,
-                InviteCode.is_used == False
-            ).first()
-            
-            if not invite:
-                raise HTTPException(status_code=400, detail="잘못된 초대코드입니다")
+            # 초대코드 5858은 무한 재사용 가능
+            if invite_code == "5858":
+                logger.info(f"Using unlimited invite code: {invite_code}")
+            else:
+                # 다른 초대코드는 기존 로직 적용
+                invite = db.query(InviteCode).filter(
+                    InviteCode.code == invite_code,
+                    InviteCode.is_used == False,
+                    InviteCode.is_active == True
+                ).first()
+                
+                if not invite:
+                    raise HTTPException(status_code=400, detail="유효하지 않은 초대코드입니다")
             
             # 닉네임 중복 검사
             existing_user = db.query(User).filter(User.nickname == nickname).first()
@@ -102,10 +107,11 @@ class AuthService:
                 created_at=datetime.utcnow()
             )
             
-            # 초대코드 사용 처리
-            invite.is_used = True
-            invite.used_at = datetime.utcnow()
-            invite.used_by_user_id = user.id
+            # 초대코드 5858이 아닌 경우에만 사용 처리
+            if invite_code != "5858":
+                invite.is_used = True
+                invite.used_at = datetime.utcnow()
+                invite.used_by_user_id = user.id
             
             db.add(user)
             db.commit()
@@ -211,6 +217,49 @@ class AuthService:
     def verify_password(plain_password: str, hashed_password: str) -> bool:
         """비밀번호 검증"""
         return pwd_context.verify(plain_password, hashed_password)
+    
+    @staticmethod
+    def authenticate_user(db: Session, site_id: str, password: str):
+        """사용자 인증 (site_id + password)"""
+        try:
+            from ..models.auth_models import User
+            
+            # site_id로 사용자 찾기
+            user = db.query(User).filter(
+                User.site_id == site_id,
+                User.is_active == True
+            ).first()
+            
+            if not user:
+                logger.warning(f"User not found: {site_id}")
+                return None
+            
+            # 비밀번호 검증
+            if not AuthService.verify_password(password, user.hashed_password):
+                logger.warning(f"Invalid password for user: {site_id}")
+                return None
+                
+            logger.info(f"User authenticated successfully: {site_id}")
+            return user
+            
+        except Exception as e:
+            logger.error(f"Authentication error for {site_id}: {str(e)}")
+            return None
+    
+    @staticmethod
+    def update_last_login(db: Session, user_id: int):
+        """마지막 로그인 시간 업데이트"""
+        try:
+            from ..models.auth_models import User
+            
+            user = db.query(User).filter(User.id == user_id).first()
+            if user:
+                user.last_login = datetime.utcnow()
+                db.commit()
+                logger.info(f"Updated last login for user {user_id}")
+            
+        except Exception as e:
+            logger.error(f"Failed to update last login: {str(e)}")
     
     @staticmethod
     def create_access_token(user_id: int, session_id: str = None) -> str:

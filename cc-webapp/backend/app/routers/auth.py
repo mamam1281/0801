@@ -38,13 +38,18 @@ async def signup(
     try:
         logger.info(f"Registration attempt: site_id={data.site_id}, nickname={data.nickname}")
         
+        # 비밀번호 검증 (4글자 이상)
+        if len(data.password) < 4:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="비밀번호는 4글자 이상이어야 합니다"
+            )
+        
         # Create user through AuthService
         user = auth_service.create_user(db, data)
         
         # Generate token
-        access_token = auth_service.create_access_token(
-            data={"sub": user.site_id, "user_id": user.id}
-        )
+        access_token = auth_service.create_access_token(user.id)
         
         # Create user response data
         user_response = UserResponse(
@@ -93,9 +98,7 @@ async def login(
             )
         
         # Generate access token
-        access_token = auth_service.create_access_token(
-            data={"sub": user.site_id, "user_id": user.id}
-        )
+        access_token = auth_service.create_access_token(user.id)
         
         # Update last login time
         auth_service.update_last_login(db, user.id)
@@ -147,9 +150,7 @@ async def admin_login(
             )
         
         # Generate access token
-        access_token = auth_service.create_access_token(
-            data={"sub": user.site_id, "user_id": user.id, "is_admin": True}
-        )
+        access_token = auth_service.create_access_token(user.id)
         
         # Update last login time
         auth_service.update_last_login(db, user.id)

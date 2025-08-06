@@ -18,7 +18,7 @@ class User(Base):
     cyber_token_balance = Column(Integer, default=200)  # 사이버 토큰 잔액
     is_active = Column(Boolean, default=True)
     is_admin = Column(Boolean, default=False)  # 관리자 여부
-    rank = Column(String(50), default="STANDARD")
+    user_rank = Column(String(50), default="STANDARD", name="rank")  # rank는 PostgreSQL 예약어이므로 name 지정
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     last_login = Column(DateTime, nullable=True)
@@ -52,6 +52,7 @@ class InviteCode(Base):
     id = Column(Integer, primary_key=True, index=True)
     code = Column(String(10), unique=True, index=True, nullable=False)
     is_used = Column(Boolean, default=False)
+    is_active = Column(Boolean, default=True)  # 추가된 필드
     used_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     used_at = Column(DateTime, nullable=True)

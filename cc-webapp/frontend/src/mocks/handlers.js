@@ -1,4 +1,5 @@
 // src/mocks/handlers.js
+// 백엔드 API 500 에러 대응용 모의 응답
 import { rest } from 'msw';
 
 export const handlers = [
