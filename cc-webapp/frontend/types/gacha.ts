@@ -1,10 +1,11 @@
 import { GameItem } from './index';
 
-export interface GachaItem extends GameItem {
+// GachaItem은 GameItem과 호환되도록 직접 정의
+export interface GachaItem {
   id: string;
   name: string;
-  type: string;
-  rarity: 'common' | 'rare' | 'epic' | 'legendary' | 'mythic';
+  type: 'powerup' | 'skin' | 'currency' | 'collectible';  // GameItem과 일치하는 타입
+  rarity: 'common' | 'rare' | 'epic' | 'legendary' | 'mythic'; // 'mythic' 추가됨
   rate: number;
   quantity: number;
   description: string;

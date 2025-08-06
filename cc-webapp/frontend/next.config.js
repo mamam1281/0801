@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Next.js 15에서는 App Router가 기본 지원됨
+  // Next.js 15에서는 App Router가 기본값이므로 experimental 설정 불필요
   images: {
     domains: ['images.unsplash.com'],
   },
@@ -11,9 +11,9 @@ const nextConfig = {
     ignoreDuringBuilds: false,
   },
   reactStrictMode: true,
-  // Pages Router를 완전히 비활성화
-  useFileSystemPublicRoutes: true,
   pageExtensions: ['tsx', 'ts', 'jsx', 'js'],
+  // Pages Router 완전 비활성화
+  trailingSlash: false,
 }
 
 module.exports = nextConfig;

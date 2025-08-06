@@ -1,6 +1,21 @@
-import { User } from '../../../types';
+import { User, GameItem } from '../../../types';
 import { GachaItem, GachaBanner, HeartParticle } from '../../../types/gacha';
 import { ANIMATION_DURATIONS, SEXY_EMOJIS, GACHA_ITEMS } from './constants';
+
+// 파티클 인터페이스 정의
+export interface Particle {
+  id: string;
+  size: number;
+  x?: string;
+  y?: string;
+  left?: string;
+  top?: string;
+  color?: string;
+  duration: number;
+  rarity?: string;
+  animationDuration?: string;
+  animationDelay?: string;
+}
 
 /**
  * 고유 ID 생성 함수
@@ -44,15 +59,29 @@ export function getAnimationDelay(index: number, baseDelay = 0, stagger = 0.1) {
  * @param count 생성할 파티클 개수
  * @returns 파티클 효과 배열
  */
-export function generateParticles(rarity: string, count = 20) {
+export function generateParticles(rarity: string, count = 20): Particle[] {
+  const colors = {
+    common: '#a0a0a0',
+    rare: '#4287f5',
+    epic: '#9c27b0',
+    legendary: '#ffd700',
+    mythic: '#ff4081'
+  };
+
+  const rarityColor = colors[rarity as keyof typeof colors] || colors.common;
+
   return Array.from({ length: count }).map((_, index) => ({
     id: `particle-${index}`,
     size: Math.random() * 15 + 5,
+    x: `${Math.random() * 100}%`,
+    y: `${Math.random() * 5}%`, // 상단에서 시작
     left: `${Math.random() * 100}%`,
-    top: `${Math.random() * 100}%`,
+    top: `${Math.random() * 5}%`,
+    color: rarityColor,
+    duration: Math.random() * 3 + 2, // 2-5초 지속
+    rarity,
     animationDuration: `${Math.random() * 2 + 1}s`,
     animationDelay: `${Math.random() * 0.5}s`,
-    rarity,
   }));
 }
 
@@ -104,10 +133,22 @@ export const updateUserInventory = (user: User, item: GachaItem): User => {
   const updatedInventory = [...(user.inventory || [])];
   const existingItemIndex = updatedInventory.findIndex(inv => inv.id === item.id);
   
+  // 아이템 타입 변환 (GachaItem -> GameItem)
+  const gameItem: GameItem = {
+    id: item.id,
+    name: item.name,
+    type: item.type,
+    rarity: item.rarity === 'mythic' ? 'legendary' : item.rarity, // mythic은 legendary로 처리
+    quantity: item.quantity,
+    description: item.description,
+    icon: item.icon,
+    value: item.value
+  };
+
   if (existingItemIndex !== -1) {
-    updatedInventory[existingItemIndex].quantity += item.quantity;
+    updatedInventory[existingItemIndex].quantity += gameItem.quantity;
   } else {
-    updatedInventory.push(item);
+    updatedInventory.push(gameItem);
   }
   
   return {
