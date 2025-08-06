@@ -371,7 +371,7 @@ export function SettingsScreen({ user, onBack, onUpdateUser, onAddNotification }
             </div>
             <div className="flex justify-between">
               <span className="text-foreground">개발자</span>
-              <span className="text-muted-foreground">Neon Quest Team</span>
+              <span className="text-muted-foreground">MODELTeam</span>
             </div>
           </div>
 

@@ -187,7 +187,7 @@ export function SexyResultOverlay({
   isTenPull?: boolean;
   items?: GachaItem[];
 }) {
-  const [hearts, setHearts] = useState<HeartParticle[]>([]);
+  const [hearts, setHearts] = useState([] as HeartParticle[]);
 
   React.useEffect(() => {
     if (isVisible) {

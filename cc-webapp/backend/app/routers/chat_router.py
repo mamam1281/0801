@@ -523,7 +523,7 @@ def generate_ai_response(user_message: str, assistant: models.AIAssistant, user:
     elif any(word in message_lower for word in ["hello", "hi", "hey"]):
         responses = [
             f"Welcome to the casino, {user.nickname}! Ready for some excitement?",
-            f"Hey there, high roller! What brings you to our neon paradise today?",
+            f"Hey there, high roller! What brings you to our model paradise today?",
             f"Greetings, {user.nickname}! The night is young and full of possibilities!"
         ]
     elif any(word in message_lower for word in ["help", "guide", "how"]):

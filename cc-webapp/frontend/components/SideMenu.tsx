@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { User as UserType } from '../types';
 import { Button } from './ui/button';
+import { handleModelNavigation } from '../utils/gameUtils';
 
 interface SideMenuProps {
   isOpen: boolean;
@@ -39,7 +40,7 @@ export function SideMenu({
   onNavigateToEventMissionPanel,
   onNavigateToSettings,
   onLogout,
-  onAddNotification
+  onAddNotification,
 }: SideMenuProps) {
   const handleExternalLink = () => {
     window.open('https://md-01.com', '_blank');
@@ -55,7 +56,7 @@ export function SideMenu({
       color: 'text-primary',
       bgColor: 'bg-primary-soft',
       action: onNavigateToEventMissionPanel,
-      badge: 'NEW'
+      badge: 'NEW',
     },
     {
       icon: Settings,
@@ -63,7 +64,7 @@ export function SideMenu({
       description: '앱 설정 및 환경설정',
       color: 'text-info',
       bgColor: 'bg-info-soft',
-      action: onNavigateToSettings
+      action: onNavigateToSettings,
     },
     {
       icon: Sparkles,
@@ -73,7 +74,7 @@ export function SideMenu({
       bgColor: 'bg-warning-soft',
       action: handleExternalLink,
       isExternal: true,
-      badge: '+P'
+      badge: '+P',
     },
     {
       icon: HelpCircle,
@@ -81,8 +82,8 @@ export function SideMenu({
       description: '게임 가이드 및 FAQ',
       color: 'text-success',
       bgColor: 'bg-success-soft',
-      action: () => onAddNotification('📚 도움말 페이지가 준비중입니다.')
-    }
+      action: () => onAddNotification('📚 도움말 페이지가 준비중입니다.'),
+    },
   ];
 
   // 관리자 전용 메뉴 아이템
@@ -94,7 +95,7 @@ export function SideMenu({
       color: 'text-error',
       bgColor: 'bg-error-soft',
       action: onNavigateToAdminPanel,
-      badge: 'ADMIN'
+      badge: 'ADMIN',
     });
   }
 
@@ -110,7 +111,7 @@ export function SideMenu({
             className="fixed inset-0 bg-black/50 z-40"
             onClick={onClose}
           />
-          
+
           {/* Side Menu */}
           <motion.div
             initial={{ x: '-100%' }}
@@ -127,17 +128,12 @@ export function SideMenu({
                     <Crown className="w-5 h-5 text-white" />
                   </div>
                   <div>
-                    <h2 className="text-lg font-bold text-gradient-primary">NEON QUEST</h2>
+                    <h2 className="text-lg font-bold text-gradient-primary">MODELCASINO</h2>
                     <p className="text-xs text-muted-foreground">게임 메뉴</p>
                   </div>
                 </div>
-                
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={onClose}
-                  className="btn-hover-lift"
-                >
+
+                <Button variant="ghost" size="icon" onClick={onClose} className="btn-hover-lift">
                   <X className="w-5 h-5" />
                 </Button>
               </div>
@@ -146,9 +142,11 @@ export function SideMenu({
               {user && (
                 <div className="p-6 border-b border-border-secondary">
                   <div className="flex items-center gap-3 mb-3">
-                    <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
-                      user.isAdmin ? 'bg-gradient-to-r from-error to-warning' : 'bg-gradient-game'
-                    }`}>
+                    <div
+                      className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                        user.isAdmin ? 'bg-gradient-to-r from-error to-warning' : 'bg-gradient-game'
+                      }`}
+                    >
                       <User className="w-6 h-6 text-white" />
                     </div>
                     <div className="flex-1">
@@ -163,10 +161,12 @@ export function SideMenu({
                       <p className="text-sm text-muted-foreground">레벨 {user.level}</p>
                     </div>
                   </div>
-                  
+
                   <div className="grid grid-cols-2 gap-3">
                     <div className="bg-secondary/30 rounded-lg p-3 text-center">
-                      <div className="text-lg font-bold text-gold">{user.goldBalance.toLocaleString()}G</div>
+                      <div className="text-lg font-bold text-gold">
+                        {user.goldBalance.toLocaleString()}G
+                      </div>
                       <div className="text-xs text-muted-foreground">골드</div>
                     </div>
                     <div className="bg-secondary/30 rounded-lg p-3 text-center">
@@ -188,23 +188,32 @@ export function SideMenu({
                     onClick={item.action}
                     className="w-full flex items-center gap-4 p-4 rounded-xl hover:bg-secondary/20 transition-all card-hover-float group"
                   >
-                    <div className={`w-12 h-12 rounded-lg ${item.bgColor} flex items-center justify-center`}>
+                    <div
+                      className={`w-12 h-12 rounded-lg ${item.bgColor} flex items-center justify-center`}
+                    >
                       <item.icon className={`w-6 h-6 ${item.color}`} />
                     </div>
-                    
+
                     <div className="flex-1 text-left">
                       <div className="flex items-center gap-2">
                         <span className="font-medium text-foreground group-hover:text-primary transition-colors">
                           {item.label}
                         </span>
-                        {item.isExternal && <ExternalLink className="w-3 h-3 text-muted-foreground" />}
+                        {item.isExternal && (
+                          <ExternalLink className="w-3 h-3 text-muted-foreground" />
+                        )}
                         {item.badge && (
-                          <span className={`text-xs px-1.5 py-0.5 rounded-full font-bold ${
-                            item.badge === 'ADMIN' ? 'bg-error text-white' :
-                            item.badge === 'NEW' ? 'bg-primary text-white' :
-                            item.badge === '+P' ? 'bg-warning text-black' :
-                            'bg-info text-white'
-                          }`}>
+                          <span
+                            className={`text-xs px-1.5 py-0.5 rounded-full font-bold ${
+                              item.badge === 'ADMIN'
+                                ? 'bg-error text-white'
+                                : item.badge === 'NEW'
+                                  ? 'bg-primary text-white'
+                                  : item.badge === '+P'
+                                    ? 'bg-warning text-black'
+                                    : 'bg-info text-white'
+                            }`}
+                          >
                             {item.badge}
                           </span>
                         )}
@@ -245,10 +254,10 @@ export function SideMenu({
                   <LogOut className="w-4 h-4 mr-2" />
                   로그아웃
                 </Button>
-                
+
                 <div className="mt-3 text-center">
-                  <p className="text-xs text-muted-foreground">NEON QUEST v1.0.0</p>
-                  <p className="text-xs text-muted-foreground">© 2024 Game Studio</p>
+                  <p className="text-xs text-muted-foreground">MODELCASINO v1.0.0</p>
+                  <p className="text-xs text-muted-foreground">© 2025 Game Studio</p>
                 </div>
               </div>
             </div>
