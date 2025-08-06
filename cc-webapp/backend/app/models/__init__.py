@@ -162,7 +162,6 @@ __all__ = [
     "SupportedEmotion",
 
     # Mission Models
-    "Mission",
     "UserMissionProgress",
     "PageView",
     "ConversionEvent",
@@ -172,7 +171,6 @@ __all__ = [
     # Event Models
     "Event",
     "EventParticipation", 
-    "Mission",
     "UserMission",
 ]
 
@@ -185,9 +183,6 @@ from .content_models import (
     ContentCategory,
     ContentTag,
 )
-
-# Mission 모델들 추가
-from .mission_models import Mission, UserMissionProgress
 
 # Analytics 모델들 추가
 from .analytics_models import (

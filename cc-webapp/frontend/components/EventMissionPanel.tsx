@@ -29,6 +29,8 @@ import {
   Settings
 } from 'lucide-react';
 import { User, Event, Mission } from '../types';
+import { EventBackend, MissionBackend, UserMissionBackend } from '../types/eventMission';
+import { eventMissionApi } from '../utils/eventMissionApi';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
@@ -161,57 +163,197 @@ export function EventMissionPanel({ user, onBack, onUpdateUser, onAddNotificatio
     }
   ]);
 
+  // Fetch API data
+  const fetchData = async () => {
+    try {
+      // 이벤트 데이터 가져오기
+      const eventsData = await eventMissionApi.events.getAll();
+      if (eventsData && Array.isArray(eventsData)) {
+        // 백엔드 데이터를 프론트엔드 형식으로 변환
+        const formattedEvents = eventsData.map((event: EventBackend) => ({
+          id: String(event.id),
+          title: event.title,
+          description: event.description || '',
+          type: event.event_type,
+          status: event.is_active ? 'active' : 'inactive',
+          startDate: new Date(event.start_date),
+          endDate: new Date(event.end_date),
+          rewards: Object.entries(event.rewards || {}).map(([type, amount]) => ({
+            type,
+            amount: Number(amount)
+          })),
+          participants: Math.floor(Math.random() * 1000), // 임시 데이터
+          maxParticipants: 10000, // 임시 데이터
+          requirements: Object.keys(event.requirements || {}),
+          icon: '🎮', // 임시 아이콘
+          progress: event.user_participation?.progress || {},
+          completed: event.user_participation?.completed || false,
+          claimed: event.user_participation?.claimed || false,
+          joined: event.user_participation?.joined || false
+        }));
+        setEvents(formattedEvents);
+      }
+      
+      // 미션 데이터 가져오기
+      const missionsData = await eventMissionApi.missions.getAll();
+      if (missionsData && Array.isArray(missionsData)) {
+        // 백엔드 데이터를 프론트엔드 형식으로 변환
+        const formattedMissions = missionsData.map((missionData: UserMissionBackend) => {
+          const mission = missionData.mission;
+          return {
+            id: String(mission.id),
+            title: mission.title,
+            description: mission.description || '',
+            type: mission.mission_type,
+            category: mission.category || 'general',
+            status: missionData.completed ? 'completed' : missionData.current_progress > 0 ? 'in-progress' : 'available',
+            target: mission.target_value,
+            progress: missionData.current_progress,
+            rewards: Object.entries(mission.rewards || {}).map(([type, amount]) => ({
+              type,
+              amount: Number(amount)
+            })),
+            icon: mission.icon || '🎯',
+            deadline: mission.reset_period ? `${mission.reset_period === 'daily' ? '오늘' : '이번 주'} 자정` : '없음',
+            claimed: missionData.claimed
+          };
+        });
+        setMissions(formattedMissions);
+      }
+    } catch (error) {
+      console.error('이벤트/미션 데이터 로드 중 오류:', error);
+      onAddNotification('이벤트와 미션 데이터를 불러오는 중 문제가 발생했습니다.');
+    }
+  };
+
+  // 컴포넌트 마운트 시 데이터 로드
+  useEffect(() => {
+    fetchData();
+  }, []);
+
   // Statistics
   const activeEvents = events.filter(e => e.status === 'active').length;
   const completedMissions = missions.filter(m => m.status === 'completed').length;
-  const totalParticipants = events.reduce((sum, e) => sum + e.participants, 0);
+  const totalParticipants = events.reduce((sum, e) => sum + (e.participants || 0), 0);
 
   // Handle mission completion
-  const handleCompleteMission = (missionId: string) => {
+  const handleCompleteMission = async (missionId: string) => {
     const mission = missions.find(m => m.id === missionId);
-    if (!mission || mission.status === 'completed') return;
-
-    // Update mission status
-    setMissions(prev => prev.map(m => 
-      m.id === missionId 
-        ? { ...m, status: 'completed' as const, progress: m.maxProgress }
-        : m
-    ));
-
-    // Give rewards
-    const totalGold = mission.rewards.reduce((sum, r) => r.type === 'gold' ? sum + r.amount : sum, 0);
-    const totalExp = mission.rewards.reduce((sum, r) => r.type === 'exp' ? sum + r.amount : sum, 0);
-
-    if (totalGold > 0 || totalExp > 0) {
-      const updatedUser = {
-        ...user,
-        goldBalance: user.goldBalance + totalGold,
-        experience: user.experience + totalExp
-      };
-
-      // Check for level up
-      if (updatedUser.experience >= updatedUser.maxExperience) {
-        updatedUser.level += 1;
-        updatedUser.experience = updatedUser.experience - updatedUser.maxExperience;
-        updatedUser.maxExperience = Math.floor(updatedUser.maxExperience * 1.2);
-        onAddNotification(`🆙 레벨업! ${updatedUser.level}레벨 달성!`);
+    if (!mission) return;
+    
+    try {
+      if (mission.progress >= mission.maxProgress && mission.status !== 'completed') {
+        // 미션이 완료 조건을 충족했지만 아직 보상을 받지 않은 경우
+        await eventMissionApi.missions.claimRewards(parseInt(missionId));
+        onAddNotification('미션 보상을 받았습니다!');
+      } else if (mission.status !== 'completed') {
+        // 미션이 진행 중인 경우, 진행 상태를 업데이트
+        await eventMissionApi.missions.updateProgress(parseInt(missionId), 1);
+        onAddNotification('미션 진행 상태가 업데이트 되었습니다!');
       }
-
-      onUpdateUser(updatedUser);
+      fetchData(); // 데이터 리로드
+    } catch (error) {
+      console.error('미션 처리 중 오류:', error);
+      onAddNotification('미션 진행 상태 업데이트에 실패했습니다.');
     }
+  };
+  
+  // 미션 보상 수령 처리
+  const handleClaimMissionReward = async (missionId: string) => {
+    try {
+      // API를 통한 미션 보상 수령
+      const response = await eventMissionApi.missions.claimRewards(parseInt(missionId));
+      
+      if (response && response.success) {
+        // 보상 내역 표시
+        const rewardMessage = Object.entries(response.rewards)
+          .map(([type, amount]) => `${type}: ${amount}`)
+          .join(', ');
+          
+        onAddNotification(`보상 수령 완료: ${rewardMessage}`);
+        
+        // 사용자 정보 업데이트
+        const totalGold = response.rewards.gold || 0;
+        const totalExp = response.rewards.exp || 0;
+        
+        const updatedUser = {
+          ...user,
+          goldBalance: user.goldBalance + totalGold,
+          experience: user.experience + totalExp
+        };
 
-    onAddNotification(`✅ 미션 완료! ${mission.title} - 보상을 받았습니다!`);
+        // Check for level up
+        if (updatedUser.experience >= updatedUser.maxExperience) {
+          updatedUser.level += 1;
+          updatedUser.experience = updatedUser.experience - updatedUser.maxExperience;
+          updatedUser.maxExperience = Math.floor(updatedUser.maxExperience * 1.2);
+          onAddNotification(`🆙 레벨업! ${updatedUser.level}레벨 달성!`);
+        }
+
+        onUpdateUser(updatedUser);
+        
+        // 데이터 다시 로드
+        fetchData();
+      }
+    } catch (error) {
+      console.error('미션 보상 수령 중 오류:', error);
+      onAddNotification('미션 보상을 받는 중 문제가 발생했습니다.');
+    }
   };
 
   // Handle event participation
-  const handleJoinEvent = (eventId: string) => {
-    setEvents(prev => prev.map(e => 
-      e.id === eventId 
-        ? { ...e, participants: e.participants + 1 }
-        : e
-    ));
-    
-    onAddNotification(`🎉 이벤트에 참여했습니다! 조건을 달성하여 보상을 받으세요.`);
+  const handleJoinEvent = async (eventId: string) => {
+    try {
+      // API를 통한 이벤트 참여
+      await eventMissionApi.events.join(parseInt(eventId));
+      
+      // 로컬 상태 업데이트
+      setEvents(prev => prev.map((e: Event) => 
+        e.id === eventId 
+          ? { ...e, participants: e.participants + 1, joined: true }
+          : e
+      ));
+      
+      onAddNotification(`🎉 이벤트에 참여했습니다! 조건을 달성하여 보상을 받으세요.`);
+      
+      // 최신 데이터로 업데이트
+      fetchData();
+    } catch (error) {
+      console.error('이벤트 참여 중 오류:', error);
+      onAddNotification('이벤트 참여 중 문제가 발생했습니다.');
+    }
+  };
+  
+  // 이벤트 보상 수령
+  const handleClaimEventReward = async (eventId: string) => {
+    try {
+      const response = await eventMissionApi.events.claimRewards(parseInt(eventId));
+      
+      if (response && response.success) {
+        // 보상 내역 표시
+        const rewardMessage = Object.entries(response.rewards)
+          .map(([type, amount]) => `${type}: ${amount}`)
+          .join(', ');
+          
+        onAddNotification(`이벤트 보상 수령 완료: ${rewardMessage}`);
+        
+        // 사용자 정보 업데이트
+        const totalGold = response.rewards.gold || 0;
+        const totalGems = response.rewards.gems || 0;
+        
+        onUpdateUser({
+          ...user,
+          goldBalance: user.goldBalance + totalGold
+          // 젬은 사용자 타입에 없으면 추가해야 함
+        });
+        
+        // 데이터 다시 로드
+        fetchData();
+      }
+    } catch (error) {
+      console.error('이벤트 보상 수령 중 오류:', error);
+      onAddNotification('이벤트 보상을 받는 중 문제가 발생했습니다.');
+    }
   };
 
   // Get difficulty color
@@ -339,7 +481,7 @@ export function EventMissionPanel({ user, onBack, onUpdateUser, onAddNotificatio
                 <Input
                   placeholder="이벤트 검색..."
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onChange={(e) => setSearchQuery(e.target.value as string)}
                   className="pl-10"
                 />
               </div>

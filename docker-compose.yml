@@ -16,7 +16,7 @@ services:
       - REDIS_PORT=${REDIS_PORT:-6379}
       - JWT_SECRET_KEY=${JWT_SECRET_KEY:-secret_key_for_development_only}
     volumes:
-      - ./cc-webapp/backend:/app:rw
+      - ./cc-webapp/backend:/app
       - ./logs/backend:/app/logs:rw
     ports:
       - "8000:8000"
@@ -34,7 +34,7 @@ services:
     environment:
       - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8000}
     volumes:
-      - ./cc-webapp/frontend:/app:rw
+      - ./cc-webapp/frontend:/app
       - ./logs/frontend:/app/logs:rw
     ports:
       - "3000:3000"
