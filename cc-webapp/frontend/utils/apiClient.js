@@ -267,7 +267,7 @@ export const gameApi = {
   },
 
   // 게임 액션 수행
-  playAction: async (gameId: string, action: any) => {
+  playAction: async (gameId, action) => {
     return await apiRequest(`/api/actions/${gameId}`, {
       method: 'POST',
       body: JSON.stringify(action)
@@ -275,7 +275,7 @@ export const gameApi = {
   },
 
   // 보상 수령
-  claimReward: async (rewardId: string) => {
+  claimReward: async (rewardId) => {
     return await apiRequest(`/api/rewards/${rewardId}/claim`, {
       method: 'POST'
     });
