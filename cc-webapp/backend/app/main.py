@@ -52,6 +52,7 @@ from app.routers import (
     unlock,      # Phase 10 added
     chat,        # Chat system added
     ai_router,   # AI recommendation system
+    events,      # 추가 - 이벤트/미션 라우터
 )
 
 # AI recommendation system router separate import (removed duplicate)
@@ -189,6 +190,9 @@ app.include_router(tracking.router, tags=["Tracking"])
 
 # Phase 10: Unlock System (no prefix - routers have their own)
 app.include_router(unlock.router, tags=["Unlock"])
+
+# 이벤트/미션 라우터 추가
+app.include_router(events.router, tags=["Events"])
 
 print("✅ Core API endpoints registered")
 print("✅ Progressive Expansion features registered") 

@@ -38,6 +38,10 @@ class User(Base):
     activities = relationship("UserActivity", back_populates="user", cascade="all, delete-orphan")
     gacha_results = relationship("GachaResult", back_populates="user", cascade="all, delete-orphan")
     progress = relationship("UserProgress", back_populates="user", cascade="all, delete-orphan")
+    game_stats = relationship("GameStats", back_populates="user", cascade="all, delete-orphan")
+    daily_limits = relationship("DailyGameLimit", back_populates="user", cascade="all, delete-orphan")
+    event_participations = relationship("EventParticipation", back_populates="user", cascade="all, delete-orphan")
+    missions = relationship("UserMission", back_populates="user", cascade="all, delete-orphan")
 
     # 세그먼트 관계 추가
     segment = relationship("UserSegment", back_populates="user", uselist=False, cascade="all, delete-orphan")

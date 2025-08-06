@@ -77,6 +77,14 @@ from .chat_models import (
     ChatModeration,
 )
 
+# Event 모델들 추가
+from .event_models import (
+    Event,
+    EventParticipation,
+    Mission,
+    UserMission
+)
+
 # 모든 모델 클래스들을 리스트로 정의
 __all__ = [
     # Base
@@ -160,6 +168,12 @@ __all__ = [
     "ConversionEvent",
     "ABTestParticipant",
     "CustomEvent",
+
+    # Event Models
+    "Event",
+    "EventParticipation", 
+    "Mission",
+    "UserMission",
 ]
 
 # Content 모델들 추가

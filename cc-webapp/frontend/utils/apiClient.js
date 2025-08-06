@@ -338,4 +338,98 @@ export const gameApi = {
   }
 };
 
+// 이벤트/미션 관련 API
+export const eventApi = {
+  // 이벤트 관련
+  getActiveEvents: async () => {
+    return await withApiLogging('GET /api/events', async () => {
+      return await apiRequest('/api/events');
+    });
+  },
+
+  getEventDetail: async (eventId) => {
+    return await withApiLogging(`GET /api/events/${eventId}`, async () => {
+      return await apiRequest(`/api/events/${eventId}`);
+    });
+  },
+
+  joinEvent: async (eventId) => {
+    return await withApiLogging('POST /api/events/join', async () => {
+      return await apiRequest('/api/events/join', {
+        method: 'POST',
+        body: JSON.stringify({ event_id: eventId })
+      });
+    });
+  },
+
+  updateEventProgress: async (eventId, progress) => {
+    return await withApiLogging(`PUT /api/events/progress/${eventId}`, async () => {
+      return await apiRequest(`/api/events/progress/${eventId}`, {
+        method: 'PUT',
+        body: JSON.stringify({ progress })
+      });
+    });
+  },
+
+  claimEventReward: async (eventId) => {
+    return await withApiLogging(`POST /api/events/claim/${eventId}`, async () => {
+      return await apiRequest(`/api/events/claim/${eventId}`, {
+        method: 'POST'
+      });
+    });
+  },
+
+  // 미션 관련
+  getDailyMissions: async () => {
+    return await withApiLogging('GET /api/events/missions/daily', async () => {
+      return await apiRequest('/api/events/missions/daily');
+    });
+  },
+
+  getWeeklyMissions: async () => {
+    return await withApiLogging('GET /api/events/missions/weekly', async () => {
+      return await apiRequest('/api/events/missions/weekly');
+    });
+  },
+
+  getAllMissions: async () => {
+    return await withApiLogging('GET /api/events/missions/all', async () => {
+      return await apiRequest('/api/events/missions/all');
+    });
+  },
+
+  updateMissionProgress: async (missionId, increment) => {
+    return await withApiLogging('PUT /api/events/missions/progress', async () => {
+      return await apiRequest('/api/events/missions/progress', {
+        method: 'PUT',
+        body: JSON.stringify({
+          mission_id: missionId,
+          progress_increment: increment
+        })
+      });
+    });
+  },
+
+  claimMissionReward: async (missionId) => {
+    return await withApiLogging(`POST /api/events/missions/claim/${missionId}`, async () => {
+      return await apiRequest(`/api/events/missions/claim/${missionId}`, {
+        method: 'POST'
+      });
+    });
+  }
+};
+
+// API 로깅 래퍼 함수
+async function withApiLogging(endpoint, apiCall) {
+  apiLogTry(endpoint);
+  try {
+    const response = await apiCall();
+    apiLogSuccess(endpoint, response);
+    return response;
+  } catch (error) {
+    apiLogFail(endpoint, error);
+    throw error;
+  }
+}
+
 export default apiRequest;
