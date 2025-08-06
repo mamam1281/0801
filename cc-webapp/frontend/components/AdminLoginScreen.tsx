@@ -15,11 +15,11 @@ import {
   Zap
 } from 'lucide-react';
 import { Button } from './ui/button';
-import { Input } from './ui/Input';
+import { Input } from './ui/input';
 import { Label } from './ui/label';
 
 interface AdminLoginProps {
-  onAdminLogin?: (adminId: string, password: string, securityCode?: string) => Promise<boolean>;
+  onAdminLogin?: (adminId: string, password: string) => Promise<boolean>;
   onBackToLogin?: () => void;
   isLoading?: boolean;
 }
@@ -31,13 +31,11 @@ export function AdminLoginScreen({
 }: AdminLoginProps) {
   const [formData, setFormData] = useState({
     adminId: '',
-    password: '',
-    securityCode: ''
+    password: ''
   });
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [securityLevel, setSecurityLevel] = useState(1);
   const [attempts, setAttempts] = useState(0);
   const [isLocked, setIsLocked] = useState(false);
   const [lockdownTime, setLockdownTime] = useState(0);
@@ -73,17 +71,11 @@ export function AdminLoginScreen({
       return;
     }
 
-    if (securityLevel >= 2 && !formData.securityCode.trim()) {
-      setError('보안 코드를 입력해주세요.');
-      return;
-    }
-
     setIsSubmitting(true);
     try {
       const success = await onAdminLogin?.(
         formData.adminId, 
-        formData.password, 
-        formData.securityCode
+        formData.password
       ) ?? false;
       
       if (!success) {
@@ -96,9 +88,6 @@ export function AdminLoginScreen({
           setError('보안 위반으로 30초간 잠금되었습니다.');
         } else {
           setError(`로그인 실패. 잘못된 정보입니다. (${newAttempts}/3)`);
-          if (newAttempts >= 2) {
-            setSecurityLevel(2);
-          }
         }
       }
     } catch (err) {
@@ -113,24 +102,6 @@ export function AdminLoginScreen({
   ) => {
     setFormData(prev => ({ ...prev, [field]: e.target.value }));
     if (error) setError('');
-  };
-
-  const getSecurityLevelColor = () => {
-    switch (securityLevel) {
-      case 1: return 'text-info';
-      case 2: return 'text-warning';
-      case 3: return 'text-error';
-      default: return 'text-info';
-    }
-  };
-
-  const getSecurityLevelText = () => {
-    switch (securityLevel) {
-      case 1: return '기본 보안';
-      case 2: return '강화 보안';
-      case 3: return '최고 보안';
-      default: return '기본 보안';
-    }
   };
 
   return (
@@ -206,18 +177,6 @@ export function AdminLoginScreen({
           >
             <ArrowLeft className="w-5 h-5" />
           </motion.button>
-
-          {/* Security Level Indicator */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="absolute top-4 right-4 flex items-center gap-1 text-xs"
-          >
-            <ShieldCheck className={`w-4 h-4 ${getSecurityLevelColor()}`} />
-            <span className={getSecurityLevelColor()}>
-              {getSecurityLevelText()}
-            </span>
-          </motion.div>
 
           {/* Header */}
           <div className="text-center mb-8 mt-8">
@@ -342,39 +301,6 @@ export function AdminLoginScreen({
                 </button>
               </div>
             </div>
-
-            {/* Security Code Field (appears after failed attempts) */}
-            <AnimatePresence>
-              {securityLevel >= 2 && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="space-y-2"
-                >
-                  <Label htmlFor="securityCode" className="text-warning flex items-center gap-2">
-                    <Zap className="w-4 h-4" />
-                    보안 코드 (강화 인증)
-                  </Label>
-                  <div className="relative">
-                    <ShieldCheck className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-warning" />
-                    <Input
-                      id="securityCode"
-                      type="text"
-                      value={formData.securityCode}
-                      onChange={handleInputChange('securityCode')}
-                      placeholder="6자리 보안 코드"
-                      className="pl-10 bg-input-background border-warning/30 focus:border-warning focus:ring-warning/20 text-foreground"
-                      disabled={isSubmitting || isLoading || isLocked}
-                      maxLength={6}
-                    />
-                  </div>
-                  <p className="text-xs text-warning">
-                    로그인 실패로 인해 추가 보안 인증이 필요합니다.
-                  </p>
-                </motion.div>
-              )}
-            </AnimatePresence>
 
             {/* Login Button */}
             <Button

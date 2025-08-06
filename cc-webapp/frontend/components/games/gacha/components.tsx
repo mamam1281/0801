@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { motion } from 'framer-motion';
-import { Heart, Crown } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Heart, Crown, Package } from 'lucide-react';
 import { User } from '../../../types';
 import { Button } from '../../ui/button';
 import { GachaBanner, GachaItem, HeartParticle } from '../../../types/gacha';
@@ -338,5 +338,251 @@ export function SexyEmojis() {
         </motion.div>
       ))}
     </div>
+  );
+}
+
+// 배경 효과 컴포넌트
+export function BackgroundEffects() {
+  return (
+    <div className="fixed inset-0 pointer-events-none z-0">
+      {/* 네온 그리드 배경 */}
+      <div className="absolute inset-0 bg-gradient-to-br from-purple-900/20 via-pink-900/20 to-blue-900/20" />
+
+      {/* 반짝이는 점들 */}
+      <div className="absolute inset-0">
+        {Array.from({ length: 20 }).map((_, i) => (
+          <motion.div
+            key={i}
+            className="absolute w-1 h-1 bg-cyan-400 rounded-full"
+            style={{
+              left: Math.random() * 100 + '%',
+              top: Math.random() * 100 + '%',
+            }}
+            animate={{
+              opacity: [0, 1, 0],
+              scale: [0.5, 1.5, 0.5],
+            }}
+            transition={{
+              duration: 2 + Math.random() * 3,
+              repeat: Infinity,
+              delay: Math.random() * 5,
+            }}
+          />
+        ))}
+      </div>
+
+      {/* 떠다니는 파티클 */}
+      <div className="absolute inset-0">
+        {Array.from({ length: 10 }).map((_, i) => (
+          <motion.div
+            key={i}
+            className="absolute w-2 h-2 border border-pink-400/30 rounded-full"
+            style={{
+              left: Math.random() * 100 + '%',
+              top: Math.random() * 100 + '%',
+            }}
+            animate={{
+              y: [0, -100, 0],
+              x: [0, Math.random() * 50 - 25, 0],
+              opacity: [0, 0.5, 0],
+            }}
+            transition={{
+              duration: 8 + Math.random() * 4,
+              repeat: Infinity,
+              delay: Math.random() * 8,
+            }}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// 뽑기 결과 모달 컴포넌트
+export function SexyPullResultsModal({
+  isOpen,
+  onClose,
+  results,
+  isPullAnimation,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  results: GachaItem[];
+  isPullAnimation: boolean;
+}) {
+  if (!isOpen) return null;
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        onClick={onClose}
+      >
+        <motion.div
+          className="bg-gradient-to-br from-gray-900 to-purple-900 rounded-2xl p-8 max-w-4xl max-h-[80vh] overflow-y-auto border-2 border-pink-500/30"
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          exit={{ scale: 0.8, opacity: 0 }}
+          onClick={(e: any) => e.stopPropagation()}
+        >
+          <div className="text-center mb-6">
+            <h2 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-pink-400 to-purple-400 mb-2">
+              🎉 뽑기 결과 🎉
+            </h2>
+            <p className="text-gray-300">총 {results.length}개 아이템 획득!</p>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+            {results.map((item, index) => (
+              <motion.div
+                key={index}
+                className={`relative p-4 rounded-xl border-2 ${
+                  RARITY_COLORS[item.rarity as keyof typeof RARITY_COLORS] || 'border-gray-600'
+                }`}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.1 }}
+                whileHover={{ scale: 1.05 }}
+              >
+                <div className="text-center">
+                  <div className="text-2xl mb-2">{item.icon}</div>
+                  <h3 className="text-sm font-semibold text-white mb-1">{item.name}</h3>
+                  <p className="text-xs text-gray-400 capitalize">{item.rarity}</p>
+                </div>
+
+                {item.rarity === 'legendary' && (
+                  <div className="absolute -top-2 -right-2">
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
+                    >
+                      <Crown className="w-6 h-6 text-yellow-400" />
+                    </motion.div>
+                  </div>
+                )}
+              </motion.div>
+            ))}
+          </div>
+
+          <div className="mt-8 text-center">
+            <Button
+              onClick={onClose}
+              className="bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600 text-white px-8 py-3 rounded-xl"
+            >
+              확인
+            </Button>
+          </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
+  );
+}
+
+// 인벤토리 모달 컴포넌트
+export function SexyInventoryModal({
+  isOpen,
+  onClose,
+  inventory,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  inventory: GachaItem[];
+}) {
+  if (!isOpen) return null;
+
+  const groupedInventory = inventory.reduce(
+    (acc, item) => {
+      const key = `${item.name}-${item.rarity}`;
+      if (!acc[key]) {
+        acc[key] = { ...item, count: 0 };
+      }
+      acc[key].count += 1;
+      return acc;
+    },
+    {} as Record<string, GachaItem & { count: number }>
+  );
+
+  const inventoryItems = Object.values(groupedInventory);
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        onClick={onClose}
+      >
+        <motion.div
+          className="bg-gradient-to-br from-gray-900 to-blue-900 rounded-2xl p-8 max-w-4xl max-h-[80vh] overflow-y-auto border-2 border-cyan-500/30"
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          exit={{ scale: 0.8, opacity: 0 }}
+          onClick={(e: any) => e.stopPropagation()}
+        >
+          <div className="text-center mb-6">
+            <h2 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-400 mb-2">
+              📦 인벤토리 📦
+            </h2>
+            <p className="text-gray-300">보유 아이템: {inventoryItems.length}종류</p>
+          </div>
+
+          {inventoryItems.length === 0 ? (
+            <div className="text-center py-12">
+              <Package className="w-16 h-16 text-gray-500 mx-auto mb-4" />
+              <p className="text-gray-400 text-lg">아직 보유한 아이템이 없습니다.</p>
+              <p className="text-gray-500 text-sm mt-2">가챠를 뽑아보세요!</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {inventoryItems.map((item, index) => (
+                <motion.div
+                  key={index}
+                  className={`relative p-4 rounded-xl border-2 ${
+                    RARITY_COLORS[item.rarity as keyof typeof RARITY_COLORS] || 'border-gray-600'
+                  }`}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.05 }}
+                  whileHover={{ scale: 1.05 }}
+                >
+                  <div className="text-center">
+                    <div className="text-2xl mb-2">{item.icon}</div>
+                    <h3 className="text-sm font-semibold text-white mb-1">{item.name}</h3>
+                    <p className="text-xs text-gray-400 capitalize">{item.rarity}</p>
+                    <div className="mt-2 bg-gray-700/50 rounded-full px-2 py-1">
+                      <span className="text-xs text-cyan-400">x{item.count}</span>
+                    </div>
+                  </div>
+
+                  {item.rarity === 'legendary' && (
+                    <div className="absolute -top-2 -right-2">
+                      <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
+                      >
+                        <Crown className="w-6 h-6 text-yellow-400" />
+                      </motion.div>
+                    </div>
+                  )}
+                </motion.div>
+              ))}
+            </div>
+          )}
+
+          <div className="mt-8 text-center">
+            <Button
+              onClick={onClose}
+              className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white px-8 py-3 rounded-xl"
+            >
+              닫기
+            </Button>
+          </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
   );
 }

@@ -64,16 +64,14 @@ export function useAuthHandlers({
   // 🔐 관리자 로그인 처리
   const handleAdminLogin = useCallback(async (
     adminId: string, 
-    password: string, 
-    securityCode?: string
+    password: string
   ): Promise<boolean> => {
     setIsLoading(true);
     await new Promise(resolve => setTimeout(resolve, APP_CONFIG.ADMIN_LOGIN_DELAY));
     
     const isValidAdmin = isAdminAccount(adminId, password);
-    const isValidSecurity = !securityCode || securityCode === ADMIN_SECURITY_CODE;
     
-    if (isValidAdmin && isValidSecurity) {
+    if (isValidAdmin) {
       // 🔧 관리자 사용자 데이터 생성 및 설정
       const adminUserData = createUserData(adminId, password, false);
       updateUser(adminUserData);

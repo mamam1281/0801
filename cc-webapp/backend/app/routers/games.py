@@ -1,12 +1,16 @@
 """Game Collection API Endpoints"""
 
+import logging
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 
 from ..database import get_db
 from ..dependencies import get_current_user
 from ..services.game_service import GameService
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/games", tags=["games"])
 
@@ -51,31 +55,85 @@ class RPSPlayResponse(BaseModel):
     tokens_change: int
     balance: int
 
+class GameResponse(BaseModel):
+    """게임 목록 응답 모델"""
+    id: int
+    name: str
+    type: str
+    description: str
+    min_bet: int
+    max_bet: int
+    is_active: bool
+
 # Dependency injection
 def get_game_service() -> GameService:
     """Game service dependency"""
     return GameService()
 
 # API endpoints
+@router.get("/", response_model=List[GameResponse])
+async def get_games(db: Session = Depends(get_db)):
+    """게임 목록 조회"""
+    logger.info("API: GET /api/games - 게임 목록 조회")
+    # 하드코딩된 게임 목록 반환 (DB 모델이 없는 경우)
+    games = [
+        {
+            "id": 1,
+            "name": "Neon Slots",
+            "type": "slot",
+            "description": "네온 테마 슬롯머신",
+            "min_bet": 100,
+            "max_bet": 10000,
+            "is_active": True
+        },
+        {
+            "id": 2,
+            "name": "Neon Crash",
+            "type": "crash",
+            "description": "네온 크래시 게임",
+            "min_bet": 50,
+            "max_bet": 5000,
+            "is_active": True
+        }
+    ]
+    return games
+
 @router.post("/slot/spin", response_model=Dict[str, Any])
 async def slot_spin(
+    request: SlotSpinRequest,
     current_user = Depends(get_current_user),
     db = Depends(get_db),
     game_service: GameService = Depends(get_game_service)
 ):
-    """Slot machine spin"""
-    try:
-        result = game_service.slot_spin(current_user.id, db)
-        return {
-            "success": True,
-            "message": "Slot spin completed",
-            "result": result,
-            "user_id": current_user.id
-        }
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail="Slot spin failed")
+    """슬롯머신 스핀"""
+    logger.info(f"API: POST /api/games/slot/spin - user_id={current_user.id}, bet_amount={request.bet_amount}")
+    # 간단한 슬롯 로직 구현
+    import random
+    
+    # 잔액 확인
+    if current_user.coin_balance < request.bet_amount:
+        raise HTTPException(status_code=400, detail="잔액이 부족합니다")
+    
+    # 슬롯 결과 생성
+    symbols = ["🍒", "🍋", "🍊", "🍇", "💎", "7️⃣"]
+    reels = [[random.choice(symbols) for _ in range(3)] for _ in range(3)]
+    
+    # 승리 판정 (간단한 로직)
+    win_amount = 0
+    if reels[1][0] == reels[1][1] == reels[1][2]:  # 중간 줄 일치
+        win_amount = request.bet_amount * 10
+    
+    # 잔액 업데이트
+    current_user.coin_balance -= request.bet_amount
+    current_user.coin_balance += win_amount
+    db.commit()
+    
+    return {
+        "reels": reels,
+        "win_amount": win_amount,
+        "balance": current_user.coin_balance,
+        "is_jackpot": win_amount > request.bet_amount * 50
+    }
 
 @router.post("/prize-roulette/spin", response_model=PrizeRouletteSpinResponse)
 async def prize_roulette_spin(
@@ -84,6 +142,7 @@ async def prize_roulette_spin(
     game_service: GameService = Depends(get_game_service)
 ):
     """Prize roulette spin"""
+    logger.info(f"API: POST /api/games/prize-roulette/spin - user_id={current_user.id}")
     try:
         result = game_service.prize_roulette_spin(current_user.id, db)
         

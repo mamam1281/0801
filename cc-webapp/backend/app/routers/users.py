@@ -1,13 +1,16 @@
 """User Management API Endpoints"""
-
+import logging
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import Optional, List
-
 from ..database import get_db
+from ..models.auth_models import User
 from ..dependencies import get_current_user
 from ..services.user_service import UserService
 from ..schemas.user import UserResponse, UserUpdate
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/users", tags=["users"])
 
@@ -36,27 +39,14 @@ def get_user_service(db = Depends(get_db)) -> UserService:
     return UserService(db)
 
 # API endpoints
-@router.get("/profile", response_model=UserProfileResponse)
-async def get_user_profile(
-    current_user = Depends(get_current_user),
-    db = Depends(get_db)
+@router.get("/profile", response_model=UserResponse)
+async def get_profile(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
-    """Get current user profile"""
-    try:
-        return UserProfileResponse(
-            id=current_user.id,
-            site_id=current_user.site_id,
-            nickname=current_user.nickname,
-            phone_number=current_user.phone_number,
-            cyber_token_balance=current_user.cyber_token_balance,
-            is_admin=current_user.is_admin,
-            is_active=current_user.is_active
-        )
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Profile retrieval failed: {str(e)}"
-        )
+    """현재 로그인한 사용자 프로필 조회"""
+    logger.info(f"API: GET /api/users/profile - user_id={current_user.id}")
+    return current_user
 
 @router.put("/profile", response_model=UserProfileResponse)
 async def update_user_profile(
@@ -68,7 +58,6 @@ async def update_user_profile(
     """Update user profile"""
     try:
         updated_user = user_service.update_user(current_user.id, update_data.dict(exclude_unset=True))
-        
         return UserProfileResponse(
             id=updated_user.id,
             site_id=updated_user.site_id,
@@ -86,6 +75,37 @@ async def update_user_profile(
             detail=f"Profile update failed: {str(e)}"
         )
 
+@router.get("/balance")
+async def get_user_balance(
+    current_user: User = Depends(get_current_user)
+):
+    """사용자 잔액 조회"""
+    logger.info(f"API: GET /api/users/balance - user_id={current_user.id}")
+    return {
+        "cyber_token_balance": current_user.cyber_token_balance,
+        "user_id": current_user.id,
+        "nickname": current_user.nickname
+    }
+
+@router.get("/info")
+async def get_user_info(
+    current_user: User = Depends(get_current_user)
+):
+    """사용자 상세 정보 조회"""
+    logger.info(f"API: GET /api/users/info - user_id={current_user.id}")
+    return {
+        "id": current_user.id,
+        "site_id": current_user.site_id,
+        "nickname": current_user.nickname,
+        "phone_number": current_user.phone_number,
+        "cyber_token_balance": current_user.cyber_token_balance,
+        "rank": getattr(current_user, 'rank', 'STANDARD'),
+        "is_admin": current_user.is_admin,
+        "is_active": current_user.is_active,
+        "created_at": current_user.created_at,
+        "last_login": current_user.last_login
+    }
+
 @router.get("/stats", response_model=UserStatsResponse)
 async def get_user_stats(
     current_user = Depends(get_current_user),
@@ -95,7 +115,6 @@ async def get_user_stats(
     """Get user statistics"""
     try:
         stats = user_service.get_user_stats(current_user.id)
-        
         return UserStatsResponse(
             total_games_played=getattr(stats, 'total_games_played', 0),
             total_tokens_earned=getattr(stats, 'total_tokens_earned', 0),
@@ -138,9 +157,7 @@ async def add_tokens(
     try:
         if amount <= 0:
             raise ValueError("Amount must be positive")
-            
         updated_balance = user_service.add_tokens(current_user.id, amount)
-        
         return {
             "success": True,
             "message": f"Added {amount} tokens",
@@ -154,3 +171,14 @@ async def add_tokens(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Token addition failed: {str(e)}"
         )
+
+@router.get("/{user_id}", response_model=UserResponse)
+async def get_user(
+    user_id: int,
+    db: Session = Depends(get_db)
+):
+    """특정 사용자 정보 조회"""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다")
+    return user

@@ -20,6 +20,7 @@ from pydantic import BaseModel
 # Core imports
 from app.database import get_db
 from app.core.logging import setup_logging
+from app.middleware.simple_logging import SimpleLoggingMiddleware
 # from app.core.exceptions import add_exception_handlers  # Disabled - empty file
 # from app.middleware.error_handling import error_handling_middleware  # Disabled
 # from app.middleware.logging import LoggingContextMiddleware  # Disabled
@@ -120,6 +121,9 @@ origins = [
 # Error handlers (disabled - files empty)
 # add_exception_handlers(app)
 
+# 간단한 API 로깅 미들웨어 추가
+app.add_middleware(SimpleLoggingMiddleware)
+
 # Middleware registration (disabled - files missing)
 # app.add_middleware(error_handling_middleware)
 # app.add_middleware(LoggingContextMiddleware)
@@ -155,7 +159,9 @@ app.include_router(dashboard.router, tags=["Dashboard"])
 app.include_router(notifications.router, tags=["Real-time Notifications"])
 
 # Individual Games (no prefix - routers have their own)
-app.include_router(rps.router, tags=["Rock Paper Scissors"])# ===== Progressive Expansion - Additional Features =====
+app.include_router(rps.router, tags=["Rock Paper Scissors"])
+
+# ===== Progressive Expansion - Additional Features =====
 
 # Phase 1: Documentation & Content (no prefix - routers have their own)
 app.include_router(doc_titles.router, tags=["Document Titles"])
