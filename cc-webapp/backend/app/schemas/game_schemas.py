@@ -71,6 +71,23 @@ class GameSession(BaseModel):
     current_bet: Optional[int] = 0
     current_round: Optional[int] = 0
     status: str = "active"
+    
+    
+class GameSessionStart(BaseModel):
+    """게임 세션 시작 요청 모델"""
+    game_type: str
+    bet_amount: Optional[int] = 0
+    metadata: Optional[Dict[str, Any]] = None
+    
+    
+class GameSessionEnd(BaseModel):
+    """게임 세션 종료 요청 모델"""
+    session_id: str
+    duration: int  # 초 단위
+    rounds_played: int = 1
+    total_bet: int = 0
+    total_win: int = 0
+    game_result: Optional[Dict[str, Any]] = None
 
 
 # 프로필 API 스키마
@@ -107,6 +124,41 @@ class ProfileGameStats(BaseModel):
     current_session: Optional[GameSession] = None
 
 
+# 게임 목록 스키마
+class GameListResponse(BaseModel):
+    """게임 목록 응답 모델"""
+    id: str
+    name: str
+    description: str
+    type: str
+    image_url: str
+    is_active: bool = True
+    daily_limit: Optional[int] = None
+    playCount: Optional[int] = 0
+    bestScore: Optional[int] = 0
+    canPlay: bool = True
+    cooldown_remaining: Optional[int] = None
+    requires_vip_tier: Optional[int] = None
+
+
+class GameDetailResponse(BaseModel):
+    """게임 상세 정보 응답 모델"""
+    id: str
+    name: str
+    description: str
+    type: str
+    image_url: str
+    rules: str
+    bet_options: Optional[List[int]] = None
+    min_bet: Optional[int] = None
+    max_bet: Optional[int] = None
+    game_config: Optional[Dict[str, Any]] = None
+    is_active: bool = True
+    daily_limit: Optional[int] = None
+    cooldown_seconds: Optional[int] = None
+    requires_vip_tier: Optional[int] = None
+
+
 # 리더보드 스키마
 class LeaderboardEntry(BaseModel):
     """리더보드 항목"""
@@ -124,3 +176,80 @@ class GameLeaderboard(BaseModel):
     entries: List[LeaderboardEntry] = []
     user_rank: Optional[int] = None
     updated_at: datetime
+
+
+# 슬롯 머신 게임 스키마
+class SlotSpinRequest(BaseModel):
+    """슬롯 머신 스핀 요청 모델"""
+    bet_amount: int
+    lines: int = 1
+
+
+class SlotSpinResponse(BaseModel):
+    """슬롯 머신 스핀 응답 모델"""
+    success: bool
+    reels: List[List[str]]
+    win_amount: int = 0
+    win_lines: List[Dict[str, Any]] = []
+    multiplier: float = 1.0
+    is_jackpot: bool = False
+    free_spins_awarded: int = 0
+    message: str
+    balance: int
+    special_animation: Optional[str] = None
+
+
+# 가위바위보 게임 스키마
+class RPSPlayRequest(BaseModel):
+    """가위바위보 게임 요청 모델"""
+    choice: str  # 'rock', 'paper', 'scissors'
+    bet_amount: int
+
+
+class RPSPlayResponse(BaseModel):
+    """가위바위보 게임 응답 모델"""
+    success: bool
+    player_choice: str
+    computer_choice: str
+    result: str  # 'win', 'lose', 'draw'
+    win_amount: int = 0
+    message: str
+    balance: int
+    streak: Optional[int] = None
+
+
+# 가챠 게임 스키마
+class GachaPullRequest(BaseModel):
+    """가챠 뽑기 요청 모델"""
+    gacha_id: str
+    pull_count: int = 1
+    use_premium_currency: bool = False
+
+
+class GachaPullResponse(BaseModel):
+    """가챠 뽑기 응답 모델"""
+    success: bool
+    items: List[Dict[str, Any]]
+    rare_item_count: int = 0
+    ultra_rare_item_count: int = 0
+    special_animation: Optional[str] = None
+    message: str
+    currency_balance: Dict[str, int]
+
+
+# 크래시 게임 스키마
+class CrashBetRequest(BaseModel):
+    """크래시 게임 베팅 요청 모델"""
+    bet_amount: int
+    auto_cashout_multiplier: Optional[float] = None
+
+
+class CrashBetResponse(BaseModel):
+    """크래시 게임 베팅 응답 모델"""
+    success: bool
+    game_id: str
+    bet_amount: int
+    potential_win: int
+    max_multiplier: Optional[float] = None
+    message: str
+    balance: int
