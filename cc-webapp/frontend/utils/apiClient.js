@@ -1,5 +1,5 @@
 import { apiLogTry, apiLogSuccess, apiLogFail } from './apiLogger';
-import { getTokens, setTokens, clearTokens } from './tokenStorage';
+import { getTokens, getAccessToken, setTokens, clearTokens } from './tokenStorage';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -7,6 +7,12 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
  * API 클라이언트
  * 백엔드와의 통신을 처리하는 함수들
  */
+
+// 인증 헤더 생성
+const getAuthHeaders = () => {
+  const accessToken = getAccessToken();
+  return accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {};
+};
 
 // 기본 API 요청 함수
 const apiRequest = async (endpoint, options = {}) => {
@@ -75,7 +81,8 @@ const apiRequest = async (endpoint, options = {}) => {
 // 액세스 토큰 리프레시
 const refreshAccessToken = async () => {
   try {
-    const { refreshToken } = getTokens();
+    const tokens = getTokens();
+    const refreshToken = tokens?.refresh_token;
     if (!refreshToken) return false;
 
     const response = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
@@ -87,7 +94,10 @@ const refreshAccessToken = async () => {
 
     if (response.ok) {
       const data = await response.json();
-      setTokens(data.access_token, data.refresh_token);
+      setTokens({
+        access_token: data.access_token,
+        refresh_token: data.refresh_token
+      });
       return true;
     }
     return false;
@@ -159,6 +169,36 @@ export const userApi = {
         bestScore: 0,
         goldBalance: 1000,
         tokenBalance: 100
+      };
+    }
+  },
+
+  getProfile: async () => {
+    try {
+      return await apiRequest('/api/users/profile');
+    } catch (error) {
+      console.warn('⚠️ 사용자 프로필 API 실패, 기본값 사용');
+      return {
+        id: 0,
+        username: 'Guest',
+        nickname: 'Guest',
+        avatar: '/avatars/default.png',
+        level: 1,
+        xp: 0,
+        vipTier: 0
+      };
+    }
+  },
+
+  getBalance: async () => {
+    try {
+      return await apiRequest('/api/users/balance');
+    } catch (error) {
+      console.warn('⚠️ 사용자 잔액 API 실패, 기본값 사용');
+      return {
+        gold: 1000,
+        gems: 50,
+        tokens: 100
       };
     }
   }

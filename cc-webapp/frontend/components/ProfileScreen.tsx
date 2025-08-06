@@ -8,7 +8,8 @@ import { Card } from './ui/card';
 import { Badge } from './ui/badge';
 import { Progress } from './ui/progress';
 import { User, UserStats, UserBalance } from '../types/user';
-import { userApi, isAuthenticated, getTokens } from '../utils/apiClient';
+import { userApi } from '../utils/apiClient';
+import { isAuthenticated, getTokens } from '../utils/tokenStorage';
 
 interface ProfileScreenProps {
   onBack: () => void;
@@ -29,7 +30,8 @@ export function ProfileScreen({ onBack, onAddNotification }: ProfileScreenProps)
         setLoading(true);
 
         // 먼저 localStorage에서 토큰 확인
-        const { accessToken } = getTokens();
+        const tokens = getTokens();
+        const accessToken = tokens?.access_token;
         if (!accessToken) {
           console.log('액세스 토큰이 없습니다. 로그인이 필요합니다.');
           setError('로그인이 필요합니다.');

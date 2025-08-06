@@ -6,6 +6,12 @@ from sqlalchemy.orm import Session
 
 from ..models.game_models import GameSession, GameStats, DailyGameLimit
 from ..models.auth_models import User
+from .slot_service import SlotSpinResult, SlotService
+from .roulette_service import RouletteSpinResult, RouletteService, PrizeRouletteSpinResult
+from .gacha_service import GachaPullResult, GachaService
+from .rps_service import RPSResult, RPSService
+from .token_service import TokenService
+from ..repositories.game_repository import GameRepository
 
 class GameService:
     """게임 서비스 클래스: 모든 게임 기능의 통합 인터페이스 제공.
