@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { 
+import {
   ArrowLeft,
   Sparkles,
   Crown,
@@ -10,7 +10,7 @@ import {
   Trophy,
   Heart,
   ExternalLink,
-  Menu
+  Menu,
 } from 'lucide-react';
 import { User } from '../types';
 import { Button } from './ui/button';
@@ -43,7 +43,7 @@ export function GameDashboard({
   onNavigateToCrash,
   onUpdateUser,
   onAddNotification,
-  onToggleSideMenu
+  onToggleSideMenu,
 }: GameDashboardProps) {
   const [games, setGames] = useState<Game[]>([]);
   const [loading, setLoading] = useState(true);
@@ -56,36 +56,41 @@ export function GameDashboard({
       try {
         setLoading(true);
         const gamesData = await gameApi.getGames();
-        setGames(gamesData);
+
+        // 게임 데이터가 있는지 확인
+        if (gamesData && gamesData.games) {
+          setGames(gamesData);
+          // 오류 상태가 있었다면 초기화
+          if (error) setError(null);
+        } else {
+          // 데이터 형식 오류 처리
+          setError('게임 데이터 형식이 올바르지 않습니다.');
+          onAddNotification('알림: 게임 정보를 불러올 수 없습니다. 나중에 다시 시도해주세요.');
+        }
       } catch (err) {
-        setError('Failed to load games.');
-        onAddNotification('Error: Could not load games.');
-        console.error(err);
+        setError('게임을 불러오는데 실패했습니다.');
+        onAddNotification('오류: 게임 목록을 불러올 수 없습니다.');
+        console.error('게임 목록 불러오기 오류:', err);
       } finally {
         setLoading(false);
       }
     };
 
     fetchGames();
-  }, [onAddNotification]);
+  }, [onAddNotification, error]);
 
   // 🎮 게임 데이터 및 핸들러 생성
   const leaderboardData = createLeaderboardData(user);
-  const navigateToGame = createGameNavigator(
-    games,
-    user.goldBalance,
-    onAddNotification,
-    {
-      onNavigateToSlot,
-      onNavigateToRPS,
-      onNavigateToGacha,
-      onNavigateToCrash
-    }
-  );
+  const navigateToGame = createGameNavigator(games, user.goldBalance, onAddNotification, {
+    onNavigateToSlot,
+    onNavigateToRPS,
+    onNavigateToGacha,
+    onNavigateToCrash,
+  });
 
   useEffect(() => {
     const timer = setInterval(() => {
-      setPopularityIndex(prev => {
+      setPopularityIndex((prev) => {
         const change = Math.random() * 6 - 3;
         return Math.max(70, Math.min(100, prev + change));
       });
@@ -131,18 +136,13 @@ export function GameDashboard({
               <ArrowLeft className="w-4 h-4 mr-2" />
               홈으로
             </Button>
-            
+
             <div>
-              <h1 className="text-xl lg:text-2xl font-bold text-gradient-primary">
-                게임
-              </h1>
+              <h1 className="text-xl lg:text-2xl font-bold text-gradient-primary">게임</h1>
             </div>
           </div>
 
-          <motion.div
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-          >
+          <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
             <Button
               onClick={handleModelNavigation}
               className="bg-gradient-to-r from-success to-warning text-white font-bold px-4 py-2 rounded-lg btn-hover-lift relative"
@@ -219,7 +219,9 @@ export function GameDashboard({
               </div>
               <div>
                 <div className="text-xl font-bold text-gradient-metal mb-1">프리미엄 모델 체험</div>
-                <div className="text-sm text-muted-foreground">더 많은 포인트를 획득하고 특별한 혜택을 누리세요</div>
+                <div className="text-sm text-muted-foreground">
+                  더 많은 포인트를 획득하고 특별한 혜택을 누리세요
+                </div>
               </div>
             </div>
             <div className="text-right glass-metal bg-gold/10 rounded-xl p-4 border-gold/30">
@@ -233,15 +235,17 @@ export function GameDashboard({
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {loading && <p>Loading games...</p>}
           {error && <p className="text-destructive">{error}</p>}
-          {!loading && !error && games.map((game, index) => (
-            <GameCard
-              key={game.id}
-              game={game}
-              index={index}
-              userGoldBalance={user.goldBalance}
-              onGameClick={navigateToGame}
-            />
-          ))}
+          {!loading &&
+            !error &&
+            games.map((game, index) => (
+              <GameCard
+                key={game.id}
+                game={game}
+                index={index}
+                userGoldBalance={user.goldBalance}
+                onGameClick={navigateToGame}
+              />
+            ))}
         </div>
 
         {/* Live Events */}
@@ -266,9 +270,7 @@ export function GameDashboard({
                 </div>
                 <div>
                   <div className="text-xl font-bold text-gradient-gold">골든 아워</div>
-                  <div className="text-sm text-muted-foreground">
-                    모든 게임에서 골드 3배 획득!
-                  </div>
+                  <div className="text-sm text-muted-foreground">모든 게임에서 골드 3배 획득!</div>
                 </div>
               </div>
               <div className="glass-metal bg-gold/10 rounded-xl p-4 text-center border-gold/20">
@@ -286,16 +288,12 @@ export function GameDashboard({
                 </div>
                 <div>
                   <div className="text-xl font-bold text-gradient-primary">럭키 타임</div>
-                  <div className="text-sm text-muted-foreground">
-                    행운 보너스 확률 2배!
-                  </div>
+                  <div className="text-sm text-muted-foreground">행운 보너스 확률 2배!</div>
                 </div>
               </div>
               <div className="glass-metal bg-primary/10 rounded-xl p-4 border-primary/20">
                 <Progress value={65} className="h-3 mb-2" />
-                <div className="text-sm text-center font-medium text-primary">
-                  65% 활성화 중
-                </div>
+                <div className="text-sm text-center font-medium text-primary">65% 활성화 중</div>
               </div>
             </motion.div>
           </div>
@@ -321,24 +319,33 @@ export function GameDashboard({
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 1 + index * 0.1 }}
                   className={`flex items-center justify-between p-4 rounded-xl glass-metal-hover glass-metal ${
-                    player.name === user.nickname 
-                      ? 'border-2 border-primary/40 bg-primary/10 metal-pulse' 
+                    player.name === user.nickname
+                      ? 'border-2 border-primary/40 bg-primary/10 metal-pulse'
                       : 'border border-border-secondary/50 bg-secondary/20'
                   }`}
                 >
                   <div className="flex items-center gap-4">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg glass-metal ${
-                      player.rank === 1 ? 'bg-gradient-gold text-black' :
-                      player.rank === 2 ? 'bg-gradient-metal text-foreground border-2 border-muted' :
-                      player.rank === 3 ? 'bg-gradient-to-r from-warning to-gold text-black' :
-                      'bg-secondary text-foreground border border-border-secondary'
-                    }`}>
+                    <div
+                      className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg glass-metal ${
+                        player.rank === 1
+                          ? 'bg-gradient-gold text-black'
+                          : player.rank === 2
+                            ? 'bg-gradient-metal text-foreground border-2 border-muted'
+                            : player.rank === 3
+                              ? 'bg-gradient-to-r from-warning to-gold text-black'
+                              : 'bg-secondary text-foreground border border-border-secondary'
+                      }`}
+                    >
                       {player.rank}
                     </div>
                     <div>
-                      <div className={`font-bold text-lg ${
-                        player.name === user.nickname ? 'text-gradient-primary' : 'text-foreground'
-                      }`}>
+                      <div
+                        className={`font-bold text-lg ${
+                          player.name === user.nickname
+                            ? 'text-gradient-primary'
+                            : 'text-foreground'
+                        }`}
+                      >
                         {player.name} {player.name === user.nickname && '(나)'}
                       </div>
                     </div>
@@ -348,8 +355,12 @@ export function GameDashboard({
                       {player.score.toLocaleString()}G
                     </span>
                     {player.trend === 'up' && <TrendingUp className="w-5 h-5 text-success" />}
-                    {player.trend === 'down' && <TrendingUp className="w-5 h-5 text-error rotate-180" />}
-                    {player.trend === 'same' && <div className="w-5 h-5 rounded-full bg-muted/50"></div>}
+                    {player.trend === 'down' && (
+                      <TrendingUp className="w-5 h-5 text-error rotate-180" />
+                    )}
+                    {player.trend === 'same' && (
+                      <div className="w-5 h-5 rounded-full bg-muted/50"></div>
+                    )}
                   </div>
                 </motion.div>
               ))}

@@ -3,7 +3,8 @@
  * 백엔드와의 통신을 처리하는 함수들
  */
 
-const API_BASE_URL = 'http://localhost:8000'; // 백엔드 API 주소 (필요에 따라 수정)
+// 환경에 따른 백엔드 API 주소 설정
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 // 개발 모드 여부 확인
 const IS_DEV = process.env.NODE_ENV === 'development';
@@ -126,14 +127,24 @@ const apiRequest = async (endpoint, options = {}) => {
       }
     }
 
-    const data = await response.json();
+    // 응답이 JSON이 아닐 경우 대비
+    let data;
+    try {
+      data = await response.json();
+    } catch (jsonError) {
+      const duration = Date.now() - startTime;
+      apiLogger.response(method, endpoint, response.status, { error: 'JSON 파싱 오류' }, duration);
+      throw new Error('서버 응답을 처리할 수 없습니다. 형식이 올바르지 않습니다.');
+    }
+
     const duration = Date.now() - startTime;
 
     // 응답 로깅
     apiLogger.response(method, endpoint, response.status, data, duration);
 
     if (!response.ok) {
-      throw new Error(data.detail || '요청 처리 중 오류가 발생했습니다.');
+      const errorMessage = data?.detail || data?.message || '요청 처리 중 오류가 발생했습니다.';
+      throw new Error(errorMessage);
     }
 
     return data;
@@ -263,7 +274,15 @@ export const userApi = {
 export const gameApi = {
   // 게임 목록 조회
   getGames: async () => {
-    return await apiRequest('/api/games');
+    try {
+      return await apiRequest('/api/games');
+    } catch (error) {
+      console.log('게임 목록을 가져오는 중 오류 발생:', error);
+      // 기본 게임 목록 반환 (백업)
+      return {
+        games: []
+      };
+    }
   },
 
   // 게임 액션 수행
