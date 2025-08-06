@@ -1,7 +1,7 @@
 """게임 관련 데이터베이스 모델"""
 from datetime import datetime
 from typing import Optional
-from sqlalchemy import Column, Integer, String, DateTime, Float, JSON, ForeignKey, Boolean, Text
+from sqlalchemy import Column, Integer, String, DateTime, Float, JSON, ForeignKey, Boolean
 from sqlalchemy.orm import relationship
 
 from ..database import Base

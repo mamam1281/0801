@@ -4,23 +4,117 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 import random
-from typing import Dict, Any
+from typing import List, Optional, Dict, Any
+from datetime import datetime
 
 from ..database import get_db
 from ..dependencies import get_current_user
 from ..models.auth_models import User
+from ..models.game_models import GameSession, GameStats
+from ..schemas.game_schemas import (
+    GameListResponse, GameDetailResponse, 
+    GameSessionStart, GameSessionEnd,
+    SlotSpinRequest, SlotSpinResponse,
+    RPSPlayRequest, RPSPlayResponse,
+    GachaPullRequest, GachaPullResponse,
+    CrashBetRequest, CrashBetResponse
+)
+from ..services.game_service import GameService
+from ..services.reward_service import RewardService
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/games", tags=["Games"])
 
-@router.post("/slot/spin")
-async def spin_slot(
-    request: Dict[str, Any],
+@router.get("/", response_model=List[GameListResponse])
+async def get_games_list(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """슬롯머신 스핀"""
+    """
+    사용자별 맞춤 게임 목록 조회
+    - 각 게임의 플레이 가능 상태
+    - 사용자의 게임별 최고 기록
+    - 일일 제한 상태
+    """
+    games = GameService.get_user_games_list(db, current_user.id)
+    
+    # 사용자별 게임 통계 추가
+    for game in games:
+        stats = GameService.get_user_game_stats(
+            db, current_user.id, game['type']
+        )
+        game.update({
+            'playCount': stats.get('totalGames', 0),
+            'bestScore': stats.get('bestScore', 0),
+            'canPlay': GameService.can_play_game(
+                db, current_user, game['type']
+            ),
+            'remainingPlays': GameService.get_remaining_plays(
+                db, current_user.id, game['type']
+            )
+        })
+    
+    return games
+
+@router.get("/stats/{user_id}")
+async def get_user_game_stats(
+    user_id: int,
+    game_type: Optional[str] = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    사용자 게임 통계 조회
+    """
+    if current_user.id != user_id and not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="권한이 없습니다")
+    
+    stats = GameService.get_comprehensive_stats(db, user_id, game_type)
+    return stats
+
+@router.post("/session/start")
+async def start_game_session(
+    request: GameSessionStart,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    게임 세션 시작
+    - 잔액 확인
+    - 일일 제한 확인
+    - 세션 생성
+    """
+    # 잔액 확인
+    if not GameService.check_balance(db, current_user.id, request.betAmount):
+        raise HTTPException(status_code=400, detail="잔액이 부족합니다")
+    
+    # 일일 제한 확인
+    if not GameService.check_daily_limit(db, current_user.id, request.gameType):
+        raise HTTPException(status_code=400, detail="일일 게임 제한을 초과했습니다")
+    
+    # 세션 생성
+    session = GameService.create_game_session(
+        db, current_user.id, request.gameType, request.betAmount
+    )
+    
+    return {
+        "sessionId": session.id,
+        "gameType": session.game_type,
+        "betAmount": session.bet_amount,
+        "startTime": session.start_time
+    }
+
+# 슬롯 게임 엔드포인트
+@router.post("/slot/spin", response_model=SlotSpinResponse)
+async def spin_slot(
+    request: SlotSpinRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    슬롯머신 스핀
+    """
     bet_amount = request.get("betAmount", 100)
     
     # 잔액 확인
@@ -68,13 +162,16 @@ async def spin_slot(
         'newBalance': current_user.gold_balance
     }
 
-@router.post("/rps/play")
+# 가위바위보 엔드포인트
+@router.post("/rps/play", response_model=RPSPlayResponse)
 async def play_rps(
-    request: Dict[str, Any],
+    request: RPSPlayRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """가위바위보 플레이"""
+    """
+    가위바위보 플레이
+    """
     user_choice = request.get("choice")
     bet_amount = request.get("betAmount", 50)
     
@@ -116,13 +213,16 @@ async def play_rps(
         'newBalance': current_user.gold_balance
     }
 
-@router.post("/gacha/pull")
+# 가챠 엔드포인트
+@router.post("/gacha/pull", response_model=GachaPullResponse)
 async def pull_gacha(
-    request: Dict[str, Any],
+    request: GachaPullRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """가챠 뽑기"""
+    """
+    가챠 뽑기
+    """
     pull_count = request.get("pullCount", 1)
     cost_per_pull = 500
     total_cost = cost_per_pull * pull_count
@@ -154,13 +254,16 @@ async def pull_gacha(
         'newBalance': current_user.gold_balance
     }
 
-@router.post("/crash/bet")
+# 크래시 게임 엔드포인트
+@router.post("/crash/bet", response_model=CrashBetResponse)
 async def place_crash_bet(
-    request: Dict[str, Any],
+    request: CrashBetRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """크래시 게임 베팅"""
+    """
+    크래시 게임 베팅
+    """
     bet_amount = request.get("betAmount", 200)
     auto_cashout = request.get("autoCashout")
     
@@ -185,11 +288,13 @@ async def place_crash_bet(
 
 @router.post("/crash/cashout")
 async def cashout_crash(
-    request: Dict[str, Any],
+    request: CrashBetRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """크래시 게임 캐시아웃"""
+    """
+    크래시 게임 캐시아웃
+    """
     game_id = request.get("gameId")
     
     # 랜덤 배율 생성 (실제로는 게임 세션에서 관리해야 함)
