@@ -1,7 +1,11 @@
-from typing import Optional
-
+import random
+import uuid
+from datetime import datetime, date
+from typing import Dict, List, Optional
 from sqlalchemy.orm import Session
 
+from ..models.game_models import GameSession, GameStats, DailyGameLimit
+from ..models.auth_models import User
 from ..repositories.game_repository import GameRepository
 from .. import models
 from .slot_service import SlotService, SlotSpinResult
@@ -117,3 +121,174 @@ class GameService:
             list[dict]: 경품 목록
         """
         return self.roulette_service.get_prizes()
+
+    @staticmethod
+    def get_user_games_list(db: Session, user_id: int) -> List[Dict]:
+        """사용자별 맞춤 게임 목록 반환"""
+        games = [
+            {
+                'id': 'slot',
+                'name': '네온 슬롯',
+                'type': 'slot',
+                'description': '잭팟의 짜릿함! 네온 빛나는 슬롯머신',
+                'cost': 100,
+                'difficulty': 'Easy',
+                'rewards': ['골드', '경험치', '특별 스킨'],
+                'trending': True
+            },
+            {
+                'id': 'rps',
+                'name': '가위바위보',
+                'type': 'rps',
+                'description': 'AI와 두뇌 대결! 승부의 짜릿함!',
+                'cost': 50,
+                'difficulty': 'Medium',
+                'rewards': ['골드', '전략 포인트', '승부사 배지'],
+                'trending': False
+            },
+            {
+                'id': 'gacha',
+                'name': '섹시 가챠',
+                'type': 'gacha',
+                'description': '희귀 아이템 획득 찬스! 운명의 뽑기',
+                'cost': 500,
+                'difficulty': 'Extreme',
+                'rewards': ['전설 아이템', '희귀 스킨', '특별 캐릭터'],
+                'trending': True
+            },
+            {
+                'id': 'crash',
+                'name': '네온 크래시',
+                'type': 'crash',
+                'description': '배율 상승의 스릴! 언제 터질까?',
+                'cost': 200,
+                'difficulty': 'Hard',
+                'rewards': ['대박 골드', '아드레날린 포인트'],
+                'trending': False
+            }
+        ]
+        return games
+    
+    @staticmethod
+    def get_user_game_stats(db: Session, user_id: int, game_type: str) -> Dict:
+        """특정 게임에 대한 사용자 통계"""
+        stats = db.query(GameStats).filter_by(
+            user_id=user_id,
+            game_type=game_type
+        ).first()
+        
+        if not stats:
+            return {
+                'totalGames': 0,
+                'totalWins': 0,
+                'winRate': 0,
+                'bestScore': 0,
+                'currentStreak': 0
+            }
+        
+        win_rate = (stats.total_wins / stats.total_games * 100) if stats.total_games > 0 else 0
+        
+        return {
+            'totalGames': stats.total_games,
+            'totalWins': stats.total_wins,
+            'winRate': round(win_rate, 2),
+            'bestScore': stats.best_score,
+            'currentStreak': stats.current_streak,
+            'totalBet': stats.total_bet,
+            'totalWon': stats.total_won
+        }
+    
+    @staticmethod
+    def check_daily_limit(db: Session, user_id: int, game_type: str) -> bool:
+        """일일 게임 제한 확인"""
+        today = date.today()
+        limit = db.query(DailyGameLimit).filter_by(
+            user_id=user_id,
+            game_type=game_type,
+            date=today
+        ).first()
+        
+        if not limit:
+            # 제한 레코드 생성
+            user = db.query(User).filter_by(id=user_id).first()
+            max_plays = 30 if game_type == 'slot' else 15 if game_type == 'crash' else 3
+            if user.vip_tier > 0:
+                max_plays = int(max_plays * 1.5)
+                
+            limit = DailyGameLimit(
+                user_id=user_id,
+                game_type=game_type,
+                date=today,
+                play_count=0,
+                max_plays=max_plays
+            )
+            db.add(limit)
+            db.commit()
+        
+        return limit.play_count < limit.max_plays
+    
+    @staticmethod
+    def process_slot_spin(db: Session, user_id: int, bet_amount: int) -> Dict:
+        """슬롯머신 스핀 처리"""
+        # 심볼 및 확률 테이블
+        symbols = ['🍒', '🍋', '🍊', '🍇', '💎', '7️⃣']
+        weights = [30, 25, 20, 15, 8, 2]
+        
+        # 릴 생성
+        reels = []
+        for _ in range(3):
+            reels.append(random.choices(symbols, weights=weights)[0])
+        
+        # 승리 판정
+        win_amount = 0
+        if reels[0] == reels[1] == reels[2]:
+            # 3개 일치
+            multiplier = {
+                '🍒': 2, '🍋': 3, '🍊': 4,
+                '🍇': 5, '💎': 10, '7️⃣': 50
+            }[reels[0]]
+            win_amount = bet_amount * multiplier
+        elif reels[0] == reels[1] or reels[1] == reels[2]:
+            # 2개 일치
+            win_amount = bet_amount * 1.5
+        
+        return {
+            'reels': reels,
+            'winAmount': int(win_amount),
+            'isJackpot': reels[0] == '7️⃣' and reels[0] == reels[1] == reels[2],
+            'betAmount': bet_amount
+        }
+    
+    @staticmethod
+    def update_game_stats(db: Session, user_id: int, game_type: str, result: Dict):
+        """게임 통계 업데이트"""
+        stats = db.query(GameStats).filter_by(
+            user_id=user_id,
+            game_type=game_type
+        ).first()
+        
+        if not stats:
+            stats = GameStats(
+                user_id=user_id,
+                game_type=game_type
+            )
+            db.add(stats)
+        
+        stats.total_games += 1
+        stats.total_bet += result.get('betAmount', 0)
+        
+        if result.get('winAmount', 0) > 0:
+            stats.total_wins += 1
+            stats.total_won += result['winAmount']
+            stats.current_streak += 1
+            if stats.current_streak > stats.best_streak:
+                stats.best_streak = stats.current_streak
+        else:
+            stats.total_losses += 1
+            stats.current_streak = 0
+        
+        if result.get('winAmount', 0) > stats.best_score:
+            stats.best_score = result['winAmount']
+        
+        stats.last_played = datetime.utcnow()
+        db.commit()

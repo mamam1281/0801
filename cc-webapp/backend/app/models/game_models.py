@@ -1,7 +1,7 @@
 """게임 관련 데이터베이스 모델"""
 from datetime import datetime
 from typing import Optional
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, Text, Float, ForeignKey
+from sqlalchemy import Column, Integer, String, DateTime, Float, JSON, ForeignKey, Boolean
 from sqlalchemy.orm import relationship
 
 from ..database import Base
@@ -53,16 +53,49 @@ class GameSession(Base):
     """게임 세션 모델"""
     __tablename__ = "game_sessions"
 
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    session_type = Column(String(50), nullable=False)
+    id = Column(String, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    game_type = Column(String, nullable=False)
+    bet_amount = Column(Integer, nullable=False)
+    win_amount = Column(Integer, default=0)
     start_time = Column(DateTime, default=datetime.utcnow)
-    end_time = Column(DateTime, nullable=True)
-    score = Column(Integer, default=0)
-    is_completed = Column(Boolean, default=False)
+    end_time = Column(DateTime)
+    status = Column(String, default="active")
+    result_data = Column(JSON)
     
-    # 관계
     user = relationship("User", back_populates="game_sessions")
+
+
+class GameStats(Base):
+    __tablename__ = "game_stats"
+    
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    game_type = Column(String, nullable=False)
+    total_games = Column(Integer, default=0)
+    total_wins = Column(Integer, default=0)
+    total_losses = Column(Integer, default=0)
+    total_bet = Column(Integer, default=0)
+    total_won = Column(Integer, default=0)
+    best_score = Column(Integer, default=0)
+    current_streak = Column(Integer, default=0)
+    best_streak = Column(Integer, default=0)
+    last_played = Column(DateTime)
+    
+    user = relationship("User", back_populates="game_stats")
+
+
+class DailyGameLimit(Base):
+    __tablename__ = "daily_game_limits"
+    
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    game_type = Column(String, nullable=False)
+    date = Column(DateTime, nullable=False)
+    play_count = Column(Integer, default=0)
+    max_plays = Column(Integer, nullable=False)
+    
+    user = relationship("User", back_populates="daily_limits")
 
 
 class UserActivity(Base):

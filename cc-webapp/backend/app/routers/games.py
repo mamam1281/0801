@@ -1,217 +1,207 @@
 """Game Collection API Endpoints"""
 
 import logging
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from pydantic import BaseModel
-from typing import Optional, List, Dict, Any
+import random
+from typing import Dict, Any
 
 from ..database import get_db
 from ..dependencies import get_current_user
-from ..services.game_service import GameService
+from ..models.auth_models import User
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/games", tags=["games"])
+router = APIRouter(prefix="/api/games", tags=["Games"])
 
-# Pydantic models
-class PrizeRouletteSpinRequest(BaseModel):
-    """Prize roulette spin request"""
-    pass  # Simple spin only, no additional parameters
-
-class GachaPullRequest(BaseModel):
-    count: int  # Number of pulls
-
-class RPSPlayRequest(BaseModel):
-    choice: str  # "rock", "paper", "scissors"
-    bet_amount: int
-
-class SlotSpinRequest(BaseModel):
-    """Slot machine spin request"""
-    bet_amount: int
-
-class PrizeRouletteSpinResponse(BaseModel):
-    """Prize roulette spin response"""
-    winner_prize: str
-    tokens_change: int
-    balance: int
-
-class PrizeRouletteInfoResponse(BaseModel):
-    """Prize roulette info response"""
-    prizes: List[Dict[str, Any]]
-    max_daily_spins: int
-
-class GachaPullResponse(BaseModel):
-    """Gacha pull response"""
-    results: List[str]  # Actual GachaPullResult format
-    tokens_change: int
-    balance: int
-
-class RPSPlayResponse(BaseModel):
-    """Rock Paper Scissors response"""
-    user_choice: str
-    computer_choice: str
-    result: str
-    tokens_change: int
-    balance: int
-
-class GameResponse(BaseModel):
-    """게임 목록 응답 모델"""
-    id: int
-    name: str
-    type: str
-    description: str
-    min_bet: int
-    max_bet: int
-    is_active: bool
-
-# Dependency injection
-def get_game_service() -> GameService:
-    """Game service dependency"""
-    return GameService()
-
-# API endpoints
-@router.get("/", response_model=List[GameResponse])
-async def get_games(db: Session = Depends(get_db)):
-    """게임 목록 조회"""
-    logger.info("API: GET /api/games - 게임 목록 조회")
-    # 하드코딩된 게임 목록 반환 (DB 모델이 없는 경우)
-    games = [
-        {
-            "id": 1,
-            "name": "Neon Slots",
-            "type": "slot",
-            "description": "네온 테마 슬롯머신",
-            "min_bet": 100,
-            "max_bet": 10000,
-            "is_active": True
-        },
-        {
-            "id": 2,
-            "name": "Neon Crash",
-            "type": "crash",
-            "description": "네온 크래시 게임",
-            "min_bet": 50,
-            "max_bet": 5000,
-            "is_active": True
-        }
-    ]
-    return games
-
-@router.post("/slot/spin", response_model=Dict[str, Any])
-async def slot_spin(
-    request: SlotSpinRequest,
-    current_user = Depends(get_current_user),
-    db = Depends(get_db),
-    game_service: GameService = Depends(get_game_service)
+@router.post("/slot/spin")
+async def spin_slot(
+    request: Dict[str, Any],
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     """슬롯머신 스핀"""
-    logger.info(f"API: POST /api/games/slot/spin - user_id={current_user.id}, bet_amount={request.bet_amount}")
-    # 간단한 슬롯 로직 구현
-    import random
+    bet_amount = request.get("betAmount", 100)
     
     # 잔액 확인
-    if current_user.coin_balance < request.bet_amount:
+    if current_user.gold_balance < bet_amount:
         raise HTTPException(status_code=400, detail="잔액이 부족합니다")
     
     # 슬롯 결과 생성
-    symbols = ["🍒", "🍋", "🍊", "🍇", "💎", "7️⃣"]
-    reels = [[random.choice(symbols) for _ in range(3)] for _ in range(3)]
+    symbols = ['🍒', '🍋', '🍊', '🍇', '💎', '7️⃣']
+    weights = [30, 25, 20, 15, 8, 2]
     
-    # 승리 판정 (간단한 로직)
+    reels = [random.choices(symbols, weights=weights)[0] for _ in range(3)]
+    
+    # 승리 판정
     win_amount = 0
-    if reels[1][0] == reels[1][1] == reels[1][2]:  # 중간 줄 일치
-        win_amount = request.bet_amount * 10
+    if reels[0] == reels[1] == reels[2]:
+        multiplier = {'🍒': 2, '🍋': 3, '🍊': 4, '🍇': 5, '💎': 10, '7️⃣': 50}
+        win_amount = bet_amount * multiplier.get(reels[0], 1)
+    elif reels[0] == reels[1] or reels[1] == reels[2]:
+        win_amount = int(bet_amount * 1.5)
     
     # 잔액 업데이트
-    current_user.coin_balance -= request.bet_amount
-    current_user.coin_balance += win_amount
+    current_user.gold_balance = current_user.gold_balance - bet_amount + win_amount
+    
+    # 통계 업데이트
+    if not hasattr(current_user, 'game_stats'):
+        current_user.game_stats = {}
+    if 'slot' not in current_user.game_stats:
+        current_user.game_stats['slot'] = {
+            'totalSpins': 0,
+            'totalWinnings': 0,
+            'biggestWin': 0
+        }
+    
+    current_user.game_stats['slot']['totalSpins'] += 1
+    current_user.game_stats['slot']['totalWinnings'] += win_amount
+    if win_amount > current_user.game_stats['slot']['biggestWin']:
+        current_user.game_stats['slot']['biggestWin'] = win_amount
+    
     db.commit()
     
     return {
-        "reels": reels,
-        "win_amount": win_amount,
-        "balance": current_user.coin_balance,
-        "is_jackpot": win_amount > request.bet_amount * 50
+        'reels': reels,
+        'winAmount': win_amount,
+        'isJackpot': reels[0] == '7️⃣' and reels[0] == reels[1] == reels[2],
+        'newBalance': current_user.gold_balance
     }
 
-@router.post("/prize-roulette/spin", response_model=PrizeRouletteSpinResponse)
-async def prize_roulette_spin(
-    current_user = Depends(get_current_user),
-    db = Depends(get_db),
-    game_service: GameService = Depends(get_game_service)
+@router.post("/rps/play")
+async def play_rps(
+    request: Dict[str, Any],
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
-    """Prize roulette spin"""
-    logger.info(f"API: POST /api/games/prize-roulette/spin - user_id={current_user.id}")
-    try:
-        result = game_service.prize_roulette_spin(current_user.id, db)
-        
-        return PrizeRouletteSpinResponse(
-            winner_prize=getattr(result, 'winner_prize', 'Unknown'),
-            tokens_change=getattr(result, 'tokens_change', 0),
-            balance=getattr(result, 'balance', 0)
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail="Prize roulette spin failed")
+    """가위바위보 플레이"""
+    user_choice = request.get("choice")
+    bet_amount = request.get("betAmount", 50)
+    
+    # 잔액 확인
+    if current_user.gold_balance < bet_amount:
+        raise HTTPException(status_code=400, detail="잔액이 부족합니다")
+    
+    # AI 선택
+    choices = ['rock', 'paper', 'scissors']
+    ai_choice = random.choice(choices)
+    
+    # 승부 판정
+    result = 'draw'
+    win_amount = 0
+    
+    if user_choice == ai_choice:
+        result = 'draw'
+        win_amount = bet_amount  # 무승부시 베팅금액 반환
+    elif (
+        (user_choice == 'rock' and ai_choice == 'scissors') or
+        (user_choice == 'paper' and ai_choice == 'rock') or
+        (user_choice == 'scissors' and ai_choice == 'paper')
+    ):
+        result = 'win'
+        win_amount = bet_amount * 2
+    else:
+        result = 'lose'
+        win_amount = 0
+    
+    # 잔액 업데이트
+    current_user.gold_balance = current_user.gold_balance - bet_amount + win_amount
+    db.commit()
+    
+    return {
+        'userChoice': user_choice,
+        'aiChoice': ai_choice,
+        'result': result,
+        'winAmount': win_amount,
+        'newBalance': current_user.gold_balance
+    }
 
-@router.get("/prize-roulette/info", response_model=PrizeRouletteInfoResponse)
-async def get_prize_roulette_info(
-    current_user = Depends(get_current_user),
-    db = Depends(get_db),
-    game_service: GameService = Depends(get_game_service)
+@router.post("/gacha/pull")
+async def pull_gacha(
+    request: Dict[str, Any],
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
-    """Get prize roulette information"""
-    try:
-        info = game_service.get_prize_roulette_info(current_user.id, db)
-        return PrizeRouletteInfoResponse(
-            prizes=getattr(info, 'prizes', []),
-            max_daily_spins=getattr(info, 'max_daily_spins', 5)
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail="Failed to get prize roulette info")
+    """가챠 뽑기"""
+    pull_count = request.get("pullCount", 1)
+    cost_per_pull = 500
+    total_cost = cost_per_pull * pull_count
+    
+    # 잔액 확인
+    if current_user.gold_balance < total_cost:
+        raise HTTPException(status_code=400, detail="잔액이 부족합니다")
+    
+    # 가챠 아이템 생성
+    rarities = ['common', 'rare', 'epic', 'legendary']
+    weights = [60, 30, 9, 1]
+    
+    items = []
+    for _ in range(pull_count):
+        rarity = random.choices(rarities, weights=weights)[0]
+        items.append({
+            'name': f'{rarity.capitalize()} Item',
+            'rarity': rarity,
+            'value': {'common': 100, 'rare': 500, 'epic': 2000, 'legendary': 10000}[rarity]
+        })
+    
+    # 잔액 업데이트
+    current_user.gold_balance -= total_cost
+    db.commit()
+    
+    return {
+        'items': items,
+        'totalValue': sum(item['value'] for item in items),
+        'newBalance': current_user.gold_balance
+    }
 
-@router.post("/gacha/pull", response_model=GachaPullResponse)
-async def gacha_pull(
-    request: GachaPullRequest,
-    current_user = Depends(get_current_user),
-    db = Depends(get_db),
-    game_service: GameService = Depends(get_game_service)
+@router.post("/crash/bet")
+async def place_crash_bet(
+    request: Dict[str, Any],
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
-    """Gacha pull"""
-    try:
-        result = game_service.gacha_pull(current_user.id, request.count, db)
-        
-        return GachaPullResponse(
-            results=getattr(result, 'results', []),
-            tokens_change=getattr(result, 'tokens_change', 0),
-            balance=getattr(result, 'balance', 0)
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail="Gacha pull failed")
+    """크래시 게임 베팅"""
+    bet_amount = request.get("betAmount", 200)
+    auto_cashout = request.get("autoCashout")
+    
+    # 잔액 확인
+    if current_user.gold_balance < bet_amount:
+        raise HTTPException(status_code=400, detail="잔액이 부족합니다")
+    
+    # 게임 ID 생성
+    import uuid
+    game_id = str(uuid.uuid4())
+    
+    # 잔액 차감
+    current_user.gold_balance -= bet_amount
+    db.commit()
+    
+    return {
+        'gameId': game_id,
+        'betAmount': bet_amount,
+        'autoCashout': auto_cashout,
+        'newBalance': current_user.gold_balance
+    }
 
-@router.post("/rps/play", response_model=RPSPlayResponse)
-async def rps_play(
-    request: RPSPlayRequest,
-    current_user = Depends(get_current_user),
-    db = Depends(get_db),
-    game_service: GameService = Depends(get_game_service)
+@router.post("/crash/cashout")
+async def cashout_crash(
+    request: Dict[str, Any],
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
-    """Rock Paper Scissors play"""
-    try:
-        result = game_service.rps_play(current_user.id, request.choice, request.bet_amount, db)
-        
-        return RPSPlayResponse(
-            user_choice=getattr(result, 'user_choice', request.choice),
-            computer_choice=getattr(result, 'computer_choice', 'rock'),
-            result=getattr(result, 'result', 'tie'),
-            tokens_change=getattr(result, 'tokens_change', 0),
-            balance=getattr(result, 'balance', 0)
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail="RPS play failed")
+    """크래시 게임 캐시아웃"""
+    game_id = request.get("gameId")
+    
+    # 랜덤 배율 생성 (실제로는 게임 세션에서 관리해야 함)
+    multiplier = random.uniform(1.0, 5.0)
+    win_amount = int(200 * multiplier)  # 임시로 200 베팅 가정
+    
+    # 잔액 업데이트
+    current_user.gold_balance += win_amount
+    db.commit()
+    
+    return {
+        'multiplier': round(multiplier, 2),
+        'winAmount': win_amount,
+        'newBalance': current_user.gold_balance
+    }

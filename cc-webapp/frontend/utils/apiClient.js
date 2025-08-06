@@ -1,3 +1,5 @@
+import { apiLogTry, apiLogSuccess, apiLogFail } from './apiLogger';
+
 /**
  * API 클라이언트
  * 백엔드와의 통신을 처리하는 함수들
@@ -100,42 +102,42 @@ export const isAuthenticated = () => {
 const apiRequest = async (endpoint, options = {}) => {
   const method = options.method || 'GET';
   const requestData = options.body ? JSON.parse(options.body) : undefined;
+
+  // API 요청 로그
+  apiLogTry(`${method} ${endpoint}`);
+
   const startTime = Date.now();
 
   try {
-    // 요청 로깅
-    apiLogger.request(method, endpoint, requestData);
-
-    const { accessToken } = getTokens();
-
-    const authHeader = accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {};
     const url = `${API_BASE_URL}${endpoint}`;
-
     const response = await fetch(url, {
       ...options,
       headers: {
         'Content-Type': 'application/json',
-        ...authHeader,
+        ...getAuthHeaders(),
         ...options.headers,
       },
-      credentials: 'include',
     });
+
+    const duration = Date.now() - startTime;
 
     if (response.ok) {
       const contentType = response.headers.get('content-type');
       if (contentType && contentType.includes('application/json')) {
         const data = await response.json();
-        const duration = Date.now() - startTime;
         
-        // apiLogger를 사용하여 로깅 (중복 제거)
-        apiLogger.response(method, endpoint, response.status, data, duration);
-        
-        // 직접 데이터 반환 (data.data가 아닌 data)
+        // API 성공 로그
+        apiLogSuccess(`${method} ${endpoint}`, {
+          status: response.status,
+          duration: `${duration}ms`,
+          data
+        });
+
         return data;
       }
       return null;
     }
-    
+
     // 401 에러 시 토큰 리프레시 시도
     if (response.status === 401) {
       apiLogger.error(method, endpoint, '인증 토큰이 만료되었습니다. 토큰 갱신 시도 중...');
@@ -150,30 +152,24 @@ const apiRequest = async (endpoint, options = {}) => {
       }
     }
 
-    // 응답이 JSON이 아닐 경우 대비
+    // 에러 응답 처리
     let data;
     try {
       data = await response.json();
     } catch (jsonError) {
-      const duration = Date.now() - startTime;
-      apiLogger.response(method, endpoint, response.status, { error: 'JSON 파싱 오류' }, duration);
-      throw new Error('서버 응답을 처리할 수 없습니다. 형식이 올바르지 않습니다.');
+      apiLogFail(`${method} ${endpoint}`, 'JSON 파싱 오류');
+      throw new Error('서버 응답을 처리할 수 없습니다.');
     }
-
-    const duration = Date.now() - startTime;
-
-    // 응답 로깅
-    apiLogger.response(method, endpoint, response.status, data, duration);
 
     if (!response.ok) {
       const errorMessage = data?.detail || data?.message || '요청 처리 중 오류가 발생했습니다.';
+      apiLogFail(`${method} ${endpoint}`, errorMessage);
       throw new Error(errorMessage);
     }
 
     return data;
   } catch (error) {
-    // 에러 로깅
-    apiLogger.error(method, endpoint, error);
+    apiLogFail(`${method} ${endpoint}`, error.message);
     throw error;
   }
 };
@@ -293,28 +289,52 @@ export const userApi = {
   }
 };
 
-// 게임 관련 API 함수들
+// 게임 관련 API - 실제 사용중인 것만 남김
 export const gameApi = {
-  // 게임 목록 조회
-  getGames: async () => {
-    const response = await apiRequest('/api/games');
-    // 응답이 이미 데이터 배열인 경우 그대로 반환
-    return response;
+  // 슬롯 게임 API
+  slot: {
+    spin: async (betAmount) => {
+      return await apiRequest('/api/games/slot/spin', {
+        method: 'POST',
+        body: JSON.stringify({ betAmount })
+      });
+    }
   },
 
-  // 게임 액션 수행
-  playAction: async (gameId, action) => {
-    return await apiRequest(`/api/actions/${gameId}`, {
-      method: 'POST',
-      body: JSON.stringify(action)
-    });
+  // 가위바위보 게임 API  
+  rps: {
+    play: async (choice, betAmount) => {
+      return await apiRequest('/api/games/rps/play', {
+        method: 'POST',
+        body: JSON.stringify({ choice, betAmount })
+      });
+    }
   },
 
-  // 보상 수령
-  claimReward: async (rewardId) => {
-    return await apiRequest(`/api/rewards/${rewardId}/claim`, {
-      method: 'POST'
-    });
+  // 가챠 게임 API
+  gacha: {
+    pull: async (pullCount = 1) => {
+      return await apiRequest('/api/games/gacha/pull', {
+        method: 'POST',
+        body: JSON.stringify({ pullCount })
+      });
+    }
+  },
+
+  // 크래시 게임 API
+  crash: {
+    placeBet: async (betAmount, autoCashout) => {
+      return await apiRequest('/api/games/crash/bet', {
+        method: 'POST',
+        body: JSON.stringify({ betAmount, autoCashout })
+      });
+    },
+    cashout: async (gameId) => {
+      return await apiRequest('/api/games/crash/cashout', {
+        method: 'POST',
+        body: JSON.stringify({ gameId })
+      });
+    }
   }
 };
 

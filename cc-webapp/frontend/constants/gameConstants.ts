@@ -76,9 +76,10 @@ export const createGamesData = (user: User): GameDashboardGame[] => [
 
 // 🎯 리더보드 더미 데이터
 export const createLeaderboardData = (user: User) => [
-  { rank: 1, name: '레전드게이머', score: 125640, trend: 'up' as const },
-  { rank: 2, name: 'ProPlayer2024', score: 98230, trend: 'up' as const },
-  { rank: 3, name: user.nickname, score: user.stats.totalEarnings, trend: 'same' as const },
-  { rank: 4, name: 'GameMaster', score: 87150, trend: 'down' as const },
-  { rank: 5, name: 'ClickKing', score: 75680, trend: 'up' as const }
+  { id: 'leader-1', rank: 1, name: '네온킹', score: 98765, badge: '💎' },
+  { id: 'leader-2', rank: 2, name: '크래시마스터', score: 87654, badge: '🏆' },
+  { id: 'leader-3', rank: 3, name: '슬롯황제', score: 76543, badge: '👑' },
+  { id: 'leader-4', rank: 4, name: user.nickname, score: 65432, badge: '🌟' },
+  { id: 'leader-5', rank: 5, name: '럭키세븐', score: 54321, badge: '🎰' },
+  { id: 'leader-6', rank: 6, name: '가챠신', score: 43210, badge: '🎁' }
 ];

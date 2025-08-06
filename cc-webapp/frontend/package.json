@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "dev:turbo": "next dev --turbopack",
+    "dev:verbose": "cross-env DEBUG=api:* next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",

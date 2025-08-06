@@ -372,7 +372,7 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
           </div>
           <div className="glass-effect rounded-xl p-4 text-center bg-red-900/20 border-red-500/30">
             <div className="text-xl font-bold text-red-300">
-              {user.gameStats.gacha.totalSpent.toLocaleString()}G
+              {user?.gameStats?.gacha?.totalSpent?.toLocaleString() || '0'}G
             </div>
             <div className="text-sm text-red-400/60">총 소모</div>
           </div>

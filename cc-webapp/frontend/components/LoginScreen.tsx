@@ -40,18 +40,22 @@ export function LoginScreen({
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     apiLogTry('POST /api/auth/login');
-    if (!formData.nickname.trim() || !formData.password.trim()) {
+
+    const { nickname, password } = formData;
+
+    if (!nickname || !password) {
       setError('모든 필드를 입력해주세요.');
       apiLogFail('POST /api/auth/login', '필드 누락');
       return;
     }
+
     setIsSubmitting(true);
     try {
-      const success = (await onLogin?.(formData.nickname, formData.password)) ?? true;
+      const success = await onLogin(nickname, password);
       if (success) {
         apiLogSuccess('POST /api/auth/login');
       } else {
@@ -66,12 +70,11 @@ export function LoginScreen({
     }
   };
 
-  const handleInputChange = (field: keyof typeof formData) => (
-    e: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    setFormData(prev => ({ ...prev, [field]: e.target.value }));
-    if (error) setError('');
-  };
+  const handleInputChange =
+    (field: keyof typeof formData) => (e: React.ChangeEvent<HTMLInputElement>) => {
+      setFormData((prev) => ({ ...prev, [field]: e.target.value }));
+      if (error) setError('');
+    };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-black to-primary/10 flex items-center justify-center p-4 relative overflow-hidden">
@@ -80,21 +83,21 @@ export function LoginScreen({
         {[...Array(15)].map((_, i) => (
           <motion.div
             key={i}
-            initial={{ 
+            initial={{
               opacity: 0,
               x: Math.random() * window.innerWidth,
-              y: Math.random() * window.innerHeight
+              y: Math.random() * window.innerHeight,
             }}
-            animate={{ 
+            animate={{
               opacity: [0, 0.3, 0],
               scale: [0, 1, 0],
-              rotate: 360
+              rotate: 360,
             }}
             transition={{
               duration: 8,
               repeat: Infinity,
               delay: i * 0.5,
-              ease: "easeInOut"
+              ease: 'easeInOut',
             }}
             className="absolute w-1 h-1 bg-primary rounded-full"
           />
@@ -105,7 +108,7 @@ export function LoginScreen({
       <motion.div
         initial={{ opacity: 0, scale: 0.9, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
-        transition={{ duration: 0.6, type: "spring", stiffness: 100 }}
+        transition={{ duration: 0.6, type: 'spring', stiffness: 100 }}
         className="w-full max-w-md"
       >
         <div className="glass-effect rounded-2xl p-8 shadow-game relative">
@@ -114,13 +117,13 @@ export function LoginScreen({
             <motion.div
               initial={{ scale: 0, rotate: -180 }}
               animate={{ scale: 1, rotate: 0 }}
-              transition={{ delay: 0.2, duration: 0.8, type: "spring", stiffness: 120 }}
+              transition={{ delay: 0.2, duration: 0.8, type: 'spring', stiffness: 120 }}
               className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-game mb-4"
             >
               <Gamepad2 className="w-8 h-8 text-white" />
             </motion.div>
-            
-            <motion.h1 
+
+            <motion.h1
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.4 }}
@@ -146,11 +149,11 @@ export function LoginScreen({
           </AnimatePresence>
 
           {/* Login Form */}
-          <motion.form 
+          <motion.form
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.8 }}
-            onSubmit={handleSubmit}
+            onSubmit={handleLogin}
             className="space-y-6"
           >
             {/* Nickname Field */}
@@ -209,7 +212,7 @@ export function LoginScreen({
                 <>
                   <motion.div
                     animate={{ rotate: 360 }}
-                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                    transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
                     className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full"
                   />
                   로그인 중...
@@ -224,7 +227,7 @@ export function LoginScreen({
           </motion.form>
 
           {/* Divider */}
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 1 }}
@@ -239,7 +242,7 @@ export function LoginScreen({
           </motion.div>
 
           {/* Action Buttons */}
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 1.2 }}
@@ -273,16 +276,16 @@ export function LoginScreen({
           <div className="absolute -top-2 -right-2">
             <motion.div
               animate={{ rotate: 360 }}
-              transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+              transition={{ duration: 20, repeat: Infinity, ease: 'linear' }}
             >
               <Star className="w-6 h-6 text-gold/30" />
             </motion.div>
           </div>
-          
+
           <div className="absolute -bottom-2 -left-2">
             <motion.div
               animate={{ rotate: -360 }}
-              transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
+              transition={{ duration: 25, repeat: Infinity, ease: 'linear' }}
             >
               <Star className="w-4 h-4 text-primary/30" />
             </motion.div>
