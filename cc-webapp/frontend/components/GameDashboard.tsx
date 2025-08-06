@@ -11,8 +11,12 @@ import {
   Heart,
   ExternalLink,
   Menu,
+  Dice1,    // 추가
+  Swords,   // 추가
+  Gift,     // 추가
+  Zap,      // 추가
 } from 'lucide-react';
-import { User } from '../types';
+import { User, GameDashboardGame } from '../types';
 import { Button } from './ui/button';
 import { Progress } from './ui/progress';
 import { GameBackground } from './games/GameBackground';
@@ -45,42 +49,77 @@ export function GameDashboard({
   onAddNotification,
   onToggleSideMenu,
 }: GameDashboardProps) {
-  const [games, setGames] = useState<Game[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [popularityIndex, setPopularityIndex] = useState(85);
-  const [totalPlayTime, setTotalPlayTime] = useState(245);
+  const [totalPlayTime] = useState(245);
 
-  useEffect(() => {
-    const fetchGames = async () => {
-      try {
-        setLoading(true);
-        const gamesData = await gameApi.getGames();
+  // API 관련 state 제거하고 실제 구현된 게임 데이터 사용
+  const games: GameDashboardGame[] = [
+    {
+      id: 'slot',
+      name: '네온 슬롯',
+      type: 'slot',
+      icon: Dice1,
+      color: 'from-primary to-primary-light',
+      description: '잭팟의 짜릿함! 네온 빛나는 슬롯머신',
+      playCount: user.gameStats?.slot?.totalSpins || 0,
+      bestScore: user.gameStats?.slot?.biggestWin || 0,
+      lastPlayed: new Date(),
+      difficulty: 'Easy',
+      rewards: ['골드', '경험치', '특별 스킨'],
+      trending: true,
+      cost: 100
+    },
+    {
+      id: 'rps',
+      name: '가위바위보',
+      type: 'rps',
+      icon: Swords,
+      color: 'from-success to-info',
+      description: 'AI와 두뇌 대결! 승부의 짜릿함!',
+      playCount: user.gameStats?.rps?.totalGames || 0,
+      bestScore: user.gameStats?.rps?.bestStreak || 0,
+      lastPlayed: new Date(),
+      difficulty: 'Medium',
+      rewards: ['골드', '전략 포인트', '승부사 배지'],
+      trending: false,
+      cost: 50
+    },
+    {
+      id: 'gacha',
+      name: '섹시 가챠',
+      type: 'gacha',
+      icon: Gift,
+      color: 'from-pink-500 to-purple-500',
+      description: '희귀 아이템 획득 찬스! 운명의 뽑기',
+      playCount: user.gameStats?.gacha?.totalPulls || 0,
+      bestScore: user.gameStats?.gacha?.legendaryPulls || 0,
+      lastPlayed: new Date(),
+      difficulty: 'Extreme',
+      rewards: ['전설 아이템', '희귀 스킨', '특별 캐릭터'],
+      trending: true,
+      cost: 500
+    },
+    {
+      id: 'crash',
+      name: '네온 크래시',
+      type: 'crash',
+      icon: Zap,
+      color: 'from-error to-primary',
+      description: '배율 상승의 스릴! 언제 터질까?',
+      playCount: user.gameStats?.crash?.totalGames || 0,
+      bestScore: Math.floor((user.gameStats?.crash?.highestMultiplier || 0) * 100),
+      lastPlayed: new Date(),
+      difficulty: 'Hard',
+      rewards: ['대박 골드', '아드레날린 포인트'],
+      trending: false,
+      cost: 200
+    }
+  ];
 
-        // 게임 데이터가 있는지 확인
-        if (gamesData && gamesData.games) {
-          setGames(gamesData);
-          // 오류 상태가 있었다면 초기화
-          if (error) setError(null);
-        } else {
-          // 데이터 형식 오류 처리
-          setError('게임 데이터 형식이 올바르지 않습니다.');
-          onAddNotification('알림: 게임 정보를 불러올 수 없습니다. 나중에 다시 시도해주세요.');
-        }
-      } catch (err) {
-        setError('게임을 불러오는데 실패했습니다.');
-        onAddNotification('오류: 게임 목록을 불러올 수 없습니다.');
-        console.error('게임 목록 불러오기 오류:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchGames();
-  }, [onAddNotification, error]);
-
-  // 🎮 게임 데이터 및 핸들러 생성
+  // 리더보드 데이터
   const leaderboardData = createLeaderboardData(user);
+  
+  // 게임 네비게이터
   const navigateToGame = createGameNavigator(games, user.goldBalance, onAddNotification, {
     onNavigateToSlot,
     onNavigateToRPS,
@@ -231,21 +270,17 @@ export function GameDashboard({
           </div>
         </motion.div>
 
-        {/* Games Grid - 간소화된 게임 카드 */}
+        {/* Games Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {loading && <p>Loading games...</p>}
-          {error && <p className="text-destructive">{error}</p>}
-          {!loading &&
-            !error &&
-            games.map((game, index) => (
-              <GameCard
-                key={game.id}
-                game={game}
-                index={index}
-                userGoldBalance={user.goldBalance}
-                onGameClick={navigateToGame}
-              />
-            ))}
+          {games.map((game, index) => (
+            <GameCard
+              key={game.id}
+              game={game}
+              index={index}
+              userGoldBalance={user.goldBalance}
+              onGameClick={navigateToGame}
+            />
+          ))}
         </div>
 
         {/* Live Events */}
@@ -371,3 +406,5 @@ export function GameDashboard({
     </div>
   );
 }
+
+export default GameDashboard;

@@ -103,20 +103,20 @@ export function SignupScreen({
     e.preventDefault();
     apiLogTry('회원가입');
     if (!validateForm()) {
-      apiLogFail('회원가입', '폼 검증 실패');
+      apiLogFail('POST /api/auth/signup', '폼 검증 실패');
       return;
     }
     setIsSubmitting(true);
     try {
-      const success = await onSignup?.(formData) ?? true;
+      const success = (await onSignup?.(formData)) ?? true;
       if (success) {
-        apiLogSuccess('회원가입');
+        apiLogSuccess('POST /api/auth/signup');
       } else {
-        apiLogFail('회원가입', '잘못된 정보');
+        apiLogFail('POST /api/auth/signup', '잘못된 정보');
         setErrors({ userId: '회원가입 중 오류가 발생했습니다.' });
       }
     } catch (err) {
-      apiLogFail('회원가입', err);
+      apiLogFail('POST /api/auth/signup', err);
       setErrors({ userId: '회원가입 중 오류가 발생했습니다.' });
     } finally {
       setIsSubmitting(false);

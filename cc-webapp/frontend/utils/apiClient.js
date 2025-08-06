@@ -108,17 +108,34 @@ const apiRequest = async (endpoint, options = {}) => {
 
     const { accessToken } = getTokens();
 
-    const headers = {
-      'Content-Type': 'application/json',
-      ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {}),
-      ...(options.headers || {})
-    };
+    const authHeader = accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {};
+    const url = `${API_BASE_URL}${endpoint}`;
 
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    const response = await fetch(url, {
       ...options,
-      headers
+      headers: {
+        'Content-Type': 'application/json',
+        ...authHeader,
+        ...options.headers,
+      },
+      credentials: 'include',
     });
 
+    if (response.ok) {
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        const data = await response.json();
+        const duration = Date.now() - startTime;
+        
+        // apiLogger를 사용하여 로깅 (중복 제거)
+        apiLogger.response(method, endpoint, response.status, data, duration);
+        
+        // 직접 데이터 반환 (data.data가 아닌 data)
+        return data;
+      }
+      return null;
+    }
+    
     // 401 에러 시 토큰 리프레시 시도
     if (response.status === 401) {
       apiLogger.error(method, endpoint, '인증 토큰이 만료되었습니다. 토큰 갱신 시도 중...');
@@ -217,7 +234,7 @@ export const authApi = {
       body: JSON.stringify({
         invite_code: inviteCode,
         nickname,
-        site_id: siteId,
+        site_id: SiteId,
         phone_number: phoneNumber,
         password
       })
@@ -280,15 +297,9 @@ export const userApi = {
 export const gameApi = {
   // 게임 목록 조회
   getGames: async () => {
-    try {
-      return await apiRequest('/api/games');
-    } catch (error) {
-      console.log('게임 목록을 가져오는 중 오류 발생:', error);
-      // 기본 게임 목록 반환 (백업)
-      return {
-        games: []
-      };
-    }
+    const response = await apiRequest('/api/games');
+    // 응답이 이미 데이터 배열인 경우 그대로 반환
+    return response;
   },
 
   // 게임 액션 수행

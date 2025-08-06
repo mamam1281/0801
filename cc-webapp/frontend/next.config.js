@@ -10,10 +10,10 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: false,
   },
-  reactStrictMode: true,
+  reactStrictMode: false, // 개발 중 중복 렌더링 방지
   // Pages Router를 완전히 비활성화
   useFileSystemPublicRoutes: true,
   pageExtensions: ['tsx', 'ts', 'jsx', 'js'],
 }
 
-module.exports = nextConfig;
+module.exports = nextConfig

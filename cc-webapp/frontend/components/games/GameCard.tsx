@@ -16,6 +16,10 @@ interface GameCardProps {
 
 export function GameCard({ game, index, userGoldBalance, onGameClick }: GameCardProps) {
   const canAfford = userGoldBalance >= game.cost;
+  
+  // 안전한 값 처리
+  const bestScore = game.bestScore || 0;
+  const playCount = game.playCount || 0;
 
   return (
     <motion.div
@@ -52,10 +56,10 @@ export function GameCard({ game, index, userGoldBalance, onGameClick }: GameCard
       {/* 💎 핵심 정보 1개 - 최고 기록 */}
       <div className="glass-metal bg-secondary/30 rounded-xl p-4 mb-6 text-center">
         <div className="text-2xl font-black text-gradient-gold mb-1">
-          {game.bestScore.toLocaleString()}
+          {bestScore.toLocaleString()}
         </div>
         <div className="text-sm text-muted-foreground">
-          최고 기록 ({game.playCount}회 플레이)
+          최고 기록 ({playCount}회 플레이)
         </div>
       </div>
 
@@ -81,8 +85,6 @@ export function GameCard({ game, index, userGoldBalance, onGameClick }: GameCard
           </span>
         )}
       </Button>
-
-
     </motion.div>
   );
 }
