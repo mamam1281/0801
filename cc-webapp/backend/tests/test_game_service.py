@@ -10,22 +10,23 @@ from app.services.user_segment_service import UserSegmentService
 from app.services.slot_service import SlotService
 from app.services.roulette_service import RouletteService
 from app.services.gacha_service import GachaService
-
+from app.services.token_service import TokenService
 
 class TestGameService:
     """Test game service functionality."""
 
     def setup_method(self):
         """Initialize test environment."""
+        self.db = MagicMock(spec=Session)
         self.repo = MagicMock(spec=GameRepository)
         self.segment_service = MagicMock(spec=UserSegmentService)
         self.slot_service = MagicMock(spec=SlotService) 
         self.roulette_service = MagicMock(spec=RouletteService)
         self.gacha_service = MagicMock(spec=GachaService)
-        self.db = MagicMock(spec=Session)
+        self.token_service = MagicMock(spec=TokenService)
         
         # Create service with mocked dependencies
-        self.service = GameService(repository=self.repo)
+        self.service = GameService(db=self.db, repository=self.repo)
         self.service.slot_service = self.slot_service
         self.service.roulette_service = self.roulette_service
         self.service.gacha_service = self.gacha_service
@@ -34,14 +35,15 @@ class TestGameService:
         """Test slot spin delegates to slot service."""
         # Arrange
         user_id = 1
+        bet_amount = 100
         expected_result = MagicMock()
         self.slot_service.spin.return_value = expected_result
         
         # Act
-        result = self.service.slot_spin(user_id, self.db)
+        result = self.service.slot_spin(user_id, bet_amount)
         
         # Assert
-        self.slot_service.spin.assert_called_once_with(user_id, self.db)
+        self.slot_service.spin.assert_called_once_with(user_id, bet_amount, self.db)
         assert result == expected_result
 
     def test_roulette_spin(self):
@@ -55,7 +57,7 @@ class TestGameService:
         self.roulette_service.spin.return_value = expected_result
         
         # Act
-        result = self.service.roulette_spin(user_id, bet, bet_type, value, self.db)
+        result = self.service.roulette_spin(user_id, bet, bet_type, value)
         
         # Assert
         self.roulette_service.spin.assert_called_once_with(user_id, bet, bet_type, value, self.db)
@@ -70,7 +72,7 @@ class TestGameService:
         self.gacha_service.pull.return_value = expected_result
         
         # Act
-        result = self.service.gacha_pull(user_id, count, self.db)
+        result = self.service.gacha_pull(user_id, count)
         
         # Assert
         self.gacha_service.pull.assert_called_once_with(user_id, count, self.db)
@@ -79,9 +81,10 @@ class TestGameService:
     def test_slot_spin_error(self):
         """SlotService에서 예외 발생 시 처리 테스트"""
         user_id = 1
+        bet_amount = 100
         self.slot_service.spin.side_effect = Exception("Slot error")
         with pytest.raises(Exception) as exc:
-            self.service.slot_spin(user_id, self.db)
+            self.service.slot_spin(user_id, bet_amount)
         assert "Slot error" in str(exc.value)
 
     def test_roulette_spin_error(self):
@@ -91,7 +94,7 @@ class TestGameService:
         value = "red"
         self.roulette_service.spin.side_effect = Exception("Roulette error")
         with pytest.raises(Exception) as exc:
-            self.service.roulette_spin(user_id, bet, bet_type, value, self.db)
+            self.service.roulette_spin(user_id, bet, bet_type, value)
         assert "Roulette error" in str(exc.value)
 
     def test_gacha_pull_error(self):
@@ -99,13 +102,13 @@ class TestGameService:
         count = 10
         self.gacha_service.pull.side_effect = Exception("Gacha error")
         with pytest.raises(Exception) as exc:
-            self.service.gacha_pull(user_id, count, self.db)
+            self.service.gacha_pull(user_id, count)
         assert "Gacha error" in str(exc.value)
 
     def test_initialization_defaults(self):
         """Test service initializes with default dependencies."""
         # Act
-        service = GameService()
+        service = GameService(db=self.db)
         
         # Assert
         assert service.repo is not None
@@ -126,20 +129,21 @@ class TestGameServiceIntegration:
     @pytest.fixture
     def service(self, db):
         """Create a GameService with real dependencies for integration testing."""
-        repo = GameRepository()
-        return GameService(repository=repo)
+        repo = GameRepository(db)
+        return GameService(db=db, repository=repo)
     
     def test_full_game_flow(self, service, db):
         """Test complete game flow from service to DB and back."""
         # This is a placeholder for a more complete integration test
         # In a real test, we'd use a test DB and verify actual DB state changes
         user_id = 1
+        bet_amount = 100
         
         # Test would include setup of test data in DB
         
         # Execute the service methods
         # (Requires a properly set up test DB, disabled for now)
-        # slot_result = service.slot_spin(user_id, db)
+        # slot_result = service.slot_spin(user_id, bet_amount)
         # assert slot_result is not None
         
         # Validate DB state changes

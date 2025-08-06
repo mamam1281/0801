@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.models import User, UserSegment, AdultContent, VIPAccessLog
 from app.schemas import VIPInfoResponse, VIPExclusiveContentItem, AdultContentGalleryItem
 from app.services.adult_content_service import AdultContentService, ContentStageEnum, STAGE_DETAILS
-from app.auth.simple_auth import SimpleAuth
+from app.services.auth_service import AuthService
 from datetime import datetime
 from typing import List, Optional, Dict, Any
 
@@ -43,7 +43,7 @@ class VIPContentService:
         user = self.db.query(User).filter(User.id == user_id).first()
         if not user:
             return False
-        return SimpleAuth.check_rank_access(str(user.rank), required_rank)
+        return AuthService.check_rank_access(str(user.rank), required_rank)
 
     def _get_user_segment_level(self, user_id: int) -> int:
         """사용자의 RFM 세그먼트 레벨 반환"""
@@ -145,7 +145,7 @@ class VIPContentService:
             return False
         
         user_segment_level = self._get_user_segment_level(user_id)
-        return SimpleAuth.check_combined_access(
+        return AuthService.check_combined_access(
             str(user.rank), user_segment_level,
             required_rank, required_segment_level
         )

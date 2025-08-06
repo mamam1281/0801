@@ -7,6 +7,18 @@ from sqlalchemy.orm import relationship
 from ..database import Base
 
 
+class Game(Base):
+    """게임 모델"""
+    __tablename__ = "games"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(100), nullable=False, unique=True)
+    description = Column(Text)
+    game_type = Column(String(50), nullable=False)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
 class UserAction(Base):
     """사용자 액션 모델"""
     __tablename__ = "user_actions"

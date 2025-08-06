@@ -26,6 +26,21 @@ security = HTTPBearer()
 
 class AuthService:
     """인증 서비스 클래스"""
+
+    @staticmethod
+    def check_rank_access(user_rank: str, required_rank: str) -> bool:
+        """랭크 기반 접근 제어"""
+        rank_hierarchy = {"STANDARD": 1, "PREMIUM": 2, "VIP": 3}
+        user_level = rank_hierarchy.get(user_rank, 0)
+        required_level = rank_hierarchy.get(required_rank, 0)
+        return user_level >= required_level
+
+    @staticmethod
+    def check_combined_access(user_rank: str, user_segment_level: int, required_rank: str, required_segment_level: int) -> bool:
+        """랭크 + RFM 세그먼트 조합 접근 제어"""
+        if not AuthService.check_rank_access(user_rank, required_rank):
+            return False
+        return user_segment_level >= required_segment_level
     
     @staticmethod
     def verify_password(plain_password: str, hashed_password: str) -> bool:

@@ -12,6 +12,9 @@ class AdultContent(Base):
     __tablename__ = "adult_contents"
 
     id = Column(Integer, primary_key=True, index=True)
+    stage = Column(Integer, default=1)
+    required_rank = Column(String(50), default="STANDARD")
+    required_segment_level = Column(Integer, default=1)
     title = Column(String(200), nullable=False)
     description = Column(Text)
     content_type = Column(String(50), nullable=False)  # video, image, text 등

@@ -60,10 +60,6 @@ export interface GameStatsDetail {
     totalPulls: number;
     legendaryPulls: number;
     totalValue: number;
-    pulls: number; // 배열이 아닌 숫자로 변경
-    totalSpent: number;
-    epicCount: number;
-    legendaryCount: number;
   };
   crash: {
     totalGames: number;

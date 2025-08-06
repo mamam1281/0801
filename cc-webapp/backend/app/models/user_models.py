@@ -18,3 +18,13 @@ class UserSegment(Base):
 
     # User 모델과의 관계 설정
     user = relationship("User", back_populates="segment")
+
+
+class VIPAccessLog(Base):
+    """VIP 콘텐츠 접근 로그 모델"""
+    __tablename__ = "vip_access_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    content_id = Column(Integer, ForeignKey("adult_contents.id"), nullable=False)
+    accessed_at = Column(DateTime, default=datetime.utcnow)

@@ -24,6 +24,7 @@ from .auth_models import (
 
 # Game 모델들
 from .game_models import (
+    Game,
     UserAction,
     UserReward,
     GameSession,
@@ -34,7 +35,7 @@ from .game_models import (
 )
 
 # User Segment 모델 추가
-from .user_models import UserSegment
+from .user_models import UserSegment, VIPAccessLog
 
 # 알림 모델 추가
 from .notification_models import Notification
@@ -90,6 +91,7 @@ __all__ = [
     "SecurityEvent",
     
     # Game
+    "Game",
     "UserAction",
     "UserReward",
     "GameSession", 
@@ -101,6 +103,7 @@ __all__ = [
     # User
         # User Segments
     "UserSegment",
+    "VIPAccessLog",
     
     # Notifications
     "Notification",
@@ -134,5 +137,53 @@ __all__ = [
     "AIMessage",
     "EmotionProfile",
     "ChatModeration",
+
+    # Content Models
+    "AdultContent",
+    "ContentView",
+    "ContentLike",
+    "ContentPurchase",
+    "ContentCategory",
+    "ContentTag",
+
+    # Analytics Models
+    "SiteVisit",
+    "UserAnalytics",
+
+    # Emotion Models
+    "SupportedEmotion",
+
+    # Mission Models
+    "Mission",
+    "UserMissionProgress",
+    "PageView",
+    "ConversionEvent",
+    "ABTestParticipant",
+    "CustomEvent",
 ]
 
+# Content 모델들 추가
+from .content_models import (
+    AdultContent,
+    ContentView,
+    ContentLike,
+    ContentPurchase,
+    ContentCategory,
+    ContentTag,
+)
+
+# Mission 모델들 추가
+from .mission_models import Mission, UserMissionProgress
+
+# Analytics 모델들 추가
+from .analytics_models import (
+    SiteVisit,
+    UserAnalytics,
+    PageView,
+    ConversionEvent,
+    ABTestParticipant,
+    CustomEvent,
+)
+
+# Emotion 모델들 추가
+from .emotion_models import SupportedEmotion
