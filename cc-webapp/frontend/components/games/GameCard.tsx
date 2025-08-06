@@ -25,17 +25,30 @@ export function GameCard({ game, index, userGoldBalance, onGameClick }: GameCard
     <motion.div
       initial={{ opacity: 0, scale: 0.9 }}
       animate={{ opacity: 1, scale: 1 }}
-      transition={{ delay: 0.3 + index * 0.1 }}
+      transition={{
+        delay: 0.3 + index * 0.1,
+        duration: 0.5,
+        type: 'tween', // spring 대신 tween 사용
+      }}
       className={`bg-black/50 backdrop-blur-sm rounded-2xl p-6 relative overflow-hidden border ${
-        game.trending ? 'border-purple-400/50 animate-pulse' : 'border-purple-500/30'
+        game.trending ? 'border-purple-400/50' : 'border-purple-500/30'
       } hover:border-purple-400/60 transition-all`}
     >
-      {/* 🎯 배지 영역 */}
+      {/* 🎯 배지 영역 - animate-pulse 제거 */}
       <div className="absolute top-4 right-4 flex flex-col gap-2">
         {game.trending && (
-          <div className="bg-gradient-to-r from-red-500 to-pink-500 text-white text-xs px-3 py-1.5 rounded-full font-bold animate-pulse flex items-center gap-1">
+          <motion.div
+            className="bg-gradient-to-r from-red-500 to-pink-500 text-white text-xs px-3 py-1.5 rounded-full font-bold flex items-center gap-1"
+            animate={{ scale: [1, 1.05, 1] }}
+            transition={{
+              duration: 2,
+              repeat: Infinity,
+              repeatType: 'loop',
+              ease: 'easeInOut',
+            }}
+          >
             🔥 HOT
-          </div>
+          </motion.div>
         )}
         <div
           className={`${getDifficultyColor(game.difficulty)} bg-black/50 text-xs px-3 py-1 rounded-full font-medium backdrop-blur-sm`}
