@@ -22,7 +22,9 @@ export const getTokens = () => {
 
   try {
     const tokens = localStorage.getItem(TOKEN_KEY);
-    return tokens ? JSON.parse(tokens) : null;
+    const parsedTokens = tokens ? JSON.parse(tokens) : null;
+    console.log('토큰 가져오기 결과:', parsedTokens ? '토큰 있음' : '토큰 없음');
+    return parsedTokens;
   } catch (error) {
     console.error('토큰 가져오기 오류:', error);
     return null;
@@ -35,7 +37,9 @@ export const getTokens = () => {
  */
 export const getAccessToken = () => {
   const tokens = getTokens();
-  return tokens?.access_token || null;
+  const accessToken = tokens?.access_token || null;
+  console.log('액세스 토큰:', accessToken ? accessToken.substring(0, 10) + '...' : '없음');
+  return accessToken;
 };
 
 /**

@@ -180,7 +180,7 @@ export function EventMissionPanel({ user, onBack, onUpdateUser, onAddNotificatio
           endDate: new Date(event.end_date),
           rewards: Object.entries(event.rewards || {}).map(([type, amount]) => ({
             type,
-            amount: Number(amount)
+            amount: Number(amount),
           })),
           participants: Math.floor(Math.random() * 1000), // 임시 데이터
           maxParticipants: 10000, // 임시 데이터
@@ -189,11 +189,11 @@ export function EventMissionPanel({ user, onBack, onUpdateUser, onAddNotificatio
           progress: event.user_participation?.progress || {},
           completed: event.user_participation?.completed || false,
           claimed: event.user_participation?.claimed || false,
-          joined: event.user_participation?.joined || false
+          joined: event.user_participation?.joined || false,
         }));
         setEvents(formattedEvents);
       }
-      
+
       // 미션 데이터 가져오기
       const missionsData = await eventMissionApi.missions.getAll();
       if (missionsData && Array.isArray(missionsData)) {
@@ -206,29 +206,76 @@ export function EventMissionPanel({ user, onBack, onUpdateUser, onAddNotificatio
             description: mission.description || '',
             type: mission.mission_type,
             category: mission.category || 'general',
-            status: missionData.completed ? 'completed' : missionData.current_progress > 0 ? 'in-progress' : 'available',
+            status: missionData.completed
+              ? 'completed'
+              : missionData.current_progress > 0
+                ? 'in-progress'
+                : 'available',
             target: mission.target_value,
             progress: missionData.current_progress,
             rewards: Object.entries(mission.rewards || {}).map(([type, amount]) => ({
               type,
-              amount: Number(amount)
+              amount: Number(amount),
             })),
             icon: mission.icon || '🎯',
-            deadline: mission.reset_period ? `${mission.reset_period === 'daily' ? '오늘' : '이번 주'} 자정` : '없음',
-            claimed: missionData.claimed
+            deadline: mission.reset_period
+              ? `${mission.reset_period === 'daily' ? '오늘' : '이번 주'} 자정`
+              : '없음',
+            claimed: missionData.claimed,
           };
         });
         setMissions(formattedMissions);
       }
     } catch (error) {
       console.error('이벤트/미션 데이터 로드 중 오류:', error);
-      onAddNotification('이벤트와 미션 데이터를 불러오는 중 문제가 발생했습니다.');
+
+      // 안전하게 오류 정보 출력
+      if (error instanceof Error) {
+        console.error('오류 세부 정보:', {
+          message: error.message,
+          stack: error.stack,
+        });
+        onAddNotification(
+          `이벤트와 미션 데이터를 불러오는 중 문제가 발생했습니다: ${error.message}`
+        );
+      } else {
+        onAddNotification('이벤트와 미션 데이터를 불러오는 중 알 수 없는 문제가 발생했습니다.');
+      }
+    }
+  };
+
+  // 인증 상태 확인
+  const checkAuthStatus = () => {
+    try {
+      // tokenStorage에서 가져오는 대신 window 객체에서 직접 확인
+      if (typeof window === 'undefined') return false;
+
+      const tokens = localStorage.getItem('cc_auth_tokens');
+      console.log('인증 상태 확인:', tokens ? '로그인됨' : '로그인되지 않음');
+      return !!tokens;
+    } catch (e) {
+      console.error('인증 상태 확인 오류:', e);
+      return false;
     }
   };
 
   // 컴포넌트 마운트 시 데이터 로드
   useEffect(() => {
+    console.log('EventMissionPanel 컴포넌트 마운트');
+
+    // 사용자 객체 확인
+    console.log('User 객체 확인:', user ? `ID: ${user.id}, 사용자 정보 있음` : '사용자 정보 없음');
+
+    const isAuthenticated = checkAuthStatus();
+    console.log('인증 상태에 따른 데이터 로드 시도:', isAuthenticated ? '인증됨' : '인증 필요');
+
+    // 인증 여부와 상관없이 일단 API 호출 시도 (디버깅 목적)
+    console.log('데이터 로드 시도 중...');
     fetchData();
+
+    if (!isAuthenticated) {
+      onAddNotification('로그인이 필요합니다. 데이터를 불러올 수 없습니다.');
+    }
   }, []);
 
   // Statistics

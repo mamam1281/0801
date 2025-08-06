@@ -11,6 +11,7 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 // 인증 헤더 생성
 const getAuthHeaders = () => {
   const accessToken = getAccessToken();
+  console.log('액세스 토큰 확인:', accessToken ? '토큰 있음' : '토큰 없음');
   return accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {};
 };
 
@@ -24,13 +25,18 @@ const apiRequest = async (endpoint, options = {}) => {
 
   const startTime = Date.now();
 
+  // 인증 헤더 디버깅
+  const authHeaders = getAuthHeaders();
+  console.log(`API 요청 토큰 확인 - ${endpoint}:`, authHeaders);
+
   try {
     const url = `${API_BASE_URL}${endpoint}`;
+    console.log(`API 요청 URL: ${url}`);
     const response = await fetch(url, {
       ...options,
       headers: {
         'Content-Type': 'application/json',
-        ...getAuthHeaders(),
+        ...authHeaders,
         ...options.headers,
       },
     });
@@ -54,7 +60,24 @@ const apiRequest = async (endpoint, options = {}) => {
       return null;
     }
 
-    // 401 처리는 동일...
+    // 401 인증 오류 처리
+    if (response.status === 401) {
+      console.error('인증 오류 발생 (401):', endpoint);
+      console.error('현재 토큰 정보:', getTokens() ? '토큰 존재' : '토큰 없음');
+
+      // 리프레시 토큰을 사용해 액세스 토큰 갱신 시도
+      const refreshed = await refreshAccessToken();
+      if (refreshed) {
+        // 토큰 갱신 성공, 원래 요청 재시도
+        console.log('토큰 갱신 성공, 요청 재시도:', endpoint);
+        return apiRequest(endpoint, options);
+      } else {
+        console.error('토큰 갱신 실패, 인증 필요');
+        // 여기서 로그인 페이지로 리디렉션하거나 인증 관련 처리
+        clearTokens(); // 잘못된 토큰 제거
+        throw new Error('인증이 필요합니다. 로그인 후 다시 시도해주세요.');
+      }
+    }
 
     // 에러 응답 처리
     let data;
@@ -81,28 +104,44 @@ const apiRequest = async (endpoint, options = {}) => {
 // 액세스 토큰 리프레시
 const refreshAccessToken = async () => {
   try {
+    console.log('토큰 리프레시 시도...');
     const tokens = getTokens();
     const refreshToken = tokens?.refresh_token;
-    if (!refreshToken) return false;
 
-    const response = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
+    if (!refreshToken) {
+      console.error('리프레시 토큰이 없습니다. 리프레시 불가능');
+      return false;
+    }
+
+    console.log('리프레시 토큰:', refreshToken.substring(0, 10) + '...');
+
+    const url = `${API_BASE_URL}/api/auth/refresh`;
+    console.log('리프레시 요청 URL:', url);
+
+    const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ refresh_token: refreshToken }),
       credentials: 'include',
     });
 
+    console.log('리프레시 응답 상태:', response.status);
+
     if (response.ok) {
       const data = await response.json();
+      console.log('새 토큰 받음:', data.access_token ? '성공' : '실패');
+
       setTokens({
         access_token: data.access_token,
         refresh_token: data.refresh_token
       });
       return true;
     }
+
+    console.error('리프레시 응답이 성공적이지 않음:', response.status);
     return false;
   } catch (error) {
-    console.error('토큰 리프레시 실패:', error);
+    console.error('토큰 리프레시 오류:', error);
     return false;
   }
 };
