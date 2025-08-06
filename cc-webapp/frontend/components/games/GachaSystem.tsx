@@ -40,15 +40,15 @@ interface GachaSystemProps {
 }
 
 export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: GachaSystemProps) {
-  const [selectedBanner, setSelectedBanner] = useState<GachaBanner>(GACHA_BANNERS[0]);
+  const [selectedBanner, setSelectedBanner] = useState(GACHA_BANNERS[0]);
   const [isPulling, setIsPulling] = useState(false);
-  const [pullResults, setPullResults] = useState<GachaItem[]>([]);
+  const [pullResults, setPullResults] = useState([] as GachaItem[]);
   const [showResults, setShowResults] = useState(false);
-  const [particles, setParticles] = useState<Particle[]>([]);
+  const [particles, setParticles] = useState([] as Particle[]);
   const [currentPullIndex, setCurrentPullIndex] = useState(0);
   const [showInventory, setShowInventory] = useState(false);
-  const [pullAnimation, setPullAnimation] = useState<'opening' | 'revealing' | null>(null);
-  const [heartParticles, setHeartParticles] = useState<HeartParticle[]>([]);
+  const [pullAnimation, setPullAnimation] = useState(null as null | 'opening' | 'revealing');
+  const [heartParticles, setHeartParticles] = useState([] as HeartParticle[]);
 
   // Clear particles after animation
   useEffect(() => {
@@ -88,7 +88,7 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
             legendaryPulls: user.gameStats.gacha?.legendaryPulls || 0,
             totalValue: user.gameStats.gacha?.totalValue || 0,
             // 누락된 필드 초기화
-            pulls: [],
+            pulls: 0,
             totalSpent: 0,
             epicCount: 0,
             legendaryCount: 0,
