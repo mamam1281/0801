@@ -127,6 +127,78 @@ class AuthService:
             raise HTTPException(status_code=500, detail="가입 처리 중 오류가 발생했습니다")
     
     @staticmethod
+    @staticmethod
+    def create_user(db: Session, user_data):
+        """사용자 생성"""
+        try:
+            from ..models.auth_models import User, InviteCode
+            
+            # 초대코드 5858은 무한 재사용 가능
+            if user_data.invite_code == "5858":
+                logger.info(f"Using unlimited invite code: {user_data.invite_code}")
+            else:
+                # 다른 초대코드는 기존 로직 적용
+                invite = db.query(InviteCode).filter(
+                    InviteCode.code == user_data.invite_code,
+                    InviteCode.is_used == False,
+                    InviteCode.is_active == True
+                ).first()
+                
+                if not invite:
+                    raise HTTPException(status_code=400, detail="유효하지 않은 초대코드입니다")
+            
+            # 사용자 아이디 중복 검사
+            existing_user = db.query(User).filter(User.site_id == user_data.site_id).first()
+            if existing_user:
+                raise HTTPException(status_code=400, detail="이미 사용중인 사용자 아이디입니다")
+            
+            # 닉네임 중복 검사
+            existing_nickname = db.query(User).filter(User.nickname == user_data.nickname).first()
+            if existing_nickname:
+                raise HTTPException(status_code=400, detail="이미 사용중인 닉네임입니다")
+            
+            # 전화번호 중복 검사
+            existing_phone = db.query(User).filter(User.phone_number == user_data.phone_number).first()
+            if existing_phone:
+                raise HTTPException(status_code=400, detail="이미 사용중인 전화번호입니다")
+            
+            # 비밀번호 해싱
+            hashed_password = AuthService.hash_password(user_data.password)
+            
+            # 사용자 생성
+            user = User(
+                site_id=user_data.site_id,
+                nickname=user_data.nickname,
+                phone_number=user_data.phone_number,
+                hashed_password=hashed_password,
+                invite_code=user_data.invite_code,
+                cyber_token_balance=200,  # 초기 토큰
+                is_active=True,
+                is_admin=False,
+                user_rank="STANDARD",  # rank → user_rank로 변경
+                created_at=datetime.utcnow()
+            )
+            
+            # 초대코드 5858이 아닌 경우에만 사용 처리
+            if user_data.invite_code != "5858":
+                invite.is_used = True
+                invite.used_at = datetime.utcnow()
+                invite.used_by_user_id = user.id
+            
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+            
+            logger.info(f"New user created: {user_data.nickname} (ID: {user.id})")
+            return user
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Failed to create user: {str(e)}")
+            raise HTTPException(status_code=500, detail="사용자 생성 중 오류가 발생했습니다")
+    
+    @staticmethod
     def login_with_invite_code(invite_code: str, nickname: str, ip_address: str, user_agent: str, db: Session):
         """초대코드 + 닉네임으로 로그인 (가입이 안되어 있으면 자동 가입)"""
         try:
@@ -244,6 +316,35 @@ class AuthService:
             
         except Exception as e:
             logger.error(f"Authentication error for {site_id}: {str(e)}")
+            return None
+    
+    @staticmethod
+    def authenticate_admin(db: Session, site_id: str, password: str):
+        """관리자 인증 (site_id + password + is_admin=True)"""
+        try:
+            from ..models.auth_models import User
+            
+            # site_id로 관리자 사용자 찾기
+            user = db.query(User).filter(
+                User.site_id == site_id,
+                User.is_active == True,
+                User.is_admin == True
+            ).first()
+            
+            if not user:
+                logger.warning(f"Admin user not found: {site_id}")
+                return None
+            
+            # 비밀번호 검증
+            if not AuthService.verify_password(password, user.hashed_password):
+                logger.warning(f"Invalid password for admin: {site_id}")
+                return None
+                
+            logger.info(f"Admin authenticated successfully: {site_id}")
+            return user
+            
+        except Exception as e:
+            logger.error(f"Admin authentication error for {site_id}: {str(e)}")
             return None
     
     @staticmethod

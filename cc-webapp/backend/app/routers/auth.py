@@ -59,7 +59,7 @@ async def signup(
             phone_number=user.phone_number,
             cyber_token_balance=user.cyber_token_balance,
             created_at=user.created_at,
-            last_login=user.last_login,
+            last_login=user.last_login or user.created_at,  # last_login이 None이면 created_at 사용
             is_admin=user.is_admin,
             is_active=user.is_active
         )

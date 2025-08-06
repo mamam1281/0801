@@ -15,7 +15,7 @@ class UserCreate(BaseModel):
     nickname: str = Field(..., min_length=2, max_length=50, description="닉네임")
     phone_number: str = Field(..., min_length=10, max_length=15, description="전화번호")
     invite_code: str = Field(..., description="초대코드 (5858)")
-    password: str = Field(..., min_length=6, description="비밀번호생성")
+    password: str = Field(..., min_length=4, description="비밀번호생성")
     
     class Config:
         json_schema_extra = {
@@ -24,7 +24,7 @@ class UserCreate(BaseModel):
                 "nickname": "테스터",
                 "phone_number": "01012345678",
                 "invite_code": "5858",
-                "password": "password123"
+                "password": "1234"
             }
         }
 
