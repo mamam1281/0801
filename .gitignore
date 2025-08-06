@@ -227,3 +227,7 @@ logs/
 # Docker volumes
 data/postgres/
 data/redis/
+
+start-all.sh
+start-backend.sh
+start-frontend.sh

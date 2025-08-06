@@ -11,6 +11,7 @@ class FeedbackRequest(FeedbackBase):
     pass
 
 class FeedbackResponse(BaseModel):
+    success: bool
     message: str
     animation_key: Optional[str] = None
     sound_key: Optional[str] = None

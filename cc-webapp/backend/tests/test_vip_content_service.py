@@ -10,7 +10,7 @@ from app.services.vip_content_service import VIPContentService, VIP_TIERS
 from app.services.adult_content_service import AdultContentService, ContentStageEnum
 from app.models import User, UserSegment, VIPAccessLog, AdultContent
 from app.schemas import VIPExclusiveContentItem, AdultContentGalleryItem
-from app.auth.simple_auth import SimpleAuth
+from app.services.auth_service import AuthService
 
 
 class TestVIPContentService(unittest.TestCase):
@@ -54,22 +54,22 @@ class TestVIPContentService(unittest.TestCase):
     def test_check_rank_access_for_vip_content(self):
         """랭크 기반 VIP 콘텐츠 접근 테스트"""
         # VIP 사용자는 모든 랭크 콘텐츠에 접근 가능
-        assert SimpleAuth.check_rank_access("VIP", "STANDARD") == True
-        assert SimpleAuth.check_rank_access("VIP", "PREMIUM") == True
-        assert SimpleAuth.check_rank_access("VIP", "VIP") == True
+        assert AuthService.check_rank_access("VIP", "STANDARD") == True
+        assert AuthService.check_rank_access("VIP", "PREMIUM") == True
+        assert AuthService.check_rank_access("VIP", "VIP") == True
         
         # STANDARD 사용자는 VIP 콘텐츠에 접근 불가
-        assert SimpleAuth.check_rank_access("STANDARD", "VIP") == False
+        assert AuthService.check_rank_access("STANDARD", "VIP") == False
 
     def test_check_combined_access_for_vip_content(self):
         """랭크 + 세그먼트 조합 VIP 콘텐츠 접근 테스트"""
         # VIP + Whale = 최고급 VIP 콘텐츠 접근 가능
-        assert SimpleAuth.check_combined_access("VIP", 3, "VIP", 3) == True
-        assert SimpleAuth.check_combined_access("VIP", 3, "PREMIUM", 2) == True
+        assert AuthService.check_combined_access("VIP", 3, "VIP", 3) == True
+        assert AuthService.check_combined_access("VIP", 3, "PREMIUM", 2) == True
         
         # 랭크 부족
-        assert SimpleAuth.check_combined_access("PREMIUM", 3, "VIP", 3) == False        # 세그먼트 부족
-        assert SimpleAuth.check_combined_access("VIP", 2, "VIP", 3) == False
+        assert AuthService.check_combined_access("PREMIUM", 3, "VIP", 3) == False        # 세그먼트 부족
+        assert AuthService.check_combined_access("VIP", 2, "VIP", 3) == False
 
     def test_get_vip_exclusive_content_access_control(self):
         """VIP 전용 콘텐츠 접근 제어 테스트"""

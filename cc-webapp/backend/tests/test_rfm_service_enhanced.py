@@ -15,7 +15,8 @@ import pytest
 from unittest.mock import Mock, patch
 from sqlalchemy.orm import Session
 
-from app.services.rfm_service import RFMService, RFMScore
+from app.services.rfm_service import RFMService
+from app.schemas.ai_schemas import RFMScore
 from app.repositories.game_repository import GameRepository
 
 

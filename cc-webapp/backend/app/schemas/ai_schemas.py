@@ -166,3 +166,22 @@ class PersonalizationResponse(BaseModel):
     confidence_score: float
     algorithm_version: str
     generated_at: datetime
+
+class RFMScore(BaseModel):
+    r_score: int
+    f_score: int
+    m_score: int
+    rfm_group: str
+
+class SupportedLanguage(str, Enum):
+    KOREAN = "ko"
+    ENGLISH = "en"
+    JAPANESE = "ja"
+    CHINESE = "zh"
+
+class EmotionResult(BaseModel):
+    emotion: str
+    score: float
+    confidence: float
+    language: SupportedLanguage
+    fallback_attempted: bool = False

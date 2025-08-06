@@ -7,6 +7,17 @@ from sqlalchemy.orm import relationship
 from ..database import Base
 
 
+class SiteVisit(Base):
+    """사이트 방문 모델"""
+    __tablename__ = "site_visits"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    ip_address = Column(String(45))
+    user_agent = Column(Text)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
 class UserAnalytics(Base):
     """사용자 분석 모델"""
     __tablename__ = "user_analytics"
@@ -69,20 +80,6 @@ class ConversionEvent(Base):
     user = relationship("User")
 
 
-class UserSegment(Base):
-    """사용자 세그먼트 모델"""
-    __tablename__ = "user_segments"
-
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    segment_name = Column(String(100), nullable=False)
-    segment_value = Column(String(200))
-    assigned_at = Column(DateTime, default=datetime.utcnow)
-    expires_at = Column(DateTime)
-    is_active = Column(Boolean, default=True)
-    
-    # 관계
-    user = relationship("User")
 
 
 class ABTestParticipant(Base):

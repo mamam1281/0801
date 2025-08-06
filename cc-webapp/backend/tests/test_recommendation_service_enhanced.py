@@ -7,7 +7,7 @@ from unittest.mock import Mock, patch
 from typing import List, Dict, Any
 
 from app.services.recommendation_service import RecommendationService, FinalRecommendation
-from app.emotion_models import SupportedEmotion
+from app.models import SupportedEmotion
 
 
 class TestRecommendationService:

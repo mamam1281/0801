@@ -18,6 +18,7 @@ class User(Base):
     cyber_token_balance = Column(Integer, default=200)  # 사이버 토큰 잔액
     is_active = Column(Boolean, default=True)
     is_admin = Column(Boolean, default=False)  # 관리자 여부
+    rank = Column(String(50), default="STANDARD")
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     last_login = Column(DateTime, nullable=True)

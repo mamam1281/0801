@@ -1,14 +1,25 @@
-import '../styles/globals.css';
+import type { Metadata } from "next";
+import { Inter } from "next/font/google";
+import "../styles/globals.css";
+import { Providers } from "./providers";
 
-export const metadata = {
-  title: '카지노 클럽 F2P',
-  description: '환영합니다! 카지노 클럽 F2P에서 게임을 즐겨보세요.',
+const inter = Inter({ subsets: ["latin"] });
+
+export const metadata: Metadata = {
+  title: "Casino-Club F2P",
+  description: "Welcome to Casino-Club F2P!",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
   return (
-    <html lang="ko" className="dark">
-      <body className="min-h-screen bg-background text-foreground">{children}</body>
+    <html lang="en" className="dark">
+      <body className={inter.className}>
+        <Providers>{children}</Providers>
+      </body>
     </html>
   );
 }

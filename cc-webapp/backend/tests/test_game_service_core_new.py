@@ -18,11 +18,11 @@ class TestGameServiceDelegation(unittest.TestCase):
 
     def setUp(self):
         """테스트를 위한 기본 설정."""
-        self.mock_repo = MagicMock(spec=GameRepository)
         self.mock_db = MagicMock(spec=Session)
+        self.mock_repo = MagicMock(spec=GameRepository)
         
         # 서비스 객체 생성
-        self.service = GameService(repository=self.mock_repo)
+        self.service = GameService(db=self.mock_db, repository=self.mock_repo)
         
         # 모의 하위 서비스 생성
         self.mock_slot_service = MagicMock(spec=SlotService)
@@ -48,10 +48,10 @@ class TestGameServiceDelegation(unittest.TestCase):
         self.mock_slot_service.spin.return_value = mock_result
         
         # 테스트 실행
-        result = self.service.slot_spin(user_id=123, db=self.mock_db)
+        result = self.service.slot_spin(user_id=123, bet_amount=100)
         
         # 검증
-        self.mock_slot_service.spin.assert_called_once_with(123, self.mock_db)
+        self.mock_slot_service.spin.assert_called_once_with(123, 100, self.mock_db)
         self.assertEqual(result.result, "win")
         self.assertEqual(result.tokens_change, 8)
         self.assertEqual(result.balance, 108)
@@ -71,10 +71,10 @@ class TestGameServiceDelegation(unittest.TestCase):
         self.mock_slot_service.spin.return_value = mock_result
         
         # 테스트 실행
-        result = self.service.slot_spin(user_id=123, db=self.mock_db)
+        result = self.service.slot_spin(user_id=123, bet_amount=100)
         
         # 검증
-        self.mock_slot_service.spin.assert_called_once_with(123, self.mock_db)
+        self.mock_slot_service.spin.assert_called_once_with(123, 100, self.mock_db)
         self.assertEqual(result.result, "lose")
         self.assertEqual(result.tokens_change, -2)
         self.assertEqual(result.balance, 98)
@@ -94,10 +94,10 @@ class TestGameServiceDelegation(unittest.TestCase):
         self.mock_slot_service.spin.return_value = mock_result
         
         # 테스트 실행
-        result = self.service.slot_spin(user_id=123, db=self.mock_db)
+        result = self.service.slot_spin(user_id=123, bet_amount=100)
         
         # 검증
-        self.mock_slot_service.spin.assert_called_once_with(123, self.mock_db)
+        self.mock_slot_service.spin.assert_called_once_with(123, 100, self.mock_db)
         self.assertEqual(result.result, "jackpot")
         self.assertEqual(result.tokens_change, 98)
         self.assertEqual(result.balance, 198)
@@ -117,10 +117,10 @@ class TestGameServiceDelegation(unittest.TestCase):
         self.mock_slot_service.spin.return_value = mock_result
         
         # 테스트 실행
-        result = self.service.slot_spin(user_id=123, db=self.mock_db)
+        result = self.service.slot_spin(user_id=123, bet_amount=100)
         
         # 검증
-        self.mock_slot_service.spin.assert_called_once_with(123, self.mock_db)
+        self.mock_slot_service.spin.assert_called_once_with(123, 100, self.mock_db)
         self.assertEqual(result.result, "win")
         self.assertEqual(result.animation, "force_win")
         self.assertEqual(result.streak, 0)
@@ -142,8 +142,7 @@ class TestGameServiceDelegation(unittest.TestCase):
             user_id=123,
             bet=10,
             bet_type="number",
-            value="17",
-            db=self.mock_db
+            value="17"
         )
         
         # 검증
@@ -170,8 +169,7 @@ class TestGameServiceDelegation(unittest.TestCase):
             user_id=123,
             bet=5,
             bet_type="color",
-            value="red",
-            db=self.mock_db
+            value="red"
         )
         
         # 검증
@@ -197,8 +195,7 @@ class TestGameServiceDelegation(unittest.TestCase):
             user_id=123,
             bet=10,
             bet_type="odd_even",
-            value="even",
-            db=self.mock_db
+            value="even"
         )
         
         # 검증
@@ -224,8 +221,7 @@ class TestGameServiceDelegation(unittest.TestCase):
             user_id=123,
             bet=10,
             bet_type="color",
-            value="red",
-            db=self.mock_db
+            value="red"
         )
         
         # 검증
@@ -242,8 +238,7 @@ class TestGameServiceDelegation(unittest.TestCase):
             user_id=123,
             bet=100,  # 제한 이상의 베팅
             bet_type="number",
-            value="17",
-            db=self.mock_db
+            value="17"
         )
         
         # 베팅 한도가 적용되어야 함 (실제 제한 로직은 roulette_service에 위임됨)
@@ -261,7 +256,7 @@ class TestGameServiceDelegation(unittest.TestCase):
         self.mock_gacha_service.pull.return_value = mock_result
         
         # 테스트 실행
-        result = self.service.gacha_pull(user_id=123, count=2, db=self.mock_db)
+        result = self.service.gacha_pull(user_id=123, count=2)
         
         # 검증
         self.mock_gacha_service.pull.assert_called_once_with(123, 2, self.mock_db)
@@ -271,14 +266,14 @@ class TestGameServiceDelegation(unittest.TestCase):
 
 
 @pytest.fixture
-def game_service_fixture():
+def game_service_fixture(db_session):
     """테스트용 게임 서비스 픽스처."""
     mock_repo = MagicMock(spec=GameRepository)
     mock_slot_service = MagicMock(spec=SlotService)
     mock_roulette_service = MagicMock(spec=RouletteService)
     mock_gacha_service = MagicMock(spec=GachaService)
     
-    service = GameService(repository=mock_repo)
+    service = GameService(db=db_session, repository=mock_repo)
     service.slot_service = mock_slot_service
     service.roulette_service = mock_roulette_service
     service.gacha_service = mock_gacha_service
@@ -286,10 +281,10 @@ def game_service_fixture():
     return service, mock_slot_service, mock_roulette_service, mock_gacha_service, mock_repo
 
 
-def test_service_initialization():
+def test_service_initialization(db_session):
     """서비스 초기화 테스트."""
     # 레포지토리 없이 초기화
-    service = GameService()
+    service = GameService(db=db_session)
     assert isinstance(service.repo, GameRepository)
     assert isinstance(service.slot_service, SlotService)
     assert isinstance(service.roulette_service, RouletteService)
@@ -297,36 +292,35 @@ def test_service_initialization():
     
     # 커스텀 레포지토리로 초기화
     custom_repo = MagicMock(spec=GameRepository)
-    service = GameService(repository=custom_repo)
+    service = GameService(db=db_session, repository=custom_repo)
     assert service.repo == custom_repo
 
 
 def test_game_service_error_propagation(game_service_fixture):
     """게임 서비스 오류 전파 테스트."""
     service, mock_slot, mock_roulette, mock_gacha, _ = game_service_fixture
-    mock_db = MagicMock(spec=Session)
     
     # 슬롯 서비스에서 오류 발생
     mock_slot.spin.side_effect = ValueError("토큰 부족")
     with pytest.raises(ValueError, match="토큰 부족"):
-        service.slot_spin(user_id=123, db=mock_db)
+        service.slot_spin(user_id=123, bet_amount=100)
     
     # 룰렛 서비스에서 오류 발생
     mock_roulette.spin.side_effect = ValueError("잘못된 베팅 타입")
     with pytest.raises(ValueError, match="잘못된 베팅 타입"):
-        service.roulette_spin(user_id=123, bet=10, bet_type="invalid", value=None, db=mock_db)
+        service.roulette_spin(user_id=123, bet=10, bet_type="invalid", value=None)
         
     # 가챠 서비스에서 오류 발생
     mock_gacha.pull.side_effect = ValueError("잘못된 뽑기 횟수")
     with pytest.raises(ValueError, match="잘못된 뽑기 횟수"):
-        service.gacha_pull(user_id=123, count=0, db=mock_db)
+        service.gacha_pull(user_id=123, count=0)
 
 
-def test_integration_between_services():
+def test_integration_between_services(db_session):
     """서비스 간 통합 테스트."""
     # 실제 서비스 생성 (통합 테스트)
-    repo = GameRepository()
-    service = GameService(repository=repo)
+    repo = GameRepository(db_session)
+    service = GameService(db=db_session, repository=repo)
     
     # 각 특화 서비스 확인
     assert service.slot_service.repo == repo

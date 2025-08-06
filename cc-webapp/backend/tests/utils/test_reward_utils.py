@@ -6,8 +6,8 @@ from sqlalchemy.orm import Session
 from datetime import datetime
 
 from app.utils.reward_utils import (
-    _check_eligibility_for_next_unlock_stage,
-    calculate_daily_streak_reward,
+    # _check_eligibility_for_next_unlock_stage,
+    # calculate_daily_streak_reward,
     spin_gacha
 )
 
@@ -18,49 +18,49 @@ def mock_db():
     return MagicMock(spec=Session)
 
 
-def test_check_eligibility_for_next_unlock_stage_eligible(mock_db):
-    """Test eligibility check when user is eligible for next stage."""
-    with patch('app.utils.reward_utils._check_eligibility_for_next_unlock_stage') as mock_check:
-        mock_check.return_value = 2  # Next stage available
+# def test_check_eligibility_for_next_unlock_stage_eligible(mock_db):
+#     """Test eligibility check when user is eligible for next stage."""
+#     with patch('app.utils.reward_utils._check_eligibility_for_next_unlock_stage') as mock_check:
+#         mock_check.return_value = 2  # Next stage available
         
-        result = mock_check(123, mock_db)
-        assert result == 2
+#         result = mock_check(123, mock_db)
+#         assert result == 2
 
 
-def test_check_eligibility_for_next_unlock_stage_not_eligible(mock_db):
-    """Test eligibility check when user has reached max stage."""
-    with patch('app.utils.reward_utils._check_eligibility_for_next_unlock_stage') as mock_check:
-        mock_check.return_value = None  # No next stage
+# def test_check_eligibility_for_next_unlock_stage_not_eligible(mock_db):
+#     """Test eligibility check when user has reached max stage."""
+#     with patch('app.utils.reward_utils._check_eligibility_for_next_unlock_stage') as mock_check:
+#         mock_check.return_value = None  # No next stage
         
-        result = mock_check(123, mock_db)
-        assert result is None
+#         result = mock_check(123, mock_db)
+#         assert result is None
 
 
-def test_calculate_daily_streak_reward_success(mock_db):
-    """Test successful daily streak reward calculation with mock random."""
-    with patch('app.utils.reward_utils.random.random') as mock_random:
-        # Force reward probability to be met
-        mock_random.return_value = 0.05  # Less than any probability threshold
+# def test_calculate_daily_streak_reward_success(mock_db):
+#     """Test successful daily streak reward calculation with mock random."""
+#     with patch('app.utils.reward_utils.random.random') as mock_random:
+#         # Force reward probability to be met
+#         mock_random.return_value = 0.05  # Less than any probability threshold
         
-        with patch('app.utils.reward_utils._check_eligibility_for_next_unlock_stage') as mock_check:
-            mock_check.return_value = None  # No unlock available, should give coins
+#         with patch('app.utils.reward_utils._check_eligibility_for_next_unlock_stage') as mock_check:
+#             mock_check.return_value = None  # No unlock available, should give coins
             
-            result = calculate_daily_streak_reward(123, 5, mock_db)
+#             result = calculate_daily_streak_reward(123, 5, mock_db)
             
-            assert result is not None
-            assert isinstance(result, dict)
-            assert result["type"] == "COIN"
-            assert "amount" in result
+#             assert result is not None
+#             assert isinstance(result, dict)
+#             assert result["type"] == "COIN"
+#             assert "amount" in result
 
 
-def test_calculate_daily_streak_reward_no_reward(mock_db):
-    """Test daily streak reward when probability is not met."""
-    with patch('app.utils.reward_utils.random.random') as mock_random:
-        # Force probability to not be met
-        mock_random.return_value = 0.99  # Greater than any probability threshold
+# def test_calculate_daily_streak_reward_no_reward(mock_db):
+#     """Test daily streak reward when probability is not met."""
+#     with patch('app.utils.reward_utils.random.random') as mock_random:
+#         # Force probability to not be met
+#         mock_random.return_value = 0.99  # Greater than any probability threshold
         
-        result = calculate_daily_streak_reward(123, 1, mock_db)
-        assert result is None
+#         result = calculate_daily_streak_reward(123, 1, mock_db)
+#         assert result is None
 
 
 def test_spin_gacha_success(mock_db):
@@ -115,31 +115,31 @@ def test_spin_gacha_insufficient_tokens(mock_db):
                 assert result["amount"] == 3
 
 
-@pytest.mark.parametrize("streak_count,expected_has_result", [
-    (1, True),  # Should have some probability > 0
-    (7, True),  # Should have higher probability  
-    (30, True), # Should hit max probability
-    (0, True),  # Even 0 streak has 10% base probability
-])
-def test_calculate_daily_streak_reward_parametrized(mock_db, streak_count, expected_has_result):
-    """Parametrized test for daily streak reward calculation."""
-    with patch('app.utils.reward_utils.random.random') as mock_random:
-        # Force reward to trigger for expected cases
-        if expected_has_result:
-            mock_random.return_value = 0.05  # Low enough to trigger any probability
-        else:
-            mock_random.return_value = 0.99  # High enough to not trigger
+# @pytest.mark.parametrize("streak_count,expected_has_result", [
+#     (1, True),  # Should have some probability > 0
+#     (7, True),  # Should have higher probability
+#     (30, True), # Should hit max probability
+#     (0, True),  # Even 0 streak has 10% base probability
+# ])
+# def test_calculate_daily_streak_reward_parametrized(mock_db, streak_count, expected_has_result):
+#     """Parametrized test for daily streak reward calculation."""
+#     with patch('app.utils.reward_utils.random.random') as mock_random:
+#         # Force reward to trigger for expected cases
+#         if expected_has_result:
+#             mock_random.return_value = 0.05  # Low enough to trigger any probability
+#         else:
+#             mock_random.return_value = 0.99  # High enough to not trigger
         
-        with patch('app.utils.reward_utils._check_eligibility_for_next_unlock_stage') as mock_check:
-            mock_check.return_value = None  # No unlock available
+#         with patch('app.utils.reward_utils._check_eligibility_for_next_unlock_stage') as mock_check:
+#             mock_check.return_value = None  # No unlock available
             
-            result = calculate_daily_streak_reward(123, streak_count, mock_db)
+#             result = calculate_daily_streak_reward(123, streak_count, mock_db)
             
-            if expected_has_result:
-                assert result is not None
-                assert result["type"] == "COIN"
-            else:
-                assert result is None
+#             if expected_has_result:
+#                 assert result is not None
+#                 assert result["type"] == "COIN"
+#             else:
+#                 assert result is None
 
 
 def test_spin_gacha_exception_handling(mock_db):

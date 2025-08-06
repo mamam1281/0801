@@ -15,7 +15,7 @@ import {
   Zap
 } from 'lucide-react';
 import { Button } from './ui/button';
-import { Input } from './ui/input';
+import { Input } from './ui/Input';
 import { Label } from './ui/label';
 
 interface AdminLoginProps {

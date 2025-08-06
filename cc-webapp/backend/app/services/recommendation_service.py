@@ -4,7 +4,7 @@
 from typing import List, Dict, Any, Optional
 import logging
 import random
-from app.emotion_models import SupportedEmotion
+from app.models import SupportedEmotion
 
 logger = logging.getLogger(__name__)
 

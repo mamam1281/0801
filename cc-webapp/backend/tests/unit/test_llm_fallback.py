@@ -5,7 +5,8 @@ import os
 import pytest
 from unittest.mock import Mock, patch
 from app.utils.sentiment_analyzer import SentimentAnalyzer
-from app.emotion_models import EmotionResult, SupportedEmotion, SupportedLanguage
+from app.models import SupportedEmotion
+from app.schemas.ai_schemas import EmotionResult, SupportedLanguage
 
 class TestSentimentAnalyzer:
     @patch('app.utils.sentiment_analyzer.call_llm_fallback')

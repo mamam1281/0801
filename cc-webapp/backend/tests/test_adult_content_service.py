@@ -9,7 +9,7 @@ from datetime import datetime
 
 from app.services.adult_content_service import AdultContentService
 from app.models import User, UserSegment, AdultContent
-from app.auth.simple_auth import SimpleAuth
+from app.services.auth_service import AuthService
 
 
 @pytest.fixture
@@ -58,7 +58,6 @@ def sample_user_segment():
         user_id=1,
         rfm_group="Whale",
         risk_profile="Low",
-        name="VIP Whale User"
     )
     return segment
 
@@ -85,35 +84,35 @@ class TestDualAccessControl:
     def test_rank_access_only(self):
         """랭크만으로 접근 제어 테스트"""
         # VIP 랭크는 모든 랭크 조건 통과
-        assert SimpleAuth.check_rank_access("VIP", "STANDARD") == True
-        assert SimpleAuth.check_rank_access("VIP", "PREMIUM") == True
-        assert SimpleAuth.check_rank_access("VIP", "VIP") == True
+        assert AuthService.check_rank_access("VIP", "STANDARD") == True
+        assert AuthService.check_rank_access("VIP", "PREMIUM") == True
+        assert AuthService.check_rank_access("VIP", "VIP") == True
         
         # PREMIUM은 VIP 조건 통과 불가
-        assert SimpleAuth.check_rank_access("PREMIUM", "VIP") == False
+        assert AuthService.check_rank_access("PREMIUM", "VIP") == False
     
     def test_combined_access_success(self):
         """랭크 + 세그먼트 조합 접근 성공 테스트"""
         # VIP + Whale (3) → VIP + Whale (3) 콘텐츠 접근 가능
-        assert SimpleAuth.check_combined_access("VIP", 3, "VIP", 3) == True
+        assert AuthService.check_combined_access("VIP", 3, "VIP", 3) == True
         
         # VIP + Whale (3) → PREMIUM + Medium (2) 콘텐츠 접근 가능 (상위 등급)
-        assert SimpleAuth.check_combined_access("VIP", 3, "PREMIUM", 2) == True
+        assert AuthService.check_combined_access("VIP", 3, "PREMIUM", 2) == True
     
     def test_combined_access_failure_rank(self):
         """랭크 부족으로 접근 실패 테스트"""
         # PREMIUM + Whale (3) → VIP + Whale (3) 콘텐츠 접근 불가 (랭크 부족)
-        assert SimpleAuth.check_combined_access("PREMIUM", 3, "VIP", 3) == False
+        assert AuthService.check_combined_access("PREMIUM", 3, "VIP", 3) == False
     
     def test_combined_access_failure_segment(self):
         """세그먼트 부족으로 접근 실패 테스트"""
         # VIP + Medium (2) → VIP + Whale (3) 콘텐츠 접근 불가 (세그먼트 부족)
-        assert SimpleAuth.check_combined_access("VIP", 2, "VIP", 3) == False
+        assert AuthService.check_combined_access("VIP", 2, "VIP", 3) == False
     
     def test_combined_access_failure_both(self):
         """랭크와 세그먼트 모두 부족으로 접근 실패 테스트"""
         # STANDARD + Low (1) → VIP + Whale (3) 콘텐츠 접근 불가 (둘 다 부족)
-        assert SimpleAuth.check_combined_access("STANDARD", 1, "VIP", 3) == False
+        assert AuthService.check_combined_access("STANDARD", 1, "VIP", 3) == False
 
 
 class TestAdultContentService:
@@ -130,7 +129,7 @@ class TestAdultContentService:
         content_segment_level = sample_content.required_segment_level
         
         # 접근 가능해야 함
-        can_access = SimpleAuth.check_combined_access(
+        can_access = AuthService.check_combined_access(
             user_rank, user_segment_level,
             content_rank, content_segment_level
         )
@@ -142,7 +141,7 @@ class TestAdultContentService:
         premium_user_rank = "PREMIUM"
         whale_segment_level = 3
         
-        can_access = SimpleAuth.check_combined_access(
+        can_access = AuthService.check_combined_access(
             premium_user_rank, whale_segment_level,
             sample_content.required_rank, sample_content.required_segment_level
         )
@@ -154,7 +153,7 @@ class TestAdultContentService:
         vip_user_rank = "VIP"
         medium_segment_level = 2
         
-        can_access = SimpleAuth.check_combined_access(
+        can_access = AuthService.check_combined_access(
             vip_user_rank, medium_segment_level,
             sample_content.required_rank, sample_content.required_segment_level
         )
@@ -189,30 +188,30 @@ class TestContentScenarios:
     def test_basic_content_access(self):
         """기본 콘텐츠 접근 (STANDARD + Low)"""
         # 모든 사용자가 접근 가능한 기본 콘텐츠
-        assert SimpleAuth.check_combined_access("STANDARD", 1, "STANDARD", 1) == True
-        assert SimpleAuth.check_combined_access("PREMIUM", 1, "STANDARD", 1) == True
-        assert SimpleAuth.check_combined_access("VIP", 1, "STANDARD", 1) == True
+        assert AuthService.check_combined_access("STANDARD", 1, "STANDARD", 1) == True
+        assert AuthService.check_combined_access("PREMIUM", 1, "STANDARD", 1) == True
+        assert AuthService.check_combined_access("VIP", 1, "STANDARD", 1) == True
     
     def test_premium_content_access(self):
         """프리미엄 콘텐츠 접근 (PREMIUM + Medium)"""
         # PREMIUM 이상 + Medium 이상 세그먼트 필요
-        assert SimpleAuth.check_combined_access("PREMIUM", 2, "PREMIUM", 2) == True
-        assert SimpleAuth.check_combined_access("VIP", 2, "PREMIUM", 2) == True
-        assert SimpleAuth.check_combined_access("VIP", 3, "PREMIUM", 2) == True
+        assert AuthService.check_combined_access("PREMIUM", 2, "PREMIUM", 2) == True
+        assert AuthService.check_combined_access("VIP", 2, "PREMIUM", 2) == True
+        assert AuthService.check_combined_access("VIP", 3, "PREMIUM", 2) == True
         
         # 조건 미달
-        assert SimpleAuth.check_combined_access("STANDARD", 2, "PREMIUM", 2) == False
-        assert SimpleAuth.check_combined_access("PREMIUM", 1, "PREMIUM", 2) == False
+        assert AuthService.check_combined_access("STANDARD", 2, "PREMIUM", 2) == False
+        assert AuthService.check_combined_access("PREMIUM", 1, "PREMIUM", 2) == False
     
     def test_vip_exclusive_content(self):
         """VIP 전용 콘텐츠 접근 (VIP + Whale)"""
         # VIP + Whale만 접근 가능한 최고급 콘텐츠
-        assert SimpleAuth.check_combined_access("VIP", 3, "VIP", 3) == True
+        assert AuthService.check_combined_access("VIP", 3, "VIP", 3) == True
         
         # 조건 미달
-        assert SimpleAuth.check_combined_access("PREMIUM", 3, "VIP", 3) == False
-        assert SimpleAuth.check_combined_access("VIP", 2, "VIP", 3) == False
-        assert SimpleAuth.check_combined_access("STANDARD", 1, "VIP", 3) == False
+        assert AuthService.check_combined_access("PREMIUM", 3, "VIP", 3) == False
+        assert AuthService.check_combined_access("VIP", 2, "VIP", 3) == False
+        assert AuthService.check_combined_access("STANDARD", 1, "VIP", 3) == False
 
 
 class TestRFMSegmentMaintenance:

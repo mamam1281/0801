@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
   ArrowLeft,
@@ -15,21 +15,56 @@ import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { Badge } from './ui/badge';
 import { Progress } from './ui/progress';
-import { User } from '../types';
+import { User, UserStats, UserBalance } from '../types/user';
+import { userApi } from '../utils/apiClient';
 
 interface ProfileScreenProps {
-  user: User;
   onBack: () => void;
-  onUpdateUser: (user: User) => void;
   onAddNotification: (message: string) => void;
 }
 
 export function ProfileScreen({
-  user,
   onBack,
-  onUpdateUser,
   onAddNotification
 }: ProfileScreenProps) {
+  const [user, setUser] = useState<User | null>(null);
+  const [stats, setStats] = useState<UserStats | null>(null);
+  const [balance, setBalance] = useState<UserBalance | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchProfileData = async () => {
+      try {
+        setLoading(true);
+        const [profileData, statsData, balanceData] = await Promise.all([
+          userApi.getProfile(),
+          userApi.getStats(),
+          userApi.getBalance()
+        ]);
+        setUser(profileData);
+        setStats(statsData);
+        setBalance(balanceData);
+      } catch (err) {
+        setError('Failed to load profile data.');
+        onAddNotification('Error: Could not load profile.');
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProfileData();
+  }, [onAddNotification]);
+
+  if (loading) {
+    return <div className="min-h-screen flex items-center justify-center bg-background text-foreground">Loading profile...</div>;
+  }
+
+  if (error) {
+    return <div className="min-h-screen flex items-center justify-center bg-background text-destructive">{error}</div>;
+  }
+
   // 안전한 계산을 위한 체크
   const progressToNext = user?.experience && user?.maxExperience 
     ? (user.experience / user.maxExperience) * 100 
@@ -129,7 +164,7 @@ export function ProfileScreen({
                   <div className="text-center">
                     <div className="text-sm text-muted-foreground mb-2">현재 보유 골드</div>
                     <div className="text-4xl font-black text-gradient-gold mb-2">
-                      {user?.goldBalance?.toLocaleString() || 0}
+                      {balance?.cyber_token_balance?.toLocaleString() || 0}
                     </div>
                     <div className="text-lg text-gold font-bold">GOLD</div>
                   </div>
@@ -169,7 +204,7 @@ export function ProfileScreen({
                     </div>
                     <div className="text-right">
                       <div className="text-lg font-bold text-primary">
-                        {user?.gameStats?.slot?.spins || 0}회
+                        {stats?.total_games_played || 0}회
                       </div>
                       <div className="text-xs text-gold">
                         최고: {user?.gameStats?.slot?.biggestWin?.toLocaleString() || 0}G
@@ -241,13 +276,13 @@ export function ProfileScreen({
                   
                   <div className="grid grid-cols-1 gap-3">
                     <div className="text-center p-4 rounded-lg bg-primary/5 border border-primary/10">
-                      <div className="text-2xl font-bold text-primary">{user?.stats?.gamesPlayed || 0}</div>
+                      <div className="text-2xl font-bold text-primary">{stats?.total_games_played || 0}</div>
                       <div className="text-sm text-muted-foreground">총 게임 수</div>
                     </div>
                     
                     <div className="text-center p-4 rounded-lg bg-gold/5 border border-gold/10">
                       <div className="text-2xl font-bold text-gradient-gold">
-                        {user?.stats?.totalEarnings?.toLocaleString() || 0}G
+                        {stats?.total_wins || 0} 승
                       </div>
                       <div className="text-sm text-muted-foreground">총 수익</div>
                     </div>
@@ -295,7 +330,7 @@ export function ProfileScreen({
                           <div className="text-xs text-muted-foreground">100,000G 모으기</div>
                         </div>
                         <Badge className="bg-muted/20 text-muted-foreground border-muted/30 text-xs">
-                          {Math.min(100, Math.floor((user?.goldBalance || 0) / 1000))}%
+                          {Math.min(100, Math.floor((balance?.cyber_token_balance || 0) / 1000))}%
                         </Badge>
                       </div>
                     </div>
