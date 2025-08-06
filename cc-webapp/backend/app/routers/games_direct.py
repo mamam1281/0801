@@ -1,8 +1,9 @@
-"""Game Collection API Endpoints"""
+"""Game Collection API Endpoints (Updated)"""
 import logging
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.orm import Session
 import random
+import json
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 from ..database import get_db
@@ -22,37 +23,47 @@ from ..schemas.game_schemas import (
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/games", tags=["Games"])
 
-@router.get("/", response_model=List[GameListResponse])
+@router.get("/")
 async def get_games_list(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    게임 목록 조회
+    게임 목록 조회 (직접 JSON 반환)
     """
     games = db.query(Game).filter(Game.is_active == True).all()
     result = []
     
     for game in games:
-        result.append({
-            "id": game.id,
+        # 직접 JSON 형식 준비
+        game_data = {
+            "id": str(game.id),
             "name": game.name,
             "description": game.description,
-            "game_type": game.game_type,
-            "is_active": game.is_active
-        })
+            "type": game.game_type,
+            "image_url": getattr(game, 'image_url', f"/assets/games/{game.game_type}.png"),
+            "is_active": game.is_active,
+            "daily_limit": None,
+            "playCount": 0,
+            "bestScore": 0,
+            "canPlay": True,
+            "cooldown_remaining": None,
+            "requires_vip_tier": None
+        }
+        result.append(game_data)
     
-    return result
+    # 직접 JSON 반환
+    return Response(content=json.dumps(result), media_type="application/json")
 
 # 슬롯 게임 엔드포인트
-@router.post("/slot/spin", response_model=SlotSpinResponse)
+@router.post("/slot/spin")
 async def spin_slot(
     request: SlotSpinRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    슬롯머신 스핀
+    슬롯머신 스핀 (직접 JSON 반환)
     """
     bet_amount = request.bet_amount
     
@@ -94,22 +105,30 @@ async def spin_slot(
     db.add(user_action)
     db.commit()
     
-    return {
-        'reels': reels,
-        'win_amount': win_amount,
-        'is_jackpot': reels[0] == '7️⃣' and reels[0] == reels[1] == reels[2],
-        'balance': new_balance
+    # 직접 JSON 반환
+    response_data = {
+        "success": True,
+        "reels": [reels],
+        "win_amount": win_amount,
+        "win_lines": [],
+        "multiplier": 1.0,
+        "is_jackpot": reels[0] == '7️⃣' and reels[0] == reels[1] == reels[2],
+        "free_spins_awarded": 0,
+        "message": "슬롯 게임 결과입니다.",
+        "balance": new_balance
     }
+    
+    return Response(content=json.dumps(response_data), media_type="application/json")
 
 # 가위바위보 엔드포인트
-@router.post("/rps/play", response_model=RPSPlayResponse)
+@router.post("/rps/play")
 async def play_rps(
     request: RPSPlayRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    가위바위보 플레이
+    가위바위보 플레이 (직접 JSON 반환)
     """
     user_choice = request.choice
     bet_amount = request.bet_amount
@@ -162,23 +181,29 @@ async def play_rps(
     db.add(user_action)
     db.commit()
     
-    return {
-        'user_choice': user_choice,
-        'ai_choice': ai_choice,
-        'result': result,
-        'win_amount': win_amount,
-        'balance': new_balance
+    # 직접 JSON 반환
+    response_data = {
+        "success": True,
+        "player_choice": user_choice,
+        "computer_choice": ai_choice,
+        "result": result,
+        "win_amount": win_amount,
+        "message": f"결과: {result}",
+        "balance": new_balance,
+        "streak": 1
     }
+    
+    return Response(content=json.dumps(response_data), media_type="application/json")
 
 # 가챠 엔드포인트
-@router.post("/gacha/pull", response_model=GachaPullResponse)
+@router.post("/gacha/pull")
 async def pull_gacha(
     request: GachaPullRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    가챠 뽑기
+    가챠 뽑기 (직접 JSON 반환)
     """
     pull_count = request.pull_count
     cost_per_pull = 300
@@ -221,21 +246,27 @@ async def pull_gacha(
     db.add(user_action)
     db.commit()
     
-    return {
-        'items': items,
-        'total_value': sum(item['value'] for item in items),
-        'balance': new_balance
+    # 직접 JSON 반환
+    response_data = {
+        "success": True,
+        "items": items,
+        "rare_item_count": sum(1 for item in items if item['rarity'] == 'rare'),
+        "ultra_rare_item_count": sum(1 for item in items if item['rarity'] in ['epic', 'legendary']),
+        "message": "가챠 뽑기 결과입니다.",
+        "currency_balance": {"cyber_token": new_balance}
     }
+    
+    return Response(content=json.dumps(response_data), media_type="application/json")
 
 # 크래시 게임 엔드포인트
-@router.post("/crash/bet", response_model=CrashBetResponse)
+@router.post("/crash/bet")
 async def place_crash_bet(
     request: CrashBetRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    크래시 게임 베팅
+    크래시 게임 베팅 (직접 JSON 반환)
     """
     bet_amount = request.bet_amount
     auto_cashout_multiplier = request.auto_cashout_multiplier
@@ -280,11 +311,15 @@ async def place_crash_bet(
     db.add(user_action)
     db.commit()
     
-    return {
-        'game_id': game_id,
-        'bet_amount': bet_amount,
-        'auto_cashout_multiplier': auto_cashout_multiplier,
-        'multiplier': round(multiplier, 2),
-        'win_amount': win_amount,
-        'balance': new_balance
+    # 직접 JSON 반환
+    response_data = {
+        "success": True,
+        "game_id": game_id,
+        "bet_amount": bet_amount,
+        "potential_win": int(bet_amount * multiplier) if win_amount == 0 else win_amount,
+        "max_multiplier": round(multiplier, 2),
+        "message": "크래시 게임 베팅이 완료되었습니다.",
+        "balance": new_balance
     }
+    
+    return Response(content=json.dumps(response_data), media_type="application/json")

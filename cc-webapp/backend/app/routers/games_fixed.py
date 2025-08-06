@@ -34,13 +34,24 @@ async def get_games_list(
     result = []
     
     for game in games:
-        result.append({
-            "id": game.id,
+        # 모든 필수 필드가 있는 딕셔너리 생성
+        game_dict = {
+            "id": str(game.id),
             "name": game.name,
             "description": game.description,
-            "game_type": game.game_type,
-            "is_active": game.is_active
-        })
+            "type": game.game_type,
+            "image_url": getattr(game, 'image_url', f"/assets/games/{game.game_type}.png"),
+            "is_active": game.is_active,
+            "daily_limit": None,
+            "playCount": 0,
+            "bestScore": 0,
+            "canPlay": True,
+            "cooldown_remaining": None,
+            "requires_vip_tier": None
+        }
+        # GameListResponse 모델에 전달
+        game_response = GameListResponse(**game_dict)
+        result.append(game_response)
     
     return result
 
@@ -94,12 +105,18 @@ async def spin_slot(
     db.add(user_action)
     db.commit()
     
-    return {
-        'reels': reels,
-        'win_amount': win_amount,
-        'is_jackpot': reels[0] == '7️⃣' and reels[0] == reels[1] == reels[2],
-        'balance': new_balance
-    }
+    # SlotSpinResponse 객체 생성 (이중 리스트로 reels 설정)
+    return SlotSpinResponse(
+        success=True,
+        reels=[reels],  # 이중 리스트로 감싸기
+        win_amount=win_amount,
+        win_lines=[],
+        multiplier=1.0,
+        is_jackpot=reels[0] == '7️⃣' and reels[0] == reels[1] == reels[2],
+        free_spins_awarded=0,
+        message='슬롯 게임 결과입니다.',
+        balance=new_balance
+    )
 
 # 가위바위보 엔드포인트
 @router.post("/rps/play", response_model=RPSPlayResponse)
@@ -162,13 +179,16 @@ async def play_rps(
     db.add(user_action)
     db.commit()
     
-    return {
-        'user_choice': user_choice,
-        'ai_choice': ai_choice,
-        'result': result,
-        'win_amount': win_amount,
-        'balance': new_balance
-    }
+    return RPSPlayResponse(
+        success=True,
+        player_choice=user_choice,
+        computer_choice=ai_choice,
+        result=result,
+        win_amount=win_amount,
+        message=f'결과: {result}',
+        balance=new_balance,
+        streak=1
+    )
 
 # 가챠 엔드포인트
 @router.post("/gacha/pull", response_model=GachaPullResponse)
@@ -221,11 +241,14 @@ async def pull_gacha(
     db.add(user_action)
     db.commit()
     
-    return {
-        'items': items,
-        'total_value': sum(item['value'] for item in items),
-        'balance': new_balance
-    }
+    return GachaPullResponse(
+        success=True,
+        items=items,
+        rare_item_count=sum(1 for item in items if item['rarity'] == 'rare'),
+        ultra_rare_item_count=sum(1 for item in items if item['rarity'] in ['epic', 'legendary']),
+        message='가챠 뽑기 결과입니다.',
+        currency_balance={'cyber_token': new_balance}
+    )
 
 # 크래시 게임 엔드포인트
 @router.post("/crash/bet", response_model=CrashBetResponse)
@@ -280,11 +303,12 @@ async def place_crash_bet(
     db.add(user_action)
     db.commit()
     
-    return {
-        'game_id': game_id,
-        'bet_amount': bet_amount,
-        'auto_cashout_multiplier': auto_cashout_multiplier,
-        'multiplier': round(multiplier, 2),
-        'win_amount': win_amount,
-        'balance': new_balance
-    }
+    return CrashBetResponse(
+        success=True,
+        game_id=game_id,
+        bet_amount=bet_amount,
+        potential_win=int(bet_amount * multiplier) if win_amount == 0 else win_amount,
+        max_multiplier=round(multiplier, 2),
+        message='크래시 게임 베팅이 완료되었습니다.',
+        balance=new_balance
+    )
