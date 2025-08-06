@@ -2,6 +2,9 @@ import { User, GameItem } from '../../../types';
 import { GachaItem, GachaBanner, HeartParticle } from '../../../types/gacha';
 import { ANIMATION_DURATIONS, SEXY_EMOJIS, GACHA_ITEMS } from './constants';
 
+// Re-export HeartParticle for use in GachaSystem
+export type { HeartParticle };
+
 // 파티클 인터페이스 정의
 export interface Particle {
   id: string;

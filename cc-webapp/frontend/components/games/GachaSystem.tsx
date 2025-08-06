@@ -62,7 +62,7 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
   useEffect(() => {
     const generateHearts = () => {
       const newHearts = generateHeartParticles();
-      setHeartParticles((prev) => [...prev.slice(-10), ...newHearts]);
+      setHeartParticles((prev: HeartParticle[]) => [...prev.slice(-10), ...newHearts]);
     };
 
     const interval = setInterval(generateHearts, 3000);
@@ -223,7 +223,7 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
   // Navigate to next result
   const handleNextResult = () => {
     if (currentPullIndex < pullResults.length - 1) {
-      setCurrentPullIndex((prev) => prev + 1);
+      setCurrentPullIndex((prev: number) => prev + 1);
     }
   };
 
@@ -238,7 +238,7 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
     <div className="min-h-screen bg-gradient-to-br from-black via-pink-900/20 to-purple-900/30 relative overflow-hidden">
       {/* Floating Heart Particles */}
       <AnimatePresence mode="wait">
-        {heartParticles.map((heart) => (
+        {heartParticles.map((heart: HeartParticle) => (
           <motion.div
             key={heart.id} // 이미 고유 ID 사용 중
             initial={{
@@ -264,7 +264,7 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
 
       {/* Particle Effects */}
       <AnimatePresence>
-        {particles.map((particle) => (
+        {particles.map((particle: Particle) => (
           <motion.div
             key={particle.id}
             initial={{
@@ -276,7 +276,7 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
             animate={{
               opacity: [0, 1, 0],
               scale: [0, 1.5, 0],
-              y: `${particle.y - 30}vh`,
+              y: `${parseInt(String(particle.y || '0')) - 30}vh`,
               rotate: 360,
             }}
             exit={{ opacity: 0 }}
@@ -383,7 +383,6 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
           banners={GACHA_BANNERS}
           selectedBanner={selectedBanner}
           onSelectBanner={setSelectedBanner}
-          isPulling={isPulling}
         />
 
         {/* Gacha Machine */}
@@ -430,7 +429,7 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
           </AnimatePresence>
 
           {/* Sexy Background Elements */}
-          <BackgroundEffects />
+          <BackgroundEffects particles={particles} />
 
           <div className="text-center relative z-10">
             <motion.div
@@ -568,23 +567,26 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
       {/* Modals */}
       <AnimatePresence mode="wait">
         {showResults && (
-          <SexyPullResultsModal
-            key="pull-results-modal"
-            results={pullResults}
-            showResults={showResults}
-            currentIndex={currentPullIndex}
-            onNext={handleNextResult}
-            onClose={handleCloseResults}
-          />
+          <React.Fragment key="pull-results-modal">
+            <SexyPullResultsModal
+              isOpen={showResults}
+              items={pullResults}
+              isTenPull={pullResults.length > 1}
+              onContinue={handleNextResult}
+              onClose={handleCloseResults}
+            />
+          </React.Fragment>
         )}
 
         {showInventory && (
-          <SexyInventoryModal
-            key="inventory-modal"
-            user={user}
-            showInventory={showInventory}
-            onClose={() => setShowInventory(false)}
-          />
+          <React.Fragment key="inventory-modal">
+            <SexyInventoryModal
+              isOpen={showInventory}
+              inventory={user.inventory as unknown as GachaItem[]} 
+              user={user}
+              onClose={() => setShowInventory(false)}
+            />
+          </React.Fragment>
         )}
       </AnimatePresence>
     </div>

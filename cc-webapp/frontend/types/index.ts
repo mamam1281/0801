@@ -60,6 +60,10 @@ export interface GameStatsDetail {
     totalPulls: number;
     legendaryPulls: number;
     totalValue: number;
+    pulls: number[]; 
+    totalSpent: number;
+    epicCount: number;
+    legendaryCount: number;
   };
   crash: {
     totalGames: number;

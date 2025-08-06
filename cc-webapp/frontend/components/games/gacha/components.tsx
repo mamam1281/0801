@@ -611,7 +611,9 @@ export function SexyInventoryModal({
             {filteredItems.length > 0 ? (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 max-h-96 overflow-y-auto pr-2">
                 {filteredItems.map((item) => (
-                  <SexyItemCard key={item.id} item={item} showDetails />
+                  <React.Fragment key={item.id}>
+                    <SexyItemCard item={item} showDetails={true} />
+                  </React.Fragment>
                 ))}
               </div>
             ) : (
