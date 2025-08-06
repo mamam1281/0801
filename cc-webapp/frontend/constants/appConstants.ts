@@ -1,6 +1,6 @@
 // 🎯 앱 전체 상수 관리
 export const APP_CONFIG = {
-  GAME_TITLE: 'MODEL CASINO',
+  GAME_TITLE: 'NEON QUEST',
   NOTIFICATION_DURATION: 7000,
   MAX_NOTIFICATIONS: 4,
   

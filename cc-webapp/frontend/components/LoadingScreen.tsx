@@ -68,7 +68,7 @@ function LoadingScreenComponent({
     // 진행바 업데이트
     const interval = setInterval(() => {
       if (isMounted && progress < 100) {
-        setProgress((prev: number) => {
+        setProgress((prev) => {
           const newProgress = Math.min(prev + 1, 100);
 
           // 단계 업데이트

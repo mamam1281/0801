@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/Input';
-import { Label } from './ui/Label';
+import { Label } from './ui/label';
 
 interface AdminLoginProps {
   onAdminLogin?: (adminId: string, password: string, securityCode?: string) => Promise<boolean>;

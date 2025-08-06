@@ -17,8 +17,10 @@ import { Button } from './ui/button';
 import { Progress } from './ui/progress';
 import { GameBackground } from './games/GameBackground';
 import { GameCard } from './games/GameCard';
-import { createGamesData, createLeaderboardData } from '../constants/gameConstants';
+import { createLeaderboardData } from '../constants/gameConstants';
 import { createGameNavigator, handleModelNavigation } from '../utils/gameUtils';
+import { gameApi } from '../utils/apiClient';
+import { Game } from '../types/game';
 
 interface GameDashboardProps {
   user: User;
@@ -43,11 +45,31 @@ export function GameDashboard({
   onAddNotification,
   onToggleSideMenu
 }: GameDashboardProps) {
+  const [games, setGames] = useState<Game[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [popularityIndex, setPopularityIndex] = useState(85);
   const [totalPlayTime, setTotalPlayTime] = useState(245);
 
+  useEffect(() => {
+    const fetchGames = async () => {
+      try {
+        setLoading(true);
+        const gamesData = await gameApi.getGames();
+        setGames(gamesData);
+      } catch (err) {
+        setError('Failed to load games.');
+        onAddNotification('Error: Could not load games.');
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchGames();
+  }, [onAddNotification]);
+
   // 🎮 게임 데이터 및 핸들러 생성
-  const games = createGamesData(user);
   const leaderboardData = createLeaderboardData(user);
   const navigateToGame = createGameNavigator(
     games,
@@ -209,7 +231,9 @@ export function GameDashboard({
 
         {/* Games Grid - 간소화된 게임 카드 */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {games.map((game, index) => (
+          {loading && <p>Loading games...</p>}
+          {error && <p className="text-destructive">{error}</p>}
+          {!loading && !error && games.map((game, index) => (
             <GameCard
               key={game.id}
               game={game}

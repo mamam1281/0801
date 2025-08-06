@@ -10,11 +10,11 @@ import { GameDashboardGame, User } from '../types';
 export const createGamesData = (user: User): GameDashboardGame[] => [
   {
     id: 'slot',
-    name: '모델 포인트슬롯',
+    name: '네온 슬롯',
     type: 'slot',
     icon: Dice1,
     color: 'from-primary to-primary-light',
-    description: '잭팟의 짜릿함! 모델회원 전용 슬롯서비스',
+    description: '운을 시험해보세요! 잭팟의 짜릿함!',
     playCount: user.gameStats.slot?.totalSpins || 0,
     bestScore: user.gameStats.slot?.biggestWin || 0,
     lastPlayed: new Date(),
@@ -42,11 +42,11 @@ export const createGamesData = (user: User): GameDashboardGame[] => [
   },
   {
     id: 'gacha',
-    name: '랜덤뽑기',
+    name: '가챠 뽑기',
     type: 'gacha',
     icon: Gift,
     color: 'from-error to-warning',
-    description: '엄청난 아이템혜택! 지금 바로 도전하세요!',
+    description: '전설의 아이템을 뽑아보세요!',
     playCount: user.gameStats.gacha?.totalPulls || 0,
     bestScore: user.gameStats.gacha?.legendaryPulls || 0,
     lastPlayed: new Date(),
@@ -58,7 +58,7 @@ export const createGamesData = (user: User): GameDashboardGame[] => [
   },
   {
     id: 'crash',
-    name: '모델 그래프',
+    name: '네온 크래시',
     type: 'crash',
     icon: Zap,
     color: 'from-error to-primary',

@@ -18,8 +18,8 @@ import {
   Star
 } from 'lucide-react';
 import { Button } from './ui/button';
-import { Input } from './ui/Input';
-import { Label } from './ui/Label';
+import { Input } from './ui/input';
+import { Label } from './ui/label';
 
 interface SignupFormData {
   userId: string;
@@ -41,7 +41,7 @@ export function SignupScreen({
   onBackToLogin,
   isLoading = false 
 }: SignupScreenProps) {
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<SignupFormData>({
     userId: '',
     nickname: '',
     phoneNumber: '',
@@ -98,7 +98,7 @@ export function SignupScreen({
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = async (e: any) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!validateForm()) return;
@@ -116,12 +116,12 @@ export function SignupScreen({
     }
   };
 
-  const handleInputChange = (field: keyof typeof formData) => (
-    e: any
+  const handleInputChange = (field: keyof SignupFormData) => (
+    e: React.ChangeEvent<HTMLInputElement>
   ) => {
-    setFormData((prev: typeof formData) => ({ ...prev, [field]: e.target.value }));
+    setFormData(prev => ({ ...prev, [field]: e.target.value }));
     if (errors[field]) {
-      setErrors((prev: any) => ({ ...prev, [field]: undefined }));
+      setErrors(prev => ({ ...prev, [field]: undefined }));
     }
   };
 
@@ -130,9 +130,9 @@ export function SignupScreen({
       // Validate first step
       const step1Fields = ['userId', 'nickname', 'phoneNumber'];
       const hasErrors = step1Fields.some(field => {
-        const key = field as keyof typeof formData;
+        const key = field as keyof SignupFormData;
         if (!formData[key].trim()) {
-          setErrors((prev: any) => ({ ...prev, [key]: '필수 입력 항목입니다.' }));
+          setErrors(prev => ({ ...prev, [key]: '필수 입력 항목입니다.' }));
           return true;
         }
         return false;

@@ -1,8 +1,5 @@
 import { GachaItem, GachaBanner } from '../../../types/gacha';
 
-// Re-export GachaBanner for use in GachaSystem
-export type { GachaBanner };
-
 // 가챠 애니메이션 상수
 export const ANIMATION_DURATIONS = {
   fadeIn: 0.3,
@@ -11,10 +8,7 @@ export const ANIMATION_DURATIONS = {
   spin: 2,
   sparkle: 2,
   stagger: 0.1,
-  baseDelay: 0.2,
-  particle: 3,
-  opening: 2,
-  heartFloat: 4
+  baseDelay: 0.2
 };
 
 // 희귀도별 색상

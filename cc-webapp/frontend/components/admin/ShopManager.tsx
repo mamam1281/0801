@@ -22,13 +22,13 @@ import {
 } from 'lucide-react';
 import { ShopItem } from '../../types/admin';
 import { Button } from '../ui/button';
-import { Input } from '../ui/Input';
+import { Input } from '../ui/input';
 import { Textarea } from '../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Badge } from '../ui/badge';
 import { Switch } from '../ui/switch';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
-import { Label } from '../ui/Label';
+import { Label } from '../ui/label';
 
 interface ShopManagerProps {
   onAddNotification: (message: string) => void;

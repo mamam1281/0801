@@ -31,7 +31,6 @@ import {
   NOTIFICATION_MESSAGES 
 } from '../constants/appConstants';
 import { NOTIFICATION_STYLES } from '../constants/notificationConstants';
-import { Notification } from '../types';
 
 export default function App() {
   const [isLoading, setIsLoading] = useState(false);
@@ -45,7 +44,7 @@ export default function App() {
     createUserData,
     restoreSavedUser,
     processDailyBonus,
-    logout,
+    logout
   } = useUserManager();
 
   const {
@@ -54,7 +53,7 @@ export default function App() {
     navigationHandlers,
     toggleSideMenu,
     closeSideMenu,
-    handleBottomNavigation,
+    handleBottomNavigation
   } = useAppNavigation();
 
   // 📱 알림 시스템
@@ -69,7 +68,7 @@ export default function App() {
     navigationHandlers,
     addNotification,
     logout,
-    closeSideMenu,
+    closeSideMenu
   });
 
   // 🔄 앱 초기화 - 한 번만 실행되도록 개선
@@ -82,20 +81,20 @@ export default function App() {
         if (savedUser) {
           updateUser(savedUser);
           navigationHandlers.toHome();
-
+          
           // 🎁 일일 보너스 체크
           const lastLogin = new Date(savedUser.lastLogin);
           const today = new Date();
           const timeDiff = today.getTime() - lastLogin.getTime();
           const daysDiff = Math.floor(timeDiff / (1000 * 3600 * 24));
-
+          
           if (daysDiff >= 1) {
             const { updatedUser, bonusGold } = processDailyBonus(savedUser);
             updateUser(updatedUser);
             addNotification(NOTIFICATION_MESSAGES.DAILY_BONUS(bonusGold, updatedUser.dailyStreak));
           }
         }
-
+        
         setHasInitialized(true);
       } catch (error) {
         console.error('App initialization failed:', error);
@@ -104,14 +103,7 @@ export default function App() {
     };
 
     initializeApp();
-  }, [
-    hasInitialized,
-    restoreSavedUser,
-    updateUser,
-    navigationHandlers,
-    processDailyBonus,
-    addNotification,
-  ]);
+  }, [hasInitialized, restoreSavedUser, updateUser, navigationHandlers, processDailyBonus, addNotification]);
 
   // 🏠 하단 네비게이션 표시 여부 결정 (메모이제이션)
   const showBottomNavigation = useMemo(() => {
@@ -123,7 +115,7 @@ export default function App() {
       {/* 📱 🎯 VIP 알림 시스템 */}
       <div className={NOTIFICATION_STYLES.CONTAINER}>
         <AnimatePresence>
-          {notifications.map((notification: Notification) => (
+          {notifications.map((notification) => (
             <motion.div
               key={notification.id}
               initial={NOTIFICATION_STYLES.ANIMATION.INITIAL}
@@ -152,205 +144,188 @@ export default function App() {
       {/* 📱 메인 화면들 */}
       <AnimatePresence mode="wait">
         {currentScreen === 'loading' && (
-          <React.Fragment key="loading">
-            <LoadingScreen
-              onComplete={navigationHandlers.toLogin}
-              gameTitle={APP_CONFIG.GAME_TITLE}
-            />
-          </React.Fragment>
+          <LoadingScreen 
+            key="loading" 
+            onComplete={navigationHandlers.toLogin} 
+            gameTitle={APP_CONFIG.GAME_TITLE} 
+          />
         )}
-
+        
         {currentScreen === 'login' && (
-          <React.Fragment key="login">
-            <LoginScreen
-              onLogin={handleLogin}
-              onSwitchToSignup={navigationHandlers.toSignup}
-              onAdminAccess={navigationHandlers.toAdminLogin}
-              isLoading={isLoading}
-            />
-          </React.Fragment>
+          <LoginScreen
+            key="login"
+            onLogin={handleLogin}
+            onSwitchToSignup={navigationHandlers.toSignup}
+            onAdminAccess={navigationHandlers.toAdminLogin}
+            isLoading={isLoading}
+          />
         )}
-
+        
         {currentScreen === 'signup' && (
-          <React.Fragment key="signup">
-            <SignupScreen
-              onSignup={handleSignup}
-              onBackToLogin={navigationHandlers.toLogin}
-              isLoading={isLoading}
-            />
-          </React.Fragment>
+          <SignupScreen
+            key="signup"
+            onSignup={handleSignup}
+            onBackToLogin={navigationHandlers.toLogin}
+            isLoading={isLoading}
+          />
         )}
-
+        
         {currentScreen === 'admin-login' && (
-          <React.Fragment key="admin-login">
-            <AdminLoginScreen
-              onAdminLogin={handleAdminLogin}
-              onBackToLogin={navigationHandlers.toLogin}
-              isLoading={isLoading}
-            />
-          </React.Fragment>
+          <AdminLoginScreen
+            key="admin-login"
+            onAdminLogin={handleAdminLogin}
+            onBackToLogin={navigationHandlers.toLogin}
+            isLoading={isLoading}
+          />
         )}
-
+        
         {currentScreen === 'home-dashboard' && user && (
-          <React.Fragment key="home-dashboard">
-            <HomeDashboard
-              user={user}
-              onLogout={handleLogout}
-              onNavigateToGames={navigationHandlers.toGames}
-              onNavigateToShop={navigationHandlers.toShop}
-              onNavigateToSettings={navigationHandlers.toSettings}
-              onNavigateToStreaming={navigationHandlers.toStreaming}
-              onUpdateUser={updateUser}
-              onAddNotification={addNotification}
-              onToggleSideMenu={toggleSideMenu}
-            />
-          </React.Fragment>
+          <HomeDashboard
+            key="home-dashboard"
+            user={user}
+            onLogout={handleLogout}
+            onNavigateToGames={navigationHandlers.toGames}
+            onNavigateToShop={navigationHandlers.toShop}
+            onNavigateToSettings={navigationHandlers.toSettings}
+            onNavigateToStreaming={navigationHandlers.toStreaming}
+            onUpdateUser={updateUser}
+            onAddNotification={addNotification}
+            onToggleSideMenu={toggleSideMenu}
+          />
         )}
-
+        
         {currentScreen === 'game-dashboard' && user && (
-          <React.Fragment key="game-dashboard">
-            <GameDashboard
-              user={user}
-              onNavigateToHome={navigationHandlers.toHome}
-              onNavigateToSlot={navigationHandlers.toSlot}
-              onNavigateToRPS={navigationHandlers.toRPS}
-              onNavigateToGacha={navigationHandlers.toGacha}
-              onNavigateToCrash={() => navigationHandlers.navigate('neon-crash')}
-              onUpdateUser={updateUser}
-              onAddNotification={addNotification}
-              onToggleSideMenu={toggleSideMenu}
-            />
-          </React.Fragment>
+          <GameDashboard
+            key="game-dashboard"
+            user={user}
+            onNavigateToHome={navigationHandlers.toHome}
+            onNavigateToSlot={navigationHandlers.toSlot}
+            onNavigateToRPS={navigationHandlers.toRPS}
+            onNavigateToGacha={navigationHandlers.toGacha}
+            onNavigateToCrash={() => navigationHandlers.navigate('neon-crash')}
+            onUpdateUser={updateUser}
+            onAddNotification={addNotification}
+            onToggleSideMenu={toggleSideMenu}
+          />
         )}
 
         {currentScreen === 'shop' && user && (
-          <React.Fragment key="shop">
-            <ShopScreen
-              user={user}
-              onBack={navigationHandlers.backToHome}
-              onNavigateToInventory={navigationHandlers.toInventory}
-              onNavigateToProfile={navigationHandlers.toProfile}
-              onUpdateUser={updateUser}
-              onAddNotification={addNotification}
-            />
-          </React.Fragment>
+          <ShopScreen
+            key="shop"
+            user={user}
+            onBack={navigationHandlers.backToHome}
+            onNavigateToInventory={navigationHandlers.toInventory}
+            onNavigateToProfile={navigationHandlers.toProfile}
+            onUpdateUser={updateUser}
+            onAddNotification={addNotification}
+          />
         )}
 
         {currentScreen === 'inventory' && user && (
-          <React.Fragment key="inventory">
-            <InventoryScreen
-              user={user}
-              onBack={navigationHandlers.backToHome}
-              onUpdateUser={updateUser}
-              onAddNotification={addNotification}
-            />
-          </React.Fragment>
+          <InventoryScreen
+            key="inventory"
+            user={user}
+            onBack={navigationHandlers.backToHome}
+            onUpdateUser={updateUser}
+            onAddNotification={addNotification}
+          />
         )}
 
         {currentScreen === 'profile' && user && (
-          <React.Fragment key="profile">
-            <ProfileScreen
-              user={user}
-              onBack={navigationHandlers.backToHome}
-              onUpdateUser={updateUser}
-              onAddNotification={addNotification}
-            />
-          </React.Fragment>
+          <ProfileScreen
+            key="profile"
+            user={user}
+            onBack={navigationHandlers.backToHome}
+            onUpdateUser={updateUser}
+            onAddNotification={addNotification}
+          />
         )}
 
         {currentScreen === 'settings' && user && (
-          <React.Fragment key="settings">
-            <SettingsScreen
-              user={user}
-              onBack={navigationHandlers.backToHome}
-              onUpdateUser={updateUser}
-              onAddNotification={addNotification}
-            />
-          </React.Fragment>
+          <SettingsScreen
+            key="settings"
+            user={user}
+            onBack={navigationHandlers.backToHome}
+            onUpdateUser={updateUser}
+            onAddNotification={addNotification}
+          />
         )}
 
         {currentScreen === 'admin-panel' && user && (
-          <React.Fragment key="admin-panel">
-            <AdminPanel
-              user={user}
-              onBack={navigationHandlers.backToHome}
-              onUpdateUser={updateUser}
-              onAddNotification={addNotification}
-            />
-          </React.Fragment>
+          <AdminPanel
+            key="admin-panel"
+            user={user}
+            onBack={navigationHandlers.backToHome}
+            onUpdateUser={updateUser}
+            onAddNotification={addNotification}
+          />
         )}
 
         {currentScreen === 'event-mission-panel' && user && (
-          <React.Fragment key="event-mission-panel">
-            <EventMissionPanel
-              user={user}
-              onBack={navigationHandlers.backToHome}
-              onUpdateUser={updateUser}
-              onAddNotification={addNotification}
-            />
-          </React.Fragment>
+          <EventMissionPanel
+            key="event-mission-panel"
+            user={user}
+            onBack={navigationHandlers.backToHome}
+            onUpdateUser={updateUser}
+            onAddNotification={addNotification}
+          />
         )}
 
         {/* 🎮 게임들 */}
         {currentScreen === 'neon-slot' && user && (
-          <React.Fragment key="neon-slot">
-            <NeonSlotGame
-              user={user}
-              onBack={navigationHandlers.backToGames}
-              onUpdateUser={updateUser}
-              onAddNotification={addNotification}
-            />
-          </React.Fragment>
+          <NeonSlotGame
+            key="neon-slot"
+            user={user}
+            onBack={navigationHandlers.backToGames}
+            onUpdateUser={updateUser}
+            onAddNotification={addNotification}
+          />
         )}
 
         {currentScreen === 'rock-paper-scissors' && user && (
-          <React.Fragment key="rock-paper-scissors">
-            <RockPaperScissorsGame
-              user={user}
-              onBack={navigationHandlers.backToGames}
-              onUpdateUser={updateUser}
-              onAddNotification={addNotification}
-            />
-          </React.Fragment>
+          <RockPaperScissorsGame
+            key="rock-paper-scissors"
+            user={user}
+            onBack={navigationHandlers.backToGames}
+            onUpdateUser={updateUser}
+            onAddNotification={addNotification}
+          />
         )}
 
         {currentScreen === 'gacha-system' && user && (
-          <React.Fragment key="gacha-system">
-            <GachaSystem
-              user={user}
-              onBack={navigationHandlers.backToGames}
-              onUpdateUser={updateUser}
-              onAddNotification={addNotification}
-            />
-          </React.Fragment>
+          <GachaSystem
+            key="gacha-system"
+            user={user}
+            onBack={navigationHandlers.backToGames}
+            onUpdateUser={updateUser}
+            onAddNotification={addNotification}
+          />
         )}
 
         {currentScreen === 'neon-crash' && user && (
-          <React.Fragment key="neon-crash">
-            <NeonCrashGame
-              user={user}
-              onBack={navigationHandlers.backToGames}
-              onUpdateUser={updateUser}
-              onAddNotification={addNotification}
-            />
-          </React.Fragment>
+          <NeonCrashGame
+            key="neon-crash"
+            user={user}
+            onBack={navigationHandlers.backToGames}
+            onUpdateUser={updateUser}
+            onAddNotification={addNotification}
+          />
         )}
 
         {currentScreen === 'streaming' && user && (
-          <React.Fragment key="streaming">
-            <StreamingScreen
-              user={user}
-              onBack={navigationHandlers.backToHome}
-              onUpdateUser={updateUser}
-              onAddNotification={addNotification}
-            />
-          </React.Fragment>
+          <StreamingScreen
+            key="streaming"
+            user={user}
+            onBack={navigationHandlers.backToHome}
+            onUpdateUser={updateUser}
+            onAddNotification={addNotification}
+          />
         )}
       </AnimatePresence>
 
       {/* 📱 하단 네비게이션 */}
       {showBottomNavigation && (
-        <BottomNavigation
+        <BottomNavigation 
           currentScreen={currentScreen}
           onNavigate={handleBottomNavigation}
           user={user}

@@ -26,7 +26,7 @@ import {
 } from 'lucide-react';
 import { User, GameItem } from '../types';
 import { Button } from './ui/button';
-import { Input } from './ui/Input';
+import { Input } from './ui/input';
 import { Badge } from './ui/badge';
 
 interface InventoryScreenProps {
