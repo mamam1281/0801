@@ -6,9 +6,22 @@ tasks:
       chmod +x ./jules-setup.sh
       chmod +x ./init-test-data.sh
       chmod +x ./health-check.sh
+      chmod +x ./jules-diagnostics.sh
+      chmod +x ./jules-adapt.sh
+      chmod +x ./jules-fixes.sh
+      
+      # Check environment and apply fixes
+      ./jules-diagnostics.sh
+      source ./jules-fixes.sh
       
       # Run Jules setup script
       ./jules-setup.sh
+      
+      # Adapt for Jules environment
+      ./jules-adapt.sh
+      
+      # Copy environment variables
+      cp .env.jules .env
       
       # Install backend dependencies
       pip install -r cc-webapp/backend/requirements.txt
