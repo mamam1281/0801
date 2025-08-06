@@ -320,7 +320,7 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
                 transition={{ duration: 2, repeat: Infinity }}
                 className="text-xl lg:text-2xl font-black text-transparent bg-gradient-to-r from-pink-400 via-purple-400 to-pink-400 bg-clip-text"
               >
-                가챠
+                랜덤뽑기
               </motion.h1>
             </div>
           </div>

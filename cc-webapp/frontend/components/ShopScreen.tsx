@@ -288,7 +288,6 @@ export function ShopScreen({
               <h1 className="text-xl lg:text-2xl font-bold text-gradient-metal">
                 💎 프리미엄 상점
               </h1>
-              <p className="text-sm text-muted-foreground">특별한 아이템과 보너스를 만나보세요</p>
             </div>
           </div>
 

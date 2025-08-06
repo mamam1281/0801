@@ -416,7 +416,7 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
               뒤로가기
             </Button>
 
-            <h1 className="text-xl lg:text-2xl font-bold text-gradient-primary">네온 슬롯</h1>
+            <h1 className="text-xl lg:text-2xl font-bold text-gradient-primary">모델 포인트슬롯</h1>
           </div>
 
           <div className="flex items-center gap-4">

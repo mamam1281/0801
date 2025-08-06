@@ -130,8 +130,8 @@ export function HomeDashboard({
             onAddNotification('📺 방송보기 기능 준비중!');
           }
           break;
-        case '랭킹':
-          onAddNotification('🏆 랭킹 기능 준비중!');
+        case '심리테스트':
+          onAddNotification('🧠 심리테스트 기능 준비중!');
           break;
       }
     }
@@ -306,7 +306,7 @@ export function HomeDashboard({
               >
                 <Gem className="w-6 h-6 mx-auto mb-1" />
                 <div className="text-xl lg:text-2xl">{treasureProgress}%</div>
-                <div className="text-xs opacity-80">보물찾기</div>
+                <div className="text-xs opacity-80">강조채널나중수정</div>
               </motion.div>
             </div>
 
@@ -546,9 +546,9 @@ export function HomeDashboard({
                           whileHover={{ x: 5 }}
                           className="font-bold text-error"
                         >
-                          더블 골드 이벤트!
+                          지민이 모델슬롯방송
                         </motion.div>
-                        <div className="text-sm text-muted-foreground">모든 게임에서 골드 2배 획득</div>
+                        <div className="text-sm text-muted-foreground">도파민터지는섹시 슬롯방송</div>
                       </div>
                     </div>
                     <motion.div 

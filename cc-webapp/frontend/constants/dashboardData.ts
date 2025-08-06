@@ -30,10 +30,10 @@ export const QUICK_ACTIONS = [
     badge: 'LIVE'
   },
   {
-    title: '랭킹',
-    description: '전체 순위 확인',
+    title: '심리테스트',
+    description: '나의배팅성향은?',
     icon: Trophy,
-    color: 'from-warning to-error',
+    color: 'from-pink-500 to-pink-300',
     highlight: false
   }
 ];

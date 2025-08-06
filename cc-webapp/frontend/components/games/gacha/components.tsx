@@ -212,7 +212,7 @@ export function SexyResultOverlay({
       >
         {isTenPull ? (
           <>
-            <h2 className="text-2xl font-bold text-pink-300 mb-6">10연 가챠 결과</h2>
+            <h2 className="text-2xl font-bold text-pink-300 mb-6">10연 랜덤뽑기 결과</h2>
             <div className="grid grid-cols-5 gap-2 mb-6">
               {items.map((item, index) => (
                 <motion.div
@@ -621,7 +621,7 @@ export function SexyInventoryModal({
                 <Gift className="text-pink-500/50 mb-4" size={40} />
                 <p className="text-pink-300/70 text-center">아이템이 없습니다</p>
                 <p className="text-pink-300/50 text-sm text-center">
-                  가챠에서 아이템을 획득해보세요!
+                  랜덤뽑기에서 아이템을 획득해보세요!
                 </p>
               </div>
             )}

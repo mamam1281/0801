@@ -442,7 +442,7 @@ export function NeonCrashGame({
           <Button variant="ghost" size="icon" onClick={onBack} className="rounded-full">
             <ArrowLeft className="h-6 w-6" />
           </Button>
-          <h1 className="text-2xl font-bold text-gradient-primary">네온 크래시</h1>
+          <h1 className="text-2xl font-bold text-gradient-primary">모델 그래프</h1>
         </div>
 
         <div className="flex items-center space-x-4">
