@@ -433,15 +433,189 @@ python scripts/export_test_data.py
 - 테스트 커버리지 확대
 - 성능 최적화 및 디버깅
 
-## 8. API 중복 문제 해결 가이드
+## 8. API 구조 표준화 및 개발 가이드
 
-### 8.1 현재 API 중복 문제
+### 8.1 API 경로 구조 표준화
 
-현재 일부 API에서 태그 중복으로 인한 문제가 발생하고 있습니다:
-- **문제 사례**: `/api/api/...` 형태의 중복 prefix 발생
-- **원인**: API 클라이언트 설정 시 base_url에 `/api`가 포함되어 있고, 개별 엔드포인트에서도 `/api`로 시작하는 경로 사용
+#### 표준 경로 구조
+모든 API 경로는 다음과 같은 구조로 표준화되었습니다:
 
-### 8.2 해결 방안
+```
+/api/{리소스_그룹}/{리소스_식별자}/{작업}
+```
+
+예시:
+- `/api/users/profile` - 사용자 프로필 조회
+- `/api/games/slot/spin` - 슬롯 게임 스핀 액션
+- `/api/admin/users/{id}` - 관리자용 특정 사용자 관리
+
+#### 주요 리소스 그룹 및 경로
+| 리소스 그룹 | 기본 경로 | 주요 기능 | 태그 |
+|------------|---------|----------|------|
+| **인증** | `/api/auth` | 로그인, 회원가입, 토큰 갱신 | Auth |
+| **사용자** | `/api/users` | 프로필, 통계, 잔액 관리 | Users |
+| **게임** | `/api/games` | 게임별 액션 (슬롯, 가챠 등) | Games |
+| **상점** | `/api/shop` | 상품 목록, 구매 처리 | Shop |
+| **보상** | `/api/rewards` | 보상 확인 및 수령 | Rewards |
+| **배틀패스** | `/api/battlepass` | 진행도, 보상 획득 | BattlePass |
+| **이벤트/미션** | `/api/events` | 이벤트 목록, 미션 진행 | Events & Missions |
+| **관리자** | `/api/admin` | 관리자용 기능 | Admin |
+| **퀴즈** | `/api/quiz` | 사용자 퀴즈 및 설문 | Quiz |
+| **채팅** | `/api/chat` | 채팅 및 메시지 | Chat |
+| **초대** | `/api/invite` | 초대 코드 관리 | Invite Codes |
+| **세그먼트** | `/api/segments` | 사용자 세그먼트 관리 | Segments |
+| **대시보드** | `/api/dashboard` | 통계 및 분석 데이터 | Dashboard |
+
+### 8.2 API 태그 표준화
+
+모든 API 라우터는 일관된 태그 네이밍 규칙을 따릅니다:
+- 첫 글자 대문자 (예: "Admin", "Users", "Games")
+- 복합 태그의 경우 & 사용 (예: "Events & Missions")
+- 태그는 라우터 정의에서만 지정하고 등록 시 재정의하지 않음
+
+### 8.3 새로운 API 개발 가이드
+
+#### 1. 백엔드 API 라우터 구현 패턴
+
+```python
+# 권장 패턴 (admin_router.py)
+from fastapi import APIRouter, Depends
+
+# 1. 태그는 라우터 정의 시 명확히 지정 (첫 글자 대문자)
+router = APIRouter(prefix="/api/admin", tags=["Admin"])
+
+# 2. 엔드포인트는 명확한 HTTP 메서드와 경로로 정의
+@router.get("/users", response_model=List[UserResponse])
+async def get_users(
+    offset: int = 0, 
+    limit: int = 100,
+    current_user: User = Depends(get_current_admin_user)
+):
+    """사용자 목록 조회 (관리자용)."""
+    # 3. 적절한 의존성 주입 사용
+    # 4. Repository 패턴 적용
+    users_repo = UserRepository()
+    return await users_repo.get_users(offset=offset, limit=limit)
+```
+
+#### 2. 메인 앱 라우터 등록 패턴
+
+```python
+# main.py
+from fastapi import FastAPI
+import admin_router, users_router, games_router
+
+app = FastAPI(
+    title="Casino-Club F2P API",
+    description="사용자 참여와 수익화를 극대화하는 카지노 클럽 F2P API",
+    version="1.0.0"
+)
+
+# 중요: 라우터 등록 시 태그 재정의하지 않음
+app.include_router(admin_router.router)  # tags 파라미터 사용하지 않음
+app.include_router(users_router.router)
+app.include_router(games_router.router)
+```
+
+#### 3. 새 API 모듈 추가 단계
+
+1. **라우터 모듈 생성**:
+   - `cc-webapp/backend/app/routers/{리소스명}_router.py` 생성
+   - 대문자로 시작하는 적절한 태그 설정
+
+2. **스키마 정의**:
+   - `cc-webapp/backend/app/schemas/{리소스명}.py` 생성
+   - Pydantic 모델로 요청/응답 스키마 정의
+
+3. **Repository 구현**:
+   - `cc-webapp/backend/app/repositories/{리소스명}_repository.py` 생성
+   - 필요한 데이터 액세스 메서드 구현
+
+4. **Service 구현** (필요시):
+   - `cc-webapp/backend/app/services/{리소스명}_service.py` 생성
+   - 비즈니스 로직 구현
+
+5. **메인 앱에 라우터 등록**:
+   - `main.py`에 import 추가
+   - `app.include_router()` 호출 (태그 재정의 없이)
+
+6. **테스트 작성**:
+   - `cc-webapp/backend/tests/test_{리소스명}.py` 생성
+   - 엔드포인트별 테스트 케이스 구현
+
+### 8.4 프론트엔드 API 클라이언트 패턴
+
+#### API 클라이언트 구현
+
+```typescript
+// api-client.ts
+// 1. 기본 URL 설정 (중요: '/api'를 포함하지 않음)
+const API_BASE_URL = 'http://localhost:8000';
+
+// 2. 리소스별 클라이언트 클래스 구현
+export class UserApiClient {
+  // 3. 표준 경로 구조 따르기
+  async getProfile(): Promise<UserProfile> {
+    const response = await fetch(`${API_BASE_URL}/api/users/profile`, {
+      headers: {
+        'Authorization': `Bearer ${getAuthToken()}`
+      }
+    });
+    
+    if (!response.ok) {
+      throw new ApiError('프로필 조회 실패', response.status);
+    }
+    
+    return response.json();
+  }
+}
+
+// 4. 타입 정의는 백엔드 스키마와 동기화
+export interface UserProfile {
+  id: string;
+  nickname: string;
+  vip_tier: string;
+  battlepass_level: number;
+  // ...추가 필드
+}
+```
+
+#### 컴포넌트에서 API 사용
+
+```tsx
+// ProfileComponent.tsx
+import { UserApiClient } from '../api/api-client';
+import { useEffect, useState } from 'react';
+
+export function ProfileComponent() {
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  
+  const userClient = new UserApiClient();
+  
+  useEffect(() => {
+    async function loadProfile() {
+      try {
+        const data = await userClient.getProfile();
+        setProfile(data);
+        setError(null);
+      } catch (err) {
+        setError('프로필을 불러올 수 없습니다');
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    
+    loadProfile();
+  }, []);
+  
+  // ...렌더링 로직
+}
+```
+
+### 8.5 API 중복 문제 최종 해결 방안
 
 #### 프론트엔드 측 해결책
 ```typescript
@@ -455,9 +629,30 @@ const fetchUser = () => fetch(`${API_BASE_URL}/api/users/profile`);
 ```
 
 #### 백엔드 측 해결책
-- API 라우터 prefix 표준화
-- 중복 등록 방지 메커니즘 구현
-- 명확한 태그 구조 적용
+- API 라우터의 prefix 표준화 (`/api/{리소스_그룹}`)
+- 라우터 정의 시에만 태그 지정, 등록 시 태그 재정의 않음
+- 명확하고 일관된 태그 네이밍 (첫 글자 대문자)
+
+### 8.6 테마별 API 그룹화 전략
+
+#### Neon 테마 적용을 위한 API 그룹화
+
+Neon 테마는 "Futuristic Neon Cyberpunk" 디자인을 지원하기 위해 특정 API 엔드포인트들을 그룹화하여 관리합니다:
+
+1. **시각적 테마 관련 API**
+   - `/api/themes/neon/settings` - 사용자별 테마 설정 관리
+   - `/api/themes/neon/elements` - 네온 UI 요소 및 애니메이션 설정
+
+2. **게임 스타일링 API**
+   - `/api/games/{game_id}/themes/neon` - 게임별 네온 테마 적용
+   - `/api/games/effects/neon` - 네온 이펙트 및 애니메이션 설정
+
+3. **UI 효과 API**
+   - `/api/ui/effects/glow` - 네온 글로우 효과 설정
+   - `/api/ui/effects/pulse` - 펄싱 애니메이션 설정
+   - `/api/ui/effects/flicker` - 네온 깜빡임 효과 설정
+
+이러한 API들은 "Neon Theme" 태그로 그룹화하여 관리하는 것을 권장합니다.
 
 이 문서는 Casino-Club F2P 프로젝트의 프론트엔드/백엔드/데이터 연동 작업을 위한 종합적인 가이드입니다. 디자인 보존과 효율적인 연동을 위해 점진적이고 체계적인 접근법을 제시합니다.
 

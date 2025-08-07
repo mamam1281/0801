@@ -13,6 +13,7 @@ redis==5.0.1
 hiredis==2.2.3
 
 # 인증 및 보안
+PyJWT==2.8.0
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
 bcrypt==4.0.1

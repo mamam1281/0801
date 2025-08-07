@@ -148,7 +148,7 @@ app.include_router(actions.router, tags=["Game Actions"])
 # app.include_router(gacha.router, tags=["Gacha"])  # 중복 제거: games.router에 포함됨
 app.include_router(rewards.router, tags=["Rewards"])
 app.include_router(shop.router, tags=["Shop"])
-app.include_router(missions.router, tags=["Missions"])
+app.include_router(missions.router)  # 태그 오버라이드 제거 - 이미 missions.py에서 "Events & Missions" 태그를 지정함
 
 # Interactive Features (no prefix - routers have their own)
 app.include_router(quiz.router)  # 태그 오버라이드 제거 - 이미 quiz_router.py에서 "Quiz" 태그를 지정함
@@ -310,3 +310,8 @@ if __name__ == "__main__":
         reload=True,
         log_level="info"
     )
+
+# 테스트용 라우터 추가
+from app.auth.test_endpoints import router as test_router
+app.include_router(test_router)
+
