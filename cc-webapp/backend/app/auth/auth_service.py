@@ -170,7 +170,7 @@ class AuthService:
                 site_id=user_data.site_id,
                 nickname=user_data.nickname,
                 phone_number=user_data.phone_number,
-                hashed_password=hashed_password,
+                password_hash=hashed_password,
                 invite_code=user_data.invite_code,
                 cyber_token_balance=200,  # 초기 토큰
                 is_active=True,
@@ -307,7 +307,7 @@ class AuthService:
                 return None
             
             # 비밀번호 검증
-            if not AuthService.verify_password(password, user.hashed_password):
+            if not AuthService.verify_password(password, user.password_hash):
                 logger.warning(f"Invalid password for user: {site_id}")
                 return None
                 
@@ -336,7 +336,7 @@ class AuthService:
                 return None
             
             # 비밀번호 검증
-            if not AuthService.verify_password(password, user.hashed_password):
+            if not AuthService.verify_password(password, user.password_hash):
                 logger.warning(f"Invalid password for admin: {site_id}")
                 return None
                 

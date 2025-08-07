@@ -1,0 +1,410 @@
+"""
+Casino-Club F2P - Enhanced Token Management System
+=============================================================================
+Comprehensive token management system for JWT access and refresh tokens
+Features:
+- Access token generation, validation, and blacklisting
+- Refresh token management with secure rotation
+- Token revocation and expiration handling
+- Session-aware token tracking
+- Redis-based token blacklist with memory fallback
+"""
+
+import os
+import jwt as PyJWT
+import uuid
+import logging
+import hashlib
+import secrets
+from datetime import datetime, timedelta
+from typing import Optional, Dict, Any, Tuple
+
+from sqlalchemy.orm import Session
+from fastapi import HTTPException, status
+from jose import JWTError
+
+logger = logging.getLogger("token_manager")
+
+# ===== Environment Settings =====
+JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "casino-club-secret-key-2024")
+JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
+JWT_EXPIRE_MINUTES = int(os.getenv("JWT_EXPIRE_MINUTES", "60"))
+REFRESH_TOKEN_EXPIRE_DAYS = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "30"))
+
+
+class TokenManager:
+    """Enhanced token management system for Casino-Club F2P"""
+    
+    @staticmethod
+    def create_access_token(
+        user_id: int, 
+        session_id: str = None,
+        additional_claims: Dict[str, Any] = None
+    ) -> str:
+        """
+        Create a new JWT access token with proper claims and expiration.
+        
+        Args:
+            user_id: User identifier
+            session_id: Optional session ID to bind token to session
+            additional_claims: Any additional claims to include in token
+            
+        Returns:
+            Encoded JWT access token string
+        """
+        expires_delta = timedelta(minutes=JWT_EXPIRE_MINUTES)
+        expire = datetime.utcnow() + expires_delta
+        
+        # Basic claims
+        claims = {
+            "sub": str(user_id),
+            "exp": expire.timestamp(),
+            "iat": datetime.utcnow().timestamp(),
+            "jti": str(uuid.uuid4()),  # Unique token identifier
+            "type": "access"
+        }
+        
+        # Add session ID if provided
+        if session_id:
+            claims["sid"] = session_id
+        
+        # Add any additional claims
+        if additional_claims:
+            claims.update(additional_claims)
+        
+        # Create token with claims
+        token = PyJWT.encode(claims, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
+        
+        logger.debug(f"Created access token for user {user_id}, expires: {expire}")
+        return token
+    
+    @staticmethod
+    def verify_access_token(token: str) -> Optional[Dict[str, Any]]:
+        """
+        Verify and decode a JWT access token.
+        
+        Args:
+            token: JWT token string to verify
+            
+        Returns:
+            Decoded payload if token is valid, None otherwise
+        """
+        try:
+            # First verify the token is not blacklisted
+            if TokenManager.is_token_blacklisted(token):
+                logger.warning("Token is blacklisted")
+                return None
+            
+            # Decode and verify token
+            payload = PyJWT.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
+            
+            # Verify token type
+            if payload.get("type") != "access":
+                logger.warning("Token is not an access token")
+                return None
+                
+            return payload
+            
+        except JWTError as e:
+            logger.warning(f"JWT verification failed: {str(e)}")
+            return None
+    
+    @staticmethod
+    def create_refresh_token(
+        user_id: int, 
+        ip_address: str,
+        user_agent: str,
+        db: Session
+    ) -> str:
+        """
+        Create a new refresh token and store its hash in the database.
+        
+        Args:
+            user_id: User identifier
+            ip_address: Client IP address
+            user_agent: Client user agent string
+            db: Database session
+            
+        Returns:
+            Generated refresh token string
+        """
+        try:
+            from ..models.auth_models import RefreshToken
+            
+            # Generate a secure random token
+            refresh_token = secrets.token_hex(32)
+            
+            # Hash the token for storage
+            token_hash = hashlib.sha256(refresh_token.encode()).hexdigest()
+            
+            # Create device fingerprint
+            device_fingerprint = hashlib.sha256(
+                f"{user_agent}:{ip_address}".encode()
+            ).hexdigest()
+            
+            # Set expiration
+            expires_at = datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+            
+            # Create database record
+            refresh_token_record = RefreshToken(
+                user_id=user_id,
+                token_hash=token_hash,
+                device_fingerprint=device_fingerprint,
+                ip_address=ip_address,
+                user_agent=user_agent,
+                expires_at=expires_at,
+                is_active=True,
+                created_at=datetime.utcnow()
+            )
+            
+            db.add(refresh_token_record)
+            db.commit()
+            
+            logger.info(f"Refresh token created for user {user_id}, expires: {expires_at}")
+            return refresh_token
+            
+        except Exception as e:
+            logger.error(f"Failed to create refresh token: {str(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="토큰 생성 중 오류가 발생했습니다"
+            )
+    
+    @staticmethod
+    def verify_refresh_token(
+        refresh_token: str, 
+        ip_address: str, 
+        user_agent: str, 
+        db: Session
+    ) -> Tuple[bool, Optional[int], str]:
+        """
+        Verify a refresh token and return user ID if valid.
+        
+        Args:
+            refresh_token: Refresh token to verify
+            ip_address: Client IP address
+            user_agent: Client user agent string
+            db: Database session
+            
+        Returns:
+            Tuple of (is_valid, user_id, error_message)
+        """
+        try:
+            from ..models.auth_models import RefreshToken
+            
+            # Calculate token hash
+            token_hash = hashlib.sha256(refresh_token.encode()).hexdigest()
+            
+            # Find token in database
+            refresh_record = db.query(RefreshToken).filter(
+                RefreshToken.token_hash == token_hash,
+                RefreshToken.is_active == True,
+                RefreshToken.expires_at > datetime.utcnow()
+            ).first()
+            
+            if not refresh_record:
+                logger.warning(f"Invalid refresh token attempt from {ip_address}")
+                return False, None, "유효하지 않은 리프레시 토큰입니다"
+            
+            # Calculate device fingerprint
+            device_fingerprint = hashlib.sha256(f"{user_agent}:{ip_address}".encode()).hexdigest()
+            
+            # Optional: Check device fingerprint match
+            if refresh_record.device_fingerprint != device_fingerprint:
+                logger.warning(f"Device fingerprint mismatch for user {refresh_record.user_id}")
+                # For security logging only, not enforcing match to improve user experience
+            
+            return True, refresh_record.user_id, ""
+            
+        except Exception as e:
+            logger.error(f"Refresh token verification failed: {str(e)}")
+            return False, None, "토큰 검증 중 오류가 발생했습니다"
+    
+    @staticmethod
+    def rotate_refresh_token(
+        current_token: str,
+        user_id: int,
+        ip_address: str,
+        user_agent: str,
+        db: Session
+    ) -> Optional[str]:
+        """
+        Rotate a refresh token - invalidate current token and create a new one.
+        
+        Args:
+            current_token: Current refresh token to invalidate
+            user_id: User identifier
+            ip_address: Client IP address
+            user_agent: Client user agent string
+            db: Database session
+            
+        Returns:
+            New refresh token string
+        """
+        try:
+            from ..models.auth_models import RefreshToken
+            
+            # Calculate current token hash
+            current_token_hash = hashlib.sha256(current_token.encode()).hexdigest()
+            
+            # Find and invalidate the current token
+            current_record = db.query(RefreshToken).filter(
+                RefreshToken.token_hash == current_token_hash,
+                RefreshToken.is_active == True
+            ).first()
+            
+            if current_record:
+                current_record.is_active = False
+                current_record.revoked_at = datetime.utcnow()
+                current_record.revoke_reason = "token_rotation"
+                db.commit()
+            
+            # Create new refresh token
+            new_token = TokenManager.create_refresh_token(
+                user_id=user_id,
+                ip_address=ip_address,
+                user_agent=user_agent,
+                db=db
+            )
+            
+            logger.info(f"Rotated refresh token for user {user_id}")
+            return new_token
+            
+        except Exception as e:
+            logger.error(f"Token rotation failed: {str(e)}")
+            return None
+    
+    @staticmethod
+    def blacklist_token(token: str, reason: str = "logout") -> bool:
+        """
+        Add a token to the blacklist to invalidate it.
+        
+        Args:
+            token: JWT token to blacklist
+            reason: Reason for blacklisting
+            
+        Returns:
+            True if blacklisting succeeded, False otherwise
+        """
+        try:
+            # Extract JWT ID from token
+            try:
+                payload = PyJWT.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
+                jti = payload.get("jti")
+                exp = payload.get("exp")
+                
+                if not jti:
+                    logger.warning("Token has no JTI, cannot blacklist")
+                    return False
+                    
+            except JWTError as e:
+                logger.warning(f"Cannot decode token for blacklisting: {e}")
+                return False
+            
+            # Try Redis first, fall back to memory
+            try:
+                import redis
+                redis_client = redis.Redis(host='redis', port=6379, db=0, decode_responses=True)
+                
+                # Store until token expiration
+                expire_time = datetime.fromtimestamp(exp) - datetime.utcnow()
+                if expire_time.total_seconds() > 0:
+                    redis_client.setex(
+                        f"blacklist_token:{jti}",
+                        int(expire_time.total_seconds()),
+                        reason
+                    )
+                    logger.info(f"Token {jti} blacklisted in Redis for {reason}")
+                    return True
+                else:
+                    logger.info(f"Token {jti} already expired, no need to blacklist")
+                    return True
+                    
+            except Exception as redis_error:
+                logger.warning(f"Redis not available, using memory fallback: {redis_error}")
+                # Memory fallback
+                if not hasattr(TokenManager, '_memory_blacklist'):
+                    TokenManager._memory_blacklist = {}
+                    
+                TokenManager._memory_blacklist[jti] = {
+                    'reason': reason,
+                    'expires_at': exp
+                }
+                logger.info(f"Token {jti} blacklisted in memory for {reason}")
+                return True
+                
+        except Exception as e:
+            logger.error(f"Failed to blacklist token: {e}")
+            return False
+    
+    @staticmethod
+    def is_token_blacklisted(token: str) -> bool:
+        """
+        Check if a token is in the blacklist.
+        
+        Args:
+            token: JWT token to check
+            
+        Returns:
+            True if token is blacklisted, False otherwise
+        """
+        try:
+            # Extract JWT ID
+            try:
+                payload = PyJWT.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
+                jti = payload.get("jti")
+                
+                if not jti:
+                    return False
+                    
+            except JWTError:
+                return True  # Invalid tokens are considered blacklisted
+            
+            # Check Redis first, fall back to memory
+            try:
+                import redis
+                redis_client = redis.Redis(host='redis', port=6379, db=0, decode_responses=True)
+                
+                blacklisted = redis_client.exists(f"blacklist_token:{jti}")
+                if blacklisted:
+                    logger.info(f"Token {jti} found in Redis blacklist")
+                    return True
+                    
+            except Exception as redis_error:
+                logger.warning(f"Redis not available, checking memory fallback: {redis_error}")
+                # Check memory fallback
+                if hasattr(TokenManager, '_memory_blacklist'):
+                    if jti in TokenManager._memory_blacklist:
+                        # Check if token has expired
+                        exp = TokenManager._memory_blacklist[jti]['expires_at']
+                        if datetime.utcnow().timestamp() < exp:
+                            logger.info(f"Token {jti} found in memory blacklist")
+                            return True
+                        else:
+                            # Clean up expired token
+                            del TokenManager._memory_blacklist[jti]
+            
+            return False
+            
+        except Exception as e:
+            logger.error(f"Failed to check token blacklist: {e}")
+            return False  # Error case, allow token (prioritize availability)
+    
+    @staticmethod
+    def get_token_payload(token: str) -> Optional[Dict[str, Any]]:
+        """
+        Safely extract payload from a token without validation.
+        
+        Args:
+            token: JWT token
+            
+        Returns:
+            Decoded payload or None
+        """
+        try:
+            # Decode without verification (just to read payload)
+            payload = PyJWT.decode(token, options={"verify_signature": False})
+            return payload
+        except Exception as e:
+            logger.error(f"Failed to decode token payload: {e}")
+            return None

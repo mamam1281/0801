@@ -13,7 +13,7 @@ class User(Base):
     site_id = Column(String(50), unique=True, index=True, nullable=False)  # 사이트 아이디
     nickname = Column(String(50), unique=True, nullable=False)  # 닉네임 (필수, 중복불가)
     phone_number = Column(String(20), unique=True, nullable=False)  # 전화번호 (필수, 중복불가)
-    hashed_password = Column(String(255), nullable=False)  # 비밀번호
+    password_hash = Column(String(255), nullable=False)  # 비밀번호
     invite_code = Column(String(10), nullable=False)  # 초대코드 (5858)
     cyber_token_balance = Column(Integer, default=200)  # 사이버 토큰 잔액
     is_active = Column(Boolean, default=True)
@@ -81,7 +81,7 @@ class RefreshToken(Base):
     __tablename__ = "refresh_tokens"
     
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)  # ← 이 줄 추가!
     token = Column(String(255), unique=True, index=True, nullable=False)
     expires_at = Column(DateTime, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -95,7 +95,6 @@ class UserSession(Base):
     __tablename__ = "user_sessions"
     
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     session_token = Column(String(255), unique=True, index=True, nullable=False)
     refresh_token = Column(String(255), unique=True, index=True)
     expires_at = Column(DateTime, nullable=False)
@@ -113,7 +112,6 @@ class SecurityEvent(Base):
     __tablename__ = "security_events"
     
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     event_type = Column(String(50), nullable=False)
     event_data = Column(Text)
     ip_address = Column(String(45))
