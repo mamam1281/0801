@@ -1,0 +1,2470 @@
+{
+	"knownSymbols": {
+		"React": [
+			{
+				"name": "React",
+				"module": "react",
+				"isDefault": true,
+				"asDefinition": "* as React"
+			}
+		],
+		"config": [
+			{
+				"name": "config",
+				"path": "c:\\Users\\bdbd\\0000\\.storybook\\main.ts",
+				"isDefault": true
+			}
+		],
+		"type { StorybookConfig": [
+			{
+				"name": "type { StorybookConfig",
+				"module": "@storybook/react-webpack5",
+				"isDefault": true
+			}
+		],
+		"cn": [
+			{
+				"name": "cn",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\components\\ui\\utils.ts",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"type ClassValue": [
+			{
+				"name": "type ClassValue",
+				"module": "clsx",
+				"isDefault": false
+			}
+		],
+		"clsx": [
+			{
+				"name": "clsx",
+				"module": "clsx",
+				"isDefault": false
+			}
+		],
+		"twMerge": [
+			{
+				"name": "twMerge",
+				"module": "tailwind-merge",
+				"isDefault": false
+			}
+		],
+		"apiLogTry": [
+			{
+				"name": "apiLogTry",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\utils\\apiLogger.ts",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"apiLogSuccess": [
+			{
+				"name": "apiLogSuccess",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\utils\\apiLogger.ts",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"apiLogFail": [
+			{
+				"name": "apiLogFail",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\utils\\apiLogger.ts",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"ShopItem": [
+			{
+				"name": "ShopItem",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\types\\admin.ts",
+				"type": "interface",
+				"isDefault": false
+			}
+		],
+		"AdminLog": [
+			{
+				"name": "AdminLog",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\types\\admin.ts",
+				"type": "interface",
+				"isDefault": false
+			}
+		],
+		"SystemBackup": [
+			{
+				"name": "SystemBackup",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\types\\admin.ts",
+				"type": "interface",
+				"isDefault": false
+			}
+		],
+		"PushNotification": [
+			{
+				"name": "PushNotification",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\types\\admin.ts",
+				"type": "interface",
+				"isDefault": false
+			}
+		],
+		"UserImportData": [
+			{
+				"name": "UserImportData",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\types\\admin.ts",
+				"type": "interface",
+				"isDefault": false
+			}
+		],
+		"AdminDashboardStats": [
+			{
+				"name": "AdminDashboardStats",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\types\\admin.ts",
+				"type": "interface",
+				"isDefault": false
+			}
+		],
+		"GameConfiguration": [
+			{
+				"name": "GameConfiguration",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\types\\admin.ts",
+				"type": "interface",
+				"isDefault": false
+			}
+		],
+		"User": [
+			{
+				"name": "User",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\types\\user.ts",
+				"type": "interface",
+				"isDefault": false
+			}
+		],
+		"GameItem": [
+			{
+				"name": "GameItem",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\types\\index.ts",
+				"type": "interface",
+				"isDefault": false
+			}
+		],
+		"GameStats": [
+			{
+				"name": "GameStats",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\types\\index.ts",
+				"type": "interface",
+				"isDefault": false
+			}
+		],
+		"GameStatsDetail": [
+			{
+				"name": "GameStatsDetail",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\types\\index.ts",
+				"type": "interface",
+				"isDefault": false
+			}
+		],
+		"Notification": [
+			{
+				"name": "Notification",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\types\\index.ts",
+				"type": "interface",
+				"isDefault": false
+			}
+		],
+		"GameDashboardGame": [
+			{
+				"name": "GameDashboardGame",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\types\\index.ts",
+				"type": "interface",
+				"isDefault": false
+			}
+		],
+		"AppScreen": [
+			{
+				"name": "AppScreen",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\types\\index.ts",
+				"type": "type",
+				"isDefault": false
+			}
+		],
+		"GameSpecific": [
+			{
+				"name": "GameSpecific",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\types\\index.ts",
+				"type": "type",
+				"isDefault": false
+			}
+		],
+		"getDifficultyColor": [
+			{
+				"name": "getDifficultyColor",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\utils\\gameUtils.ts",
+				"type": "const",
+				"isDefault": false
+			}
+		],
+		"createGameNavigator": [
+			{
+				"name": "createGameNavigator",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\utils\\gameUtils.ts",
+				"type": "const",
+				"isDefault": false
+			}
+		],
+		"handleModelNavigation": [
+			{
+				"name": "handleModelNavigation",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\utils\\gameUtils.ts",
+				"type": "const",
+				"isDefault": false
+			}
+		],
+		"Game": [
+			{
+				"name": "Game",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\types\\game.ts",
+				"type": "interface",
+				"isDefault": false
+			}
+		],
+		"GameAction": [
+			{
+				"name": "GameAction",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\types\\game.ts",
+				"type": "interface",
+				"isDefault": false
+			}
+		],
+		"Reward": [
+			{
+				"name": "Reward",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\types\\game.ts",
+				"type": "interface",
+				"isDefault": false
+			}
+		],
+		"PopupConfig": [
+			{
+				"name": "PopupConfig",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\utils\\gamePopup.ts",
+				"type": "interface",
+				"isDefault": false
+			}
+		],
+		"POPUP_CONFIGS": [
+			{
+				"name": "POPUP_CONFIGS",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\utils\\gamePopup.ts",
+				"type": "const",
+				"isDefault": false
+			}
+		],
+		"PopupType": [
+			{
+				"name": "PopupType",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\utils\\gamePopup.ts",
+				"type": "type",
+				"isDefault": false
+			}
+		],
+		"calculateAutoFitSize": [
+			{
+				"name": "calculateAutoFitSize",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\utils\\gamePopup.ts",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"calculatePopupPosition": [
+			{
+				"name": "calculatePopupPosition",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\utils\\gamePopup.ts",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"getResponsivePopupClasses": [
+			{
+				"name": "getResponsivePopupClasses",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\utils\\gamePopup.ts",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"openPopup": [
+			{
+				"name": "openPopup",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\utils\\gamePopup.ts",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"closePopup": [
+			{
+				"name": "closePopup",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\utils\\gamePopup.ts",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"handlePopupResize": [
+			{
+				"name": "handlePopupResize",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\utils\\gamePopup.ts",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"getDeviceOrientation": [
+			{
+				"name": "getDeviceOrientation",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\utils\\gamePopup.ts",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"getOrientationOptimizedConfig": [
+			{
+				"name": "getOrientationOptimizedConfig",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\utils\\gamePopup.ts",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"openGamePopup": [
+			{
+				"name": "openGamePopup",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\utils\\gamePopup.ts",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"isPopupWindow": [
+			{
+				"name": "isPopupWindow",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\utils\\gamePopup.ts",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"GachaItem": [
+			{
+				"name": "GachaItem",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\types\\gacha.ts",
+				"type": "interface",
+				"isDefault": false
+			}
+		],
+		"HeartParticle": [
+			{
+				"name": "HeartParticle",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\types\\gacha.ts",
+				"type": "interface",
+				"isDefault": false
+			}
+		],
+		"GachaBanner": [
+			{
+				"name": "GachaBanner",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\types\\gacha.ts",
+				"type": "interface",
+				"isDefault": false
+			}
+		],
+		"SparkleProps": [
+			{
+				"name": "SparkleProps",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\components\\games\\gacha\\types.ts",
+				"type": "interface",
+				"isDefault": false
+			}
+		],
+		"ParticleProps": [
+			{
+				"name": "ParticleProps",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\components\\games\\gacha\\types.ts",
+				"type": "interface",
+				"isDefault": false
+			}
+		],
+		"EventBackend": [
+			{
+				"name": "EventBackend",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\types\\eventMission.ts",
+				"type": "interface",
+				"isDefault": false
+			}
+		],
+		"EventParticipation": [
+			{
+				"name": "EventParticipation",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\types\\eventMission.ts",
+				"type": "interface",
+				"isDefault": false
+			}
+		],
+		"MissionBackend": [
+			{
+				"name": "MissionBackend",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\types\\eventMission.ts",
+				"type": "interface",
+				"isDefault": false
+			}
+		],
+		"UserMissionBackend": [
+			{
+				"name": "UserMissionBackend",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\types\\eventMission.ts",
+				"type": "interface",
+				"isDefault": false
+			}
+		],
+		"ClaimRewardResponse": [
+			{
+				"name": "ClaimRewardResponse",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\types\\eventMission.ts",
+				"type": "interface",
+				"isDefault": false
+			}
+		],
+		"useDebounce": [
+			{
+				"name": "useDebounce",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\utils\\performanceUtils.ts",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"useThrottle": [
+			{
+				"name": "useThrottle",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\utils\\performanceUtils.ts",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"useSafeTimer": [
+			{
+				"name": "useSafeTimer",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\utils\\performanceUtils.ts",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"useAnimationFrame": [
+			{
+				"name": "useAnimationFrame",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\utils\\performanceUtils.ts",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"useIntersectionObserver": [
+			{
+				"name": "useIntersectionObserver",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\utils\\performanceUtils.ts",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"useMemoryMonitor": [
+			{
+				"name": "useMemoryMonitor",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\utils\\performanceUtils.ts",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"useLazyImage": [
+			{
+				"name": "useLazyImage",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\utils\\performanceUtils.ts",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"useBatchUpdate": [
+			{
+				"name": "useBatchUpdate",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\utils\\performanceUtils.ts",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"useVirtualization": [
+			{
+				"name": "useVirtualization",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\utils\\performanceUtils.ts",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"useWebWorker": [
+			{
+				"name": "useWebWorker",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\utils\\performanceUtils.ts",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"useCallback": [
+			{
+				"name": "useCallback",
+				"module": "react",
+				"isDefault": true
+			}
+		],
+		"useRef": [
+			{
+				"name": "useRef",
+				"module": "react",
+				"isDefault": true
+			}
+		],
+		"useEffect": [
+			{
+				"name": "useEffect",
+				"module": "react",
+				"isDefault": true
+			}
+		],
+		"useMemo": [
+			{
+				"name": "useMemo",
+				"module": "react",
+				"isDefault": true
+			}
+		],
+		"useState": [
+			{
+				"name": "useState",
+				"module": "react",
+				"isDefault": true
+			}
+		],
+		"sanitizeInput": [
+			{
+				"name": "sanitizeInput",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\utils\\securityUtils.ts",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"escapeHtml": [
+			{
+				"name": "escapeHtml",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\utils\\securityUtils.ts",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"validateNickname": [
+			{
+				"name": "validateNickname",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\utils\\securityUtils.ts",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"validatePassword": [
+			{
+				"name": "validatePassword",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\utils\\securityUtils.ts",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"validateEmail": [
+			{
+				"name": "validateEmail",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\utils\\securityUtils.ts",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"validateUser": [
+			{
+				"name": "validateUser",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\utils\\securityUtils.ts",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"validateAdminAccess": [
+			{
+				"name": "validateAdminAccess",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\utils\\securityUtils.ts",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"validateSession": [
+			{
+				"name": "validateSession",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\utils\\securityUtils.ts",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"validateNumberRange": [
+			{
+				"name": "validateNumberRange",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\utils\\securityUtils.ts",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"limitInputLength": [
+			{
+				"name": "limitInputLength",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\utils\\securityUtils.ts",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"validateFileUpload": [
+			{
+				"name": "validateFileUpload",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\utils\\securityUtils.ts",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"extractSafeLogData": [
+			{
+				"name": "extractSafeLogData",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\utils\\securityUtils.ts",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"createDefaultGameStats": [
+			{
+				"name": "createDefaultGameStats",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\utils\\userUtils.ts",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"ensureUserCompatibility": [
+			{
+				"name": "ensureUserCompatibility",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\utils\\userUtils.ts",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"calculateExperiencePercentage": [
+			{
+				"name": "calculateExperiencePercentage",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\utils\\userUtils.ts",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"calculateWinRate": [
+			{
+				"name": "calculateWinRate",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\utils\\userUtils.ts",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"checkLevelUp": [
+			{
+				"name": "checkLevelUp",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\utils\\userUtils.ts",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"calculateDailyBonus": [
+			{
+				"name": "calculateDailyBonus",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\utils\\userUtils.ts",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"formatPlayTime": [
+			{
+				"name": "formatPlayTime",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\utils\\userUtils.ts",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"getUserRank": [
+			{
+				"name": "getUserRank",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\utils\\userUtils.ts",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"SpinRequestBody": [
+			{
+				"name": "SpinRequestBody",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\utils\\mockApi.ts",
+				"type": "interface",
+				"isDefault": false
+			}
+		],
+		"SymbolType": [
+			{
+				"name": "SymbolType",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\utils\\mockApi.ts",
+				"type": "interface",
+				"isDefault": false
+			}
+		],
+		"SpinResponseBody": [
+			{
+				"name": "SpinResponseBody",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\utils\\mockApi.ts",
+				"type": "interface",
+				"isDefault": false
+			}
+		],
+		"ActionRequestBody": [
+			{
+				"name": "ActionRequestBody",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\utils\\mockApi.ts",
+				"type": "interface",
+				"isDefault": false
+			}
+		],
+		"FeedbackRequestBody": [
+			{
+				"name": "FeedbackRequestBody",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\utils\\mockApi.ts",
+				"type": "interface",
+				"isDefault": false
+			}
+		],
+		"FeedbackResponseBody": [
+			{
+				"name": "FeedbackResponseBody",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\utils\\mockApi.ts",
+				"type": "interface",
+				"isDefault": false
+			}
+		],
+		"postSlotSpin": [
+			{
+				"name": "postSlotSpin",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\utils\\mockApi.ts",
+				"type": "const",
+				"isDefault": false
+			}
+		],
+		"recordAction": [
+			{
+				"name": "recordAction",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\utils\\mockApi.ts",
+				"type": "const",
+				"isDefault": false
+			}
+		],
+		"getRewardsHistory": [
+			{
+				"name": "getRewardsHistory",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\utils\\mockApi.ts",
+				"type": "const",
+				"isDefault": false
+			}
+		],
+		"postFeedback": [
+			{
+				"name": "postFeedback",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\utils\\mockApi.ts",
+				"type": "const",
+				"isDefault": false
+			}
+		],
+		"apiLogger": [
+			{
+				"name": "apiLogger",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\utils\\api.ts",
+				"type": "const",
+				"isDefault": false
+			}
+		],
+		"getTokens": [
+			{
+				"name": "getTokens",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\utils\\api.ts",
+				"type": "const",
+				"isDefault": false
+			}
+		],
+		"setTokens": [
+			{
+				"name": "setTokens",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\utils\\api.ts",
+				"type": "const",
+				"isDefault": false
+			}
+		],
+		"clearTokens": [
+			{
+				"name": "clearTokens",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\utils\\api.ts",
+				"type": "const",
+				"isDefault": false
+			}
+		],
+		"refreshAccessToken": [
+			{
+				"name": "refreshAccessToken",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\utils\\api.ts",
+				"type": "const",
+				"isDefault": false
+			}
+		],
+		"authApi": [
+			{
+				"name": "authApi",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\utils\\api.ts",
+				"type": "const",
+				"isDefault": false
+			}
+		],
+		"apiRequest": [
+			{
+				"name": "apiRequest",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\utils\\api.ts",
+				"isDefault": true
+			}
+		],
+		"UserStats": [
+			{
+				"name": "UserStats",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\types\\user.ts",
+				"type": "interface",
+				"isDefault": false
+			}
+		],
+		"UserBalance": [
+			{
+				"name": "UserBalance",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\types\\user.ts",
+				"type": "interface",
+				"isDefault": false
+			}
+		],
+		"Frame1": [
+			{
+				"name": "Frame1",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\imports\\Frame1-2-201.tsx",
+				"type": "function",
+				"isDefault": true
+			}
+		],
+		"useAuthHandlers": [
+			{
+				"name": "useAuthHandlers",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\hooks\\useAuthHandlers.tsx",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"useAppNavigation": [
+			{
+				"name": "useAppNavigation",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\hooks\\useAppNavigation.tsx",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"useLoadingController": [
+			{
+				"name": "useLoadingController",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\hooks\\useLoadingController.ts",
+				"type": "const",
+				"isDefault": false
+			}
+		],
+		"{ useEffect": [
+			{
+				"name": "{ useEffect",
+				"module": "react",
+				"isDefault": true
+			}
+		],
+		"useRouter": [
+			{
+				"name": "useRouter",
+				"module": "next/navigation",
+				"isDefault": false
+			}
+		],
+		"useClientOnlyValue": [
+			{
+				"name": "useClientOnlyValue",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\hooks\\useClientOnlyValue.ts",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"useUserManager": [
+			{
+				"name": "useUserManager",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\hooks\\useUserManager.tsx",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"VIP_NOTIFICATION_KEYWORDS": [
+			{
+				"name": "VIP_NOTIFICATION_KEYWORDS",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\constants\\notificationConstants.ts",
+				"type": "const",
+				"isDefault": false
+			}
+		],
+		"NOTIFICATION_CONFIG": [
+			{
+				"name": "NOTIFICATION_CONFIG",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\constants\\notificationConstants.ts",
+				"type": "const",
+				"isDefault": false
+			}
+		],
+		"NOTIFICATION_STYLES": [
+			{
+				"name": "NOTIFICATION_STYLES",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\constants\\notificationConstants.ts",
+				"type": "const",
+				"isDefault": false
+			}
+		],
+		"createGamesData": [
+			{
+				"name": "createGamesData",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\constants\\gameConstants.ts",
+				"type": "const",
+				"isDefault": false
+			}
+		],
+		"createLeaderboardData": [
+			{
+				"name": "createLeaderboardData",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\constants\\gameConstants.ts",
+				"type": "const",
+				"isDefault": false
+			}
+		],
+		"GameProvider": [
+			{
+				"name": "GameProvider",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\contexts\\GameContext.tsx",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"useGame": [
+			{
+				"name": "useGame",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\contexts\\GameContext.tsx",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"{ createContext": [
+			{
+				"name": "{ createContext",
+				"module": "react",
+				"isDefault": true
+			}
+		],
+		"useContext": [
+			{
+				"name": "useContext",
+				"module": "react",
+				"isDefault": true
+			}
+		],
+		"useReducer": [
+			{
+				"name": "useReducer",
+				"module": "react",
+				"isDefault": true
+			}
+		],
+		"ReactNode": [
+			{
+				"name": "ReactNode",
+				"module": "react",
+				"isDefault": true
+			}
+		],
+		"QUICK_ACTIONS": [
+			{
+				"name": "QUICK_ACTIONS",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\constants\\dashboardData.ts",
+				"type": "const",
+				"isDefault": false
+			}
+		],
+		"ACHIEVEMENTS_DATA": [
+			{
+				"name": "ACHIEVEMENTS_DATA",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\constants\\dashboardData.ts",
+				"type": "const",
+				"isDefault": false
+			}
+		],
+		"APP_CONFIG": [
+			{
+				"name": "APP_CONFIG",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\constants\\appConstants.ts",
+				"type": "const",
+				"isDefault": false
+			}
+		],
+		"ADMIN_ACCOUNTS": [
+			{
+				"name": "ADMIN_ACCOUNTS",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\constants\\appConstants.ts",
+				"type": "const",
+				"isDefault": false
+			}
+		],
+		"ADMIN_SECURITY_CODE": [
+			{
+				"name": "ADMIN_SECURITY_CODE",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\constants\\appConstants.ts",
+				"type": "const",
+				"isDefault": false
+			}
+		],
+		"GAME_DEFAULTS": [
+			{
+				"name": "GAME_DEFAULTS",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\constants\\appConstants.ts",
+				"type": "const",
+				"isDefault": false
+			}
+		],
+		"SCREENS_WITH_BOTTOM_NAV": [
+			{
+				"name": "SCREENS_WITH_BOTTOM_NAV",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\constants\\appConstants.ts",
+				"type": "const",
+				"isDefault": false
+			}
+		],
+		"DEFAULT_ITEMS": [
+			{
+				"name": "DEFAULT_ITEMS",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\constants\\appConstants.ts",
+				"type": "const",
+				"isDefault": false
+			}
+		],
+		"NOTIFICATION_MESSAGES": [
+			{
+				"name": "NOTIFICATION_MESSAGES",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\constants\\appConstants.ts",
+				"type": "const",
+				"isDefault": false
+			}
+		],
+		"NEW_GAME_IDEAS": [
+			{
+				"name": "NEW_GAME_IDEAS",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\constants\\appConstants.ts",
+				"type": "const",
+				"isDefault": false
+			}
+		],
+		"AdminLoginScreen": [
+			{
+				"name": "AdminLoginScreen",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\components\\AdminLoginScreen.tsx",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"{ useState": [
+			{
+				"name": "{ useState",
+				"module": "react",
+				"isDefault": true
+			}
+		],
+		"motion": [
+			{
+				"name": "motion",
+				"module": "framer-motion",
+				"isDefault": false
+			}
+		],
+		"AnimatePresence": [
+			{
+				"name": "AnimatePresence",
+				"module": "framer-motion",
+				"isDefault": false
+			}
+		],
+		"AdminPanel": [
+			{
+				"name": "AdminPanel",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\components\\AdminPanel.tsx",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"CJChatBubble": [
+			{
+				"name": "CJChatBubble",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\components\\CJChatBubble.tsx",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"CJAIChatBubble": [
+			{
+				"name": "CJAIChatBubble",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\components\\CJAIChatBubble.tsx",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"BottomNavigation": [
+			{
+				"name": "BottomNavigation",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\components\\BottomNavigation.tsx",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"ShopScreen": [
+			{
+				"name": "ShopScreen",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\components\\ShopScreen.tsx",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"App": [
+			{
+				"name": "App",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\app\\App.tsx",
+				"type": "function",
+				"isDefault": true
+			}
+		],
+		"SideMenu": [
+			{
+				"name": "SideMenu",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\components\\SideMenu.tsx",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"ProductionLoadingScreen": [
+			{
+				"name": "ProductionLoadingScreen",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\components\\loading\\ProductionLoadingScreen.tsx",
+				"type": "function",
+				"isDefault": true
+			}
+		],
+		"Gamepad2": [
+			{
+				"name": "Gamepad2",
+				"module": "lucide-react",
+				"isDefault": false
+			}
+		],
+		"Sparkles": [
+			{
+				"name": "Sparkles",
+				"module": "lucide-react",
+				"isDefault": false
+			}
+		],
+		"Providers": [
+			{
+				"name": "Providers",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\app\\providers.tsx",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"Home": [
+			{
+				"name": "Home",
+				"module": "lucide-react",
+				"isDefault": false
+			},
+			{
+				"name": "Home",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\app\\page.tsx",
+				"type": "function",
+				"isDefault": true
+			}
+		],
+		"NotFound": [
+			{
+				"name": "NotFound",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\app\\not-found.tsx",
+				"type": "function",
+				"isDefault": true
+			}
+		],
+		"CrownIcon": [
+			{
+				"name": "CrownIcon",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\components\\icons\\GameIcons.tsx",
+				"type": "const",
+				"isDefault": false
+			}
+		],
+		"SlotMachineIcon": [
+			{
+				"name": "SlotMachineIcon",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\components\\icons\\GameIcons.tsx",
+				"type": "const",
+				"isDefault": false
+			}
+		],
+		"RouletteIcon": [
+			{
+				"name": "RouletteIcon",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\components\\icons\\GameIcons.tsx",
+				"type": "const",
+				"isDefault": false
+			}
+		],
+		"GachaBoxIcon": [
+			{
+				"name": "GachaBoxIcon",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\components\\icons\\GameIcons.tsx",
+				"type": "const",
+				"isDefault": false
+			}
+		],
+		"SwordFightIcon": [
+			{
+				"name": "SwordFightIcon",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\components\\icons\\GameIcons.tsx",
+				"type": "const",
+				"isDefault": false
+			}
+		],
+		"GoldCoinIcon": [
+			{
+				"name": "GoldCoinIcon",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\components\\icons\\GameIcons.tsx",
+				"type": "const",
+				"isDefault": false
+			}
+		],
+		"TrophyIcon": [
+			{
+				"name": "TrophyIcon",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\components\\icons\\GameIcons.tsx",
+				"type": "const",
+				"isDefault": false
+			}
+		],
+		"StarAchievementIcon": [
+			{
+				"name": "StarAchievementIcon",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\components\\icons\\GameIcons.tsx",
+				"type": "const",
+				"isDefault": false
+			}
+		],
+		"LightningBoltIcon": [
+			{
+				"name": "LightningBoltIcon",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\components\\icons\\GameIcons.tsx",
+				"type": "const",
+				"isDefault": false
+			}
+		],
+		"GemDiamondIcon": [
+			{
+				"name": "GemDiamondIcon",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\components\\icons\\GameIcons.tsx",
+				"type": "const",
+				"isDefault": false
+			}
+		],
+		"Loading": [
+			{
+				"name": "Loading",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\app\\loading.tsx",
+				"type": "function",
+				"isDefault": true
+			}
+		],
+		"TokenBalanceWidget": [
+			{
+				"name": "TokenBalanceWidget",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\components\\TokenBalanceWidget.tsx",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"TrendingUp": [
+			{
+				"name": "TrendingUp",
+				"module": "lucide-react",
+				"isDefault": false
+			}
+		],
+		"TrendingDown": [
+			{
+				"name": "TrendingDown",
+				"module": "lucide-react",
+				"isDefault": false
+			}
+		],
+		"Coins": [
+			{
+				"name": "Coins",
+				"module": "lucide-react",
+				"isDefault": false
+			}
+		],
+		"AlertTriangle": [
+			{
+				"name": "AlertTriangle",
+				"module": "lucide-react",
+				"isDefault": false
+			}
+		],
+		"metadata": [
+			{
+				"name": "metadata",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\app\\layout.tsx",
+				"type": "const",
+				"isDefault": false
+			}
+		],
+		"RootLayout": [
+			{
+				"name": "RootLayout",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\app\\layout.tsx",
+				"type": "function",
+				"isDefault": true
+			}
+		],
+		"type { Metadata": [
+			{
+				"name": "type { Metadata",
+				"module": "next",
+				"isDefault": true
+			}
+		],
+		"Inter": [
+			{
+				"name": "Inter",
+				"module": "next/font/google",
+				"isDefault": false
+			}
+		],
+		"StreamingScreen": [
+			{
+				"name": "StreamingScreen",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\components\\StreamingScreen.tsx",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"GlobalError": [
+			{
+				"name": "GlobalError",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\app\\global-error.tsx",
+				"type": "function",
+				"isDefault": true
+			}
+		],
+		"SignupScreen": [
+			{
+				"name": "SignupScreen",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\components\\SignupScreen.tsx",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"SettingsScreen": [
+			{
+				"name": "SettingsScreen",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\components\\SettingsScreen.tsx",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"ProfileScreen": [
+			{
+				"name": "ProfileScreen",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\components\\ProfileScreen.tsx",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"ArrowLeft": [
+			{
+				"name": "ArrowLeft",
+				"module": "lucide-react",
+				"isDefault": false
+			},
+			{
+				"name": "ArrowLeft",
+				"module": "lucide-react@0.487.0",
+				"isDefault": false
+			}
+		],
+		"Star": [
+			{
+				"name": "Star",
+				"module": "lucide-react",
+				"isDefault": false
+			}
+		],
+		"Trophy": [
+			{
+				"name": "Trophy",
+				"module": "lucide-react",
+				"isDefault": false
+			}
+		],
+		"Target": [
+			{
+				"name": "Target",
+				"module": "lucide-react",
+				"isDefault": false
+			}
+		],
+		"Flame": [
+			{
+				"name": "Flame",
+				"module": "lucide-react",
+				"isDefault": false
+			}
+		],
+		"Award": [
+			{
+				"name": "Award",
+				"module": "lucide-react",
+				"isDefault": false
+			}
+		],
+		"LogIn": [
+			{
+				"name": "LogIn",
+				"module": "lucide-react",
+				"isDefault": false
+			}
+		],
+		"UserX": [
+			{
+				"name": "UserX",
+				"module": "lucide-react",
+				"isDefault": false
+			}
+		],
+		"NotificationSystem": [
+			{
+				"name": "NotificationSystem",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\components\\NotificationSystem.tsx",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"useNotificationSystem": [
+			{
+				"name": "useNotificationSystem",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\components\\NotificationSystem.tsx",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"LoginScreen": [
+			{
+				"name": "LoginScreen",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\components\\LoginScreen.tsx",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"ShopManager": [
+			{
+				"name": "ShopManager",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\components\\admin\\ShopManager.tsx",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"Zap": [
+			{
+				"name": "Zap",
+				"module": "lucide-react",
+				"isDefault": false
+			}
+		],
+		"Crown": [
+			{
+				"name": "Crown",
+				"module": "lucide-react",
+				"isDefault": false
+			}
+		],
+		"dynamic": [
+			{
+				"name": "dynamic",
+				"module": "next/dynamic",
+				"isDefault": true
+			}
+		],
+		"InventoryScreen": [
+			{
+				"name": "InventoryScreen",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\components\\InventoryScreen.tsx",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"HomeDashboard": [
+			{
+				"name": "HomeDashboard",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\components\\HomeDashboard.tsx",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"GameDashboardProps": [
+			{
+				"name": "GameDashboardProps",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\components\\GameDashboard.tsx",
+				"type": "interface",
+				"isDefault": false
+			}
+		],
+		"GameDashboard": [
+			{
+				"name": "GameDashboard",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\components\\GameDashboard.tsx",
+				"type": "function",
+				"isDefault": true
+			}
+		],
+		"EventMissionPanel": [
+			{
+				"name": "EventMissionPanel",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\components\\EventMissionPanel.tsx",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"ErrorBoundary": [
+			{
+				"name": "ErrorBoundary",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\components\\ErrorBoundary.tsx",
+				"isDefault": true
+			}
+		],
+		"useErrorHandler": [
+			{
+				"name": "useErrorHandler",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\components\\ErrorBoundary.tsx",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"useAsyncError": [
+			{
+				"name": "useAsyncError",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\components\\ErrorBoundary.tsx",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"useErrorRecovery": [
+			{
+				"name": "useErrorRecovery",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\components\\ErrorBoundary.tsx",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"{ Component": [
+			{
+				"name": "{ Component",
+				"module": "react",
+				"isDefault": true
+			}
+		],
+		"ErrorInfo": [
+			{
+				"name": "ErrorInfo",
+				"module": "react",
+				"isDefault": true
+			}
+		],
+		"RefreshCw": [
+			{
+				"name": "RefreshCw",
+				"module": "lucide-react",
+				"isDefault": false
+			}
+		],
+		"Bug": [
+			{
+				"name": "Bug",
+				"module": "lucide-react",
+				"isDefault": false
+			}
+		],
+		"RewardContainer": [
+			{
+				"name": "RewardContainer",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\components\\reward\\RewardContainer.tsx",
+				"type": "function",
+				"isDefault": true
+			}
+		],
+		"ProgressBar": [
+			{
+				"name": "ProgressBar",
+				"module": "@/components/ui/data-display/ProgressBar",
+				"isDefault": true
+			}
+		],
+		"Tabs": [
+			{
+				"name": "Tabs",
+				"module": "@/components/ui/navigation/Tabs",
+				"isDefault": true
+			}
+		],
+		"Button": [
+			{
+				"name": "Button",
+				"module": "@/components/ui/basic/button",
+				"isDefault": false
+			}
+		],
+		"ModernCard": [
+			{
+				"name": "ModernCard",
+				"module": "@/components/ui/data-display/ModernCard",
+				"isDefault": true
+			}
+		],
+		"RewardResultModal": [
+			{
+				"name": "RewardResultModal",
+				"module": "@/components/ui/feedback/RewardResultModal",
+				"isDefault": true
+			}
+		],
+		"AlertDialogPrimitive": [
+			{
+				"name": "AlertDialogPrimitive",
+				"module": "@radix-ui/react-alert-dialog@1.1.6",
+				"isDefault": true,
+				"asDefinition": "* as AlertDialogPrimitive"
+			}
+		],
+		"GameBackground": [
+			{
+				"name": "GameBackground",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\components\\games\\GameBackground.tsx",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"GachaSystem": [
+			{
+				"name": "GachaSystem",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\components\\games\\GachaSystem.tsx",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"GachaStats": [
+			{
+				"name": "GachaStats",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\components\\games\\gacha\\types.ts",
+				"type": "interface",
+				"isDefault": false
+			}
+		],
+		"GachaRarity": [
+			{
+				"name": "GachaRarity",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\components\\games\\gacha\\types.ts",
+				"type": "type",
+				"isDefault": false
+			}
+		],
+		"AccordionPrimitive": [
+			{
+				"name": "AccordionPrimitive",
+				"module": "@radix-ui/react-accordion",
+				"isDefault": true,
+				"asDefinition": "* as AccordionPrimitive"
+			}
+		],
+		"ChevronDownIcon": [
+			{
+				"name": "ChevronDownIcon",
+				"module": "lucide-react@0.487.0",
+				"isDefault": false
+			},
+			{
+				"name": "ChevronDownIcon",
+				"module": "lucide-react",
+				"isDefault": false
+			}
+		],
+		"GameCard": [
+			{
+				"name": "GameCard",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\components\\games\\GameCard.tsx",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"Play": [
+			{
+				"name": "Play",
+				"module": "lucide-react",
+				"isDefault": false
+			}
+		],
+		"NeonSlotGame": [
+			{
+				"name": "NeonSlotGame",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\components\\games\\NeonSlotGame.tsx",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"AspectRatioPrimitive": [
+			{
+				"name": "AspectRatioPrimitive",
+				"module": "@radix-ui/react-aspect-ratio@1.1.2",
+				"isDefault": true,
+				"asDefinition": "* as AspectRatioPrimitive"
+			}
+		],
+		"NeonCrashGame": [
+			{
+				"name": "NeonCrashGame",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\components\\games\\NeonCrashGame.tsx",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"ChevronLeft": [
+			{
+				"name": "ChevronLeft",
+				"module": "lucide-react",
+				"isDefault": false
+			}
+		],
+		"ChevronRight": [
+			{
+				"name": "ChevronRight",
+				"module": "lucide-react",
+				"isDefault": false
+			}
+		],
+		"DayPicker": [
+			{
+				"name": "DayPicker",
+				"module": "react-day-picker",
+				"isDefault": false
+			}
+		],
+		"Slot": [
+			{
+				"name": "Slot",
+				"module": "@radix-ui/react-slot",
+				"isDefault": false
+			}
+		],
+		"cva": [
+			{
+				"name": "cva",
+				"module": "class-variance-authority@0.7.1",
+				"isDefault": false
+			},
+			{
+				"name": "cva",
+				"module": "class-variance-authority",
+				"isDefault": false
+			}
+		],
+		"type VariantProps": [
+			{
+				"name": "type VariantProps",
+				"module": "class-variance-authority@0.7.1",
+				"isDefault": false
+			},
+			{
+				"name": "type VariantProps",
+				"module": "class-variance-authority",
+				"isDefault": false
+			}
+		],
+		"MoreHorizontal": [
+			{
+				"name": "MoreHorizontal",
+				"module": "lucide-react",
+				"isDefault": false
+			}
+		],
+		"ArrowRight": [
+			{
+				"name": "ArrowRight",
+				"module": "lucide-react@0.487.0",
+				"isDefault": false
+			}
+		],
+		"AvatarPrimitive": [
+			{
+				"name": "AvatarPrimitive",
+				"module": "@radix-ui/react-avatar@1.1.3",
+				"isDefault": true,
+				"asDefinition": "* as AvatarPrimitive"
+			}
+		],
+		"RockPaperScissorsGame": [
+			{
+				"name": "RockPaperScissorsGame",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\components\\games\\RockPaperScissorsGame.tsx",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"AppHeader": [
+			{
+				"name": "AppHeader",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\components\\layout\\AppHeader.tsx",
+				"type": "function",
+				"isDefault": true
+			}
+		],
+		"Settings": [
+			{
+				"name": "Settings",
+				"module": "lucide-react",
+				"isDefault": false
+			}
+		],
+		"Bell": [
+			{
+				"name": "Bell",
+				"module": "lucide-react",
+				"isDefault": false
+			}
+		],
+		"async": [
+			{
+				"name": "async",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\route.ts",
+				"isDefault": false
+			}
+		],
+		"NextResponse": [
+			{
+				"name": "NextResponse",
+				"module": "next/server",
+				"isDefault": false
+			}
+		],
+		"fs": [
+			{
+				"name": "fs",
+				"module": "fs",
+				"isDefault": true
+			}
+		],
+		"path": [
+			{
+				"name": "path",
+				"module": "path",
+				"isDefault": true
+			}
+		],
+		"generateUniqueId": [
+			{
+				"name": "generateUniqueId",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\components\\games\\gacha\\utils.ts",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"generateSparkles": [
+			{
+				"name": "generateSparkles",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\components\\games\\gacha\\utils.ts",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"getAnimationDelay": [
+			{
+				"name": "getAnimationDelay",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\components\\games\\gacha\\utils.ts",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"generateParticles": [
+			{
+				"name": "generateParticles",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\components\\games\\gacha\\utils.ts",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"generateHeartParticles": [
+			{
+				"name": "generateHeartParticles",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\components\\games\\gacha\\utils.ts",
+				"type": "const",
+				"isDefault": false
+			}
+		],
+		"getRandomItem": [
+			{
+				"name": "getRandomItem",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\components\\games\\gacha\\utils.ts",
+				"type": "const",
+				"isDefault": false
+			}
+		],
+		"updateUserInventory": [
+			{
+				"name": "updateUserInventory",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\components\\games\\gacha\\utils.ts",
+				"type": "const",
+				"isDefault": false
+			}
+		],
+		"getRarityMessage": [
+			{
+				"name": "getRarityMessage",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\components\\games\\gacha\\utils.ts",
+				"type": "const",
+				"isDefault": false
+			}
+		],
+		"countRarities": [
+			{
+				"name": "countRarities",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\components\\games\\gacha\\utils.ts",
+				"type": "const",
+				"isDefault": false
+			}
+		],
+		"getTenPullMessage": [
+			{
+				"name": "getTenPullMessage",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\components\\games\\gacha\\utils.ts",
+				"type": "const",
+				"isDefault": false
+			}
+		],
+		"getBannerStyle": [
+			{
+				"name": "getBannerStyle",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\components\\games\\gacha\\utils.ts",
+				"type": "const",
+				"isDefault": false
+			}
+		],
+		"createAnimationSequence": [
+			{
+				"name": "createAnimationSequence",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\components\\games\\gacha\\utils.ts",
+				"type": "const",
+				"isDefault": false
+			}
+		],
+		"getSexinessLevel": [
+			{
+				"name": "getSexinessLevel",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\components\\games\\gacha\\utils.ts",
+				"type": "const",
+				"isDefault": false
+			}
+		],
+		"getSexinessColor": [
+			{
+				"name": "getSexinessColor",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\components\\games\\gacha\\utils.ts",
+				"type": "const",
+				"isDefault": false
+			}
+		],
+		"LabelPrimitive": [
+			{
+				"name": "LabelPrimitive",
+				"module": "@radix-ui/react-label",
+				"isDefault": true,
+				"asDefinition": "* as LabelPrimitive"
+			}
+		],
+		"OTPInput": [
+			{
+				"name": "OTPInput",
+				"module": "input-otp@1.4.2",
+				"isDefault": false
+			}
+		],
+		"OTPInputContext": [
+			{
+				"name": "OTPInputContext",
+				"module": "input-otp@1.4.2",
+				"isDefault": false
+			}
+		],
+		"MinusIcon": [
+			{
+				"name": "MinusIcon",
+				"module": "lucide-react@0.487.0",
+				"isDefault": false
+			}
+		],
+		"HoverCardPrimitive": [
+			{
+				"name": "HoverCardPrimitive",
+				"module": "@radix-ui/react-hover-card",
+				"isDefault": true,
+				"asDefinition": "* as HoverCardPrimitive"
+			}
+		],
+		"DropdownMenuPrimitive": [
+			{
+				"name": "DropdownMenuPrimitive",
+				"module": "@radix-ui/react-dropdown-menu@2.1.6",
+				"isDefault": true,
+				"asDefinition": "* as DropdownMenuPrimitive"
+			}
+		],
+		"CheckIcon": [
+			{
+				"name": "CheckIcon",
+				"module": "lucide-react",
+				"isDefault": false
+			},
+			{
+				"name": "CheckIcon",
+				"module": "lucide-react@0.487.0",
+				"isDefault": false
+			}
+		],
+		"ChevronRightIcon": [
+			{
+				"name": "ChevronRightIcon",
+				"module": "lucide-react",
+				"isDefault": false
+			},
+			{
+				"name": "ChevronRightIcon",
+				"module": "lucide-react@0.487.0",
+				"isDefault": false
+			}
+		],
+		"CircleIcon": [
+			{
+				"name": "CircleIcon",
+				"module": "lucide-react@0.487.0",
+				"isDefault": false
+			},
+			{
+				"name": "CircleIcon",
+				"module": "lucide-react",
+				"isDefault": false
+			}
+		],
+		"ANIMATION_DURATIONS": [
+			{
+				"name": "ANIMATION_DURATIONS",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\components\\games\\gacha\\constants.ts",
+				"type": "const",
+				"isDefault": false
+			}
+		],
+		"RARITY_COLORS": [
+			{
+				"name": "RARITY_COLORS",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\components\\games\\gacha\\constants.ts",
+				"type": "const",
+				"isDefault": false
+			}
+		],
+		"SEXY_EMOJIS": [
+			{
+				"name": "SEXY_EMOJIS",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\components\\games\\gacha\\constants.ts",
+				"type": "const",
+				"isDefault": false
+			}
+		],
+		"GACHA_ITEMS": [
+			{
+				"name": "GACHA_ITEMS",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\components\\games\\gacha\\constants.ts",
+				"type": "const",
+				"isDefault": false
+			}
+		],
+		"GACHA_BANNERS": [
+			{
+				"name": "GACHA_BANNERS",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\components\\games\\gacha\\constants.ts",
+				"type": "const",
+				"isDefault": false
+			}
+		],
+		"Drawer as DrawerPrimitive": [
+			{
+				"name": "Drawer as DrawerPrimitive",
+				"module": "vaul@1.1.2",
+				"isDefault": false
+			}
+		],
+		"DialogPrimitive": [
+			{
+				"name": "DialogPrimitive",
+				"module": "@radix-ui/react-dialog",
+				"isDefault": true,
+				"asDefinition": "* as DialogPrimitive"
+			}
+		],
+		"XIcon": [
+			{
+				"name": "XIcon",
+				"module": "lucide-react@0.487.0",
+				"isDefault": false
+			},
+			{
+				"name": "XIcon",
+				"module": "lucide-react",
+				"isDefault": false
+			}
+		],
+		"SexyBannerSelector": [
+			{
+				"name": "SexyBannerSelector",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\components\\games\\gacha\\components.tsx",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"SexyItemCard": [
+			{
+				"name": "SexyItemCard",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\components\\games\\gacha\\components.tsx",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"SexyResultOverlay": [
+			{
+				"name": "SexyResultOverlay",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\components\\games\\gacha\\components.tsx",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"SexyEmojis": [
+			{
+				"name": "SexyEmojis",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\components\\games\\gacha\\components.tsx",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"BackgroundEffects": [
+			{
+				"name": "BackgroundEffects",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\components\\games\\gacha\\components.tsx",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"SexyPullResultsModal": [
+			{
+				"name": "SexyPullResultsModal",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\components\\games\\gacha\\components.tsx",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"SexyInventoryModal": [
+			{
+				"name": "SexyInventoryModal",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\components\\games\\gacha\\components.tsx",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"Heart": [
+			{
+				"name": "Heart",
+				"module": "lucide-react",
+				"isDefault": false
+			}
+		],
+		"Package": [
+			{
+				"name": "Package",
+				"module": "lucide-react",
+				"isDefault": false
+			}
+		],
+		"ContextMenuPrimitive": [
+			{
+				"name": "ContextMenuPrimitive",
+				"module": "@radix-ui/react-context-menu@2.2.6",
+				"isDefault": true,
+				"asDefinition": "* as ContextMenuPrimitive"
+			}
+		],
+		"Command as CommandPrimitive": [
+			{
+				"name": "Command as CommandPrimitive",
+				"module": "cmdk@1.1.1",
+				"isDefault": false
+			}
+		],
+		"SearchIcon": [
+			{
+				"name": "SearchIcon",
+				"module": "lucide-react@0.487.0",
+				"isDefault": false
+			}
+		],
+		"CollapsiblePrimitive": [
+			{
+				"name": "CollapsiblePrimitive",
+				"module": "@radix-ui/react-collapsible@1.1.3",
+				"isDefault": true,
+				"asDefinition": "* as CollapsiblePrimitive"
+			}
+		],
+		"CheckboxPrimitive": [
+			{
+				"name": "CheckboxPrimitive",
+				"module": "@radix-ui/react-checkbox@1.1.4",
+				"isDefault": true,
+				"asDefinition": "* as CheckboxPrimitive"
+			}
+		],
+		"InputProps": [
+			{
+				"name": "InputProps",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\components\\ui\\input.tsx",
+				"type": "interface",
+				"isDefault": false
+			}
+		],
+		"ChartConfig": [
+			{
+				"name": "ChartConfig",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\components\\ui\\chart.tsx",
+				"type": "type",
+				"isDefault": false
+			}
+		],
+		"RechartsPrimitive": [
+			{
+				"name": "RechartsPrimitive",
+				"module": "recharts",
+				"isDefault": true,
+				"asDefinition": "* as RechartsPrimitive"
+			}
+		],
+		"MenubarPrimitive": [
+			{
+				"name": "MenubarPrimitive",
+				"module": "@radix-ui/react-menubar",
+				"isDefault": true,
+				"asDefinition": "* as MenubarPrimitive"
+			}
+		],
+		"useIsMobile": [
+			{
+				"name": "useIsMobile",
+				"path": "c:\\Users\\bdbd\\0000\\cc-webapp\\frontend\\components\\ui\\use-mobile.ts",
+				"type": "function",
+				"isDefault": false
+			}
+		],
+		"TooltipPrimitive": [
+			{
+				"name": "TooltipPrimitive",
+				"module": "@radix-ui/react-tooltip@1.1.8",
+				"isDefault": true,
+				"asDefinition": "* as TooltipPrimitive"
+			}
+		],
+		"TogglePrimitive": [
+			{
+				"name": "TogglePrimitive",
+				"module": "@radix-ui/react-toggle@1.1.2",
+				"isDefault": true,
+				"asDefinition": "* as TogglePrimitive"
+			}
+		],
+		"ToggleGroupPrimitive": [
+			{
+				"name": "ToggleGroupPrimitive",
+				"module": "@radix-ui/react-toggle-group@1.1.2",
+				"isDefault": true,
+				"asDefinition": "* as ToggleGroupPrimitive"
+			}
+		],
+		"TabsPrimitive": [
+			{
+				"name": "TabsPrimitive",
+				"module": "@radix-ui/react-tabs",
+				"isDefault": true,
+				"asDefinition": "* as TabsPrimitive"
+			}
+		],
+		"SwitchPrimitive": [
+			{
+				"name": "SwitchPrimitive",
+				"module": "@radix-ui/react-switch",
+				"isDefault": true,
+				"asDefinition": "* as SwitchPrimitive"
+			}
+		],
+		"useTheme": [
+			{
+				"name": "useTheme",
+				"module": "next-themes",
+				"isDefault": false
+			}
+		],
+		"Toaster as Sonner": [
+			{
+				"name": "Toaster as Sonner",
+				"module": "sonner",
+				"isDefault": false
+			}
+		],
+		"ToasterProps": [
+			{
+				"name": "ToasterProps",
+				"module": "sonner",
+				"isDefault": false
+			}
+		],
+		"SliderPrimitive": [
+			{
+				"name": "SliderPrimitive",
+				"module": "@radix-ui/react-slider",
+				"isDefault": true,
+				"asDefinition": "* as SliderPrimitive"
+			}
+		],
+		"VariantProps": [
+			{
+				"name": "VariantProps",
+				"module": "class-variance-authority",
+				"isDefault": false
+			}
+		],
+		"PanelLeftIcon": [
+			{
+				"name": "PanelLeftIcon",
+				"module": "lucide-react",
+				"isDefault": false
+			}
+		],
+		"SheetPrimitive": [
+			{
+				"name": "SheetPrimitive",
+				"module": "@radix-ui/react-dialog@1.1.6",
+				"isDefault": true,
+				"asDefinition": "* as SheetPrimitive"
+			}
+		],
+		"SeparatorPrimitive": [
+			{
+				"name": "SeparatorPrimitive",
+				"module": "@radix-ui/react-separator@1.1.2",
+				"isDefault": true,
+				"asDefinition": "* as SeparatorPrimitive"
+			}
+		],
+		"SelectPrimitive": [
+			{
+				"name": "SelectPrimitive",
+				"module": "@radix-ui/react-select",
+				"isDefault": true,
+				"asDefinition": "* as SelectPrimitive"
+			}
+		],
+		"ScrollAreaPrimitive": [
+			{
+				"name": "ScrollAreaPrimitive",
+				"module": "@radix-ui/react-scroll-area@1.2.3",
+				"isDefault": true,
+				"asDefinition": "* as ScrollAreaPrimitive"
+			}
+		],
+		"GripVerticalIcon": [
+			{
+				"name": "GripVerticalIcon",
+				"module": "lucide-react@0.487.0",
+				"isDefault": false
+			}
+		],
+		"ResizablePrimitive": [
+			{
+				"name": "ResizablePrimitive",
+				"module": "react-resizable-panels@2.1.7",
+				"isDefault": true,
+				"asDefinition": "* as ResizablePrimitive"
+			}
+		],
+		"RadioGroupPrimitive": [
+			{
+				"name": "RadioGroupPrimitive",
+				"module": "@radix-ui/react-radio-group",
+				"isDefault": true,
+				"asDefinition": "* as RadioGroupPrimitive"
+			}
+		],
+		"ProgressPrimitive": [
+			{
+				"name": "ProgressPrimitive",
+				"module": "@radix-ui/react-progress",
+				"isDefault": true,
+				"asDefinition": "* as ProgressPrimitive"
+			}
+		],
+		"PopoverPrimitive": [
+			{
+				"name": "PopoverPrimitive",
+				"module": "@radix-ui/react-popover@1.1.6",
+				"isDefault": true,
+				"asDefinition": "* as PopoverPrimitive"
+			}
+		],
+		"NavigationMenuPrimitive": [
+			{
+				"name": "NavigationMenuPrimitive",
+				"module": "@radix-ui/react-navigation-menu@1.2.5",
+				"isDefault": true,
+				"asDefinition": "* as NavigationMenuPrimitive"
+			}
+		]
+	}
+}

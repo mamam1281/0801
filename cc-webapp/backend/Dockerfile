@@ -18,5 +18,5 @@ COPY . .
 # 포트 노출
 EXPOSE 8000
 
-# 시작 명령
-CMD ["uvicorn", "app.main_simple:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+# 시작 명령 (통합 main.py 사용)
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
