@@ -18,5 +18,5 @@ COPY . .
 # 포트 노출
 EXPOSE 8000
 
-# 시작 명령
-CMD ["uvicorn", "app.main_simple:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+# 시작 명령 - 독립형 앱 실행
+CMD ["uvicorn", "app.standalone_app:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]

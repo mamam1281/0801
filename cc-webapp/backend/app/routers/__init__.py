@@ -2,7 +2,8 @@
 # Clean English comments only - no Unicode issues
 
 # Core authentication and user management
-from . import auth  # Authentication system
+# from . import auth  # Authentication system - 순환 임포트 문제로 제거
+from . import auth_simple  # Simplified Authentication
 from . import users  # User API
 
 # Administrative and basic game functions

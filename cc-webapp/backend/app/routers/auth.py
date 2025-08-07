@@ -1,452 +1,22 @@
-"""Authentication Router for Casino-Club F2P
+"""통합된 인증 API 라우터
 
-This module handles authentication endpoints including:
-- User login/logout
-- Admin login
-- Token refresh
-- Session management
-"""
-
-from datetime import datetime
-import logging
-from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer, OAuth2PasswordRequestForm
-from sqlalchemy.orm import Session
-
-from ..services.auth_service import AuthService
-from ..database import get_db
-from ..schemas.auth import (
-    UserCreate,
-    UserLogin,
-    AdminLogin,
-    UserResponse,
-    Token
-)
-from ..models.auth_models import User
-from ..config import settings
-
-# Configure logging
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-if not logger.handlers:
-    handler = logging.StreamHandler()
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
-
-# Initialize router and security scheme
+Casino-Club F2P - 인증 시스# 라우터 정의
 router = APIRouter(
     prefix="/api/auth",
-    tags=["authentication"],
-    responses={401: {"description": "Authentication failed"}}
+    tags=["authentication"]
 )
-security = HTTPBearer()
 
 def get_auth_service(db: Session = Depends(get_db)) -> AuthService:
-    """Create and return an instance of AuthService"""
+    """AuthService 인스턴스 생성"""
     return AuthService(db)
 
 @router.post("/login", response_model=Token)
 async def login(
-    form_data: OAuth2PasswordRequestForm = Depends(),
-    auth_service: AuthService = Depends(get_auth_service)
+    form_data: UserLogin,
+    auth_service: AuthService = Depends(get_auth_service),
+    request: Request = None
 ):
-    """Handle user login"""
-    try:
-        user = auth_service.authenticate_user(
-            form_data.username,
-            form_data.password
-        )
-        if not user:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid username or password",
-                headers={"WWW-Authenticate": "Bearer"}
-            )
-            
-        token_data = {
-            "sub": str(user.id),
-            "site_id": user.site_id,
-            "is_admin": user.is_admin
-        }
-        access_token = auth_service.create_access_token(token_data)
-        
-        user.last_login = datetime.utcnow()
-        auth_service.db.commit()
-        
-        user_response = UserResponse(
-            id=user.id,
-            site_id=user.site_id,
-            nickname=user.nickname,
-            phone_number=user.phone_number,
-            cyber_token_balance=user.cyber_token_balance,
-            created_at=user.created_at,
-            last_login=user.last_login,
-            is_admin=user.is_admin,
-            is_active=user.is_active
-        )
-        
-        logger.info(f"User logged in successfully: {user.site_id}")
-        return Token(
-            access_token=access_token,
-            token_type="bearer",
-            user=user_response
-        )
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Login failed: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error during login"
-        )
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Login failed: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error during login"
-        )
-
-@router.post("/admin/login", response_model=Token)
-async def admin_login(
-    form_data: AdminLogin,
-    auth_service: AuthService = Depends(get_auth_service)
-):
-    """Handle admin login"""
-    try:
-        # Authenticate admin
-        user = auth_service.authenticate_admin(
-            form_data.site_id,
-            form_data.password
-        )
-        if not user:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid credentials or insufficient permissions",
-                headers={"WWW-Authenticate": "Bearer"}
-            )
-            
-        # Generate token
-        token_data = {
-            "sub": str(user.id),
-            "site_id": user.site_id,
-            "is_admin": True
-        }
-        access_token = auth_service.create_access_token(token_data)
-        
-        # Update login timestamp
-        user.last_login = datetime.utcnow()
-        auth_service.db.commit()
-        
-        # Prepare response
-        user_response = UserResponse(
-            id=user.id,
-            site_id=user.site_id,
-            nickname=user.nickname,
-            phone_number=user.phone_number,
-            cyber_token_balance=user.cyber_token_balance,
-            created_at=user.created_at,
-            last_login=user.last_login,
-            is_admin=user.is_admin,
-            is_active=user.is_active
-        )
-        
-        logger.info(f"Admin logged in successfully: {user.site_id}")
-        return Token(
-            access_token=access_token,
-            token_type="bearer",
-            user=user_response
-        )
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Admin login failed: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error during admin login"
-        )
-
-@router.post("/refresh", response_model=Token)
-async def refresh_token(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-    auth_service: AuthService = Depends(get_auth_service)
-):
-    """Refresh access token"""
-    try:
-        # Verify current token
-        token_data = auth_service.verify_token(credentials.credentials)
-        
-        # Get user
-        user = auth_service.db.query(User).filter(
-            User.id == int(token_data["sub"])
-        ).first()
-        if not user:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="User not found"
-            )
-            
-        # Generate new token
-        token_data = {
-            "sub": str(user.id),
-            "site_id": user.site_id,
-            "is_admin": user.is_admin
-        }
-        access_token = auth_service.create_access_token(token_data)
-        
-        # Prepare response
-        user_response = UserResponse(
-            id=user.id,
-            site_id=user.site_id,
-            nickname=user.nickname,
-            phone_number=user.phone_number,
-            cyber_token_balance=user.cyber_token_balance,
-            created_at=user.created_at,
-            last_login=user.last_login,
-            is_admin=user.is_admin,
-            is_active=user.is_active
-        )
-        
-        logger.info(f"Token refreshed for user: {user.site_id}")
-        return Token(
-            access_token=access_token,
-            token_type="bearer",
-            user=user_response
-        )
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Token refresh failed: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error during token refresh"
-        )
-
-@router.post("/logout")
-async def logout(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-    auth_service: AuthService = Depends(get_auth_service)
-):
-    """Handle user logout"""
-    try:
-        # Verify and blacklist token
-        token_data = auth_service.verify_token(credentials.credentials)
-        auth_service.blacklist_token(
-            credentials.credentials,
-            reason="logout",
-            user_id=token_data["sub"]
-        )
-        
-        logger.info(f"User logged out: {token_data['sub']}")
-        return {"message": "Logged out successfully"}
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Logout failed: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error during logout"
-        )
-):
-    """User login endpoint"""
-    try:
-        # Authenticate user
-        user = auth_service.authenticate_user(
-            form_data.username,
-            form_data.password
-        )
-        if not user:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Incorrect username or password",
-                headers={"WWW-Authenticate": "Bearer"}
-            )
-        
-        # Create access token
-        access_token = auth_service.create_access_token({
-            "sub": str(user.id),
-            "site_id": user.site_id,
-            "is_admin": user.is_admin
-        })
-        
-        # Update last login time
-        user.last_login = datetime.utcnow()
-        auth_service.db.commit()
-        
-        # Create response
-        user_response = UserResponse(
-            id=user.id,
-            site_id=user.site_id,
-            nickname=user.nickname,
-            phone_number=user.phone_number,
-            cyber_token_balance=user.cyber_token_balance,
-            created_at=user.created_at,
-            last_login=user.last_login,
-            is_admin=user.is_admin,
-            is_active=user.is_active
-        )
-        
-        logger.info(f"Login successful for user: {user.site_id}")
-        return Token(
-            access_token=access_token,
-            token_type="bearer",
-            user=user_response
-        )
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Login error: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error during login process"
-        )
-
-@router.post("/admin/login", response_model=Token)
-async def admin_login(
-    form_data: AdminLogin,
-    auth_service: AuthService = Depends(get_auth_service)
-):
-    """Admin login endpoint"""
-    try:
-        # Authenticate admin
-        user = auth_service.authenticate_admin(
-            form_data.site_id,
-            form_data.password
-        )
-        if not user:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Incorrect username or password or not admin",
-                headers={"WWW-Authenticate": "Bearer"}
-            )
-        
-        # Create access token
-        access_token = auth_service.create_access_token({
-            "sub": str(user.id),
-            "site_id": user.site_id,
-            "is_admin": True
-        })
-        
-        # Update last login time
-        user.last_login = datetime.utcnow()
-        auth_service.db.commit()
-        
-        # Create response
-        user_response = UserResponse(
-            id=user.id,
-            site_id=user.site_id,
-            nickname=user.nickname,
-            phone_number=user.phone_number,
-            cyber_token_balance=user.cyber_token_balance,
-            created_at=user.created_at,
-            last_login=user.last_login,
-            is_admin=user.is_admin,
-            is_active=user.is_active
-        )
-        
-        logger.info(f"Admin login successful for user: {user.site_id}")
-        return Token(
-            access_token=access_token,
-            token_type="bearer",
-            user=user_response
-        )
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Admin login error: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error during admin login process"
-        )
-
-@router.post("/refresh")
-async def refresh_token(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-    auth_service: AuthService = Depends(get_auth_service)
-):
-    """Refresh access token"""
-    try:
-        # Verify current token
-        token_data = auth_service.verify_token(credentials.credentials)
-        
-        # Get user
-        user = auth_service.db.query(User).filter(
-            User.id == int(token_data["sub"])
-        ).first()
-        if not user:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="User not found"
-            )
-        
-        # Create new access token
-        access_token = auth_service.create_access_token({
-            "sub": str(user.id),
-            "site_id": user.site_id,
-            "is_admin": user.is_admin
-        })
-        
-        # Create response
-        user_response = UserResponse(
-            id=user.id,
-            site_id=user.site_id,
-            nickname=user.nickname,
-            phone_number=user.phone_number,
-            cyber_token_balance=user.cyber_token_balance,
-            created_at=user.created_at,
-            last_login=user.last_login,
-            is_admin=user.is_admin,
-            is_active=user.is_active
-        )
-        
-        logger.info(f"Token refresh successful for user: {user.site_id}")
-        return Token(
-            access_token=access_token,
-            token_type="bearer",
-            user=user_response
-        )
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Token refresh error: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error during token refresh"
-        )
-
-@router.post("/logout")
-async def logout(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-    auth_service: AuthService = Depends(get_auth_service)
-):
-    """Logout endpoint"""
-    try:
-        # Add token to blacklist
-        token_data = auth_service.verify_token(credentials.credentials)
-        auth_service.blacklist_token(
-            credentials.credentials,
-            reason="logout",
-            user_id=token_data["sub"]
-        )
-        
-        logger.info(f"Logout successful for user ID: {token_data['sub']}")
-        return {"message": "Successfully logged out"}
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Logout error: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error during logout process"
-        )
-):
-    """User login endpoint"""
+    """일반 사용자 로그인"""
     user = auth_service.authenticate_user(form_data.site_id, form_data.password)
     if not user:
         raise HTTPException(
@@ -575,26 +145,21 @@ async def logout(
             detail="Could not blacklist token"
         )
     
-    return {"message": "Successfully logged out"}
-
-"""
-Features:
-- User registration with invitation code
-- Username/password login
-- JWT token management (access + refresh)
-- Session management and security
-- Token blacklist
-- Logout
+    return {"message": "Successfully logged out"}============================================================================
+기능:
+- 초대 코드를 통한 회원가입
+- 아이디/비밀번호 로그인
+- JWT 토큰 관리 (액세스 + 리프레시)
+- 세션 관리 및 보안
+- 토큰 블랙리스트
+- 로그아웃
 """
 
 import logging
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
-import jwt
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Response
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer, OAuth2PasswordRequestForm
-from ..models.auth import InviteCode
-from ..config import settings
 from sqlalchemy.orm import Session
 
 from ..auth.auth_service import AuthService
@@ -621,18 +186,14 @@ if not logger.handlers:
 # HTTP 보안 스키마
 security = HTTPBearer()
 
-# Router definition
+# 라우터 정의
 router = APIRouter(
     prefix="/api/auth",
     tags=["authentication"]
 )
 
-class AuthHandler:
-    def __init__(self, db: Session):
-        self.db = db
-
     def create_access_token(self, data: dict, expires_delta: Optional[timedelta] = None) -> str:
-        """Create JWT access token"""
+        """JWT 액세스 토큰 생성"""
         try:
             to_encode = data.copy()
             expire = datetime.utcnow() + (expires_delta or timedelta(minutes=settings.jwt_expire_minutes))
