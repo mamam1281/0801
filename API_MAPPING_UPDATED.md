@@ -1,33 +1,4 @@
-# API 매핑 및 인증 시스템 가이드
-
-## 🚀 빠른 시작
-
-### 1. Docker 환경 시작
-```bash
-# PowerShell에서 실행
-./docker-manage-simple.ps1 start --tools
-```
-
-### 2. 데이터베이스 초기화
-```bash
-# 데이터베이스 컨테이너에 접속
-docker exec -it your_db_container_name psql -U your_db_user -d your_db_name
-
-# 데이터베이스 초기화 스크립트 실행
-\i /path/to/your/init_script.sql
-```
-
-### 3. 백엔드 서버 시작
-```bash
-# 백엔드 서비스 재시작
-docker-compose restart backend
-```
-
-### 4. 프론트엔드 서버 시작
-```bash
-# 프론트엔드 서비스 재시작
-docker-compose restart frontend
-```
+# API 매핑 및 인증 시스템 문제 해결 가이드
 
 ## 문제 진단
 

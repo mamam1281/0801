@@ -1,0 +1,86 @@
+version: "3.8"
+
+services:
+  backend_standalone:
+    build:
+      context: ./cc-webapp/backend
+      dockerfile: Dockerfile.standalone
+    container_name: cc_backend_standalone
+    environment:
+      - PYTHONPATH=/app
+      - POSTGRES_SERVER=${POSTGRES_SERVER:-postgres_standalone}
+      - POSTGRES_USER=${POSTGRES_USER:-cc_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-cc_password}
+      - POSTGRES_DB=${POSTGRES_DB:-cc_webapp}
+      - REDIS_HOST=${REDIS_HOST:-redis_standalone}
+      - REDIS_PORT=${REDIS_PORT:-6379}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-secret_key_for_development_only}
+      - DEBUG=true
+    volumes:
+      - ./cc-webapp/backend:/app
+      - ./logs/backend_standalone:/app/logs:rw
+    ports:
+      - "8001:8000"  # 다른 포트 사용
+    depends_on:
+      - postgres_standalone
+      - redis_standalone
+    networks:
+      - ccnet_standalone
+
+  frontend:
+    build:
+      context: ./cc-webapp/frontend
+      dockerfile: Dockerfile.dev
+    container_name: cc_frontend_standalone
+    environment:
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8001}
+    volumes:
+      - ./cc-webapp/frontend:/app
+      - ./logs/frontend_standalone:/app/logs:rw
+    ports:
+      - "3001:3000"  # 다른 포트 사용
+    depends_on:
+      - backend_standalone
+    networks:
+      - ccnet_standalone
+
+  postgres_standalone:
+    image: postgres:14
+    container_name: cc_postgres_standalone
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-cc_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-cc_password}
+      - POSTGRES_DB=${POSTGRES_DB:-cc_webapp}
+    volumes:
+      - ./data/postgres_standalone:/var/lib/postgresql/data:rw
+      - ./logs/postgres_standalone:/var/log/postgresql:rw
+    ports:
+      - "5433:5432"  # 다른 포트 사용
+    networks:
+      - ccnet_standalone
+
+  redis_standalone:
+    image: redis:7
+    container_name: cc_redis_standalone
+    command: redis-server --requirepass ${REDIS_PASSWORD:-redis_password}
+    ports:
+      - "6380:6379"  # 다른 포트 사용
+    networks:
+      - ccnet_standalone
+
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: cc_pgadmin_standalone
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=${PGADMIN_EMAIL:-admin@casino-club.local}
+      - PGADMIN_DEFAULT_PASSWORD=${PGADMIN_PASSWORD:-admin123}
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres_standalone
+    networks:
+      - ccnet_standalone
+
+networks:
+  ccnet_standalone:
+    driver: bridge
