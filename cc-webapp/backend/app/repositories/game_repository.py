@@ -6,7 +6,7 @@ from sqlalchemy import func
 from datetime import datetime, timedelta
 
 from .. import models
-from ..config_simple import get_settings
+from ..config import get_settings
 
 logger = logging.getLogger(__name__)
 
