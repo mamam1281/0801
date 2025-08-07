@@ -42,8 +42,8 @@ from app.routers import (
     notifications,
     doc_titles,  # Phase 1 added
     feedback,    # Phase 2 added
-    # games,       # Phase 3 added - 통합된 게임 API (Replaced with games_direct)
-    games_direct, # Fixed games router - direct JSON response
+    games,       # 통합된 게임 라우터 (games_direct 내용으로 대체됨)
+    # games_direct, # 중복 제거: games.py에 통합됨
     # game_api,    # 중복 제거: games.router에 통합됨
     invite_router,  # Phase 5 added
     analyze,     # Phase 6 added
@@ -172,8 +172,7 @@ app.include_router(doc_titles.router, tags=["Document Titles"])
 app.include_router(feedback.router, tags=["Feedback"])
 
 # Phase 3: Game Collection (no prefix - routers have their own) - 통합된 게임 API
-# Replaced games router with games_direct
-app.include_router(games_direct.router, tags=["Game Collection"])
+app.include_router(games.router, tags=["Game Collection"])
 
 # Phase 4: Unified Game API (no prefix - routers have their own) - 중복 제거
 # app.include_router(game_api.router, tags=["Game API"])  # 중복 제거: games.router에 통합됨
@@ -199,7 +198,7 @@ app.include_router(events.router)  # 태그 오버라이드 제거 - 이미 even
 print("✅ Core API endpoints registered")
 print("✅ Progressive Expansion features registered") 
 print("✅ No duplicate API registrations - Clean structure maintained")
-print("✅ Using games_direct router with improved JSON responses")
+print("✅ Using integrated games router with improved JSON responses")
 
 # ===== Core API Endpoints =====
 
