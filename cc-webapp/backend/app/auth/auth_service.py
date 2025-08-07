@@ -42,7 +42,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import and_
 
 from ..database import get_db
-from ..models import auth_models
+from ..models import auth_models, token_blacklist
 
 logger = logging.getLogger("unified_auth")
 
@@ -61,6 +61,271 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 class AuthService:
     """🎰 통합 인증 서비스 - 모든 auth 기능 포함"""
+    
+    def __init__(self, db: Session):
+        """서비스 초기화"""
+        self.db = db
+        self.pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+        try:
+            import redis
+            self.redis_client = redis.Redis(
+                host='redis',
+                port=6379,
+                db=0,
+                decode_responses=True
+            )
+        except Exception as e:
+            logger.warning(f"Redis connection failed: {e}")
+            self.redis_client = None
+    
+    def authenticate_user(self, username: str, password: str) -> Optional[auth_models.User]:
+        """일반 사용자 인증
+        
+        Args:
+            username: 사용자 아이디
+            password: 비밀번호
+            
+        Returns:
+            인증된 User 객체 또는 None
+        """
+        user = self.db.query(auth_models.User).filter(
+            auth_models.User.site_id == username
+        ).first()
+        
+        if not user:
+            return None
+            
+        if not self.pwd_context.verify(password, user.password_hash):
+            return None
+            
+        return user
+    
+    def authenticate_admin(self, username: str, password: str) -> Optional[auth_models.User]:
+        """관리자 인증
+        
+        Args:
+            username: 관리자 아이디
+            password: 비밀번호
+            
+        Returns:
+            인증된 관리자 User 객체 또는 None
+        """
+        user = self.authenticate_user(username, password)
+        if not user or not user.is_admin:
+            return None
+            
+        return user
+
+    def verify_token(self, token: str) -> dict:
+        """토큰 검증 및 페이로드 반환
+        
+        Args:
+            token: JWT 토큰
+            
+        Returns:
+            토큰 페이로드
+            
+        Raises:
+            HTTPException: 토큰이 유효하지 않거나 블랙리스트에 있는 경우
+        """
+        try:
+            # 블랙리스트 확인
+            if self.is_token_blacklisted(token):
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Token has been revoked"
+                )
+            
+            # 토큰 복호화 및 검증
+            payload = jwt.decode(
+                token, 
+                JWT_SECRET_KEY,
+                algorithms=[JWT_ALGORITHM]
+            )
+            
+            # 토큰 타입 확인 (리프레시 토큰은 별도 처리)
+            if payload.get("token_type") == "refresh":
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid token type"
+                )
+            
+            return payload
+            
+        except JWTError:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Could not validate credentials"
+            )
+    
+    def create_refresh_token(self, data: dict) -> str:
+        """리프레시 토큰 생성
+        
+        Args:
+            data: 토큰에 포함될 데이터
+            
+        Returns:
+            JWT 리프레시 토큰
+        """
+        to_encode = data.copy()
+        expire = datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+        
+        to_encode.update({
+            "exp": expire,
+            "jti": str(uuid.uuid4()),
+            "token_type": "refresh"
+        })
+        
+        return jwt.encode(to_encode, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
+    
+    def verify_refresh_token(self, token: str) -> dict:
+        """리프레시 토큰 검증
+        
+        Args:
+            token: 리프레시 토큰
+            
+        Returns:
+            토큰 페이로드
+            
+        Raises:
+            HTTPException: 토큰이 유효하지 않거나 블랙리스트에 있는 경우
+        """
+        try:
+            # 블랙리스트 확인
+            if self.is_token_blacklisted(token):
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Token has been revoked"
+                )
+            
+            # 토큰 복호화 및 검증
+            payload = jwt.decode(
+                token,
+                JWT_SECRET_KEY,
+                algorithms=[JWT_ALGORITHM]
+            )
+            
+            # 리프레시 토큰 타입 확인
+            if payload.get("token_type") != "refresh":
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid token type"
+                )
+            
+            return payload
+            
+        except JWTError:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Could not validate refresh token"
+            )
+    
+    def blacklist_token(self, token: str, reason: str = "logout") -> bool:
+        """토큰을 블랙리스트에 추가
+        
+        Args:
+            token: 블랙리스트에 추가할 토큰
+            reason: 블랙리스트 추가 사유
+            
+        Returns:
+            성공 여부
+        """
+        try:
+            # 토큰 디코딩
+            payload = jwt.decode(
+                token,
+                JWT_SECRET_KEY,
+                algorithms=[JWT_ALGORITHM]
+            )
+            
+            jti = payload.get("jti")
+            exp = payload.get("exp")
+            user_id = payload.get("sub")
+            
+            if not jti or not exp:
+                logger.warning("Token missing required claims")
+                return False
+            
+            # Redis에 저장 시도
+            if self.redis_client:
+                try:
+                    expire_time = datetime.fromtimestamp(exp) - datetime.utcnow()
+                    if expire_time.total_seconds() > 0:
+                        self.redis_client.setex(
+                            f"blacklist:{jti}",
+                            int(expire_time.total_seconds()),
+                            reason
+                        )
+                        logger.info(f"Token {jti} blacklisted in Redis")
+                        return True
+                except Exception as e:
+                    logger.warning(f"Redis operation failed: {e}")
+            
+            # DB에 저장
+            blacklist_token = token_blacklist.TokenBlacklist(
+                token=token,
+                jti=jti,
+                expires_at=datetime.fromtimestamp(exp),
+                blacklisted_by=user_id,
+                reason=reason
+            )
+            
+            self.db.add(blacklist_token)
+            self.db.commit()
+            
+            logger.info(f"Token {jti} blacklisted in database")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to blacklist token: {e}")
+            return False
+    
+    def is_token_blacklisted(self, token: str) -> bool:
+        """토큰이 블랙리스트에 있는지 확인
+        
+        Args:
+            token: 확인할 토큰
+            
+        Returns:
+            블랙리스트 포함 여부
+        """
+        try:
+            # 토큰 디코딩
+            payload = jwt.decode(
+                token,
+                JWT_SECRET_KEY,
+                algorithms=[JWT_ALGORITHM]
+            )
+            
+            jti = payload.get("jti")
+            if not jti:
+                return False
+            
+            # Redis 확인
+            if self.redis_client:
+                try:
+                    exists = self.redis_client.exists(f"blacklist:{jti}")
+                    if exists:
+                        logger.info(f"Token {jti} found in Redis blacklist")
+                        return True
+                except Exception as e:
+                    logger.warning(f"Redis operation failed: {e}")
+            
+            # DB 확인
+            exists = self.db.query(token_blacklist.TokenBlacklist).filter(
+                token_blacklist.TokenBlacklist.jti == jti,
+                token_blacklist.TokenBlacklist.expires_at > datetime.utcnow()
+            ).first()
+            
+            if exists:
+                logger.info(f"Token {jti} found in database blacklist")
+                return True
+            
+            return False
+            
+        except Exception as e:
+            logger.error(f"Failed to check token blacklist: {e}")
+            return True  # 오류 시 보안을 위해 블랙리스트 처리된 것으로 간주
     
     # ===== 초대코드 기반 가입 기능 =====
     @staticmethod

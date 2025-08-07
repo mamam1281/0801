@@ -1,0 +1,206 @@
+version: '3.8'
+
+services:
+  # ===== 백엔드 API 서버 =====
+  backend:
+    build: 
+      context: ./cc-webapp/backend
+      dockerfile: Dockerfile
+    container_name: cc_api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./cc-webapp/backend:/app
+      - ./logs/backend:/app/logs
+    environment:
+      - ENVIRONMENT=development
+      - DATABASE_URL=postgresql://cc_user:cc_password@postgres:5432/cc_webapp
+      - REDIS_URL=redis://:redis_password@redis:6379/0
+      - JWT_SECRET_KEY=dev_jwt_secret_key_change_in_production
+      - JWT_ALGORITHM=HS256
+      - JWT_ACCESS_TOKEN_EXPIRE_MINUTES=60
+      - JWT_REFRESH_TOKEN_EXPIRE_DAYS=7
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ===== 프론트엔드 웹앱 서버 =====
+  frontend:
+    build:
+      context: ./cc-webapp/frontend
+      dockerfile: Dockerfile
+    container_name: cc_webapp
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./cc-webapp/frontend:/app
+      - /app/node_modules
+      - /app/.next
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NODE_ENV=development
+    depends_on:
+      - backend
+
+  # ===== PostgreSQL 데이터베이스 =====
+  postgres:
+    image: postgres:14
+    container_name: cc_postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./data/init:/docker-entrypoint-initdb.d
+      - ./logs/postgres:/var/log/postgresql
+    environment:
+      - POSTGRES_USER=cc_user
+      - POSTGRES_PASSWORD=cc_password
+      - POSTGRES_DB=cc_webapp
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cc_user -d cc_webapp"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ===== Redis 캐시 =====
+  redis:
+    image: redis:7
+    container_name: cc_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: redis-server --requirepass redis_password
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "redis_password", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ===== Celery Worker 및 Beat =====
+  celery_worker:
+    build:
+      context: ./cc-webapp/backend
+      dockerfile: Dockerfile
+    container_name: cc_celery_worker
+    restart: unless-stopped
+    command: celery -A app.worker worker --loglevel=info
+    volumes:
+      - ./cc-webapp/backend:/app
+      - ./logs/celery:/app/logs/celery
+    environment:
+      - ENVIRONMENT=development
+      - DATABASE_URL=postgresql://cc_user:cc_password@postgres:5432/cc_webapp
+      - REDIS_URL=redis://:redis_password@redis:6379/0
+    depends_on:
+      - backend
+      - redis
+      - postgres
+
+  celery_beat:
+    build:
+      context: ./cc-webapp/backend
+      dockerfile: Dockerfile
+    container_name: cc_celery_beat
+    restart: unless-stopped
+    command: celery -A app.worker beat --loglevel=info
+    volumes:
+      - ./cc-webapp/backend:/app
+      - ./logs/celery:/app/logs/celery
+    environment:
+      - ENVIRONMENT=development
+      - DATABASE_URL=postgresql://cc_user:cc_password@postgres:5432/cc_webapp
+      - REDIS_URL=redis://:redis_password@redis:6379/0
+    depends_on:
+      - backend
+      - redis
+      - postgres
+      - celery_worker
+
+  # ===== 개발 도구 (--tools 프로필) =====
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: cc_pgadmin
+    restart: unless-stopped
+    ports:
+      - "5050:80"
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=admin@casino-club.local
+      - PGADMIN_DEFAULT_PASSWORD=admin123
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      - postgres
+    profiles:
+      - tools
+
+  redis_commander:
+    image: rediscommander/redis-commander:latest
+    container_name: cc_redis_commander
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=redis_password
+    depends_on:
+      - redis
+    profiles:
+      - tools
+
+  kafka:
+    image: confluentinc/cp-kafka:7.0.0
+    container_name: cc_kafka
+    restart: unless-stopped
+    ports:
+      - "9093:9093"
+    environment:
+      - KAFKA_BROKER_ID=1
+      - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
+      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:9093
+      - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      - KAFKA_INTER_BROKER_LISTENER_NAME=PLAINTEXT
+      - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
+    depends_on:
+      - zookeeper
+    profiles:
+      - tools
+      - kafka
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.0.0
+    container_name: cc_zookeeper
+    restart: unless-stopped
+    environment:
+      - ZOOKEEPER_CLIENT_PORT=2181
+      - ZOOKEEPER_TICK_TIME=2000
+    profiles:
+      - tools
+      - kafka
+
+  kafka_ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: cc_kafka_ui
+    restart: unless-stopped
+    ports:
+      - "8082:8080"
+    environment:
+      - KAFKA_CLUSTERS_0_NAME=local
+      - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka:9092
+    depends_on:
+      - kafka
+    profiles:
+      - tools
+      - kafka
+
+volumes:
+  postgres_data:
+  redis_data:
+  pgadmin_data:

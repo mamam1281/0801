@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:14
+    container_name: cc-postgres
+    environment:
+      POSTGRES_USER: cc_user
+      POSTGRES_PASSWORD: cc_password
+      POSTGRES_DB: cc_webapp
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cc_user -d cc_webapp"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./cc-webapp/backend
+    container_name: cc-backend
+    environment:
+      - DATABASE_URL=postgresql://cc_user:cc_password@postgres:5432/cc_webapp
+      - REDIS_URL=redis://redis:6379/0
+      - JWT_SECRET_KEY=your_jwt_secret_key
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./cc-webapp/backend:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  redis:
+    image: redis:7
+    container_name: cc-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+volumes:
+  postgres_data:
+  redis_data:
