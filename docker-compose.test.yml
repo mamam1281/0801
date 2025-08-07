@@ -1,0 +1,62 @@
+version: "3.8"
+
+# 테스트 환경 구성을 위한 Docker Compose 설정
+# 테스트 실행을 위한 최소 구성만 포함
+
+services:
+  backend:
+    build:
+      context: ./cc-webapp/backend
+      dockerfile: Dockerfile.test
+    container_name: cc_backend_test
+    environment:
+      - PYTHONPATH=/app
+      - ENVIRONMENT=test
+      - POSTGRES_SERVER=postgres_test
+      - POSTGRES_USER=test_user
+      - POSTGRES_PASSWORD=test_password
+      - POSTGRES_DB=cc_test
+      - REDIS_HOST=redis_test
+      - REDIS_PORT=6379
+      - JWT_SECRET_KEY=secret_key_for_test_environment
+    volumes:
+      - ./cc-webapp/backend:/app
+      - ./logs/test:/app/logs:rw
+    ports:
+      - "8001:8000"  # 다른 포트 사용으로 개발 환경과 동시 실행 가능
+    depends_on:
+      - postgres_test
+      - redis_test
+    networks:
+      - ccnet_test
+    command: pytest -xvs
+
+  postgres_test:
+    image: postgres:15.3
+    container_name: cc_postgres_test
+    environment:
+      - POSTGRES_USER=test_user
+      - POSTGRES_PASSWORD=test_password
+      - POSTGRES_DB=cc_test
+    volumes:
+      - postgres_test_data:/var/lib/postgresql/data
+      - ./database/init-test.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "5433:5432"  # 다른 포트 사용으로 개발 환경과 동시 실행 가능
+    networks:
+      - ccnet_test
+
+  redis_test:
+    image: redis:7.0
+    container_name: cc_redis_test
+    ports:
+      - "6380:6379"  # 다른 포트 사용으로 개발 환경과 동시 실행 가능
+    networks:
+      - ccnet_test
+
+networks:
+  ccnet_test:
+    driver: bridge
+
+volumes:
+  postgres_test_data:
