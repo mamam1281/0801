@@ -4,13 +4,27 @@ from jose import jwt, JWTError
 from sqlalchemy.orm import Session
 from .models.auth_models import User
 from .database import get_db
-from .config_simple import settings
+from .config import settings
+import logging
+
+# 로깅 설정
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+
+# 콘솔 로그 핸들러 설정
+if not logger.handlers:
+    handler = logging.StreamHandler()
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/login")
 security = HTTPBearer()
 
 def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> User:
-    """Get current authenticated user."""
+    """현재 인증된 사용자 가져오기"""
+    logger.debug(f"[AUTH] Token received (first 10 chars): {token[:10]}...")
+    
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",

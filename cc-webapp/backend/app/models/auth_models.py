@@ -93,8 +93,9 @@ class RefreshToken(Base):
 class UserSession(Base):
     """사용자 세션 모델"""
     __tablename__ = "user_sessions"
-    
+
     id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)  # 이 줄 추가!
     session_token = Column(String(255), unique=True, index=True, nullable=False)
     refresh_token = Column(String(255), unique=True, index=True)
     expires_at = Column(DateTime, nullable=False)
@@ -103,7 +104,7 @@ class UserSession(Base):
     is_active = Column(Boolean, default=True)
     user_agent = Column(Text)
     ip_address = Column(String(45))
-    
+
     # 관계
     user = relationship("User", back_populates="sessions")
 

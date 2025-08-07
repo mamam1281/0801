@@ -1,3 +1,4 @@
+import logging
 """인증 관련 서비스"""
 import os
 from datetime import datetime, timedelta
@@ -63,6 +64,29 @@ class AuthService:
     
     @staticmethod
     def verify_token(token: str) -> TokenData:
+        print("=== DEBUG: verify_token called ===")
+        print(f"Token: {token[:30]}...")
+        try:
+
+            logging.info(f'Attempting to verify token: {token}')
+            logging.info(f'Using secret key: {SECRET_KEY}')
+            logging.info(f'Using algorithm: {ALGORITHM}')
+            # Debug: Try decoding without verification
+            import json, base64
+            token_parts = token.split('.')
+            if len(token_parts) == 3:
+                header_raw, payload_raw, sig = token_parts
+                try:
+                    header_json = base64.b64decode(header_raw + "=" * ((4 - len(header_raw) % 4) % 4)).decode('utf-8')
+                    payload_json = base64.b64decode(payload_raw + "=" * ((4 - len(payload_raw) % 4) % 4)).decode('utf-8')
+                    print(f"Debug header: {header_json}")
+                    print(f"Debug payload: {payload_json}")
+                except Exception as e:
+
+                    logging.error(f'Token verification error: {e}')
+                    print(f"Debug decode error: {e}")
+        except Exception as debug_e:
+            print(f"Debug error: {debug_e}")
         """토큰 검증"""
         try:
             payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
@@ -125,21 +149,29 @@ class AuthService:
                 detail="이미 존재하는 닉네임입니다"
             )
         
-        # 전화번호 중복 검사
-        if db.query(User).filter(User.phone_number == user_create.phone_number).first():
+        # 전화번호 필드가 있는 경우에만 중복 검사
+        if hasattr(user_create, 'phone_number') and user_create.phone_number:
+            if db.query(User).filter(User.phone_number == user_create.phone_number).first():
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="이미 등록된 전화번호입니다"
+                )
+        
+        # 비밀번호 길이 검증 (4글자 이상)
+        if len(user_create.password) < 4:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="이미 등록된 전화번호입니다"
+                detail="비밀번호는 4글자 이상이어야 합니다"
             )
         
-        # 사용자 생성
+        # 사용자 생성 (site_id는 user_id와 동일한 개념으로 사용)
         hashed_password = AuthService.get_password_hash(user_create.password)
         db_user = User(
-            site_id=user_create.site_id,
+            site_id=user_create.site_id,  # site_id는 user_id와 동일한 개념
             nickname=user_create.nickname,
-            phone_number=user_create.phone_number,
+            phone_number=getattr(user_create, 'phone_number', None),  # 선택적 필드로 처리
             hashed_password=hashed_password,
-            invite_code=user_create.invite_code,
+            invite_code="5858",  # 항상 5858 초대코드 사용
             is_admin=False
         )
         db.add(db_user)

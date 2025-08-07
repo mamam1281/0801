@@ -1,7 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+ï»¿from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 
-router = APIRouter(prefix="/test", tags=["Å×½ºÆ®"])
+router = APIRouter(prefix="/test", tags=["test"])  # í•œê¸€ "í…ŒìŠ¤íŠ¸"ë¥¼ "test"ë¡œ ë³€ê²½
 
 class TestUserCreate(BaseModel):
     site_id: str
@@ -10,8 +10,8 @@ class TestUserCreate(BaseModel):
 
 @router.post("/simple-register")
 async def simple_register(user: TestUserCreate):
-    """°£´ÜÇÑ Å×½ºÆ®¿ë È¸¿ø°¡ÀÔ"""
+    """Simple test registration"""
     try:
-        return {"message": "Å×½ºÆ® ¼º°ø", "user": user.site_id}
+        return {"message": "Test successful", "user": user.site_id}
     except Exception as e:
         return {"error": str(e)}

@@ -1,16 +1,48 @@
-"""Authentication API Router"""
+"""통합된 인증 API 라우터"""
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
+from passlib.context import CryptContext
+from jose import jwt
 from ..database import get_db
 from ..schemas.auth import UserCreate, UserLogin, AdminLogin, UserResponse, Token
-from ..services.auth_service import AuthService, security
-from ..models.auth_models import User, InviteCode
-from ..config_simple import settings
+from ..models.auth_models import User, InviteCode, SecurityEvent
+from ..config import settings
+from ..dependencies import get_current_user
+
+# 로깅 설정
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+
+# 콘솔 로그 핸들러 설정
+if not logger.handlers:
+    handler = logging.StreamHandler()
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+
+# 비밀번호 해싱
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+# HTTP 보안 스키마
+security = HTTPBearer()
+
+# 인증 서비스 클래스
+class AuthService:
+    def create_access_token(self, data: dict, expires_delta: timedelta = None):
+        """JWT 액세스 토큰 생성"""
+        to_encode = data.copy()
+        expire = datetime.utcnow() + (expires_delta or timedelta(minutes=settings.jwt_expire_minutes))
+        to_encode.update({"exp": expire})
+        encoded_jwt = jwt.encode(to_encode, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
+        return encoded_jwt
+
+# 인증 서비스 인스턴스
+auth_service = AuthService()
 
 # Logger setup
 logger = logging.getLogger(__name__)
@@ -25,6 +57,7 @@ oauth2_scheme = HTTPBearer()
 JWT_EXPIRE_MINUTES = settings.jwt_expire_minutes
 INITIAL_CYBER_TOKENS = getattr(settings, 'initial_cyber_tokens', 200)
 
+# 라우터 설정 - prefix 및 태그 통일
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 
 @router.post("/signup", response_model=Token)
@@ -32,7 +65,7 @@ async def signup(
     data: UserCreate,
     db = Depends(get_db)
 ):
-    """User registration (5 required fields: site_id, nickname, phone_number, invite_code, password)"""
+    """User registration (site_id(=user_id), nickname, password (min 4 chars), using fixed invite code '5858')"""
     try:
         logger.info(f"Registration attempt: site_id={data.site_id}, nickname={data.nickname}")
         
