@@ -8,7 +8,7 @@ from ..database import get_db
 
 router = APIRouter(
     prefix="/api/missions",
-    tags=["Missions"],
+    tags=["Events & Missions"],
 )
 
 def get_mission_service(db = Depends(get_db)) -> MissionService:

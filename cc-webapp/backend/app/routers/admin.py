@@ -9,7 +9,7 @@ from ..database import get_db
 from ..dependencies import get_current_user
 from ..services.admin_service import AdminService
 
-router = APIRouter(prefix="/api/admin", tags=["admin"])
+router = APIRouter(prefix="/api/admin", tags=["Admin"])
 
 class AdminStatsResponse(BaseModel):
     """Admin statistics response"""

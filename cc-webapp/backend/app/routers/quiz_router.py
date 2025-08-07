@@ -21,7 +21,7 @@ from ..services.quiz_service import QuizService
 from ..services.user_service import UserService
 from sqlalchemy.orm import Session
 
-router = APIRouter(tags=["quiz"])
+router = APIRouter(tags=["Quiz"])
 logger = logging.getLogger(__name__)
 
 @router.get("/questions", response_model=List[QuizQuestionResponse])

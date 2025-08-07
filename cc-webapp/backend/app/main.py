@@ -140,8 +140,8 @@ app.add_middleware(
 
 # Authentication & User Management (no prefix - routers have their own)
 app.include_router(auth.router, tags=["Authentication"])
-app.include_router(users.router, tags=["Users"])  
-app.include_router(admin.router, tags=["Admin"])
+app.include_router(users.router)  # 태그 오버라이드 제거 - 이미 users.py에서 "Users" 태그를 지정함
+app.include_router(admin.router)  # 태그 오버라이드 제거 - 이미 admin.py에서 "Admin" 태그를 지정함
 
 # Core Game Systems (no prefix - routers have their own)
 app.include_router(actions.router, tags=["Game Actions"])
@@ -151,12 +151,12 @@ app.include_router(shop.router, tags=["Shop"])
 app.include_router(missions.router, tags=["Missions"])
 
 # Interactive Features (no prefix - routers have their own)
-app.include_router(quiz.router, tags=["Quiz"])
-app.include_router(chat.router, tags=["Chat"])
+app.include_router(quiz.router)  # 태그 오버라이드 제거 - 이미 quiz_router.py에서 "Quiz" 태그를 지정함
+app.include_router(chat.router)  # 태그 오버라이드 제거 - 이미 chat_router.py에서 "Chat" 태그를 지정함
 app.include_router(ai_router.router, tags=["AI Recommendation"])
 
 # Management & Monitoring (no prefix - routers have their own)
-app.include_router(dashboard.router, tags=["Dashboard"])
+app.include_router(dashboard.router)  # 태그 오버라이드 제거 - 이미 dashboard.py에서 "Dashboard" 태그를 지정함
 app.include_router(notifications.router, tags=["Real-time Notifications"])
 
 # Individual Games (no prefix - routers have their own)
@@ -177,13 +177,13 @@ app.include_router(games.router, tags=["Game Collection"])
 # app.include_router(game_api.router, tags=["Game API"])  # 중복 제거: games.router에 통합됨
 
 # Phase 5: Invite System (no prefix - routers have their own)
-app.include_router(invite_router.router, tags=["Invite Codes"])
+app.include_router(invite_router.router)  # 태그 오버라이드 제거 - 이미 invite_router.py에서 "Invite Codes" 태그를 지정함
 
 # Phase 6: Analytics (no prefix - routers have their own)
 app.include_router(analyze.router, tags=["Analytics"])
 
 # Phase 8: User Segmentation (no prefix - routers have their own)  
-app.include_router(segments.router, tags=["Segments"])
+app.include_router(segments.router)  # 태그 오버라이드 제거 - 이미 segments.py에서 "Segments" 태그를 지정함
 
 # Phase 9: User Tracking (no prefix - routers have their own)
 app.include_router(tracking.router, tags=["Tracking"])
@@ -192,7 +192,7 @@ app.include_router(tracking.router, tags=["Tracking"])
 app.include_router(unlock.router, tags=["Unlock"])
 
 # 이벤트/미션 라우터 추가
-app.include_router(events.router, tags=["Events"])
+app.include_router(events.router)  # 태그 오버라이드 제거 - 이미 events.py에서 "Events & Missions" 태그를 지정함
 
 print("✅ Core API endpoints registered")
 print("✅ Progressive Expansion features registered") 

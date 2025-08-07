@@ -13,7 +13,7 @@ from app import models
 from datetime import datetime
 import json
 
-router = APIRouter(prefix="/api/chat", tags=["chat"])
+router = APIRouter(prefix="/api/chat", tags=["Chat"])
 
 # Request/Response Models
 class ChatRoomResponse(BaseModel):

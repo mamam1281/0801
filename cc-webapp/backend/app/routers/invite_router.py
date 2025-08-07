@@ -16,7 +16,7 @@ from datetime import datetime, timedelta
 import secrets
 import string
 
-router = APIRouter(prefix="/api/invite", tags=["invite"])
+router = APIRouter(prefix="/api/invite", tags=["Invite Codes"])
 
 def generate_invite_code(length: int = 8) -> str:
     """Generate a random invite code"""

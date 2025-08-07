@@ -50,7 +50,7 @@ class PaginatedRewardsResponse(BaseModel):
 @router.get(
     "/users/{user_id}/rewards",
     response_model=PaginatedRewardsResponse,
-    tags=["users", "rewards"]
+    tags=["Rewards"]  # "users" 태그 제거, "Rewards"로 통일
 )
 async def get_user_rewards(
     user_id: int = Path(..., title="The ID of the user to get rewards for", ge=1),

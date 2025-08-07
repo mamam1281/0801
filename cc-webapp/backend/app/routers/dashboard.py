@@ -8,7 +8,7 @@ from .. import models
 
 router = APIRouter(
     prefix="/dashboard",
-    tags=["dashboard", "admin"],
+    tags=["Dashboard"],
     # dependencies=[Depends(AuthService.get_current_admin)] # Protect all dashboard routes
 )
 

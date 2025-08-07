@@ -12,7 +12,7 @@ from ..schemas.user import UserResponse, UserUpdate
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/users", tags=["users"])
+router = APIRouter(prefix="/api/users", tags=["Users"])  # "users"를 "Users"로 변경하여 일관성 유지
 
 class UserProfileResponse(BaseModel):
     """User profile response"""
