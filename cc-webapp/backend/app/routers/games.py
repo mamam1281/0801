@@ -1,8 +1,9 @@
-"""Game Collection API Endpoints"""
+"""Game Collection API Endpoints (Updated)"""
 import logging
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.orm import Session
 import random
+import json
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 from ..database import get_db
@@ -22,30 +23,40 @@ from ..schemas.game_schemas import (
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/games", tags=["Games"])
 
-@router.get("/", response_model=List[GameListResponse])
+@router.get("/")
 async def get_games_list(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    게임 목록 조회
+    게임 목록 조회 (직접 JSON 반환)
     """
     games = db.query(Game).filter(Game.is_active == True).all()
     result = []
     
     for game in games:
-        result.append({
-            "id": game.id,
+        # 직접 JSON 형식 준비
+        game_data = {
+            "id": str(game.id),
             "name": game.name,
             "description": game.description,
-            "game_type": game.game_type,
-            "is_active": game.is_active
-        })
+            "type": game.game_type,
+            "image_url": getattr(game, 'image_url', f"/assets/games/{game.game_type}.png"),
+            "is_active": game.is_active,
+            "daily_limit": None,
+            "playCount": 0,
+            "bestScore": 0,
+            "canPlay": True,
+            "cooldown_remaining": None,
+            "requires_vip_tier": None
+        }
+        result.append(game_data)
     
-    return result
+    # 직접 JSON 반환
+    return Response(content=json.dumps(result), media_type="application/json")
 
 # 슬롯 게임 엔드포인트
-@router.post("/slot/spin", response_model=SlotSpinResponse)
+@router.post("/slot/spin")
 async def spin_slot(
     request: SlotSpinRequest,
     current_user: User = Depends(get_current_user),
