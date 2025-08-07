@@ -1,6 +1,20 @@
 """
-Casino-Club F2P - 인증 시스템 종합 테스트
-=============================================================================
+Casino-Club F2P - 인증 시스템 종합def test_01_signup():
+    """회원가입 테스트"""
+    # 테스트용 사용자 생성
+    test_user = {
+        "site_id": f"testuser_{int(time.time())}",
+        "password": "test1234",
+        "nickname": test_data["nickname"],
+        "phone_number": f"010{int(time.time())%100000000:08d}",
+        "invite_code": "5858"  # 무한 재사용 가능한 초대 코드
+    }
+    
+    response = requests.post(
+        f"{BASE_URL}/api/auth/signup", 
+        headers=HEADERS,
+        json=test_user
+    )======================================================================
 인증 시스템의 전체 흐름을 종합적으로 테스트:
 - 회원가입 → 로그인 → 토큰 갱신 → 보호된 리소스 접근 → 로그아웃 → 접근 불가 확인
 """
@@ -57,20 +71,26 @@ def test_01_signup():
     
     print(f"✅ 회원가입 성공: {test_data['nickname']}")
 
-def test_02_access_protected_resource():
-    """인증 토큰으로 보호된 리소스 접근 테스트"""
-    assert test_data["access_token"], "액세스 토큰이 없습니다"
-    
-    auth_headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {test_data['access_token']}"
-    }
-    
-    # 사용자 프로필 조회
-    response = requests.get(
-        f"{BASE_URL}/auth/profile",
-        headers=auth_headers
+def test_02_verify_invite_code():
+    """초대 코드 검증 테스트"""
+    # 유효한 초대 코드 테스트
+    response = requests.post(
+        f"{BASE_URL}/api/auth/verify-invite",
+        headers=HEADERS,
+        json={"inviteCode": "5858"}
     )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["valid"] is True
+    
+    # 잘못된 초대 코드 테스트
+    response = requests.post(
+        f"{BASE_URL}/api/auth/verify-invite",
+        headers=HEADERS,
+        json={"inviteCode": "wrong"}
+    )
+    assert response.status_code == 400
+    print("✅ 초대 코드 검증 성공")
     
     assert response.status_code == 200, f"프로필 조회 실패: {response.text}"
     data = response.json()
@@ -80,19 +100,33 @@ def test_02_access_protected_resource():
     
     print("✅ 보호된 리소스 접근 성공")
 
-def test_03_token_refresh():
-    """토큰 갱신 테스트"""
-    assert test_data["refresh_token"], "리프레시 토큰이 없습니다"
-    
-    refresh_data = {
-        "refresh_token": test_data["refresh_token"]
+def test_03_login():
+    """로그인 테스트"""
+    # 일반 사용자 로그인
+    login_data = {
+        "username": test_data["site_id"],
+        "password": "test1234"
     }
     
     response = requests.post(
-        f"{BASE_URL}/auth/refresh",
-        headers=HEADERS,
-        json=refresh_data
+        f"{BASE_URL}/api/auth/login",
+        data=login_data  # OAuth2 form data
     )
+    assert response.status_code == 200
+    data = response.json()
+    assert "access_token" in data
+    assert data["user"]["site_id"] == test_data["site_id"]
+    
+    # 잘못된 비밀번호로 로그인
+    wrong_login = login_data.copy()
+    wrong_login["password"] = "wrong"
+    response = requests.post(
+        f"{BASE_URL}/api/auth/login",
+        data=wrong_login
+    )
+    assert response.status_code == 401  # 인증 실패
+    
+    print("✅ 로그인 테스트 성공")
     
     assert response.status_code == 200, f"토큰 갱신 실패: {response.text}"
     data = response.json()
@@ -107,20 +141,34 @@ def test_03_token_refresh():
     assert test_data["access_token"] != old_token, "액세스 토큰이 변경되지 않았습니다"
     print("✅ 토큰 갱신 성공")
 
-def test_04_access_with_new_token():
-    """새로운 토큰으로 보호된 리소스 접근 테스트"""
-    assert test_data["access_token"], "액세스 토큰이 없습니다"
-    
-    auth_headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {test_data['access_token']}"
+def test_04_admin_login():
+    """관리자 로그인 테스트"""
+    admin_data = {
+        "site_id": "admin@casino-club.local",
+        "password": "admin1234"
     }
     
-    # 세션 목록 조회
-    response = requests.get(
-        f"{BASE_URL}/auth/sessions",
-        headers=auth_headers
+    response = requests.post(
+        f"{BASE_URL}/api/auth/admin/login",
+        headers=HEADERS,
+        json=admin_data
     )
+    assert response.status_code == 200
+    data = response.json()
+    assert "access_token" in data
+    assert data["user"]["is_admin"] is True
+    
+    # 잘못된 관리자 자격증명
+    wrong_admin = admin_data.copy()
+    wrong_admin["password"] = "wrong"
+    response = requests.post(
+        f"{BASE_URL}/api/auth/admin/login",
+        headers=HEADERS,
+        json=wrong_admin
+    )
+    assert response.status_code == 401  # 인증 실패
+    
+    print("✅ 관리자 로그인 테스트 성공")
     
     assert response.status_code == 200, f"세션 목록 조회 실패: {response.text}"
     data = response.json()
@@ -130,7 +178,34 @@ def test_04_access_with_new_token():
     
     print("✅ 새 토큰으로 보호된 리소스 접근 성공")
 
-def test_05_logout():
+def test_05_refresh_token():
+    """토큰 갱신 테스트"""
+    assert test_data["access_token"], "액세스 토큰이 없습니다"
+    
+    auth_headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {test_data['access_token']}"
+    }
+    
+    # 토큰 갱신
+    response = requests.post(
+        f"{BASE_URL}/api/auth/refresh",
+        headers=auth_headers
+    )
+    assert response.status_code == 200
+    data = response.json()
+    
+    # 새 토큰 검증
+    old_token = test_data["access_token"]
+    test_data["access_token"] = data["access_token"]
+    assert test_data["access_token"] != old_token, "액세스 토큰이 변경되지 않았습니다"
+    
+    print("✅ 토큰 갱신 테스트 성공")
+    
+    assert response.status_code == 200, f"로그아웃 실패: {response.text}"
+    print("✅ 로그아웃 성공")
+
+def test_06_logout():
     """로그아웃 테스트"""
     assert test_data["access_token"], "액세스 토큰이 없습니다"
     
@@ -139,28 +214,22 @@ def test_05_logout():
         "Authorization": f"Bearer {test_data['access_token']}"
     }
     
+    # 로그아웃
     response = requests.post(
-        f"{BASE_URL}/auth/logout",
+        f"{BASE_URL}/api/auth/logout",
         headers=auth_headers
     )
+    assert response.status_code == 200
+    assert response.json()["message"] == "로그아웃되었습니다"
     
-    assert response.status_code == 200, f"로그아웃 실패: {response.text}"
-    print("✅ 로그아웃 성공")
-
-def test_06_access_after_logout():
-    """로그아웃 후 보호된 리소스 접근 시도 테스트"""
-    assert test_data["access_token"], "액세스 토큰이 없습니다"
-    
-    auth_headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {test_data['access_token']}"
-    }
-    
-    # 사용자 프로필 조회 시도
-    response = requests.get(
-        f"{BASE_URL}/auth/profile",
+    # 로그아웃 후 토큰으로 접근 시도
+    response = requests.post(
+        f"{BASE_URL}/api/auth/refresh",
         headers=auth_headers
     )
+    assert response.status_code == 401  # 인증 실패
+    
+    print("✅ 로그아웃 테스트 성공")
     
     # 응답 코드가 401(Unauthorized)인지 확인
     assert response.status_code == 401, "로그아웃 후에도 인증이 유지됩니다"

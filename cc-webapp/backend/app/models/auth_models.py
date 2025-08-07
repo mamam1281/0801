@@ -113,6 +113,7 @@ class SecurityEvent(Base):
     __tablename__ = "security_events"
     
     id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)  # 외래키 추가
     event_type = Column(String(50), nullable=False)
     event_data = Column(Text)
     ip_address = Column(String(45))
