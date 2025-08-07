@@ -13,7 +13,7 @@ from app import models
 from datetime import datetime, timedelta
 import json
 
-router = APIRouter(prefix="/api/segments", tags=["segments"])
+router = APIRouter(prefix="/api/segments", tags=["Segments"])
 
 # Request/Response Models
 class UserSegmentResponse(BaseModel):
