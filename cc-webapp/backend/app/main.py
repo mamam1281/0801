@@ -42,7 +42,8 @@ from app.routers import (
     notifications,
     doc_titles,  # Phase 1 added
     feedback,    # Phase 2 added
-    games,       # Phase 3 added - 통합된 게임 API
+    # games,       # Phase 3 added - 통합된 게임 API (Replaced with games_direct)
+    games_direct, # Fixed games router - direct JSON response
     # game_api,    # 중복 제거: games.router에 통합됨
     invite_router,  # Phase 5 added
     analyze,     # Phase 6 added
@@ -171,7 +172,8 @@ app.include_router(doc_titles.router, tags=["Document Titles"])
 app.include_router(feedback.router, tags=["Feedback"])
 
 # Phase 3: Game Collection (no prefix - routers have their own) - 통합된 게임 API
-app.include_router(games.router, tags=["Game Collection"])
+# Replaced games router with games_direct
+app.include_router(games_direct.router, tags=["Game Collection"])
 
 # Phase 4: Unified Game API (no prefix - routers have their own) - 중복 제거
 # app.include_router(game_api.router, tags=["Game API"])  # 중복 제거: games.router에 통합됨
@@ -197,6 +199,7 @@ app.include_router(events.router)  # 태그 오버라이드 제거 - 이미 even
 print("✅ Core API endpoints registered")
 print("✅ Progressive Expansion features registered") 
 print("✅ No duplicate API registrations - Clean structure maintained")
+print("✅ Using games_direct router with improved JSON responses")
 
 # ===== Core API Endpoints =====
 
@@ -311,7 +314,7 @@ if __name__ == "__main__":
         log_level="info"
     )
 
-# 테스트용 라우터 추가
-from app.auth.test_endpoints import router as test_router
-app.include_router(test_router)
+# 테스트 라우터는 제거되었습니다 - main_fixed.py에서 이 부분이 제거됨
+# from app.auth.test_endpoints import router as test_router
+# app.include_router(test_router)
 
