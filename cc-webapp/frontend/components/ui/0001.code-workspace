@@ -3,5 +3,8 @@
         {
             "path": "../../../.."
         }
-    ]
+    ],
+    "settings": {
+      "chat.todoListTool.enabled": true
+    }
 }

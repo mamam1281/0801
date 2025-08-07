@@ -1,11 +1,12 @@
-"""Game Collection API Endpoints (Updated)"""
+"""Game Collection API Endpoints (Updated & Unified)"""
 import logging
 from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.orm import Session
 import random
 import json
 from typing import List, Optional, Dict, Any
-from datetime import datetime
+from datetime import datetime, timedelta
+
 from ..database import get_db
 from ..dependencies import get_current_user
 from ..models.auth_models import User
@@ -17,11 +18,15 @@ from ..schemas.game_schemas import (
     SlotSpinRequest, SlotSpinResponse,
     RPSPlayRequest, RPSPlayResponse,
     GachaPullRequest, GachaPullResponse,
-    CrashBetRequest, CrashBetResponse
+    CrashBetRequest, CrashBetResponse,
+    GameStats, ProfileGameStats, Achievement, GameSession, GameLeaderboard
 )
+from app import models
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/games", tags=["Games"])
+
+# ================= Existing Simple Game Feature Endpoints =================
 
 @router.get("/")
 async def get_games_list(
@@ -299,3 +304,163 @@ async def place_crash_bet(
         'win_amount': win_amount,
         'balance': new_balance
     }
+
+# -------------------------------------------------------------------------
+# ================= Integrated Unified Game API (from game_api.py) =================
+@router.get("/stats/{user_id}", response_model=GameStats)
+def get_game_stats(user_id: int, db: Session = Depends(get_db)):
+    """사용자 전체 게임 통계 (슬롯/룰렛/가챠 등)"""
+    total_spins = db.query(models.UserAction).filter(
+        models.UserAction.user_id == user_id,
+        models.UserAction.action_type.in_(['SLOT_SPIN', 'ROULETTE_SPIN', 'GACHA_PULL'])
+    ).count()
+
+    # TODO: 보상 테이블 존재 여부 검증 후 reward 집계 로직 조정 필요
+    total_coins_won = 0
+    total_gems_won = 0
+    special_items_won = 0
+    jackpots_won = db.query(models.UserAction).filter(
+        models.UserAction.user_id == user_id,
+        models.UserAction.action_data.contains('jackpot')
+    ).count()
+
+    return GameStats(
+        user_id=user_id,
+        total_spins=total_spins,
+        total_coins_won=total_coins_won,
+        total_gems_won=total_gems_won,
+        special_items_won=special_items_won,
+        jackpots_won=jackpots_won,
+        bonus_spins_won=0,
+        best_streak=0,
+        current_streak=calculate_user_streak(user_id, db),
+        last_spin_date=None
+    )
+
+@router.get("/profile/{user_id}/stats", response_model=ProfileGameStats)
+def get_profile_game_stats(user_id: int, db: Session = Depends(get_db)):
+    """프로필용 상세 게임 통계"""
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    week_ago = datetime.now() - timedelta(days=7)
+    recent_actions = db.query(models.UserAction).filter(
+        models.UserAction.user_id == user_id,
+        models.UserAction.created_at >= week_ago
+    ).count()
+
+    favorite_game_query = db.query(
+        models.UserAction.action_type,
+        db.func.count(models.UserAction.id).label('count')
+    ).filter(
+        models.UserAction.user_id == user_id
+    ).group_by(models.UserAction.action_type).order_by(db.text('count DESC')).first()
+    favorite_game = favorite_game_query[0] if favorite_game_query else None
+
+    return ProfileGameStats(
+        user_id=user_id,
+        total_games_played=db.query(models.UserAction).filter(models.UserAction.user_id == user_id).count(),
+        favorite_game=favorite_game,
+        recent_activities=[],  # TODO: 세부 활동 리스트 구성
+        achievements=[],       # 아래 업적 엔드포인트에서 세부 제공
+        current_session=None
+    )
+
+@router.get("/leaderboard", response_model=List[GameLeaderboard])
+def get_game_leaderboard(game_type: Optional[str] = None, limit: int = 10, db: Session = Depends(get_db)):
+    """게임별 또는 전체 리더보드"""
+    if game_type:
+        leaderboard_query = db.query(
+            models.User.id,
+            models.User.nickname,
+            db.func.count(models.UserAction.id).label('score')
+        ).join(
+            models.UserAction, models.User.id == models.UserAction.user_id
+        ).filter(
+            models.UserAction.action_type == game_type
+        ).group_by(
+            models.User.id, models.User.nickname
+        ).order_by(db.text('score DESC')).limit(limit).all()
+    else:
+        leaderboard_query = db.query(
+            models.User.id,
+            models.User.nickname,
+            models.User.total_spent.label('score')
+        ).order_by(models.User.total_spent.desc()).limit(limit).all()
+
+    results: List[GameLeaderboard] = []
+    # NOTE: GameLeaderboard 스키마 구조 조정 필요할 수 있음 (현재 정의와 불일치 가능)
+    for rank, (user_id, nickname, score) in enumerate(leaderboard_query, 1):
+        results.append(GameLeaderboard(
+            game_type=game_type or 'overall',
+            period='daily',
+            entries=[],  # 간단화 - 상세 항목 분리 가능
+            user_rank=rank,
+            updated_at=datetime.utcnow()
+        ))
+    return results
+
+@router.get("/achievements/{user_id}", response_model=List[Achievement])
+def get_user_achievements(user_id: int, db: Session = Depends(get_db)):
+    """사용자 업적 목록 (기본 예시)"""
+    # TODO: 실제 업적 계산 로직 통합
+    sample = Achievement(
+        id=1,
+        name="First Spin",
+        description="첫 게임 플레이 완료",
+        badge_icon="🎯",
+        badge_color="#FFD700",
+        achieved_at=datetime.utcnow(),
+        progress=1.0
+    )
+    return [sample]
+
+@router.post("/session/start", response_model=GameSession)
+def start_game_session(game_type: str, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """게임 세션 시작"""
+    session = GameSession(
+        session_id=str(uuid4()),
+        user_id=current_user.id,
+        game_type=game_type,
+        start_time=datetime.utcnow(),
+        status="active"
+    )
+    action = models.UserAction(
+        user_id=current_user.id,
+        action_type="SESSION_START",
+        action_data=json.dumps({"game_type": game_type, "session_id": session.session_id})
+    )
+    db.add(action)
+    db.commit()
+    return session
+
+@router.post("/session/end")
+def end_game_session(session_id: str, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """게임 세션 종료"""
+    action = models.UserAction(
+        user_id=current_user.id,
+        action_type="SESSION_END",
+        action_data=json.dumps({"session_id": session_id, "ended_at": datetime.utcnow().isoformat()})
+    )
+    db.add(action)
+    db.commit()
+    return {"message": "Session ended"}
+
+# Helper
+from uuid import uuid4
+
+def calculate_user_streak(user_id: int, db: Session) -> int:
+    today = datetime.utcnow().date()
+    streak = 0
+    for i in range(30):
+        check_date = today - timedelta(days=i)
+        activity = db.query(models.UserAction).filter(
+            models.UserAction.user_id == user_id,
+            db.func.date(models.UserAction.created_at) == check_date
+        ).first()
+        if activity:
+            streak += 1
+        else:
+            break
+    return streak
