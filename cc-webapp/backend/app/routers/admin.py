@@ -126,83 +126,83 @@ async def list_users(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to list users: {e}")
 
-    @router.post("/notifications/send")
-    async def send_notification(
-        payload: AdminNotificationRequest,
-        admin_user = Depends(require_admin_access),
-    ):
-        """Send a notification to a specific user via WebSocket."""
-        if not payload.user_id:
-            raise HTTPException(status_code=400, detail="user_id is required for targeted send")
-        message = {
-            "type": "ADMIN_NOTIFICATION",
-            "payload": {
-                "title": payload.title,
-                "body": payload.body,
-                "data": payload.data or {},
-            },
-            "meta": {"by": getattr(admin_user, 'id', None)},
-        }
-        try:
-            await manager.send_personal_message(message, payload.user_id)
-            return {"success": True}
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to send: {e}")
+@router.post("/notifications/send")
+async def send_notification(
+    payload: AdminNotificationRequest,
+    admin_user = Depends(require_admin_access),
+):
+    """Send a notification to a specific user via WebSocket."""
+    if not payload.user_id:
+        raise HTTPException(status_code=400, detail="user_id is required for targeted send")
+    message = {
+        "type": "ADMIN_NOTIFICATION",
+        "payload": {
+            "title": payload.title,
+            "body": payload.body,
+            "data": payload.data or {},
+        },
+        "meta": {"by": getattr(admin_user, 'id', None)},
+    }
+    try:
+        await manager.send_personal_message(message, payload.user_id)
+        return {"success": True}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to send: {e}")
 
-    @router.post("/notifications/broadcast")
-    async def broadcast_notification(
-        payload: AdminNotificationRequest,
-        admin_user = Depends(require_admin_access),
-    ):
-        """Broadcast a notification to all connected users via WebSocket."""
-        message = {
-            "type": "ADMIN_BROADCAST",
-            "payload": {
-                "title": payload.title,
-                "body": payload.body,
-                "data": payload.data or {},
-            },
-            "meta": {"by": getattr(admin_user, 'id', None)},
-        }
-        try:
-            await manager.broadcast(message)
-            return {"success": True}
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to broadcast: {e}")
+@router.post("/notifications/broadcast")
+async def broadcast_notification(
+    payload: AdminNotificationRequest,
+    admin_user = Depends(require_admin_access),
+):
+    """Broadcast a notification to all connected users via WebSocket."""
+    message = {
+        "type": "ADMIN_BROADCAST",
+        "payload": {
+            "title": payload.title,
+            "body": payload.body,
+            "data": payload.data or {},
+        },
+        "meta": {"by": getattr(admin_user, 'id', None)},
+    }
+    try:
+        await manager.broadcast(message)
+        return {"success": True}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to broadcast: {e}")
 
-    @router.post("/rewards/grant-bulk", response_model=BulkRewardResult)
-    async def grant_rewards_bulk(
-        payload: BulkRewardRequest,
-        admin_user = Depends(require_admin_access),
-        db = Depends(get_db),
-    ):
-        """Grant rewards to many users in one call. Returns per-user results."""
-        if not payload.items:
-            raise HTTPException(status_code=400, detail="items cannot be empty")
-        service = RewardService(db)
-        results: List[dict] = []
-        for item in payload.items:
-            try:
-                reward = service.distribute_reward(
-                    user_id=item.user_id,
-                    reward_type=item.reward_type,
-                    amount=item.amount,
-                    source_description=item.source_description or f"admin:{getattr(admin_user, 'id', None)}",
-                )
-                results.append({
-                    "user_id": item.user_id,
-                    "status": "ok",
-                    "reward_id": reward.id,
-                    "awarded_at": getattr(reward, 'awarded_at', None),
-                })
-            except Exception as e:
-                results.append({
-                    "user_id": item.user_id,
-                    "status": "error",
-                    "error": str(e),
-                })
-        success = all(r.get("status") == "ok" for r in results)
-        return {"success": success, "results": results}
+@router.post("/rewards/grant-bulk", response_model=BulkRewardResult)
+async def grant_rewards_bulk(
+    payload: BulkRewardRequest,
+    admin_user = Depends(require_admin_access),
+    db = Depends(get_db),
+):
+    """Grant rewards to many users in one call. Returns per-user results."""
+    if not payload.items:
+        raise HTTPException(status_code=400, detail="items cannot be empty")
+    service = RewardService(db)
+    results: List[dict] = []
+    for item in payload.items:
+        try:
+            reward = service.distribute_reward(
+                user_id=item.user_id,
+                reward_type=item.reward_type,
+                amount=item.amount,
+                source_description=item.source_description or f"admin:{getattr(admin_user, 'id', None)}",
+            )
+            results.append({
+                "user_id": item.user_id,
+                "status": "ok",
+                "reward_id": reward.id,
+                "awarded_at": getattr(reward, 'awarded_at', None),
+            })
+        except Exception as e:
+            results.append({
+                "user_id": item.user_id,
+                "status": "error",
+                "error": str(e),
+            })
+    success = all(r.get("status") == "ok" for r in results)
+    return {"success": success, "results": results}
 
 @router.get("/users/{user_id}", response_model=AdminUserDetailResponse)
 async def get_user_detail(

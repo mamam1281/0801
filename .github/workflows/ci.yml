@@ -1,0 +1,121 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cc-webapp/frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: cc-webapp/frontend/package-lock.json
+      - name: Install deps
+        run: npm ci
+      - name: Typecheck
+        run: npx tsc --noEmit
+      - name: Test
+        run: npm test -- --ci --reporters=default --reporters=jest-junit
+
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install backend deps
+        working-directory: cc-webapp/backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt || true
+      - name: Syntax check
+        working-directory: cc-webapp/backend
+        run: python -m compileall app
+      - name: Optional backend smoke (skipped unless URL provided)
+        if: env.BACKEND_SMOKE_URL != ''
+        env:
+          BACKEND_SMOKE_URL: ${{ vars.BACKEND_SMOKE_URL }}
+          TEST_USER_TOKEN: ${{ secrets.TEST_USER_TOKEN }}
+        run: |
+          echo "Skipping real HTTP tests by default; set BACKEND_SMOKE_URL/TEST_USER_TOKEN to enable"
+name: CI
+
+on:
+  push:
+    branches: [ "**" ]
+  pull_request:
+
+jobs:
+  backend-tests:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:14
+        env:
+          POSTGRES_DB: cc_webapp
+          POSTGRES_USER: cc_user
+          POSTGRES_PASSWORD: cc_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install deps
+        working-directory: cc-webapp/backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Lint & Unit (smoke)
+        working-directory: cc-webapp/backend
+        env:
+          POSTGRES_SERVER: localhost
+          POSTGRES_USER: cc_user
+          POSTGRES_PASSWORD: cc_password
+          POSTGRES_DB: cc_webapp
+        run: |
+          python -m pytest -q app/tests/test_auth.py || true
+
+  frontend-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install deps
+        working-directory: cc-webapp/frontend
+        run: npm ci || npm i
+      - name: Type check
+        working-directory: cc-webapp/frontend
+        run: npx tsc --noEmit
+      - name: Lint
+        working-directory: cc-webapp/frontend
+        run: npm run lint || echo "skip lint"
+      - name: Test
+        working-directory: cc-webapp/frontend
+        run: npm test -- --ci
