@@ -687,6 +687,89 @@
         ]
       }
     },
+    "/api/admin/crash/sessions": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "List Crash Sessions",
+        "description": "Return recent crash_sessions for audit and operations (admin-only).\nOptional filters: user_id, status. Sorted by started_at desc.",
+        "operationId": "list_crash_sessions_api_admin_crash_sessions_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "User Id"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^(active|cashed|expired)$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/admin/users/{user_id}": {
       "get": {
         "tags": [
@@ -1693,8 +1776,6 @@
     "/api/rewards/users/{user_id}/rewards": {
       "get": {
         "tags": [
-          "Rewards",
-          "Rewards",
           "Rewards"
         ],
         "summary": "Get User Rewards",
@@ -1766,9 +1847,7 @@
     "/api/rewards/distribute": {
       "post": {
         "tags": [
-          "Rewards",
-          "Rewards",
-          "rewards"
+          "Rewards"
         ],
         "summary": "Distribute Reward To User",
         "description": "Distributes a specific reward to a user.\nThis is the central endpoint for granting rewards from games or events.",
@@ -2806,7 +2885,6 @@
     "/api/games/": {
       "get": {
         "tags": [
-          "Game Collection",
           "Games"
         ],
         "summary": "Get Games List",
@@ -2832,7 +2910,6 @@
     "/api/games/slot/spin": {
       "post": {
         "tags": [
-          "Game Collection",
           "Games"
         ],
         "summary": "Spin Slot",
@@ -2878,7 +2955,6 @@
     "/api/games/rps/play": {
       "post": {
         "tags": [
-          "Game Collection",
           "Games"
         ],
         "summary": "Play Rps",
@@ -2926,7 +3002,6 @@
     "/api/games/gacha/pull": {
       "post": {
         "tags": [
-          "Game Collection",
           "Games"
         ],
         "summary": "Pull Gacha",
@@ -2974,7 +3049,6 @@
     "/api/games/crash/bet": {
       "post": {
         "tags": [
-          "Game Collection",
           "Games"
         ],
         "summary": "Place Crash Bet",
@@ -3022,7 +3096,6 @@
     "/api/games/crash/cashout": {
       "post": {
         "tags": [
-          "Game Collection",
           "Games"
         ],
         "summary": "Cashout Crash",
@@ -3067,10 +3140,34 @@
         ]
       }
     },
+    "/api/games/crash/debug/current": {
+      "get": {
+        "tags": [
+          "Games"
+        ],
+        "summary": "Get Crash Debug Current",
+        "description": "현재 사용자에 대한 크래시 세션 상태를 반환합니다.\n운영에서는 사용하지 말고, 개발/QA 확인용으로만 사용하세요.",
+        "operationId": "get_crash_debug_current_api_games_crash_debug_current_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/games/stats/{user_id}": {
       "get": {
         "tags": [
-          "Game Collection",
           "Games"
         ],
         "summary": "Get Game Stats",
@@ -3114,7 +3211,6 @@
     "/api/games/profile/{user_id}/stats": {
       "get": {
         "tags": [
-          "Game Collection",
           "Games"
         ],
         "summary": "Get Profile Game Stats",
@@ -3158,7 +3254,6 @@
     "/api/games/leaderboard": {
       "get": {
         "tags": [
-          "Game Collection",
           "Games"
         ],
         "summary": "Get Game Leaderboard",
@@ -3223,7 +3318,6 @@
     "/api/games/achievements/{user_id}": {
       "get": {
         "tags": [
-          "Game Collection",
           "Games"
         ],
         "summary": "Get User Achievements",
@@ -3271,7 +3365,6 @@
     "/api/games/session/start": {
       "post": {
         "tags": [
-          "Game Collection",
           "Games"
         ],
         "summary": "Start Game Session",
@@ -3320,7 +3413,6 @@
     "/api/games/session/end": {
       "post": {
         "tags": [
-          "Game Collection",
           "Games"
         ],
         "summary": "End Game Session",
