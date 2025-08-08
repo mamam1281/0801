@@ -10,6 +10,7 @@ from ..dependencies import get_current_user
 from ..services.admin_service import AdminService
 from ..websockets import manager
 from ..services.reward_service import RewardService
+from sqlalchemy import text
 
 router = APIRouter(prefix="/api/admin", tags=["Admin"])
 
@@ -203,6 +204,46 @@ async def grant_rewards_bulk(
             })
     success = all(r.get("status") == "ok" for r in results)
     return {"success": success, "results": results}
+
+@router.get("/crash/sessions")
+async def list_crash_sessions(
+    user_id: Optional[int] = Query(None, ge=1),
+    status: Optional[str] = Query(None, regex="^(active|cashed|expired)$"),
+    limit: int = Query(50, ge=1, le=500),
+    admin_user = Depends(require_admin_access),
+    db = Depends(get_db),
+):
+    """Return recent crash_sessions for audit and operations (admin-only).
+    Optional filters: user_id, status. Sorted by started_at desc.
+    """
+    where = []
+    params = {}
+    if user_id is not None:
+        where.append("user_id = :uid")
+        params["uid"] = user_id
+    if status is not None:
+        where.append("status = :st")
+        params["st"] = status
+    where_sql = (" WHERE " + " AND ".join(where)) if where else ""
+    q = text(
+        f"""
+        SELECT id, external_session_id, user_id, game_id, bet_amount, started_at,
+               cashed_out_at, cashout_multiplier, payout_amount, status
+        FROM crash_sessions
+        {where_sql}
+        ORDER BY started_at DESC
+        LIMIT :limit
+        """
+    )
+    params["limit"] = limit
+    rows = db.execute(q, params).fetchall()
+    # Convert to plain dicts
+    cols = [
+        "id","external_session_id","user_id","game_id","bet_amount","started_at",
+        "cashed_out_at","cashout_multiplier","payout_amount","status"
+    ]
+    items = [dict(zip(cols, r)) for r in rows]
+    return {"items": items, "count": len(items)}
 
 @router.get("/users/{user_id}", response_model=AdminUserDetailResponse)
 async def get_user_detail(

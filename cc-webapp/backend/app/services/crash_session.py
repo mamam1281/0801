@@ -38,6 +38,8 @@ except Exception:  # redis may not exist in some dev environments
 	redis = None  # type: ignore
 
 from app.database import SessionLocal  # SQLAlchemy session factory
+from sqlalchemy import text
+import os
 
 class CrashSessionService:
 	def __init__(self, redis_url: Optional[str] = None):
@@ -75,6 +77,26 @@ class CrashSessionService:
 		}
 		self._r.set(key, json_dumps(session))
 		self._r.expire(key, 60 * 30)
+
+		# Persist a pending row to DB with external_session_id
+		with SessionLocal() as db:
+			try:
+				db.execute(
+					text(
+						"""
+						INSERT INTO crash_sessions (external_session_id, user_id, game_id, bet_amount, status)
+						VALUES (:ext_id, :uid, :gid, :bet, 'active')
+						"""
+					),
+					{"ext_id": session["session_id"], "uid": user_id, "gid": game_id, "bet": bet_amount},
+				)
+				db.commit()
+			except Exception as e:
+				# Fail-fast if strict mode is enabled for guaranteed Postgres envs
+				if os.getenv("CRASH_DB_STRICT", "0") in ("1", "true", "True"):  # env-gated strictness
+					raise
+				# Otherwise, non-fatal in early stage; audit table can be backfilled later
+				print(f"[crash] DB insert failed (non-strict): {e}")
 		return session
 
 	def get_session(self, user_id: int) -> Optional[Dict[str, Any]]:
@@ -107,13 +129,24 @@ class CrashSessionService:
 		session['payout_amount'] = payout
 		self._r.delete(self._key(user_id))
 
-		# Persist final to DB (sketch)
+		# Persist final to DB
 		with SessionLocal() as db:
 			try:
-				# TODO: insert into crash_sessions table
-				pass
-			except Exception:
-				pass
+				db.execute(
+					text(
+						"""
+						UPDATE crash_sessions
+						SET status='cashed', cashed_out_at=NOW(), cashout_multiplier=:mult, payout_amount=:payout
+						WHERE external_session_id=:ext_id
+						"""
+					),
+					{"mult": mult, "payout": payout, "ext_id": session["session_id"]},
+				)
+				db.commit()
+			except Exception as e:
+				if os.getenv("CRASH_DB_STRICT", "0") in ("1", "true", "True"):
+					raise
+				print(f"[crash] DB update failed (non-strict): {e}")
 		return {"session_id": session['session_id'], "payout": payout}
 
 	def expire_session(self, user_id: int) -> None:
