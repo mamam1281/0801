@@ -6,7 +6,7 @@ Kafka Producer/Consumer integration for FastAPI backend.
 """
 import json
 from kafka import KafkaProducer, KafkaConsumer
-from app.config import settings
+from app.core.config import settings
 
 KAFKA_BOOTSTRAP_SERVERS = settings.kafka_bootstrap_servers
 
