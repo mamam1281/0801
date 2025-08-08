@@ -8,6 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 from app.main import app
 
+# Initialize the TestClient correctly for the current FastAPI/httpx version
 client = TestClient(app)
 
 

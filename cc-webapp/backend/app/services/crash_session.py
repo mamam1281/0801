@@ -43,7 +43,18 @@ import os
 
 class CrashSessionService:
 	def __init__(self, redis_url: Optional[str] = None):
-		self.redis_url = redis_url or 'redis://localhost:6379/0'
+		# Prefer environment variables provided by docker-compose
+		if redis_url:
+			self.redis_url = redis_url
+		else:
+			host = os.getenv("REDIS_HOST", "redis")  # default to service name in compose
+			port = os.getenv("REDIS_PORT", "6379")
+			pwd = os.getenv("REDIS_PASSWORD")
+			if pwd:
+				self.redis_url = f"redis://:{pwd}@{host}:{port}/0"
+			else:
+				self.redis_url = f"redis://{host}:{port}/0"
+
 		self._r = None
 		if redis is not None:
 			try:
@@ -157,7 +168,7 @@ class CrashSessionService:
 
 # Small JSON helpers (avoid importing full json to keep this stub lightweight)
 import json as _json
-
+                                                                                                      
 def json_dumps(obj: Any) -> str:
 	return _json.dumps(obj, separators=(',', ':'))
 
