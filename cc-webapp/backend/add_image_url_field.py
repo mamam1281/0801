@@ -7,14 +7,19 @@ from app.database import SessionLocal
 from sqlalchemy import Column, String
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
-from app.config import settings
+import os
 
 def add_image_url_field():
     """Game 모델에 image_url 필드 추가"""
     print("✅ Game 모델에 image_url 필드 추가 시작")
     
-    # SQLAlchemy 엔진 직접 생성
-    engine = create_engine(settings.DATABASE_URL)
+    # SQLAlchemy 엔진 직접 생성 (환경변수 우선)
+    db_url = (
+        os.getenv("SQLALCHEMY_DATABASE_URI")
+        or os.getenv("DATABASE_URL")
+        or f"postgresql://{os.getenv('POSTGRES_USER','cc_user')}:{os.getenv('POSTGRES_PASSWORD','cc_password')}@{os.getenv('POSTGRES_SERVER','postgres')}:{os.getenv('POSTGRES_PORT','5432')}/{os.getenv('POSTGRES_DB','cc_webapp')}"
+    )
+    engine = create_engine(db_url)
     
     try:
         # 필드 추가 SQL 실행

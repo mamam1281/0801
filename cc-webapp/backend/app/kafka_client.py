@@ -1,14 +1,14 @@
 """
 Kafka Producer/Consumer integration for FastAPI backend.
 - Uses kafka-python (already installed)
-- Loads config from app.config
+- Loads config from environment to avoid config module duplication
 - Provides reusable producer and consumer utilities
 """
 import json
 from kafka import KafkaProducer, KafkaConsumer
-from app.config import settings
+import os
 
-KAFKA_BOOTSTRAP_SERVERS = settings.kafka_bootstrap_servers
+KAFKA_BOOTSTRAP_SERVERS = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
 
 # --- Producer (Lazy Loading) ---
 _producer = None
