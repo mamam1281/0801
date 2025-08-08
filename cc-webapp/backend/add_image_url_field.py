@@ -7,7 +7,7 @@ from app.database import SessionLocal
 from sqlalchemy import Column, String
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
-from app.config import settings
+from app.core.config import settings
 
 def add_image_url_field():
     """Game 모델에 image_url 필드 추가"""
