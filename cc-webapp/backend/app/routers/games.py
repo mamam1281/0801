@@ -395,6 +395,21 @@ async def cashout_crash(
         'balance': new_balance,
     }
 
+# 크래시 디버그 엔드포인트: 현재 세션 상태 조회 (개발/QA 보조용)
+@router.get("/crash/debug/current")
+async def get_crash_debug_current(
+    current_user: User = Depends(get_current_user),
+):
+    """현재 사용자에 대한 크래시 세션 상태를 반환합니다.
+    운영에서는 사용하지 말고, 개발/QA 확인용으로만 사용하세요.
+    """
+    css = CrashSessionService()
+    # redis 미구성 시에도 예외 대신 안전한 페이로드 반환
+    if getattr(css, "_r", None) is None:
+        return {"available": False, "session": None}
+    session = css.get_session(current_user.id)
+    return {"available": True, "session": session}
+
 # -------------------------------------------------------------------------
 # ================= Integrated Unified Game API (from game_api.py) =================
 @router.get("/stats/{user_id}", response_model=GameStats)

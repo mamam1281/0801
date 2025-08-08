@@ -50,7 +50,6 @@ class PaginatedRewardsResponse(BaseModel):
 @router.get(
     "/users/{user_id}/rewards",
     response_model=PaginatedRewardsResponse,
-    tags=["Rewards"]  # "users" 태그 제거, "Rewards"로 통일
 )
 async def get_user_rewards(
     user_id: int = Path(..., title="The ID of the user to get rewards for", ge=1),
@@ -110,7 +109,7 @@ async def get_user_rewards(
         total_pages=total_pages
     )
 
-@router.post("/distribute", response_model=RewardItem, tags=["rewards"])
+@router.post("/distribute", response_model=RewardItem)
 async def distribute_reward_to_user(
     request: RewardDistributionRequest,
     db = Depends(get_db)
