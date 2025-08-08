@@ -1,65 +1,35 @@
-# Casino Club F2P Backend - Router Module Registry
-# Clean English comments only - no Unicode issues
+"""
+Routers package initialization.
 
-# Core authentication and user management
-# from . import auth  # Authentication system - 순환 임포트 문제로 제거
-from . import auth_simple  # Simplified Authentication
-from . import users  # User API
+Keep this file minimal to avoid circular imports and import-time side effects.
+FastAPI app imports submodules directly (e.g., `from app.routers import auth`).
+Python will auto-import `app.routers.<name>` when referenced, so we don't import
+submodules here.
+"""
 
-# Administrative and basic game functions
-from . import admin  # Admin API
-from . import actions  # Game action API
-from . import gacha  # Gacha system API
-from . import rewards  # Reward system API
-from . import shop  # Shop transaction API
-from . import missions  # Mission system API
-from . import quiz  # Quiz system API
-from . import dashboard  # Dashboard API
-# from . import prize_roulette  # ARCHIVED - Prize roulette API
-from . import rps  # Rock Paper Scissors API
-from . import notifications  # Notification API
-
-# Progressive expansion phases
-from . import doc_titles  # Phase 1: Document titles
-from . import feedback  # Phase 2: Feedback system
-from . import games  # Phase 3: Game collection
-from . import game_api  # Phase 4: Unified game API
-from . import invite_router  # Phase 5: Invite code system
-from . import analyze  # Phase 6: Analytics API
-# from . import roulette  # ARCHIVED - Phase 7: Roulette API
-from . import segments  # Phase 8: User segmentation
-from . import tracking  # Phase 9: User tracking
-from . import unlock  # Phase 10: Content unlock system
-
-# AI and Chat systems
-from . import ai_router  # AI recommendation system
-from . import chat_router as chat  # Chat system
-
-# Export list for controlled imports
+# Optionally define the public submodules for linters/type-checkers. This list
+# intentionally includes only stable routers known to exist in this codebase.
 __all__ = [
     "auth",
     "users",
     "admin",
-    "actions", 
-    "gacha",
+    "actions",
     "rewards",
     "shop",
     "missions",
     "quiz",
     "dashboard",
-    "prize_roulette",
-    "rps", 
+    "rps",
     "notifications",
     "doc_titles",
     "feedback",
     "games",
-    "game_api",
     "invite_router",
     "analyze",
-    "roulette",
     "segments",
     "tracking",
     "unlock",
     "ai_router",
-    "chat"
+    "chat",
+    "events",
 ]

@@ -165,8 +165,8 @@ app.include_router(ai_router.router, tags=["AI Recommendation"])
 app.include_router(dashboard.router)  # 태그 오버라이드 제거 - 이미 dashboard.py에서 "Dashboard" 태그를 지정함
 app.include_router(notifications.router, tags=["Real-time Notifications"])
 
-# Individual Games (no prefix - routers have their own)
-app.include_router(rps.router, tags=["Rock Paper Scissors"])
+# Individual Games (removed - consolidated into games.router)
+# app.include_router(rps.router, tags=["Rock Paper Scissors"])  # duplicated in games.router
 
 # ===== Progressive Expansion - Additional Features =====
 

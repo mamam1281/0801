@@ -6,7 +6,7 @@ from jose import JWTError
 from sqlalchemy.orm import Session
 
 from .database import get_db
-from .auth.auth_service import AuthService
+from .services.auth_service import AuthService
 from .models.auth_models import User
 
 # 로깅 설정
@@ -22,21 +22,15 @@ if not logger.handlers:
 
 security = HTTPBearer()
 
-def get_auth_service(db: Session = Depends(get_db)) -> AuthService:
-    """AuthService 인스턴스를 반환"""
-    return AuthService(db)
-
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
-    auth_service: AuthService = Depends(get_auth_service)
+    db: Session = Depends(get_db),
 ) -> User:
     """현재 인증된 사용자 정보 반환"""
     try:
         token = credentials.credentials
-        payload = auth_service.verify_token(token)
-        
-        user_id = int(payload["sub"])
-        user = auth_service.db.query(User).filter(User.id == user_id).first()
+        token_data = AuthService.verify_token(token)
+        user = db.query(User).filter(User.id == token_data.user_id).first()
         
         if not user:
             raise HTTPException(
@@ -45,7 +39,7 @@ async def get_current_user(
             )
             
         return user
-        
+
     except HTTPException as e:
         raise e
     except Exception as e:
@@ -64,12 +58,3 @@ async def get_current_admin_user(
             detail="Not enough permissions"
         )
     return current_user
-    user = get_current_user(token, db)
-    # Safe check for admin attribute
-    is_admin = getattr(user, 'is_admin', False)
-    if not is_admin:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized as admin",
-        )
-    return user
