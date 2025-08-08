@@ -66,6 +66,7 @@ cd auto7777
 - **프론트엔드**: http://localhost:3000
 - **백엔드 API**: http://localhost:8000
 - **API 문서**: http://localhost:8000/docs
+ - **OpenAPI 스펙 (Canonical)**: `cc-webapp/backend/current_openapi.json`
 - **pgAdmin**: http://localhost:5050
 - **Redis Commander**: http://localhost:8081
 - **Kafka UI**: http://localhost:8082
@@ -158,6 +159,14 @@ auto7777/
 
 # 프론트엔드 테스트
 .\docker-manage.ps1 test frontend
+```
+
+### OpenAPI 스펙 내보내기
+컨테이너 내부에서 FastAPI의 app.openapi()를 호출해 최신 스펙을 생성합니다.
+
+```powershell
+docker exec cc_backend python -m app.export_openapi
+# 출력: cc-webapp/backend/current_openapi.json
 ```
 
 ## 🎨 디자인 시스템

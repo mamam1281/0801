@@ -8,7 +8,7 @@ from typing import Optional, List, Dict, Any
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
 from app.database import get_db
-from app.dependencies import get_current_user, get_current_admin
+from app.dependencies import get_current_user, get_current_admin_user as get_current_admin
 from app import models
 from datetime import datetime, timedelta
 import json
