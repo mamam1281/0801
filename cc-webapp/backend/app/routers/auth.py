@@ -5,7 +5,7 @@ Delegates business logic to services.auth_service.AuthService.
 """
 
 import logging
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Body
 from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 
@@ -86,18 +86,25 @@ async def admin_login(data: AdminLogin, db: Session = Depends(get_db)):
 
 @router.post("/refresh", response_model=Token)
 async def refresh(
+    # Body로 {"refresh_token": "..."} 를 받는 것도 허용 (FE 호환)
+    refresh_token: str | None = Body(default=None, embed=True),
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: Session = Depends(get_db),
 ):
     try:
-        token_data = AuthService.verify_token(credentials.credentials)
+        # 우선순위: Body.refresh_token -> Authorization Bearer
+        provided_token = refresh_token or (credentials.credentials if credentials else None)
+        if not provided_token:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token required")
+
+        token_data = AuthService.verify_token(provided_token)
         user = db.query(User).filter(User.id == token_data.user_id).first()
         if not user:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
         new_access_token = AuthService.create_access_token(
             {"sub": user.site_id, "user_id": user.id, "is_admin": user.is_admin}
         )
-        return Token(access_token=new_access_token, token_type="bearer", user=_build_user_response(user))
+        return Token(access_token=new_access_token, token_type="bearer", user=_build_user_response(user), refresh_token=provided_token)
     except HTTPException:
         raise
     except Exception:

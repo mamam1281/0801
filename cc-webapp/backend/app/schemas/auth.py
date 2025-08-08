@@ -76,6 +76,8 @@ class Token(BaseModel):
     """토큰 응답 스키마"""
     access_token: str
     token_type: str = "bearer"
+    # 선택적으로 리프레시 토큰을 반환 (예: /refresh에서 기존 리프레시 토큰 유지 목적)
+    refresh_token: Optional[str] = None
     user: UserResponse
 
 

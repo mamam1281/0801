@@ -20,6 +20,7 @@ from ..schemas.game_schemas import (
     RPSPlayRequest, RPSPlayResponse,
     GachaPullRequest, GachaPullResponse,
     CrashBetRequest, CrashBetResponse,
+    CrashCashoutRequest, CrashCashoutResponse,
     GameStats, ProfileGameStats, Achievement, GameSession, GameLeaderboard
 )
 from app import models
@@ -326,6 +327,53 @@ async def place_crash_bet(
         'max_multiplier': round(multiplier, 2),
         'message': 'Bet placed' if win_amount == 0 else 'Auto-cashout triggered',
         'balance': new_balance
+    }
+
+# 크래시 게임 캐시아웃 엔드포인트 (FE 호환)
+@router.post("/crash/cashout", response_model=CrashCashoutResponse)
+async def cashout_crash(
+    request: CrashCashoutRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    크래시 게임 캐시아웃 처리 (단순 시뮬레이션)
+    - 프론트엔드에서 gameId만 전달하므로, 간단히 임의의 승리 금액을 산출하고 잔액에 반영
+    - 실제 구현에서는 진행 중인 게임 상태를 추적하여 정확한 배율과 금액을 계산해야 함
+    """
+    game_id = request.game_id
+
+    # 간단한 배당 계산 (1.2x ~ 3.0x 사이 무작위)
+    multiplier = round(random.uniform(1.2, 3.0), 2)
+    # 기본 베팅 금액 가정 (추적 시스템이 없으므로 최소값 10 적용)
+    base_bet = 10
+    win_amount = int(base_bet * (multiplier - 1))
+
+    # 잔액 갱신
+    new_balance = SimpleUserService.update_user_tokens(db, current_user.id, win_amount)
+
+    # 기록 저장
+    action_data = {
+        "game_type": "crash",
+        "action": "cashout",
+        "game_id": game_id,
+        "multiplier": multiplier,
+        "win_amount": win_amount,
+    }
+    user_action = UserAction(
+        user_id=current_user.id,
+        action_type="CRASH_CASHOUT",
+        action_data=str(action_data)
+    )
+    db.add(user_action)
+    db.commit()
+
+    return {
+        'success': True,
+        'game_id': game_id,
+        'cashed_out_at': datetime.utcnow(),
+        'win_amount': win_amount,
+        'balance': new_balance,
     }
 
 # -------------------------------------------------------------------------

@@ -44,3 +44,20 @@ class AdminService:
         Gets a list of all recent user activities.
         """
         return self.db.query(models.UserAction).order_by(models.UserAction.created_at.desc()).offset(skip).limit(limit).all()
+
+    def update_user_partial(self, user_id: int, payload: dict) -> models.User:
+        user = self.db.query(models.User).filter(models.User.id == user_id).first()
+        if not user:
+            raise ValueError("User not found")
+
+        editable = {
+            'nickname', 'phone_number', 'vip_tier', 'is_active',
+            'risk_profile', 'segment'
+        }
+        for k, v in payload.items():
+            if k in editable:
+                setattr(user, k, v)
+
+        self.db.commit()
+        self.db.refresh(user)
+        return user
