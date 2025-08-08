@@ -110,8 +110,8 @@ class LoginResponse(BaseModel):
 
 # ===== Middleware Setup =====
 
-# CORS settings
-origins = [
+# CORS settings (ENV override: CORS_ORIGINS="http://localhost:3000,https://localhost:3000")
+_default_origins = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
     "https://localhost:3000",
@@ -119,6 +119,11 @@ origins = [
     "http://139.180.155.143:3000",
     "https://139.180.155.143:3000",
 ]
+_env_origins = os.getenv("CORS_ORIGINS", "").strip()
+origins = (
+    [o.strip() for o in _env_origins.split(",") if o.strip()]
+    if _env_origins else _default_origins
+)
 
 # Error handlers (disabled - files empty)
 # add_exception_handlers(app)
