@@ -54,8 +54,6 @@ from app.routers import (
     chat,        # Chat system added
     ai_router,   # AI recommendation system
     events,      # 추가 - 이벤트/미션 라우터
-    admin_events, # Admin Events CRUD
-    admin_missions, # Admin Missions CRUD
 )
 
 # AI recommendation system router separate import (removed duplicate)
@@ -150,13 +148,11 @@ app.add_middleware(
 app.include_router(auth.router, tags=["Authentication"])
 app.include_router(users.router)  # 태그 오버라이드 제거 - 이미 users.py에서 "Users" 태그를 지정함
 app.include_router(admin.router)  # 태그 오버라이드 제거 - 이미 admin.py에서 "Admin" 태그를 지정함
-app.include_router(admin_events.router)  # Admin Events
-app.include_router(admin_missions.router)  # Admin Missions
 
 # Core Game Systems (no prefix - routers have their own)
 app.include_router(actions.router, tags=["Game Actions"])
 # app.include_router(gacha.router, tags=["Gacha"])  # 중복 제거: games.router에 포함됨
-app.include_router(rewards.router)
+app.include_router(rewards.router, tags=["Rewards"])
 app.include_router(shop.router, tags=["Shop"])
 app.include_router(missions.router)  # 태그 오버라이드 제거 - 이미 missions.py에서 "Events & Missions" 태그를 지정함
 
@@ -181,7 +177,7 @@ app.include_router(doc_titles.router, tags=["Document Titles"])
 app.include_router(feedback.router, tags=["Feedback"])
 
 # Phase 3: Game Collection (no prefix - routers have their own) - 통합된 게임 API
-app.include_router(games.router)
+app.include_router(games.router, tags=["Game Collection"])
 
 # Phase 4: Unified Game API (no prefix - routers have their own) - 중복 제거
 # app.include_router(game_api.router, tags=["Game API"])  # 중복 제거: games.router에 통합됨

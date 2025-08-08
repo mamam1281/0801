@@ -1,7 +1,6 @@
 """Game Collection API Endpoints (Updated & Unified)"""
 import logging
 from fastapi import APIRouter, Depends, HTTPException, Response
-from sqlalchemy import exc as sa_exc
 from sqlalchemy.orm import Session
 import random
 import json
@@ -20,11 +19,9 @@ from ..schemas.game_schemas import (
     RPSPlayRequest, RPSPlayResponse,
     GachaPullRequest, GachaPullResponse,
     CrashBetRequest, CrashBetResponse,
-    CrashCashoutRequest, CrashCashoutResponse,
     GameStats, ProfileGameStats, Achievement, GameSession, GameLeaderboard
 )
 from app import models
-from app.services.crash_session import CrashSessionService
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/games", tags=["Games"])
@@ -39,30 +36,29 @@ async def get_games_list(
     """
     게임 목록 조회 (직접 JSON 반환)
     """
-    try:
-        games = db.query(Game).filter(Game.is_active == True).all()
-        result = []
-        for game in games:
-            game_data = {
-                "id": str(game.id),
-                "name": game.name,
-                "description": game.description,
-                "type": game.game_type,
-                "image_url": getattr(game, 'image_url', f"/assets/games/{game.game_type}.png"),
-                "is_active": game.is_active,
-                "daily_limit": None,
-                "playCount": 0,
-                "bestScore": 0,
-                "canPlay": True,
-                "cooldown_remaining": None,
-                "requires_vip_tier": None
-            }
-            result.append(game_data)
-        return Response(content=json.dumps(result), media_type="application/json")
-    except sa_exc.ProgrammingError as e:
-        # Fallback for missing table during smoke tests
-        logger.error(f"Games list failed due to DB error, returning empty list: {e}")
-        return Response(content="[]", media_type="application/json")
+    games = db.query(Game).filter(Game.is_active == True).all()
+    result = []
+    
+    for game in games:
+        # 직접 JSON 형식 준비
+        game_data = {
+            "id": str(game.id),
+            "name": game.name,
+            "description": game.description,
+            "type": game.game_type,
+            "image_url": getattr(game, 'image_url', f"/assets/games/{game.game_type}.png"),
+            "is_active": game.is_active,
+            "daily_limit": None,
+            "playCount": 0,
+            "bestScore": 0,
+            "canPlay": True,
+            "cooldown_remaining": None,
+            "requires_vip_tier": None
+        }
+        result.append(game_data)
+    
+    # 직접 JSON 반환
+    return Response(content=json.dumps(result), media_type="application/json")
 
 # 슬롯 게임 엔드포인트
 @router.post("/slot/spin")
@@ -122,7 +118,7 @@ async def spin_slot(
     }
 
 # 가위바위보 엔드포인트
-@router.post("/rps/play", response_model=RPSPlayResponse, operation_id="games_rps_play_v1")
+@router.post("/rps/play", response_model=RPSPlayResponse)
 async def play_rps(
     request: RPSPlayRequest,
     current_user: User = Depends(get_current_user),
@@ -284,29 +280,22 @@ async def place_crash_bet(
     if current_tokens < bet_amount:
         raise HTTPException(status_code=400, detail="토큰이 부족합니다")
     
-    # 세션 시작 (단일 활성 세션 보장)
-    css = CrashSessionService()
-    try:
-        session = css.start_session(current_user.id, game_id=0, bet_amount=bet_amount)
-    except RuntimeError:
-        raise HTTPException(status_code=503, detail="세션 서비스가 준비되지 않았습니다(캐시). 잠시 후 다시 시도하세요.")
-    except ValueError:
-        raise HTTPException(status_code=409, detail="이미 진행 중인 크래시 세션이 있습니다.")
-
-    # 세션 ID를 game_id로 사용 (FE 호환)
-    game_id = session.get("session_id")
+    # 게임 ID 생성
+    import uuid
+    game_id = str(uuid.uuid4())
     
     # 잔액 차감
     new_balance = SimpleUserService.update_user_tokens(db, current_user.id, -bet_amount)
     
-    # 간단한 크래시 배율 업데이트(시뮬레이션)
-    multiplier = round(random.uniform(1.2, 3.0), 2)
-    try:
-        css.update_multiplier(current_user.id, multiplier)
-    except Exception:
-        pass
-
-    win_amount = 0  # 즉시 자동 캐시아웃은 현재 비활성화(상태 기반 캐시아웃으로 전환)
+    # 간단한 크래시 시뮬레이션
+    # 실제로는 실시간 소켓 연결로 구현해야 함
+    multiplier = random.uniform(1.0, 5.0)
+    win_amount = 0
+    
+    # 자동 캐시아웃 시뮬레이션
+    if auto_cashout_multiplier and multiplier >= auto_cashout_multiplier:
+        win_amount = int(bet_amount * auto_cashout_multiplier)
+        new_balance = SimpleUserService.update_user_tokens(db, current_user.id, win_amount)
     
     # 플레이 기록 저장
     action_data = {
@@ -336,79 +325,6 @@ async def place_crash_bet(
         'message': 'Bet placed' if win_amount == 0 else 'Auto-cashout triggered',
         'balance': new_balance
     }
-
-# 크래시 게임 캐시아웃 엔드포인트 (FE 호환)
-@router.post("/crash/cashout", response_model=CrashCashoutResponse)
-async def cashout_crash(
-    request: CrashCashoutRequest,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """
-    크래시 게임 캐시아웃 처리 (단순 시뮬레이션)
-    - 프론트엔드에서 gameId만 전달하므로, 간단히 임의의 승리 금액을 산출하고 잔액에 반영
-    - 실제 구현에서는 진행 중인 게임 상태를 추적하여 정확한 배율과 금액을 계산해야 함
-    """
-    game_id = request.game_id
-
-    css = CrashSessionService()
-    session = css.get_session(current_user.id)
-    if not session or session.get("session_id") != game_id:
-        raise HTTPException(status_code=404, detail="진행 중인 크래시 세션을 찾을 수 없습니다.")
-
-    # at_multiplier는 현재 세션 배율을 사용하여 즉시 캐시아웃
-    current_mult = float(session.get("multiplier", 1.0))
-    result = css.cashout(current_user.id, at_multiplier=current_mult)
-    if not result:
-        raise HTTPException(status_code=409, detail="캐시아웃을 수행할 수 없습니다.")
-
-    payout = float(result.get("payout", 0))
-    bet_amount = float(session.get("bet_amount", 0))
-    profit = max(int(round(payout - bet_amount)), 0)
-
-    # 잔액 갱신: 베팅은 선차감, 캐시아웃 시 이익분만 적립
-    new_balance = SimpleUserService.update_user_tokens(db, current_user.id, profit)
-
-    # 기록 저장
-    action_data = {
-        "game_type": "crash",
-        "action": "cashout",
-        "game_id": game_id,
-        "multiplier": current_mult,
-        "bet_amount": bet_amount,
-        "payout": payout,
-        "profit": profit,
-    }
-    user_action = UserAction(
-        user_id=current_user.id,
-        action_type="CRASH_CASHOUT",
-        action_data=str(action_data)
-    )
-    db.add(user_action)
-    db.commit()
-
-    return {
-        'success': True,
-        'game_id': game_id,
-        'cashed_out_at': datetime.utcnow(),
-        'win_amount': profit,
-        'balance': new_balance,
-    }
-
-# 크래시 디버그 엔드포인트: 현재 세션 상태 조회 (개발/QA 보조용)
-@router.get("/crash/debug/current")
-async def get_crash_debug_current(
-    current_user: User = Depends(get_current_user),
-):
-    """현재 사용자에 대한 크래시 세션 상태를 반환합니다.
-    운영에서는 사용하지 말고, 개발/QA 확인용으로만 사용하세요.
-    """
-    css = CrashSessionService()
-    # redis 미구성 시에도 예외 대신 안전한 페이로드 반환
-    if getattr(css, "_r", None) is None:
-        return {"available": False, "session": None}
-    session = css.get_session(current_user.id)
-    return {"available": True, "session": session}
 
 # -------------------------------------------------------------------------
 # ================= Integrated Unified Game API (from game_api.py) =================

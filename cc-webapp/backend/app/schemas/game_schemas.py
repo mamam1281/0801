@@ -5,7 +5,6 @@ PrizeRoulette 게임 및 프로필 API에서 사용하는 요청/응답 스키�
 """
 from typing import Dict, List, Optional, Any
 from pydantic import BaseModel, Field
-from pydantic import ConfigDict
 from datetime import datetime
 import uuid
 
@@ -182,12 +181,8 @@ class GameLeaderboard(BaseModel):
 # 슬롯 머신 게임 스키마
 class SlotSpinRequest(BaseModel):
     """슬롯 머신 스핀 요청 모델"""
-    # Accept both snake_case and camelCase from frontend
-    bet_amount: int = Field(alias="betAmount")
-    lines: int = Field(default=1, alias="lines")
-    
-    # Allow population by field name or alias
-    model_config = ConfigDict(populate_by_name=True)
+    bet_amount: int
+    lines: int = 1
 
 
 class SlotSpinResponse(BaseModel):
@@ -208,9 +203,7 @@ class SlotSpinResponse(BaseModel):
 class RPSPlayRequest(BaseModel):
     """가위바위보 게임 요청 모델"""
     choice: str  # 'rock', 'paper', 'scissors'
-    bet_amount: int = Field(alias="betAmount")
-
-    model_config = ConfigDict(populate_by_name=True)
+    bet_amount: int
 
 
 class RPSPlayResponse(BaseModel):
@@ -228,12 +221,9 @@ class RPSPlayResponse(BaseModel):
 # 가챠 게임 스키마
 class GachaPullRequest(BaseModel):
     """가챠 뽑기 요청 모델"""
-    # Make gacha_id optional with sensible default; accept camelCase as well
-    gacha_id: Optional[str] = Field(default="default", alias="gachaId")
-    pull_count: int = Field(default=1, alias="pullCount")
-    use_premium_currency: bool = Field(default=False, alias="usePremiumCurrency")
-
-    model_config = ConfigDict(populate_by_name=True)
+    gacha_id: str
+    pull_count: int = 1
+    use_premium_currency: bool = False
 
 
 class GachaPullResponse(BaseModel):
@@ -250,10 +240,8 @@ class GachaPullResponse(BaseModel):
 # 크래시 게임 스키마
 class CrashBetRequest(BaseModel):
     """크래시 게임 베팅 요청 모델"""
-    bet_amount: int = Field(alias="betAmount")
-    auto_cashout_multiplier: Optional[float] = Field(default=None, alias="autoCashout")
-
-    model_config = ConfigDict(populate_by_name=True)
+    bet_amount: int
+    auto_cashout_multiplier: Optional[float] = None
 
 
 class CrashBetResponse(BaseModel):
@@ -264,21 +252,4 @@ class CrashBetResponse(BaseModel):
     potential_win: int
     max_multiplier: Optional[float] = None
     message: str
-    balance: int
-
-
-# 크래시 캐시아웃 스키마
-class CrashCashoutRequest(BaseModel):
-    """크래시 게임 캐시아웃 요청 모델"""
-    game_id: str = Field(alias="gameId")
-
-    model_config = ConfigDict(populate_by_name=True)
-
-
-class CrashCashoutResponse(BaseModel):
-    """크래시 게임 캐시아웃 응답 모델"""
-    success: bool
-    game_id: str
-    cashed_out_at: datetime
-    win_amount: int
     balance: int

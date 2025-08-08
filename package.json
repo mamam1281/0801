@@ -3,10 +3,7 @@
     "dev": "cd cc-webapp/frontend && npm run dev",
     "build": "cd cc-webapp/frontend && npm run build",
     "start": "cd cc-webapp/frontend && npm run start",
-    "lint": "cd cc-webapp/frontend && npm run lint",
-    "storybook": "cd cc-webapp/frontend && npx storybook dev -p 6006",
-    "build-storybook": "cd cc-webapp/frontend && npx storybook build",
-    "test:backend:smoke": "docker exec cc_backend pytest -q tests/test_auth_refresh_and_crash.py -q"
+    "lint": "cd cc-webapp/frontend && npm run lint"
   },
   "dependencies": {
     "@radix-ui/react": "^2.1.6",
@@ -40,5 +37,9 @@
     "@types/react-dom": "^19.1.6",
     "storybook": "^9.0.13",
     "typescript": "^5.8.3"
+  },
+  "scripts": {
+    "storybook": "storybook dev -p 6006",
+    "build-storybook": "storybook build"
   }
 }
