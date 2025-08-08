@@ -11,15 +11,8 @@ def test_crash_lifecycle_requires_auth():
 
 @pytest.mark.order(2)
 @pytest.mark.integration
-def test_crash_lifecycle_happy_path():
-    # This test assumes a running backend and a valid token; adjust if a fixture is available.
-    # If token isn't available in CI, skip.
-    import os
-    token = os.getenv('TEST_USER_TOKEN')
-    if not token:
-        pytest.skip("TEST_USER_TOKEN not set")
-
-    headers = {"Authorization": f"Bearer {token}"}
+def test_crash_lifecycle_happy_path(auth_token: str):
+    headers = {"Authorization": f"Bearer {auth_token}"}
 
     # 1) Bet
     r1 = Client().post(f"{BASE}/api/games/crash/bet", json={"betAmount": 10}, headers=headers)
