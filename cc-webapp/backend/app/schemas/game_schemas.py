@@ -265,3 +265,20 @@ class CrashBetResponse(BaseModel):
     max_multiplier: Optional[float] = None
     message: str
     balance: int
+
+
+# 크래시 캐시아웃 스키마
+class CrashCashoutRequest(BaseModel):
+    """크래시 게임 캐시아웃 요청 모델"""
+    game_id: str = Field(alias="gameId")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class CrashCashoutResponse(BaseModel):
+    """크래시 게임 캐시아웃 응답 모델"""
+    success: bool
+    game_id: str
+    cashed_out_at: datetime
+    win_amount: int
+    balance: int

@@ -140,6 +140,20 @@
         ],
         "summary": "Refresh",
         "operationId": "refresh_api_auth_refresh_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/Body_refresh_api_auth_refresh_post"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -147,6 +161,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Token"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -447,6 +471,255 @@
             "HTTPBearer": []
           }
         ]
+      }
+    },
+    "/api/admin/users": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "List Users",
+        "operationId": "list_users_api_admin_users_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Search"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 20,
+              "title": "Page Size"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUserListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/users/{user_id}": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Get User Detail",
+        "operationId": "get_user_detail_api_admin_users__user_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "title": "User Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUserDetailResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Patch User",
+        "operationId": "patch_user_api_admin_users__user_id__patch",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "title": "User Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "title": "Payload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/users/{user_id}/activities": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Get User Activities",
+        "operationId": "get_user_activities_api_admin_users__user_id__activities_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "title": "User Id"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 20,
+              "title": "Page Size"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/admin/users/{user_id}/ban": {
@@ -1987,6 +2260,54 @@
         ]
       }
     },
+    "/api/games/crash/cashout": {
+      "post": {
+        "tags": [
+          "Game Collection",
+          "Games"
+        ],
+        "summary": "Cashout Crash",
+        "description": "크래시 게임 캐시아웃 처리 (단순 시뮬레이션)\n- 프론트엔드에서 gameId만 전달하므로, 간단히 임의의 승리 금액을 산출하고 잔액에 반영\n- 실제 구현에서는 진행 중인 게임 상태를 추적하여 정확한 배율과 금액을 계산해야 함",
+        "operationId": "cashout_crash_api_games_crash_cashout_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CrashCashoutRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CrashCashoutResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/games/stats/{user_id}": {
       "get": {
         "tags": [
@@ -3476,6 +3797,68 @@
         "title": "AdminStatsResponse",
         "description": "Admin statistics response"
       },
+      "AdminUserDetailResponse": {
+        "properties": {
+          "user": {
+            "type": "object",
+            "title": "User"
+          },
+          "balances": {
+            "type": "object",
+            "title": "Balances"
+          },
+          "flags": {
+            "items": {
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Flags",
+            "default": []
+          },
+          "recent": {
+            "type": "object",
+            "title": "Recent",
+            "default": {}
+          }
+        },
+        "type": "object",
+        "required": [
+          "user",
+          "balances"
+        ],
+        "title": "AdminUserDetailResponse"
+      },
+      "AdminUserListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "page_size": {
+            "type": "integer",
+            "title": "Page Size"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "page",
+          "page_size",
+          "total"
+        ],
+        "title": "AdminUserListResponse"
+      },
       "AnswerRequest": {
         "properties": {
           "answers": {
@@ -3491,6 +3874,23 @@
           "answers"
         ],
         "title": "AnswerRequest"
+      },
+      "Body_refresh_api_auth_refresh_post": {
+        "properties": {
+          "refresh_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Refresh Token"
+          }
+        },
+        "type": "object",
+        "title": "Body_refresh_api_auth_refresh_post"
       },
       "ClaimRewardResponse": {
         "properties": {
@@ -3517,11 +3917,11 @@
       },
       "CrashBetRequest": {
         "properties": {
-          "bet_amount": {
+          "betAmount": {
             "type": "integer",
-            "title": "Bet Amount"
+            "title": "Betamount"
           },
-          "auto_cashout_multiplier": {
+          "autoCashout": {
             "anyOf": [
               {
                 "type": "number"
@@ -3530,12 +3930,12 @@
                 "type": "null"
               }
             ],
-            "title": "Auto Cashout Multiplier"
+            "title": "Autocashout"
           }
         },
         "type": "object",
         "required": [
-          "bet_amount"
+          "betAmount"
         ],
         "title": "CrashBetRequest",
         "description": "크래시 게임 베팅 요청 모델"
@@ -3589,6 +3989,55 @@
         ],
         "title": "CrashBetResponse",
         "description": "크래시 게임 베팅 응답 모델"
+      },
+      "CrashCashoutRequest": {
+        "properties": {
+          "gameId": {
+            "type": "string",
+            "title": "Gameid"
+          }
+        },
+        "type": "object",
+        "required": [
+          "gameId"
+        ],
+        "title": "CrashCashoutRequest",
+        "description": "크래시 게임 캐시아웃 요청 모델"
+      },
+      "CrashCashoutResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "game_id": {
+            "type": "string",
+            "title": "Game Id"
+          },
+          "cashed_out_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Cashed Out At"
+          },
+          "win_amount": {
+            "type": "integer",
+            "title": "Win Amount"
+          },
+          "balance": {
+            "type": "integer",
+            "title": "Balance"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success",
+          "game_id",
+          "cashed_out_at",
+          "win_amount",
+          "balance"
+        ],
+        "title": "CrashCashoutResponse",
+        "description": "크래시 게임 캐시아웃 응답 모델"
       },
       "EmotionFeedbackRequest": {
         "properties": {
@@ -3926,25 +4375,30 @@
       },
       "GachaPullRequest": {
         "properties": {
-          "gacha_id": {
-            "type": "string",
-            "title": "Gacha Id"
+          "gachaId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gachaid",
+            "default": "default"
           },
-          "pull_count": {
+          "pullCount": {
             "type": "integer",
-            "title": "Pull Count",
+            "title": "Pullcount",
             "default": 1
           },
-          "use_premium_currency": {
+          "usePremiumCurrency": {
             "type": "boolean",
-            "title": "Use Premium Currency",
+            "title": "Usepremiumcurrency",
             "default": false
           }
         },
         "type": "object",
-        "required": [
-          "gacha_id"
-        ],
         "title": "GachaPullRequest",
         "description": "가챠 뽑기 요청 모델"
       },
@@ -4703,15 +5157,15 @@
             "type": "string",
             "title": "Choice"
           },
-          "bet_amount": {
+          "betAmount": {
             "type": "integer",
-            "title": "Bet Amount"
+            "title": "Betamount"
           }
         },
         "type": "object",
         "required": [
           "choice",
-          "bet_amount"
+          "betAmount"
         ],
         "title": "RPSPlayRequest",
         "description": "가위바위보 게임 요청 모델"
@@ -5114,9 +5568,9 @@
       },
       "SlotSpinRequest": {
         "properties": {
-          "bet_amount": {
+          "betAmount": {
             "type": "integer",
-            "title": "Bet Amount"
+            "title": "Betamount"
           },
           "lines": {
             "type": "integer",
@@ -5126,7 +5580,7 @@
         },
         "type": "object",
         "required": [
-          "bet_amount"
+          "betAmount"
         ],
         "title": "SlotSpinRequest",
         "description": "슬롯 머신 스핀 요청 모델"
@@ -5141,6 +5595,17 @@
             "type": "string",
             "title": "Token Type",
             "default": "bearer"
+          },
+          "refresh_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Refresh Token"
           },
           "user": {
             "$ref": "#/components/schemas/app__schemas__auth__UserResponse"

@@ -21,10 +21,30 @@ export const getTokens = () => {
   if (typeof window === 'undefined') return null;
 
   try {
+    // 1) 신규 형식: 단일 키에 JSON 객체 저장
     const tokens = localStorage.getItem(TOKEN_KEY);
     const parsedTokens = tokens ? JSON.parse(tokens) : null;
-    console.log('토큰 가져오기 결과:', parsedTokens ? '토큰 있음' : '토큰 없음');
-    return parsedTokens;
+    if (parsedTokens?.access_token) {
+      console.log('토큰 가져오기 결과: 신규 형식 토큰 사용');
+      return parsedTokens;
+    }
+
+    // 2) 레거시 형식: 개별 키 저장 ('access_token', 'refresh_token')
+    const legacyAccess = localStorage.getItem('access_token');
+    const legacyRefresh = localStorage.getItem('refresh_token');
+    if (legacyAccess || legacyRefresh) {
+      const migrated = {
+        access_token: legacyAccess || null,
+        refresh_token: legacyRefresh || null,
+      };
+      // 마이그레이션: 신규 형식으로 저장해 두기 (향후 일관성 유지)
+      localStorage.setItem(TOKEN_KEY, JSON.stringify(migrated));
+      console.log('토큰 가져오기 결과: 레거시 형식 발견 → 신규 형식으로 마이그레이션');
+      return migrated;
+    }
+
+    console.log('토큰 가져오기 결과: 토큰 없음');
+    return null;
   } catch (error) {
     console.error('토큰 가져오기 오류:', error);
     return null;
@@ -50,7 +70,11 @@ export const setTokens = (tokens) => {
   if (typeof window === 'undefined') return;
 
   try {
+    // 신규 형식 저장
     localStorage.setItem(TOKEN_KEY, JSON.stringify(tokens));
+    // 레거시 키도 동기화 저장 (호환성)
+    if (tokens?.access_token) localStorage.setItem('access_token', tokens.access_token);
+    if (tokens?.refresh_token) localStorage.setItem('refresh_token', tokens.refresh_token);
   } catch (error) {
     console.error('토큰 저장 오류:', error);
   }
@@ -64,6 +88,9 @@ export const clearTokens = () => {
 
   try {
     localStorage.removeItem(TOKEN_KEY);
+    // 레거시 키도 함께 제거
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
   } catch (error) {
     console.error('토큰 삭제 오류:', error);
   }
