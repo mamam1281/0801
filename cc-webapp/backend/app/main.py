@@ -54,6 +54,8 @@ from app.routers import (
     chat,        # Chat system added
     ai_router,   # AI recommendation system
     events,      # 추가 - 이벤트/미션 라우터
+    admin_events, # Admin Events CRUD
+    admin_missions, # Admin Missions CRUD
 )
 
 # AI recommendation system router separate import (removed duplicate)
@@ -148,6 +150,8 @@ app.add_middleware(
 app.include_router(auth.router, tags=["Authentication"])
 app.include_router(users.router)  # 태그 오버라이드 제거 - 이미 users.py에서 "Users" 태그를 지정함
 app.include_router(admin.router)  # 태그 오버라이드 제거 - 이미 admin.py에서 "Admin" 태그를 지정함
+app.include_router(admin_events.router)  # Admin Events
+app.include_router(admin_missions.router)  # Admin Missions
 
 # Core Game Systems (no prefix - routers have their own)
 app.include_router(actions.router, tags=["Game Actions"])

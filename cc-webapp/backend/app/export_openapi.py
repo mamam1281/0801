@@ -12,6 +12,11 @@ from app.main import app
 
 
 def main() -> None:
+    # Invalidate cached schema so newly added routes are included
+    try:
+        app.openapi_schema = None  # type: ignore[attr-defined]
+    except Exception:
+        pass
     schema = app.openapi()
     out_path = "current_openapi.json"  # Writes to backend workdir (/app)
     with open(out_path, "w", encoding="utf-8") as f:

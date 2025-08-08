@@ -24,6 +24,7 @@ from ..schemas.game_schemas import (
     GameStats, ProfileGameStats, Achievement, GameSession, GameLeaderboard
 )
 from app import models
+from app.services.crash_session import CrashSessionService
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/games", tags=["Games"])
@@ -283,22 +284,29 @@ async def place_crash_bet(
     if current_tokens < bet_amount:
         raise HTTPException(status_code=400, detail="토큰이 부족합니다")
     
-    # 게임 ID 생성
-    import uuid
-    game_id = str(uuid.uuid4())
+    # 세션 시작 (단일 활성 세션 보장)
+    css = CrashSessionService()
+    try:
+        session = css.start_session(current_user.id, game_id=0, bet_amount=bet_amount)
+    except RuntimeError:
+        raise HTTPException(status_code=503, detail="세션 서비스가 준비되지 않았습니다(캐시). 잠시 후 다시 시도하세요.")
+    except ValueError:
+        raise HTTPException(status_code=409, detail="이미 진행 중인 크래시 세션이 있습니다.")
+
+    # 세션 ID를 game_id로 사용 (FE 호환)
+    game_id = session.get("session_id")
     
     # 잔액 차감
     new_balance = SimpleUserService.update_user_tokens(db, current_user.id, -bet_amount)
     
-    # 간단한 크래시 시뮬레이션
-    # 실제로는 실시간 소켓 연결로 구현해야 함
-    multiplier = random.uniform(1.0, 5.0)
-    win_amount = 0
-    
-    # 자동 캐시아웃 시뮬레이션
-    if auto_cashout_multiplier and multiplier >= auto_cashout_multiplier:
-        win_amount = int(bet_amount * auto_cashout_multiplier)
-        new_balance = SimpleUserService.update_user_tokens(db, current_user.id, win_amount)
+    # 간단한 크래시 배율 업데이트(시뮬레이션)
+    multiplier = round(random.uniform(1.2, 3.0), 2)
+    try:
+        css.update_multiplier(current_user.id, multiplier)
+    except Exception:
+        pass
+
+    win_amount = 0  # 즉시 자동 캐시아웃은 현재 비활성화(상태 기반 캐시아웃으로 전환)
     
     # 플레이 기록 저장
     action_data = {
@@ -343,22 +351,33 @@ async def cashout_crash(
     """
     game_id = request.game_id
 
-    # 간단한 배당 계산 (1.2x ~ 3.0x 사이 무작위)
-    multiplier = round(random.uniform(1.2, 3.0), 2)
-    # 기본 베팅 금액 가정 (추적 시스템이 없으므로 최소값 10 적용)
-    base_bet = 10
-    win_amount = int(base_bet * (multiplier - 1))
+    css = CrashSessionService()
+    session = css.get_session(current_user.id)
+    if not session or session.get("session_id") != game_id:
+        raise HTTPException(status_code=404, detail="진행 중인 크래시 세션을 찾을 수 없습니다.")
 
-    # 잔액 갱신
-    new_balance = SimpleUserService.update_user_tokens(db, current_user.id, win_amount)
+    # at_multiplier는 현재 세션 배율을 사용하여 즉시 캐시아웃
+    current_mult = float(session.get("multiplier", 1.0))
+    result = css.cashout(current_user.id, at_multiplier=current_mult)
+    if not result:
+        raise HTTPException(status_code=409, detail="캐시아웃을 수행할 수 없습니다.")
+
+    payout = float(result.get("payout", 0))
+    bet_amount = float(session.get("bet_amount", 0))
+    profit = max(int(round(payout - bet_amount)), 0)
+
+    # 잔액 갱신: 베팅은 선차감, 캐시아웃 시 이익분만 적립
+    new_balance = SimpleUserService.update_user_tokens(db, current_user.id, profit)
 
     # 기록 저장
     action_data = {
         "game_type": "crash",
         "action": "cashout",
         "game_id": game_id,
-        "multiplier": multiplier,
-        "win_amount": win_amount,
+        "multiplier": current_mult,
+        "bet_amount": bet_amount,
+        "payout": payout,
+        "profit": profit,
     }
     user_action = UserAction(
         user_id=current_user.id,
@@ -372,7 +391,7 @@ async def cashout_crash(
         'success': True,
         'game_id': game_id,
         'cashed_out_at': datetime.utcnow(),
-        'win_amount': win_amount,
+        'win_amount': profit,
         'balance': new_balance,
     }
 

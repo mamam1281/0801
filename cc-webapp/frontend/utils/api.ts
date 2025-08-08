@@ -3,7 +3,9 @@
  * 백엔드와의 통신을 처리하는 함수들
  */
 
-const API_BASE_URL = 'http://localhost:8000'; // 백엔드 API 주소 (필요에 따라 수정)
+// 백엔드 API 주소 (환경변수 우선)
+const API_BASE_URL = (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_API_URL) || 'http://localhost:8000';
+const API_PREFIX = '/api';
 
 // 개발 모드 여부 확인
 const IS_DEV = process.env.NODE_ENV === 'development';
@@ -73,20 +75,46 @@ export const apiLogger = {
 };
 
 // 토큰 관리
+type TokenBundle = { access_token: string; refresh_token: string };
+
+const CC_TOKEN_KEY = 'cc_auth_tokens';
+
 export const getTokens = () => {
-  const accessToken = localStorage.getItem('access_token');
-  const refreshToken = localStorage.getItem('refresh_token');
+  try {
+    const raw = localStorage.getItem(CC_TOKEN_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as TokenBundle;
+      if (parsed?.access_token && parsed?.refresh_token) {
+        // 레거시 키도 동기화
+        localStorage.setItem('access_token', parsed.access_token);
+        localStorage.setItem('refresh_token', parsed.refresh_token);
+        return { accessToken: parsed.access_token, refreshToken: parsed.refresh_token };
+      }
+    }
+  } catch { }
+  // 레거시 키 폴백
+  const accessToken = localStorage.getItem('access_token') || undefined;
+  const refreshToken = localStorage.getItem('refresh_token') || undefined;
   return { accessToken, refreshToken };
 };
 
 export const setTokens = (accessToken: string, refreshToken: string) => {
+  const bundle: TokenBundle = { access_token: accessToken, refresh_token: refreshToken };
+  try { localStorage.setItem(CC_TOKEN_KEY, JSON.stringify(bundle)); } catch { }
   localStorage.setItem('access_token', accessToken);
   localStorage.setItem('refresh_token', refreshToken);
 };
 
 export const clearTokens = () => {
+  localStorage.removeItem(CC_TOKEN_KEY);
   localStorage.removeItem('access_token');
   localStorage.removeItem('refresh_token');
+};
+
+// 내부 유틸: 경로가 '/api' 프리픽스를 포함하도록 정규화
+const withApiPrefix = (endpoint: string) => {
+  if (!endpoint.startsWith('/')) return `${API_PREFIX}/${endpoint}`;
+  return endpoint.startsWith(API_PREFIX) ? endpoint : `${API_PREFIX}${endpoint}`;
 };
 
 // 기본 API 요청 함수
@@ -107,7 +135,7 @@ const apiRequest = async (endpoint: string, options: RequestInit = {}) => {
       ...(options.headers || {})
     };
 
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    const response = await fetch(`${API_BASE_URL}${withApiPrefix(endpoint)}`, {
       ...options,
       headers
     });
@@ -126,14 +154,17 @@ const apiRequest = async (endpoint: string, options: RequestInit = {}) => {
       }
     }
 
-    const data = await response.json();
+    let data: any = null;
+    const text = await response.text();
+    try { data = text ? JSON.parse(text) : null; } catch { data = text; }
     const duration = Date.now() - startTime;
     
     // 응답 로깅
     apiLogger.response(method, endpoint, response.status, data, duration);
     
     if (!response.ok) {
-      throw new Error(data.detail || '요청 처리 중 오류가 발생했습니다.');
+      const detail = (data && (data.detail || data.message)) || '요청 처리 중 오류가 발생했습니다.';
+      throw new Error(detail);
     }
     
     return data;
@@ -159,13 +190,15 @@ export const refreshAccessToken = async (): Promise<boolean> => {
       return false;
     }
 
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    const response = await fetch(`${API_BASE_URL}${withApiPrefix(endpoint)}`, {
       method,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ refresh_token: refreshToken })
     });
 
-    const data = await response.json();
+    let data: any = null;
+    const text = await response.text();
+    try { data = text ? JSON.parse(text) : null; } catch { data = text; }
     const duration = Date.now() - startTime;
     
     if (!response.ok) {
@@ -175,7 +208,13 @@ export const refreshAccessToken = async (): Promise<boolean> => {
 
     apiLogger.response(method, endpoint, response.status, { message: '토큰 갱신 성공' }, duration);
     
-    setTokens(data.access_token, refreshToken); // 리프레시 토큰은 유지
+    const nextAccess = data?.access_token || data?.accessToken;
+    const nextRefresh = data?.refresh_token || data?.refreshToken || refreshToken;
+    if (!nextAccess) {
+      apiLogger.error(method, endpoint, '토큰 갱신 실패: access_token 없음');
+      return false;
+    }
+    setTokens(nextAccess, nextRefresh); // 리프레시 토큰은 응답값 우선, 없으면 기존 유지
     return true;
   } catch (error) {
     apiLogger.error(method, endpoint, error);

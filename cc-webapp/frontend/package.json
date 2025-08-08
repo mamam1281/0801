@@ -6,7 +6,9 @@
     "dev": "next dev",
     "dev:verbose": "cross-env DEBUG=api:* next dev",
     "build": "next build",
-    "start": "next start"
+  "start": "next start",
+  "test": "jest --config jest.config.js --runInBand --passWithNoTests",
+  "test:watch": "jest --config jest.config.js --watch --runInBand"
   },
   "dependencies": {
     "@emotion/is-prop-valid": "^1.3.1",
