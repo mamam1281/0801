@@ -33,7 +33,7 @@ prometheus-fastapi-instrumentator==6.1.0
 sentry-sdk[fastapi]==1.39.1
 
 # HTTP 클라이언트
-httpx
+httpx==0.27.2
 aiohttp==3.9.1
 requests==2.32.4
 
