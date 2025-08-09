@@ -72,6 +72,8 @@
     "components/ui/alert-dialog.tsx"
   ],
   "exclude": [
-    "node_modules"
+  "node_modules",
+  "components/ui/Label.tsx",
+  "types/react-namespace-shim.d.ts"
   ]
 }

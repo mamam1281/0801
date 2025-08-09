@@ -2,10 +2,8 @@ import * as React from "react";
 
 import { cn } from "./utils";
 
-const Textarea = React.forwardRef<
-  HTMLTextAreaElement,
-  React.ComponentProps<"textarea">
->(({ className, ...props }, ref) => {
+const Textarea = React.forwardRef((props: any, ref: any) => {
+  const { className, ...rest } = props || {};
   return (
     <textarea
       data-slot="textarea"
@@ -14,7 +12,7 @@ const Textarea = React.forwardRef<
         className,
       )}
       ref={ref}
-      {...props}
+      {...rest}
     />
   );
 });

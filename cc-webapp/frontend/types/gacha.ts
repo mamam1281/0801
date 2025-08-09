@@ -1,15 +1,12 @@
 import { GameItem } from './index';
 
 export interface GachaItem extends GameItem {
-  id: string;
-  name: string;
-  type: string;
+  // Narrow/align existing GameItem fields
+  type: 'powerup' | 'skin' | 'currency' | 'collectible' | 'weapon' | 'character' | 'premium' | 'special';
   rarity: 'common' | 'rare' | 'epic' | 'legendary' | 'mythic';
-  rate: number;
-  quantity: number;
-  description: string;
-  icon: string;
   value: number;
+  // Additional gacha-specific metadata
+  rate: number;
   sexiness?: number;
   isNew?: boolean;
 }
@@ -19,6 +16,8 @@ export interface HeartParticle {
   x: number;
   y: number;
 }
+
+export type Particle = ParticleProps;
 
 export interface GachaBanner {
   id: string;

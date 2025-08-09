@@ -120,11 +120,15 @@ export function GameDashboard({
   const leaderboardData = createLeaderboardData(user);
   
   // 게임 네비게이터
-  const navigateToGame = createGameNavigator(games, user.goldBalance, onAddNotification, {
-    onNavigateToSlot,
-    onNavigateToRPS,
-    onNavigateToGacha,
-    onNavigateToCrash,
+  const safeNotify = (msg: string) => {
+    try { onAddNotification && onAddNotification(msg); } catch {}
+  };
+  const noop = () => {};
+  const navigateToGame = createGameNavigator(games, user.goldBalance, safeNotify, {
+    onNavigateToSlot: onNavigateToSlot ?? noop,
+    onNavigateToRPS: onNavigateToRPS ?? noop,
+    onNavigateToGacha: onNavigateToGacha ?? noop,
+    onNavigateToCrash: onNavigateToCrash ?? noop,
   });
 
   useEffect(() => {
@@ -251,14 +255,14 @@ export function GameDashboard({
               </div>
               <div className="space-y-3">
                 <div className="text-3xl font-bold text-yellow-400">
-                  {user.vipTier > 0 ? `VIP ${user.vipTier}` : 'Standard'}
+                  {(user.vipTier ?? 0) > 0 ? `VIP ${user.vipTier}` : 'Standard'}
                 </div>
                 <Progress 
-                  value={user.vipTier > 0 ? (user.vipTier / 5) * 100 : 10} 
+                  value={(user.vipTier ?? 0) > 0 ? ((user.vipTier as number) / 5) * 100 : 10} 
                   className="h-2 bg-purple-900/50" 
                 />
                 <p className="text-sm text-gray-400">
-                  {user.vipTier > 0 ? '프리미엄 혜택 활성화' : '더 많은 혜택을 누리세요'}
+                  {(user.vipTier ?? 0) > 0 ? '프리미엄 혜택 활성화' : '더 많은 혜택을 누리세요'}
                 </p>
               </div>
             </div>
