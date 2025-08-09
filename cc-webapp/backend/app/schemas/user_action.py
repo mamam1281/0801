@@ -1,5 +1,5 @@
 # 파일 위치: c:\Users\bdbd\Downloads\auto202506-a-main\auto202506-a-main\cc-webapp\backend\app\schemas\user_action.py
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
 
@@ -14,4 +14,6 @@ class UserActionCreate(UserActionBase):
 class UserAction(UserActionBase):
     id: int
     timestamp: datetime
-    model_config = ConfigDict(from_attributes=True)
+
+    class Config:
+        from_attributes = True

@@ -12,17 +12,28 @@ import { cn } from "./utils";
 
 const Select = SelectPrimitive.Root;
 
-const SelectGroup = React.forwardRef<any, any>((props, ref) => (
+const SelectGroup = React.forwardRef<
+  React.ElementRef<typeof SelectPrimitive.Group>,
+  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Group>
+>(({ ...props }, ref) => (
   <SelectPrimitive.Group ref={ref} data-slot="select-group" {...props} />
 ));
 SelectGroup.displayName = SelectPrimitive.Group.displayName;
 
-const SelectValue = React.forwardRef<any, any>((props, ref) => (
+const SelectValue = React.forwardRef<
+  React.ElementRef<typeof SelectPrimitive.Value>,
+  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Value>
+>(({ ...props }, ref) => (
   <SelectPrimitive.Value ref={ref} data-slot="select-value" {...props} />
 ));
 SelectValue.displayName = SelectPrimitive.Value.displayName;
 
-const SelectTrigger = React.forwardRef<any, any>(({ className, size = "default", children, ...props }, ref) => (
+const SelectTrigger = React.forwardRef<
+  React.ElementRef<typeof SelectPrimitive.Trigger>,
+  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Trigger> & {
+    size?: "sm" | "default";
+  }
+>(({ className, size = "default", children, ...props }, ref) => (
   <SelectPrimitive.Trigger
     ref={ref}
     data-slot="select-trigger"
@@ -41,7 +52,10 @@ const SelectTrigger = React.forwardRef<any, any>(({ className, size = "default",
 ));
 SelectTrigger.displayName = SelectPrimitive.Trigger.displayName;
 
-const SelectContent = React.forwardRef<any, any>(({ className, children, position = "popper", ...props }, ref) => (
+const SelectContent = React.forwardRef<
+  React.ElementRef<typeof SelectPrimitive.Content>,
+  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content>
+>(({ className, children, position = "popper", ...props }, ref) => (
   <SelectPrimitive.Portal>
     <SelectPrimitive.Content
       ref={ref}
@@ -71,7 +85,10 @@ const SelectContent = React.forwardRef<any, any>(({ className, children, positio
 ));
 SelectContent.displayName = SelectPrimitive.Content.displayName;
 
-const SelectLabel = React.forwardRef<any, any>(({ className, ...props }, ref) => (
+const SelectLabel = React.forwardRef<
+  React.ElementRef<typeof SelectPrimitive.Label>,
+  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Label>
+>(({ className, ...props }, ref) => (
   <SelectPrimitive.Label
     ref={ref}
     data-slot="select-label"
@@ -81,7 +98,10 @@ const SelectLabel = React.forwardRef<any, any>(({ className, ...props }, ref) =>
 ));
 SelectLabel.displayName = SelectPrimitive.Label.displayName;
 
-const SelectItem = React.forwardRef<any, any>(({ className, children, value, ...props }, ref) => (
+const SelectItem = React.forwardRef<
+  React.ElementRef<typeof SelectPrimitive.Item>,
+  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Item>
+>(({ className, children, ...props }, ref) => (
   <SelectPrimitive.Item
     ref={ref}
     data-slot="select-item"
@@ -89,8 +109,7 @@ const SelectItem = React.forwardRef<any, any>(({ className, children, value, ...
       "focus:bg-accent focus:text-accent-foreground [&_svg:not([class*='text-'])]:text-muted-foreground relative flex w-full cursor-default items-center gap-2 rounded-sm py-1.5 pr-8 pl-2 text-sm outline-hidden select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 *:[span]:last:flex *:[span]:last:items-center *:[span]:last:gap-2",
       className,
     )}
-  value={value ?? String(children ?? '')}
-  {...props}
+    {...props}
   >
     <span className="absolute right-2 flex size-3.5 items-center justify-center">
       <SelectPrimitive.ItemIndicator>
@@ -102,7 +121,10 @@ const SelectItem = React.forwardRef<any, any>(({ className, children, value, ...
 ));
 SelectItem.displayName = SelectPrimitive.Item.displayName;
 
-const SelectSeparator = React.forwardRef<any, any>(({ className, ...props }, ref) => (
+const SelectSeparator = React.forwardRef<
+  React.ElementRef<typeof SelectPrimitive.Separator>,
+  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Separator>
+>(({ className, ...props }, ref) => (
   <SelectPrimitive.Separator
     ref={ref}
     data-slot="select-separator"
@@ -112,7 +134,10 @@ const SelectSeparator = React.forwardRef<any, any>(({ className, ...props }, ref
 ));
 SelectSeparator.displayName = SelectPrimitive.Separator.displayName;
 
-const SelectScrollUpButton = React.forwardRef<any, any>(({ className, ...props }, ref) => (
+const SelectScrollUpButton = React.forwardRef<
+  React.ElementRef<typeof SelectPrimitive.ScrollUpButton>,
+  React.ComponentPropsWithoutRef<typeof SelectPrimitive.ScrollUpButton>
+>(({ className, ...props }, ref) => (
   <SelectPrimitive.ScrollUpButton
     ref={ref}
     data-slot="select-scroll-up-button"
@@ -127,7 +152,10 @@ const SelectScrollUpButton = React.forwardRef<any, any>(({ className, ...props }
 ));
 SelectScrollUpButton.displayName = SelectPrimitive.ScrollUpButton.displayName;
 
-const SelectScrollDownButton = React.forwardRef<any, any>(({ className, ...props }, ref) => (
+const SelectScrollDownButton = React.forwardRef<
+  React.ElementRef<typeof SelectPrimitive.ScrollDownButton>,
+  React.ComponentPropsWithoutRef<typeof SelectPrimitive.ScrollDownButton>
+>(({ className, ...props }, ref) => (
   <SelectPrimitive.ScrollDownButton
     ref={ref}
     data-slot="select-scroll-down-button"

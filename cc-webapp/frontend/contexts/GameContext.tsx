@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useReducer, useCallback, useEffect } from 'react';
+import React, { createContext, useContext, useReducer, useCallback, useEffect, ReactNode } from 'react';
 import { User } from '../types';
 import { ensureUserCompatibility, calculateDailyBonus } from '../utils/userUtils';
 import { validateUser, sanitizeInput } from '../utils/securityUtils';
@@ -113,9 +113,11 @@ interface GameContextType extends GameState {
   loadUser: () => Promise<User | null>;
 }
 
-const GameContext: any = createContext(undefined);
+const GameContext = createContext<GameContextType | undefined>(undefined);
 
-interface GameProviderProps { children: any }
+interface GameProviderProps {
+  children: ReactNode;
+}
 
 export function GameProvider({ children }: GameProviderProps) {
   const [state, dispatch] = useReducer(gameReducer, initialState);
@@ -263,7 +265,7 @@ export function GameProvider({ children }: GameProviderProps) {
 }
 
 export function useGame(): GameContextType {
-  const context = useContext(GameContext) as GameContextType | undefined;
+  const context = useContext(GameContext);
   if (context === undefined) {
     throw new Error('useGame must be used within a GameProvider');
   }

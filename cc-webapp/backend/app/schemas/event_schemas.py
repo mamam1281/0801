@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel
 from datetime import datetime
 from typing import Optional, Dict, List, Any
 
@@ -31,7 +31,8 @@ class EventResponse(EventBase):
     participation_count: Optional[int] = 0
     user_participation: Optional[Dict[str, Any]] = None
     
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        from_attributes = True
 
 # Event Participation Schemas
 class EventParticipationBase(BaseModel):
@@ -53,7 +54,8 @@ class EventParticipationResponse(EventParticipationBase):
     completed_at: Optional[datetime] = None
     event: Optional[EventResponse] = None
     
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        from_attributes = True
 
 # Mission Schemas
 class MissionBase(BaseModel):
@@ -85,7 +87,8 @@ class MissionResponse(MissionBase):
     created_at: datetime
     user_progress: Optional[Dict[str, Any]] = None
     
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        from_attributes = True
 
 # User Mission Schemas
 class UserMissionProgress(BaseModel):
@@ -105,7 +108,8 @@ class UserMissionResponse(BaseModel):
     reset_at: Optional[datetime] = None
     mission: Optional[MissionResponse] = None
     
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        from_attributes = True
 
 class ClaimRewardRequest(BaseModel):
     mission_id: Optional[int] = None

@@ -127,10 +127,7 @@ export function getResponsivePopupClasses(popupType: PopupType): string {
     profile: ['overflow-y-auto', 'max-h-screen'],
     profileEdit: ['overflow-y-auto', 'max-h-screen'],
     settings: ['overflow-hidden'],
-  gacha: ['overflow-hidden', 'select-none'],
-  rps: ['overflow-hidden', 'select-none'],
-  slots: ['overflow-hidden', 'select-none'],
-  roulette: ['overflow-hidden', 'select-none']
+    gacha: ['overflow-hidden', 'select-none']
   };
   
   return [...baseClasses, ...typeSpecificClasses[popupType]].join(' ');

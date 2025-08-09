@@ -4,7 +4,7 @@
 퀴즈 시스템 Pydantic 스키마 정의
 """
 
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 from enum import Enum
@@ -32,7 +32,8 @@ class QuizCategoryResponse(BaseModel):
     category_type: str = "general"
     is_active: bool = True
     
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        from_attributes = True
 
 
 class QuizAnswerResponse(BaseModel):
@@ -40,7 +41,8 @@ class QuizAnswerResponse(BaseModel):
     text: str
     order: int = 0
     
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        from_attributes = True
 
 
 class QuizQuestionResponse(BaseModel):
@@ -52,7 +54,8 @@ class QuizQuestionResponse(BaseModel):
     explanation: Optional[str] = None
     answers: List[QuizAnswerResponse] = []
     
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        from_attributes = True
 
 
 class QuizResponse(BaseModel):
@@ -68,7 +71,8 @@ class QuizResponse(BaseModel):
     category: Optional[QuizCategoryResponse] = None
     questions: List[QuizQuestionResponse] = []
     
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        from_attributes = True
 
 
 class QuizAttemptCreate(BaseModel):
@@ -99,7 +103,8 @@ class QuizAttemptResponse(BaseModel):
     status: str = "in_progress"
     feedback: Optional[Dict[str, Any]] = None
     
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        from_attributes = True
 
 
 class QuizLeaderboardResponse(BaseModel):
@@ -111,7 +116,8 @@ class QuizLeaderboardResponse(BaseModel):
     completion_rate: float = 0.0
     rank_position: Optional[int] = None
     
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        from_attributes = True
 
 
 class QuizStatsResponse(BaseModel):

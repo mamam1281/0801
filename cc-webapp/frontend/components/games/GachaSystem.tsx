@@ -11,7 +11,7 @@ import {
   Crown
 } from 'lucide-react';
 import { User } from '../../types';  // App.tsx가 아닌 types에서 import
-import { GachaItem, Particle, HeartParticle, GachaBanner } from '../../types/gacha';
+import { GachaItem } from '../../types/gacha';
 import { Button } from '../ui/button';
 import { GACHA_BANNERS, ANIMATION_DURATIONS } from './gacha/constants';
 import { 
@@ -20,7 +20,9 @@ import {
   getRandomItem,
   updateUserInventory,
   getRarityMessage,
-  getTenPullMessage
+  getTenPullMessage,
+  Particle,
+  HeartParticle
 } from './gacha/utils';
 import {
   SexyBannerSelector,
@@ -28,7 +30,7 @@ import {
   SexyInventoryModal,
   BackgroundEffects, // BackgroundEffects 컴포넌트 추가
 } from './gacha/components';
-// GachaBanner type already imported from types
+import type { GachaBanner } from './gacha/constants';
 
 interface GachaSystemProps {
   user: User;
@@ -42,7 +44,7 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
   const [isPulling, setIsPulling] = useState(false);
   const [pullResults, setPullResults] = useState<GachaItem[]>([]);
   const [showResults, setShowResults] = useState(false);
-  const [particles, setParticles] = useState<any[]>([]);
+  const [particles, setParticles] = useState<Particle[]>([]);
   const [currentPullIndex, setCurrentPullIndex] = useState(0);
   const [showInventory, setShowInventory] = useState(false);
   const [pullAnimation, setPullAnimation] = useState<'opening' | 'revealing' | null>(null);

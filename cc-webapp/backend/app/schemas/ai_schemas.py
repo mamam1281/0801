@@ -4,7 +4,7 @@
 AI 추천 시스템 Pydantic 스키마 정의
 """
 
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 from enum import Enum
@@ -42,7 +42,8 @@ class RecommendationTemplateResponse(BaseModel):
     priority: int = 1
     is_active: bool = True
     
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        from_attributes = True
 
 
 class UserRecommendationCreate(BaseModel):
@@ -76,7 +77,8 @@ class UserRecommendationResponse(BaseModel):
     algorithm_version: Optional[str] = None
     created_at: datetime
     
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        from_attributes = True
 
 
 class RecommendationInteractionCreate(BaseModel):
@@ -96,7 +98,8 @@ class RecommendationInteractionResponse(BaseModel):
     result_data: Optional[Dict[str, Any]] = None
     created_at: datetime
     
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        from_attributes = True
 
 
 class UserPreferenceUpdate(BaseModel):
@@ -129,7 +132,8 @@ class UserPreferenceResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        from_attributes = True
 
 
 class ModelPredictionResponse(BaseModel):
@@ -145,7 +149,8 @@ class ModelPredictionResponse(BaseModel):
     created_at: datetime
     validated_at: Optional[datetime] = None
     
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        from_attributes = True
 
 
 class PersonalizationRequest(BaseModel):

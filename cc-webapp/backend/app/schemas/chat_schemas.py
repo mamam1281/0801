@@ -4,7 +4,7 @@
 채팅 시스템 Pydantic 스키마 정의
 """
 
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 from enum import Enum
@@ -70,7 +70,8 @@ class ChatRoomResponse(BaseModel):
     created_at: datetime
     participant_count: Optional[int] = 0
     
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        from_attributes = True
 
 
 class ChatParticipantResponse(BaseModel):
@@ -84,7 +85,8 @@ class ChatParticipantResponse(BaseModel):
     last_seen: Optional[datetime] = None
     message_count: int = 0
     
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        from_attributes = True
 
 
 class ChatMessageCreate(BaseModel):
@@ -116,7 +118,8 @@ class ChatMessageResponse(BaseModel):
     edited_at: Optional[datetime] = None
     sender_nickname: Optional[str] = None
     
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        from_attributes = True
 
 
 class MessageReactionCreate(BaseModel):
@@ -132,7 +135,8 @@ class MessageReactionResponse(BaseModel):
     reaction_value: str
     created_at: datetime
     
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        from_attributes = True
 
 
 class AIAssistantCreate(BaseModel):
@@ -167,7 +171,8 @@ class AIAssistantResponse(BaseModel):
     is_active: bool = True
     created_at: datetime
     
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        from_attributes = True
 
 
 class AIConversationCreate(BaseModel):
@@ -191,7 +196,8 @@ class AIConversationResponse(BaseModel):
     ended_at: Optional[datetime] = None
     last_activity: datetime
     
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        from_attributes = True
 
 
 class AIMessageCreate(BaseModel):
@@ -218,7 +224,8 @@ class AIMessageResponse(BaseModel):
     follow_up_needed: bool = False
     created_at: datetime
     
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        from_attributes = True
 
 
 class EmotionProfileUpdate(BaseModel):
@@ -241,7 +248,8 @@ class EmotionProfileResponse(BaseModel):
     last_updated: datetime
     created_at: datetime
     
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        from_attributes = True
 
 
 class ChatModerationAction(BaseModel):
@@ -264,4 +272,5 @@ class ChatModerationResponse(BaseModel):
     expires_at: Optional[datetime] = None
     created_at: datetime
     
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        from_attributes = True

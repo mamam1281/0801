@@ -28,7 +28,7 @@ import {
   Eye,
   Settings
 } from 'lucide-react';
-import { User } from '../types';
+import { User, Event, Mission } from '../types';
 import { EventBackend, MissionBackend, UserMissionBackend } from '../types/eventMission';
 import { eventMissionApi } from '../utils/eventMissionApi';
 import { Button } from './ui/button';
@@ -50,20 +50,11 @@ interface EventMissionPanelProps {
 export function EventMissionPanel({ user, onBack, onUpdateUser, onAddNotification }: EventMissionPanelProps) {
   const [activeTab, setActiveTab] = useState('events');
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [editingItem, setEditingItem] = useState<EventBackend | MissionBackend | null>(null);
+  const [editingItem, setEditingItem] = useState<Event | Mission | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Local Event type used in this component (frontend view model)
-  type LocalEvent = {
-    id: string;
-    title: string;
-    participants: number;
-    joined?: boolean;
-    [key: string]: any;
-  };
-
   // Mock events data
-  const [events, setEvents] = useState<LocalEvent[]>([
+  const [events, setEvents] = useState<Event[]>([
     {
       id: 'event_1',
       title: '🎄 크리스마스 특별 이벤트',
@@ -117,7 +108,7 @@ export function EventMissionPanel({ user, onBack, onUpdateUser, onAddNotificatio
   ]);
 
   // Mock missions data
-  const [missions, setMissions] = useState<any[]>([
+  const [missions, setMissions] = useState<Mission[]>([
     {
       id: 'mission_1',
       title: '일일 로그인',
@@ -364,7 +355,7 @@ export function EventMissionPanel({ user, onBack, onUpdateUser, onAddNotificatio
       await eventMissionApi.events.join(parseInt(eventId));
       
       // 로컬 상태 업데이트
-  setEvents(prev => prev.map((e: LocalEvent) => 
+      setEvents(prev => prev.map((e: Event) => 
         e.id === eventId 
           ? { ...e, participants: e.participants + 1, joined: true }
           : e
@@ -537,7 +528,7 @@ export function EventMissionPanel({ user, onBack, onUpdateUser, onAddNotificatio
                 <Input
                   placeholder="이벤트 검색..."
                   value={searchQuery}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchQuery(e.target.value as string)}
+                  onChange={(e) => setSearchQuery(e.target.value as string)}
                   className="pl-10"
                 />
               </div>
@@ -764,7 +755,7 @@ export function EventMissionPanel({ user, onBack, onUpdateUser, onAddNotificatio
                         
                         {/* Rewards */}
                         <div className="flex flex-wrap gap-2 mb-3">
-                          {mission.rewards.map((reward: any, idx: number) => (
+                          {mission.rewards.map((reward, idx) => (
                             <Badge key={idx} variant="secondary" className="text-xs">
                               {reward.type === 'gold' ? `${reward.amount.toLocaleString()}G` :
                                reward.type === 'exp' ? `${reward.amount.toLocaleString()}XP` :
