@@ -173,6 +173,7 @@ class AIAssistantResponse(BaseModel):
     
     class Config:
         from_attributes = True
+        protected_namespaces = ()
 
 
 class AIConversationCreate(BaseModel):
@@ -226,6 +227,7 @@ class AIMessageResponse(BaseModel):
     
     class Config:
         from_attributes = True
+        protected_namespaces = ()
 
 
 class EmotionProfileUpdate(BaseModel):
