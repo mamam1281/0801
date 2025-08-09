@@ -243,7 +243,7 @@ export function InventoryScreen({ user, onBack, onUpdateUser, onAddNotification 
               <Input
                 placeholder="아이템 검색..."
                 value={searchQuery}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchQuery(e.target.value)}
+                onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10"
               />
             </div>
@@ -333,7 +333,7 @@ export function InventoryScreen({ user, onBack, onUpdateUser, onAddNotification 
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+                      onClick={(e) => {
                         e.stopPropagation();
                         setSelectedItem(item);
                         setShowItemModal(true);

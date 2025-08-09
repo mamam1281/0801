@@ -61,7 +61,11 @@ class GachaPullResponseItem(BaseModel):
                     
         super().__init__(**data)
 
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        # Pydantic V2 uses ``from_attributes``. This is not strictly needed
+        # here as we are creating from a dict, but is good practice if the
+        # source dict could be an ORM model.
+        from_attributes = True
 
 
 

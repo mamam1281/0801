@@ -11,7 +11,6 @@ export interface User {
   inventory: GameItem[];
   stats: GameStats;
   gameStats: GameStatsDetail;
-  vipTier?: number;
   lastLogin: Date;
   totalPlayTime: number;
   isAdmin: boolean;
@@ -25,8 +24,8 @@ export interface User {
 export interface GameItem {
   id: string;
   name: string;
-  type: 'powerup' | 'skin' | 'currency' | 'collectible' | 'weapon' | 'character' | 'premium' | 'special';
-  rarity: 'common' | 'rare' | 'epic' | 'legendary' | 'mythic';
+  type: 'powerup' | 'skin' | 'currency' | 'collectible';
+  rarity: 'common' | 'rare' | 'epic' | 'legendary';
   quantity: number;
   description: string;
   icon: string;
@@ -58,14 +57,9 @@ export interface GameStatsDetail {
     bestStreak: number;
   };
   gacha: {
-  totalPulls: number;
-  legendaryPulls: number;
-  totalValue: number;
-  // used by components
-  pulls: any;
-  totalSpent: any;
-  epicCount: number;
-  legendaryCount: number;
+    totalPulls: number;
+    legendaryPulls: number;
+    totalValue: number;
   };
   crash: {
     totalGames: number;
@@ -122,23 +116,6 @@ export type AppScreen =
 // GameSpecific 타입 추가 (GameSpecificStats 대신 GameStatsDetail 사용)
 export type GameSpecific = GameStatsDetail;
 
-// Event & Mission aliases for frontend use
-export interface Event {
-  id: string;
-  title: string;
-  description?: string | null;
-  startDate?: string | Date;
-  endDate?: string | Date;
-  rewards?: any;
-}
-
-export interface Mission {
-  id: string;
-  title: string;
-  description?: string | null;
-  category?: string | null;
-  target_value?: number;
-  target_type?: string;
-  rewards?: any;
-}
+// Event 타입이 이미 추가되어 있는지 확인하고, 없으면 추가
+// Mission 타입도 이미 추가됨
 

@@ -312,7 +312,7 @@ export function ShopManager({ onAddNotification }: ShopManagerProps) {
           <Input
             placeholder="아이템 검색..."
             value={searchQuery}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchQuery(e.target.value)}
+            onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-10"
           />
         </div>
@@ -539,7 +539,7 @@ function ItemModal({
                 <Input
                   id="name"
                   value={formData.name || ''}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                  onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
                   placeholder="아이템 이름을 입력하세요"
                   required
                 />
@@ -550,7 +550,7 @@ function ItemModal({
                 <Input
                   id="icon"
                   value={formData.icon || ''}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData(prev => ({ ...prev, icon: e.target.value }))}
+                  onChange={(e) => setFormData(prev => ({ ...prev, icon: e.target.value }))}
                   placeholder="📦"
                   required
                 />
@@ -562,7 +562,7 @@ function ItemModal({
               <Textarea
                 id="description"
                 value={formData.description || ''}
-                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
                 placeholder="아이템 설명을 입력하세요"
                 rows={3}
               />
@@ -575,7 +575,7 @@ function ItemModal({
                   id="price"
                   type="number"
                   value={formData.price || 0}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData(prev => ({ ...prev, price: parseInt(e.target.value) || 0 }))}
+                  onChange={(e) => setFormData(prev => ({ ...prev, price: parseInt(e.target.value) || 0 }))}
                   placeholder="0"
                   min="0"
                   required
@@ -588,7 +588,7 @@ function ItemModal({
                   id="stock"
                   type="number"
                   value={formData.stock || ''}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData(prev => ({ ...prev, stock: e.target.value ? parseInt(e.target.value) : undefined }))}
+                  onChange={(e) => setFormData(prev => ({ ...prev, stock: e.target.value ? parseInt(e.target.value) : undefined }))}
                   placeholder="무제한"
                   min="0"
                 />
@@ -600,7 +600,7 @@ function ItemModal({
                   id="discount"
                   type="number"
                   value={formData.discount || ''}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData(prev => ({ ...prev, discount: e.target.value ? parseInt(e.target.value) : undefined }))}
+                  onChange={(e) => setFormData(prev => ({ ...prev, discount: e.target.value ? parseInt(e.target.value) : undefined }))}
                   placeholder="0"
                   min="0"
                   max="100"
@@ -653,7 +653,7 @@ function ItemModal({
               <Input
                 id="tags"
                 value={Array.isArray(formData.tags) ? formData.tags.join(', ') : ''}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData(prev => ({ 
+                onChange={(e) => setFormData(prev => ({ 
                   ...prev, 
                   tags: e.target.value.split(',').map(tag => tag.trim()).filter(Boolean)
                 }))}
@@ -664,7 +664,7 @@ function ItemModal({
             <div className="flex items-center gap-3">
               <Switch
                 checked={formData.isActive ?? true}
-                onCheckedChange={(checked: boolean) => setFormData(prev => ({ ...prev, isActive: checked }))}
+                onCheckedChange={(checked) => setFormData(prev => ({ ...prev, isActive: checked }))}
               />
               <Label>아이템 활성화</Label>
             </div>

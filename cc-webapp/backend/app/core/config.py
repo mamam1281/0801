@@ -1,6 +1,5 @@
 import os
 from pydantic import Field
-from pydantic_settings import SettingsConfigDict
 from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
@@ -43,7 +42,8 @@ class Settings(BaseSettings):
     VIP_DAILY_RPS_PLAYS: int = 5
     VIP_DAILY_GACHA_PULLS: int = 5
 
-    model_config = SettingsConfigDict(case_sensitive=True)
+    class Config:
+        case_sensitive = True
 
 # Create global settings object
 settings = Settings()

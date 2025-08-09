@@ -231,6 +231,3 @@ data/redis/
 start-all.sh
 start-backend.sh
 start-frontend.sh
-
-# Security tokens and debug artifacts
-**/token.json

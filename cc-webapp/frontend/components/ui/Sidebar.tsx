@@ -26,7 +26,7 @@ import {
 } from "./tooltip";
 
 // 타입 정의 추가
-type ComponentWithAsChild<T, P = {}> = any;
+type ComponentWithAsChild<T, P = {}> = React.ComponentProps<T> & { asChild?: boolean } & P;
 
 const SIDEBAR_COOKIE_NAME = "sidebar_state";
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
@@ -45,7 +45,7 @@ type SidebarContextProps = {
   toggleSidebar: () => void;
 };
 
-const SidebarContext: any = React.createContext(null);
+const SidebarContext = React.createContext<SidebarContextProps | null>(null);
 
 function useSidebar() {
   const context = React.useContext(SidebarContext);
@@ -166,7 +166,7 @@ function Sidebar({
   variant?: "sidebar" | "floating" | "inset";
   collapsible?: "offcanvas" | "icon" | "none";
 }) {
-  const { isMobile, state, openMobile, setOpenMobile } = (useSidebar() as any) || ({} as any);
+  const { isMobile, state, openMobile, setOpenMobile } = useSidebar();
 
   if (collapsible === "none") {
     return (
@@ -261,7 +261,7 @@ function SidebarTrigger({
   onClick,
   ...props
 }: React.ComponentProps<typeof Button>) {
-  const { toggleSidebar } = (useSidebar() as any) || ({} as any);
+  const { toggleSidebar } = useSidebar();
 
   return (
     <Button
@@ -270,7 +270,7 @@ function SidebarTrigger({
       variant="ghost"
       size="icon"
       className={cn("size-7", className)}
-  onClick={(event: React.MouseEvent) => {
+      onClick={(event) => {
         onClick?.(event);
         toggleSidebar();
       }}
@@ -283,7 +283,7 @@ function SidebarTrigger({
 }
 
 function SidebarRail({ className, ...props }: React.ComponentProps<"button">) {
-  const { toggleSidebar } = (useSidebar() as any) || ({} as any);
+  const { toggleSidebar } = useSidebar();
 
   return (
     <button
@@ -498,25 +498,20 @@ const sidebarMenuButtonVariants = cva(
   },
 );
 
-type SidebarMenuButtonProps = ComponentWithAsChild<
-  'button',
-  {
-    isActive?: boolean;
-    tooltip?: string | React.ComponentProps<typeof TooltipContent>;
-  } & VariantProps<typeof sidebarMenuButtonVariants>
->;
-
 function SidebarMenuButton({
   asChild = false,
   isActive = false,
-  variant = 'default',
-  size = 'default',
+  variant = "default",
+  size = "default",
   tooltip,
   className,
   ...props
-}: SidebarMenuButtonProps) {
-  const Comp = asChild ? Slot : 'button';
-  const { isMobile, state } = (useSidebar() as any) || ({} as any);
+}: ComponentWithAsChild<"button", {
+  isActive?: boolean;
+  tooltip?: string | React.ComponentProps<typeof TooltipContent>;
+} & VariantProps<typeof sidebarMenuButtonVariants>) {
+  const Comp = asChild ? Slot : "button";
+  const { isMobile, state } = useSidebar();
 
   const button = (
     <Comp
@@ -533,7 +528,7 @@ function SidebarMenuButton({
     return button;
   }
 
-  if (typeof tooltip === 'string') {
+  if (typeof tooltip === "string") {
     tooltip = {
       children: tooltip,
     };
@@ -545,7 +540,7 @@ function SidebarMenuButton({
       <TooltipContent
         side="right"
         align="center"
-        hidden={state !== 'collapsed' || isMobile}
+        hidden={state !== "collapsed" || isMobile}
         {...tooltip}
       />
     </Tooltip>

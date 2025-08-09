@@ -8,10 +8,7 @@ export const ANIMATION_DURATIONS = {
   spin: 2,
   sparkle: 2,
   stagger: 0.1,
-  baseDelay: 0.2,
-  opening: 1.0,
-  particle: 1.0,
-  heartFloat: 1.2,
+  baseDelay: 0.2
 };
 
 // 희귀도별 색상
