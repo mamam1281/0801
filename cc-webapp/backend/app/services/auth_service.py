@@ -110,7 +110,7 @@ class AuthService:
     def authenticate_user(db: Session, site_id: str, password: str) -> Optional[User]:
         """사용자 인증"""
         user = db.query(User).filter(User.site_id == site_id).first()
-        if not user or not AuthService.verify_password(password, user.hashed_password):
+        if not user or not AuthService.verify_password(password, user.password_hash):
             return None
         return user
     
@@ -121,7 +121,7 @@ class AuthService:
             User.site_id == site_id,
             User.is_admin == True
         ).first()
-        if not user or not AuthService.verify_password(password, user.hashed_password):
+        if not user or not AuthService.verify_password(password, user.password_hash):
             return None
         return user
     
@@ -170,7 +170,7 @@ class AuthService:
             site_id=user_create.site_id,  # site_id는 user_id와 동일한 개념
             nickname=user_create.nickname,
             phone_number=getattr(user_create, 'phone_number', None),  # 선택적 필드로 처리
-            hashed_password=hashed_password,
+            password_hash=hashed_password,
             invite_code="5858",  # 항상 5858 초대코드 사용
             is_admin=False
         )

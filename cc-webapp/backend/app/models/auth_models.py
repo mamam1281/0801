@@ -18,7 +18,8 @@ class User(Base):
     cyber_token_balance = Column(Integer, default=200)  # 사이버 토큰 잔액
     is_active = Column(Boolean, default=True)
     is_admin = Column(Boolean, default=False)  # 관리자 여부
-    user_rank = Column(String(50), default="STANDARD", name="rank")  # rank는 PostgreSQL 예약어이므로 name 지정
+    # DB의 컬럼명은 'vip_tier' 이므로 name='vip_tier'로 매핑 (기존 'rank' 예약어 사용 회피)
+    user_rank = Column(String(50), default="STANDARD", name="vip_tier")
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     last_login = Column(DateTime, nullable=True)
