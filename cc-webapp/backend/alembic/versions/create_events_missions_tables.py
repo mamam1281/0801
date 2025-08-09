@@ -10,9 +10,10 @@ from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
-# revision identifiers, used by Alembic.
-revision: str = 'events_missions_001'
-down_revision: Union[str, None] = '79b9722f373c'
+# NOTE: This file duplicates events_missions_001; deactivate by renaming Alembic metadata vars.
+# revision identifiers, used by Alembic (DEACTIVATED IN THIS FILE)
+revision_dupe: str = 'events_missions_001'  # deactivated duplicate
+down_revision_dupe: Union[str, None] = '79b9722f373c'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
