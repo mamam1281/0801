@@ -4,13 +4,14 @@
 // like React.ComponentProps, React.ElementRef, and generic forwardRef calls.
 
 declare module 'react' {
-  // Namespace-level aliases so `React.ComponentProps` resolves in legacy code
-  // Keep these very loose to avoid coupling, but DO NOT override function types.
+  // Namespace-level legacy aliases. Keep them loose and types-only.
   namespace React {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     type ComponentProps<T> = any;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     type ComponentPropsWithoutRef<T> = any;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    type ComponentRef<T> = any;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     type ElementRef<T> = any;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -19,13 +20,17 @@ declare module 'react' {
     type ReactNode = any;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     type KeyboardEvent<T = Element> = any;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    interface ErrorInfo { componentStack: string }
   }
 
-  // Export aliases at module root for `import type { ... } from 'react'` patterns
+  // Module-level aliases for import type usage
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   export type ComponentProps<T> = any;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   export type ComponentPropsWithoutRef<T> = any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  export type ComponentRef<T> = any;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   export type ElementRef<T> = any;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -34,6 +39,7 @@ declare module 'react' {
   export type ReactNode = any;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   export type KeyboardEvent<T = Element> = any;
+  export interface ErrorInfo { componentStack: string }
 }
 
 export {};

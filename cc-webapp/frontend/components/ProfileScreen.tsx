@@ -21,7 +21,10 @@ export function ProfileScreen({ onBack, onAddNotification }: ProfileScreenProps)
   const [stats, setStats] = useState(null);
   const [balance, setBalance] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
+  const [user, setUser] = useState<any>(null);
+  const [balance, setBalance] = useState<any>(null);
+  const [stats, setStats] = useState<any>(null);
   const [authChecked, setAuthChecked] = useState(false);
 
   useEffect(() => {
