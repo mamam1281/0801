@@ -13,7 +13,7 @@ export interface User {
 export interface UserStats {
   total_games_played: number;
   total_wins: number;
-  total_losses:
+  total_losses: number;
   win_rate: number;
 }
 

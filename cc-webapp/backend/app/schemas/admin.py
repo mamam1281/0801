@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, List, Dict
 from datetime import datetime
 
@@ -14,9 +14,8 @@ class UserActivityCreate(UserActivityBase):
 class UserActivity(UserActivityBase):
     id: int
     timestamp: datetime
-
-    class Config:
-        from_attributes = True
+    
+    model_config = ConfigDict(from_attributes=True)
 
 # Reward schemas
 class RewardBase(BaseModel):
@@ -31,9 +30,8 @@ class RewardCreate(RewardBase):
 class Reward(RewardBase):
     id: int
     created_at: datetime
-
-    class Config:
-        from_attributes = True
+    
+    model_config = ConfigDict(from_attributes=True)
 
 # Admin dashboard schemas
 class UserActivitySummary(BaseModel):
@@ -58,8 +56,7 @@ class UserAdminResponse(BaseModel):
     cyber_token_balance: int
     rank: str
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class ActivityResponse(BaseModel):
     id: int
@@ -67,8 +64,7 @@ class ActivityResponse(BaseModel):
     timestamp: datetime
     details: Optional[str] = None
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class UserDetailResponse(UserAdminResponse):
     activities: List[ActivityResponse]
@@ -85,5 +81,4 @@ class RewardResponse(BaseModel):
     amount: int
     created_at: datetime
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

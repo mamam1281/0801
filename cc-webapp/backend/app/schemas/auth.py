@@ -1,7 +1,7 @@
 """인증 관련 Pydantic 스키마"""
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 class UserBase(BaseModel):
@@ -17,8 +17,7 @@ class UserCreate(BaseModel):
     invite_code: str = Field(..., description="초대코드 (5858)")
     password: str = Field(..., min_length=4, description="비밀번호생성")
     
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(json_schema_extra={
             "example": {
                 "site_id": "testuser123",
                 "nickname": "테스터",
@@ -26,7 +25,7 @@ class UserCreate(BaseModel):
                 "invite_code": "5858",
                 "password": "1234"
             }
-        }
+        })
 
 
 class UserLogin(BaseModel):
@@ -34,13 +33,12 @@ class UserLogin(BaseModel):
     site_id: str = Field(..., description="사이트 아이디")
     password: str = Field(..., description="비밀번호")
     
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(json_schema_extra={
             "example": {
                 "site_id": "testuser123",
                 "password": "password123"
             }
-        }
+        })
 
 
 class AdminLogin(BaseModel):
@@ -48,13 +46,12 @@ class AdminLogin(BaseModel):
     site_id: str = Field(..., description="관리자 사이트 아이디")
     password: str = Field(..., description="관리자 비밀번호")
     
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(json_schema_extra={
             "example": {
                 "site_id": "admin",
                 "password": "admin123"
             }
-        }
+        })
 
 
 class UserResponse(BaseModel):
@@ -68,8 +65,7 @@ class UserResponse(BaseModel):
     created_at: datetime
     last_login: Optional[datetime] = None
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class Token(BaseModel):
