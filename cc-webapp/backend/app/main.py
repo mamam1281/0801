@@ -83,6 +83,27 @@ try:
 except Exception:
     sentry_sdk = None
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    print("🚀 Casino-Club F2P Backend starting up...")
+    try:
+        setup_logging()
+        print("📋 Logging initialized")
+    except Exception as e:
+        print(f"⚠️ Logging setup failed: {e}")
+    start_scheduler()
+    print("✅ Backend startup complete")
+    try:
+        yield
+    finally:
+        # Shutdown
+        print("🛑 Casino-Club F2P Backend shutting down...")
+        if scheduler and scheduler.running:
+            scheduler.shutdown(wait=True)
+            print("⏱️ Scheduler stopped")
+        print("✅ Backend shutdown complete")
+
 # ===== FastAPI App Initialization =====
 
 app = FastAPI(
@@ -91,6 +112,7 @@ app = FastAPI(
     version="1.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
+    lifespan=lifespan,
 )
 
 # ===== Request/Response Models =====
@@ -247,26 +269,7 @@ async def api_info():
         }
     }
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # Startup
-    print("🚀 Casino-Club F2P Backend starting up...")
-    try:
-        setup_logging()
-        print("📋 Logging initialized")
-    except Exception as e:
-        print(f"⚠️ Logging setup failed: {e}")
-    start_scheduler()
-    print("✅ Backend startup complete")
-    try:
-        yield
-    finally:
-        # Shutdown
-        print("🛑 Casino-Club F2P Backend shutting down...")
-        if scheduler and scheduler.running:
-            scheduler.shutdown(wait=True)
-            print("⏱️ Scheduler stopped")
-        print("✅ Backend shutdown complete")
+ 
 
 # ===== Error Handlers =====
 
