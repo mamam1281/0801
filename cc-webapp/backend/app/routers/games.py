@@ -22,6 +22,7 @@ from ..schemas.game_schemas import (
     GameStats, ProfileGameStats, Achievement, GameSession, GameLeaderboard
 )
 from app import models
+from sqlalchemy import text
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/games", tags=["Games"])
@@ -314,6 +315,50 @@ async def place_crash_bet(
     )
     db.add(user_action)
     db.commit()
+
+    # Optional crash persistence (best-effort, no hard failure)
+    try:
+        # Ensure session row exists
+        db.execute(text(
+            """
+            INSERT INTO crash_sessions (external_session_id, user_id, bet_amount, status, auto_cashout_multiplier, actual_multiplier, win_amount)
+            VALUES (:external_session_id, :user_id, :bet_amount, :status, :auto_cashout_multiplier, :actual_multiplier, :win_amount)
+            ON CONFLICT (external_session_id) DO UPDATE SET
+                auto_cashout_multiplier = EXCLUDED.auto_cashout_multiplier,
+                actual_multiplier = EXCLUDED.actual_multiplier,
+                win_amount = EXCLUDED.win_amount,
+                status = CASE WHEN EXCLUDED.win_amount > 0 THEN 'cashed' ELSE crash_sessions.status END
+            """
+        ), {
+            "external_session_id": game_id,
+            "user_id": current_user.id,
+            "bet_amount": bet_amount,
+            "status": "active",
+            "auto_cashout_multiplier": auto_cashout_multiplier,
+            "actual_multiplier": multiplier,
+            "win_amount": win_amount,
+        })
+        # Insert bet row
+        db.execute(text(
+            """
+            INSERT INTO crash_bets (session_id, user_id, bet_amount, payout_amount, cashout_multiplier, status)
+            SELECT s.id, :user_id, :bet_amount, :payout_amount, :cashout_multiplier,
+                   CASE WHEN :payout_amount IS NOT NULL AND :payout_amount > 0 THEN 'cashed' ELSE 'placed' END
+            FROM crash_sessions s
+            WHERE s.external_session_id = :external_session_id
+            """
+        ), {
+            "external_session_id": game_id,
+            "user_id": current_user.id,
+            "bet_amount": bet_amount,
+            "payout_amount": win_amount if win_amount > 0 else None,
+            "cashout_multiplier": auto_cashout_multiplier if win_amount > 0 else None,
+        })
+        db.commit()
+    except Exception as _e:
+        db.rollback()
+        # Log softly without breaking API
+        logger.warning(f"Crash persistence skipped: {_e}")
     
     potential_win = int(bet_amount * (auto_cashout_multiplier or multiplier))
     return {
