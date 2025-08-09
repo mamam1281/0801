@@ -13,6 +13,7 @@ from datetime import datetime
 from typing import Optional
 
 from fastapi import FastAPI, HTTPException, Depends, status
+from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -246,41 +247,26 @@ async def api_info():
         }
     }
 
-# ===== Application Lifecycle Events =====
-
-@app.on_event("startup")
-async def startup_event():
-    """Application startup event"""
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
     print("🚀 Casino-Club F2P Backend starting up...")
-    
-    # Initialize logging
     try:
         setup_logging()
         print("📋 Logging initialized")
     except Exception as e:
         print(f"⚠️ Logging setup failed: {e}")
-    
-    # Start scheduler
     start_scheduler()
-    
-    # Note: Prometheus monitoring disabled to avoid middleware timing issue
-    # if Instrumentator:
-    #     Instrumentator().instrument(app).expose(app)
-    #     print("📊 Prometheus monitoring enabled")
-    
     print("✅ Backend startup complete")
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Application shutdown event"""
-    print("🛑 Casino-Club F2P Backend shutting down...")
-    
-    # Shutdown scheduler
-    if scheduler and scheduler.running:
-        scheduler.shutdown(wait=True)
-        print("⏱️ Scheduler stopped")
-    
-    print("✅ Backend shutdown complete")
+    try:
+        yield
+    finally:
+        # Shutdown
+        print("🛑 Casino-Club F2P Backend shutting down...")
+        if scheduler and scheduler.running:
+            scheduler.shutdown(wait=True)
+            print("⏱️ Scheduler stopped")
+        print("✅ Backend shutdown complete")
 
 # ===== Error Handlers =====
 

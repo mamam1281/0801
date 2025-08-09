@@ -24,10 +24,7 @@ class SiteVisitResponse(BaseModel):
     source: str
     visit_timestamp: datetime
 
-    class Config:
-
-        # Pydantic V2 uses ``from_attributes`` for ORM integration.
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # Dependency provider for TrackingService
 def get_tracking_service(db = Depends(get_db)):

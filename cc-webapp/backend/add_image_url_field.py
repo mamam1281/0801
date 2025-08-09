@@ -6,7 +6,7 @@ from app.models.game_models import Game
 from app.database import SessionLocal
 from sqlalchemy import Column, String
 from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import declarative_base
 from app.core.config import settings
 
 def add_image_url_field():
