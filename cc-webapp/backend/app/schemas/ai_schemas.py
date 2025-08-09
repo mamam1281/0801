@@ -151,6 +151,7 @@ class ModelPredictionResponse(BaseModel):
     
     class Config:
         from_attributes = True
+        protected_namespaces = ()
 
 
 class PersonalizationRequest(BaseModel):
