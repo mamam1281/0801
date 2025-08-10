@@ -3324,6 +3324,144 @@
         }
       }
     },
+    "/api/kafka/health": {
+      "get": {
+        "tags": [
+          "Kafka"
+        ],
+        "summary": "Kafka Health",
+        "description": "Lightweight health that reflects config; avoids blocking if broker is absent.",
+        "operationId": "kafka_health_api_kafka_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/kafka/produce": {
+      "post": {
+        "tags": [
+          "Kafka"
+        ],
+        "summary": "Kafka Produce",
+        "description": "Produce a message to Kafka if enabled; otherwise 503.",
+        "operationId": "kafka_produce_api_kafka_produce_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProduceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/kafka/debug/peek": {
+      "get": {
+        "tags": [
+          "Kafka"
+        ],
+        "summary": "Kafka Peek",
+        "description": "Peek messages directly from Kafka with a temporary consumer.\n\nReturns up to max_messages messages with basic metadata. Does not commit offsets.",
+        "operationId": "kafka_peek_api_kafka_debug_peek_get",
+        "parameters": [
+          {
+            "name": "topic",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Topic"
+            }
+          },
+          {
+            "name": "max_messages",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 20,
+              "title": "Max Messages"
+            }
+          },
+          {
+            "name": "from_beginning",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": true,
+              "title": "From Beginning"
+            }
+          },
+          {
+            "name": "timeout_ms",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 1000,
+              "title": "Timeout Ms"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/": {
       "get": {
         "tags": [
@@ -3360,6 +3498,68 @@
                 "schema": {
                   "$ref": "#/components/schemas/HealthResponse"
                 }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/kafka/_debug/last": {
+      "get": {
+        "tags": [
+          "Kafka"
+        ],
+        "summary": "Kafka Last Messages",
+        "description": "Return last consumed Kafka messages (debug).",
+        "operationId": "kafka_last_messages_api_kafka__debug_last_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 10,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/kafka/_debug/ready": {
+      "get": {
+        "tags": [
+          "Kafka"
+        ],
+        "summary": "Kafka Ready",
+        "description": "Return whether the Kafka consumer is initialized and assigned partitions.",
+        "operationId": "kafka_ready_api_kafka__debug_ready_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
               }
             }
           }
@@ -4670,6 +4870,24 @@
           "generated_at"
         ],
         "title": "PersonalizationResponse"
+      },
+      "ProduceRequest": {
+        "properties": {
+          "topic": {
+            "type": "string",
+            "title": "Topic"
+          },
+          "payload": {
+            "type": "object",
+            "title": "Payload"
+          }
+        },
+        "type": "object",
+        "required": [
+          "topic",
+          "payload"
+        ],
+        "title": "ProduceRequest"
       },
       "ProfileGameStats": {
         "properties": {

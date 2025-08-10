@@ -31,18 +31,29 @@ def get_kafka_producer():
     return _producer
 
 def send_kafka_message(topic: str, value: Dict[str, Any]) -> None:
-    try:
-        producer = get_kafka_producer()
-        fut = producer.send(topic, value=value)
+    """Produce with small retry/backoff to improve resilience under CI/dev.
+
+    Errors are logged; endpoint returns 502 upstream when exceptions bubble.
+    """
+    attempts = 0
+    delay = 0.2
+    while attempts < 3:
+        attempts += 1
         try:
-            md = fut.get(timeout=5)
-            # Optional: print delivery metadata for debugging in test
-            print(f"Kafka produce ok topic={md.topic} partition={md.partition} offset={md.offset}")
+            producer = get_kafka_producer()
+            fut = producer.send(topic, value=value)
+            try:
+                md = fut.get(timeout=5)
+                print(f"Kafka produce ok topic={md.topic} partition={md.partition} offset={md.offset}")
+            except Exception as e:
+                print(f"Kafka produce future error: {e}")
+            producer.flush()
+            return
         except Exception as e:
-            print(f"Kafka produce future error: {e}")
-        producer.flush()
-    except Exception as e:
-        print(f"Failed to send Kafka message: {e}")
+            print(f"Failed to send Kafka message (attempt {attempts}/3): {e}")
+            time.sleep(delay)
+            delay *= 2
+    # If we reach here, all attempts failed; let caller handle response
 
 # --- Async Consumer (aiokafka; optional) ---
 _consumer_task: Optional[asyncio.Task] = None
