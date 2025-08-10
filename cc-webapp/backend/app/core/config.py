@@ -30,6 +30,16 @@ class Settings(BaseSettings):
     DEBUG: bool = os.getenv("DEBUG", "0") == "1"
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
 
+    # Kafka Settings
+    # Prefer uppercase attribute for clarity, keep lowercase alias for backward-compat
+    KAFKA_BOOTSTRAP_SERVERS: str = os.getenv("KAFKA_BOOTSTRAP_SERVERS", os.getenv("KAFKA_BROKER", ""))
+    KAFKA_ENABLED: bool = os.getenv("KAFKA_ENABLED", "0") == "1"
+    # Comma-separated topics for background consumer; default to cc_test
+    KAFKA_TOPICS: str = os.getenv("KAFKA_TOPICS", "cc_test")
+    KAFKA_CONSUMER_GROUP: str = os.getenv("KAFKA_CONSUMER_GROUP", "cc_backend_group")
+    # Back-compat alias used in some modules
+    kafka_bootstrap_servers: str = KAFKA_BOOTSTRAP_SERVERS
+
     # Game Settings
     DAILY_SLOT_SPINS: int = 30
     DAILY_CRASH_PLAYS: int = 15
