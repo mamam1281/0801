@@ -33,6 +33,28 @@ def test_db_crud_fk_sanity():
 		db.close()
 
 
+def test_acid_transaction_rollback():
+	db = SessionLocal()
+	try:
+		# Start transaction and insert, then rollback
+		u = User(
+			site_id=f"rb_{uuid.uuid4().hex[:8]}",
+			nickname=f"rb_{uuid.uuid4().hex[:8]}",
+			phone_number=f"010{uuid.uuid4().int % 100000000:08d}",
+			password_hash="x",
+			invite_code="5858",
+		)
+		db.add(u)
+		db.flush()
+		assert u.id is not None
+		db.rollback()
+		# Ensure not persisted
+		exists = db.query(User).filter(User.site_id == u.site_id).first()
+		assert exists is None
+	finally:
+		db.close()
+
+
 def test_kafka_peek_endpoint_skip_if_disabled():
 	if not (os.getenv("KAFKA_ENABLED", "0") == "1" and (os.getenv("KAFKA_BOOTSTRAP_SERVERS") or os.getenv("KAFKA_BROKER"))):
 		return
