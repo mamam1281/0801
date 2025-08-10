@@ -128,6 +128,7 @@ async def start_consumer() -> None:
                     "offset": msg.offset,
                     "value": msg.value,
                 }
+                print(f"[aiokafka] consumed topic={msg.topic} partition={msg.partition} offset={msg.offset} value={msg.value}")
                 _last_messages.append(payload)
                 # Keep only recent 100
                 if len(_last_messages) > 100:
@@ -227,6 +228,7 @@ def _start_thread_consumer():
                     "offset": msg.offset,
                     "value": msg.value,
                 }
+                print(f"[kafka-python] consumed topic={msg.topic} partition={msg.partition} offset={msg.offset} value={msg.value}")
                 _last_messages.append(payload)
                 if len(_last_messages) > 100:
                     del _last_messages[: len(_last_messages) - 100]

@@ -17,8 +17,15 @@ def test_kafka_roundtrip_debug_endpoint():
     topic = os.getenv("KAFKA_TEST_TOPIC", "cc_test")
     marker = str(uuid.uuid4())
     payload = {"marker": marker}
-    # Give the consumer a moment to finish startup and partition assignment
-    time.sleep(1.0)
+    # Wait for consumer readiness before producing
+    for _ in range(40):  # up to ~10s
+        try:
+            rr = client.get("/api/kafka/_debug/ready", timeout=2)
+            if rr.status_code == 200 and rr.json().get("ready"):
+                break
+        except Exception:
+            pass
+        time.sleep(0.25)
     # Produce
     r = client.post("/api/kafka/produce", json={"topic": topic, "payload": payload})
     assert r.status_code in (200, 502)

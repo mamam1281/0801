@@ -58,7 +58,7 @@ from app.routers import (
     events,      # 추가 - 이벤트/미션 라우터
 )
 from app.routers import kafka_api
-from app.kafka_client import start_consumer, stop_consumer, get_last_messages
+from app.kafka_client import start_consumer, stop_consumer, get_last_messages, is_consumer_ready
 
 # AI recommendation system router separate import (removed duplicate)
 
@@ -271,6 +271,15 @@ async def health_check():
 async def kafka_last_messages(limit: int = 10):
     """Return last consumed Kafka messages (debug)."""
     return {"items": get_last_messages(limit)}
+
+@app.get("/api/kafka/_debug/ready", tags=["Kafka"])
+async def kafka_ready():
+    """Return whether the Kafka consumer is initialized and assigned partitions."""
+    try:
+        ready = bool(is_consumer_ready())
+    except Exception:
+        ready = False
+    return {"ready": ready}
 
 @app.get("/api", tags=["API Info"])
 async def api_info():
