@@ -1,24 +1,24 @@
-version: "3.8"
-
 # 테스트 환경 구성을 위한 Docker Compose 설정
 # 테스트 실행을 위한 최소 구성만 포함
 
 services:
-  backend:
+  backend_test:
     build:
       context: ./cc-webapp/backend
-      dockerfile: Dockerfile.test
+      dockerfile: Dockerfile
     container_name: cc_backend_test
     environment:
-      - PYTHONPATH=/app
-      - ENVIRONMENT=test
-      - POSTGRES_SERVER=postgres_test
-      - POSTGRES_USER=test_user
-      - POSTGRES_PASSWORD=test_password
-      - POSTGRES_DB=cc_test
-      - REDIS_HOST=redis_test
-      - REDIS_PORT=6379
-      - JWT_SECRET_KEY=secret_key_for_test_environment
+      PYTHONPATH: /app
+      ENVIRONMENT: test
+      POSTGRES_SERVER: postgres_test
+      POSTGRES_USER: test_user
+      POSTGRES_PASSWORD: test_password
+      POSTGRES_DB: cc_test
+      DATABASE_URL: postgresql+psycopg2://test_user:test_password@postgres_test:5432/cc_test
+      REDIS_HOST: redis_test
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_password}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-test_secret_key_change_me}
     volumes:
       - ./cc-webapp/backend:/app
       - ./logs/test:/app/logs:rw
@@ -29,7 +29,8 @@ services:
       - redis_test
     networks:
       - ccnet_test
-    command: pytest -xvs
+    # 테스트 컨테이너는 대기 상태로 두고, CI에서 docker exec로 pytest 실행
+    command: ["sh", "-c", "tail -f /dev/null"]
 
   postgres_test:
     image: postgres:15.3
@@ -40,7 +41,7 @@ services:
       - POSTGRES_DB=cc_test
     volumes:
       - postgres_test_data:/var/lib/postgresql/data
-      - ./database/init-test.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - ./data/init:/docker-entrypoint-initdb.d:ro
     ports:
       - "5433:5432"  # 다른 포트 사용으로 개발 환경과 동시 실행 가능
     networks:
@@ -49,6 +50,7 @@ services:
   redis_test:
     image: redis:7.0
     container_name: cc_redis_test
+    command: redis-server --requirepass ${REDIS_PASSWORD:-redis_password}
     ports:
       - "6380:6379"  # 다른 포트 사용으로 개발 환경과 동시 실행 가능
     networks:

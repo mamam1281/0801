@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  backend-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Start test stack
+        run: |
+          docker compose -f docker-compose.yml -f docker-compose.test.yml --env-file .env.test up -d --build postgres_test redis_test
+          docker compose -f docker-compose.yml -f docker-compose.test.yml --env-file .env.test up -d --build backend_test
+
+      - name: Wait for backend presence
+        run: |
+          for i in {1..30}; do
+            if docker ps --format '{{.Names}} {{.Status}}' | grep -q 'cc_backend_test'; then echo "Backend container present"; break; fi; sleep 2; done
+          docker logs cc_backend_test --tail 200 || true
+
+      - name: Alembic upgrade head
+        run: docker exec cc_backend_test alembic upgrade head
+
+      - name: Run pytest (inside container)
+        run: docker exec cc_backend_test pytest -q
+
+      - name: Teardown
+        if: always()
+        run: docker compose -f docker-compose.yml -f docker-compose.test.yml --env-file .env.test down -v
