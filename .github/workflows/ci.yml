@@ -19,7 +19,7 @@ jobs:
 
       - name: Start test stack
         run: |
-          docker compose -f docker-compose.yml -f docker-compose.test.yml --env-file .env.test up -d --build postgres_test redis_test
+          docker compose -f docker-compose.yml -f docker-compose.test.yml --env-file .env.test up -d --build postgres_test redis_test zookeeper_test kafka_test
           docker compose -f docker-compose.yml -f docker-compose.test.yml --env-file .env.test up -d --build backend_test
 
       - name: Wait for backend presence
