@@ -14,6 +14,7 @@ from typing import Optional
 
 from fastapi import FastAPI, HTTPException, Depends, status
 from contextlib import asynccontextmanager
+import asyncio
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -56,6 +57,8 @@ from app.routers import (
     ai_router,   # AI recommendation system
     events,      # 추가 - 이벤트/미션 라우터
 )
+from app.routers import kafka_api
+from app.kafka_client import start_consumer, stop_consumer, get_last_messages
 
 # AI recommendation system router separate import (removed duplicate)
 
@@ -93,12 +96,26 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"⚠️ Logging setup failed: {e}")
     start_scheduler()
+    # Start Kafka consumer (optional)
+    try:
+        await start_consumer()
+        if os.getenv("KAFKA_ENABLED", "0") == "1":
+            print("📡 Kafka consumer started")
+    except Exception as e:
+        print(f"⚠️ Kafka consumer start failed: {e}")
     print("✅ Backend startup complete")
     try:
         yield
     finally:
         # Shutdown
         print("🛑 Casino-Club F2P Backend shutting down...")
+        # Stop Kafka consumer
+        try:
+            await stop_consumer()
+            if os.getenv("KAFKA_ENABLED", "0") == "1":
+                print("📡 Kafka consumer stopped")
+        except Exception as e:
+            print(f"⚠️ Kafka consumer stop failed: {e}")
         if scheduler and scheduler.running:
             scheduler.shutdown(wait=True)
             print("⏱️ Scheduler stopped")
@@ -222,6 +239,7 @@ app.include_router(unlock.router, tags=["Unlock"])
 
 # 이벤트/미션 라우터 추가
 app.include_router(events.router)  # 태그 오버라이드 제거 - 이미 events.py에서 "Events & Missions" 태그를 지정함
+app.include_router(kafka_api.router)
 
 print("✅ Core API endpoints registered")
 print("✅ Progressive Expansion features registered") 
@@ -248,6 +266,11 @@ async def health_check():
         timestamp=datetime.now(),
         version="1.0.0"
     )
+
+@app.get("/api/kafka/_debug/last", tags=["Kafka"])
+async def kafka_last_messages(limit: int = 10):
+    """Return last consumed Kafka messages (debug)."""
+    return {"items": get_last_messages(limit)}
 
 @app.get("/api", tags=["API Info"])
 async def api_info():
