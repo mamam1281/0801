@@ -69,6 +69,13 @@ class SimpleLoggingMiddleware(BaseHTTPMiddleware):
         try:
             response = await call_next(request)
 
+            # 요청 추적을 위해 응답 헤더에 Request ID 부여
+            try:
+                response.headers["X-Request-ID"] = request_id
+            except Exception:
+                # 일부 StreamingResponse 등에서는 헤더 설정이 제한될 수 있음
+                pass
+
             # 처리 시간 계산
             process_time = time.time() - start_time
 
