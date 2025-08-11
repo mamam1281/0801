@@ -457,8 +457,13 @@
           "Users"
         ],
         "summary": "Get User",
-        "description": "특정 사용자 정보 조회",
+        "description": "특정 사용자 정보 조회 (본인=전체, 타인=제한적 정보)",
         "operationId": "get_user_api_users__user_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "user_id",
@@ -4277,7 +4282,14 @@
       "GachaPullRequest": {
         "properties": {
           "gacha_id": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Gacha Id"
           },
           "pull_count": {
@@ -4292,9 +4304,6 @@
           }
         },
         "type": "object",
-        "required": [
-          "gacha_id"
-        ],
         "title": "GachaPullRequest",
         "description": "가챠 뽑기 요청 모델"
       },
@@ -4321,6 +4330,14 @@
             "type": "integer",
             "title": "Ultra Rare Item Count",
             "default": 0
+          },
+          "pull_count": {
+            "type": "integer",
+            "title": "Pull Count"
+          },
+          "balance": {
+            "type": "integer",
+            "title": "Balance"
           },
           "special_animation": {
             "anyOf": [
@@ -4349,6 +4366,8 @@
         "required": [
           "success",
           "items",
+          "pull_count",
+          "balance",
           "message",
           "currency_balance"
         ],
