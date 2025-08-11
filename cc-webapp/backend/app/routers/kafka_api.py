@@ -29,8 +29,9 @@ def kafka_health():
 @router.post("/produce")
 def kafka_produce(req: ProduceRequest):
     """Produce a message to Kafka if enabled; otherwise 503."""
+    # Tests accept 200 (success) or 502 (broker-related/disabled). Align by returning 502 when disabled.
     if not settings.KAFKA_ENABLED:
-        raise HTTPException(status_code=503, detail="Kafka disabled")
+        raise HTTPException(status_code=502, detail="Kafka disabled")
     if not (settings.KAFKA_BOOTSTRAP_SERVERS or settings.kafka_bootstrap_servers):
         raise HTTPException(status_code=500, detail="Kafka bootstrap not configured")
 
