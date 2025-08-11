@@ -20,7 +20,7 @@ services:
       - ./cc-webapp/backend:/app
       - ./logs/backend:/app/logs:rw
     ports:
-      - "8000:8000"
+      - "${BACKEND_PORT:-8000}:8000"
     depends_on:
       - postgres
       - redis
@@ -46,7 +46,7 @@ services:
       - ./logs/frontend:/app/logs:rw
       - /app/node_modules
     ports:
-      - "3000:3000"
+      - "${FRONTEND_PORT:-3000}:3000"
     depends_on:
       - backend
     restart: unless-stopped
@@ -71,7 +71,7 @@ services:
       - ./logs/postgres:/var/log/postgresql:rw
       - ./data/init:/docker-entrypoint-initdb.d:ro
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     networks:
       - ccnet
     restart: unless-stopped

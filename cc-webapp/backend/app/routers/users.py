@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from typing import Optional, List
 from ..database import get_db
 from ..models.auth_models import User
-from ..dependencies import get_current_user
+from ..dependencies import get_current_user, require_min_tier
 from ..services.user_service import UserService
 from ..schemas.user import UserResponse, UserUpdate
 
@@ -157,6 +157,13 @@ async def add_tokens(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Token addition failed: {str(e)}"
         )
+
+@router.get("/vip-only")
+async def vip_only_feature(
+    current_user: User = Depends(require_min_tier("VIP")),
+):
+    """Example VIP-only endpoint to validate tier-based access control."""
+    return {"ok": True, "user_id": current_user.id, "tier": getattr(current_user, "user_rank", "STANDARD")}
 
 @router.get("/{user_id}", response_model=UserResponse)
 async def get_user(
