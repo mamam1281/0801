@@ -1,14 +1,22 @@
 services:
   backend:
     container_name: cc_backend_local
+    ports:
+      - "8001:8000"
+    environment:
+      KAFKA_ENABLED: "0"
 
   frontend:
     container_name: cc_frontend_local
     environment:
-      NEXT_PUBLIC_API_URL: "${NEXT_PUBLIC_API_URL:-http://localhost:8000}"
+      NEXT_PUBLIC_API_URL: "${NEXT_PUBLIC_API_URL:-http://localhost:8001}"
+    ports:
+      - "3001:3000"
 
   postgres:
     container_name: cc_postgres_local
+    ports:
+      - "5433:5432"
 
   redis:
     container_name: cc_redis_local

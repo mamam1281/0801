@@ -73,7 +73,7 @@ function Start-Environment {
     if ($usingOverride) {
         Write-Host "Frontend: http://localhost:3001" -ForegroundColor Yellow
         Write-Host "Backend API: http://localhost:8001" -ForegroundColor Yellow
-        Write-Host "Database: localhost:55432 (User: cc_user, Password: cc_password, DB: cc_webapp)" -ForegroundColor Yellow
+    Write-Host "Database: localhost:5433 (User: cc_user, Password: cc_password, DB: cc_webapp)" -ForegroundColor Yellow
     } else {
         Write-Host "Frontend: http://localhost:3000" -ForegroundColor Yellow
         Write-Host "Backend API: http://localhost:8000" -ForegroundColor Yellow
@@ -139,7 +139,10 @@ function Check-Prerequisites {
     Write-Host "✔ Docker detected" -ForegroundColor Green
     try { Compose -f $ComposeFile config *> $null; Write-Host "✔ Compose file valid" -ForegroundColor Green } catch { Write-Host "✖ Compose file invalid" -ForegroundColor Red; exit 1 }
     # Quick port checks
-    $ports = 3000,8000,5432
+    $ports = @(3000,8000,5432)
+    if (Test-Path "docker-compose.override.local.yml") {
+        $ports = @(3001,8001,5433)
+    }
     foreach ($p in $ports) {
         $inUse = (Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue | Where-Object { $_.LocalPort -eq $p }).Count -gt 0
         if ($inUse) { Write-Host "⚠ Port $p is already in use" -ForegroundColor Yellow } else { Write-Host "✔ Port $p is free" -ForegroundColor Green }
@@ -149,8 +152,8 @@ function Check-Prerequisites {
 
 function Check-Health {
     Write-Host "Probing service health..." -ForegroundColor Cyan
-    $apiPort = 8000
-    $webPort = 3000
+    $apiPort = (Test-Path "docker-compose.override.local.yml") ? 8001 : 8000
+    $webPort = (Test-Path "docker-compose.override.local.yml") ? 3001 : 3000
     if (Test-Path ".env.local") {
         $lines = Get-Content .env.local
         foreach ($l in $lines) {
@@ -167,7 +170,7 @@ function Check-DBConnection {
     Detect-Compose
 
     # Host port check
-    $dbPort = 5432
+    $dbPort = (Test-Path "docker-compose.override.local.yml") ? 5433 : 5432
     if (Test-Path ".env.local") {
         $lines = Get-Content .env.local
         foreach ($l in $lines) { if ($l -match '^POSTGRES_PORT=(\d+)$') { $dbPort = [int]$Matches[1] } }
