@@ -108,17 +108,22 @@ def validate_invite_code(
         )
     
     # Check if code has reached max uses
-    if invite_code.used_count >= invite_code.max_uses:
+    if invite_code.max_uses is not None and invite_code.used_count >= invite_code.max_uses:
         return ValidateInviteCodeResponse(
             is_valid=False,
             error_message="Invite code has reached maximum usage limit"
         )
     
+    # Compute remaining uses (None for unlimited)
+    remaining = None
+    if invite_code.max_uses is not None:
+        remaining = max(invite_code.max_uses - invite_code.used_count, 0)
+
     return ValidateInviteCodeResponse(
         is_valid=True,
         code=invite_code.code,
         expires_at=invite_code.expires_at,
-        remaining_uses=invite_code.max_uses - invite_code.used_count
+        remaining_uses=remaining
     )
 
 @router.get("/codes", response_model=list[InviteCodeResponse])

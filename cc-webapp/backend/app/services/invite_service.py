@@ -41,7 +41,7 @@ class InviteService:
                     created_at=datetime.utcnow(),
                     expires_at=None,  # 만료 없음
                     max_uses=None,    # 무제한 사용
-                    use_count=0
+                    used_count=0
                 )
                 self.db.add(invite_code)
                 self.db.commit()
@@ -53,7 +53,7 @@ class InviteService:
                 "created_at": invite_code.created_at if invite_code else datetime.utcnow(),
                 "expires_at": None,
                 "max_uses": None,
-                "use_count": invite_code.use_count if invite_code else 0,
+                "use_count": invite_code.used_count if invite_code else 0,
                 "is_special": True
             }
         
@@ -74,7 +74,7 @@ class InviteService:
             raise UserServiceException(f"초대코드 {code}는 만료되었습니다.", "EXPIRED_INVITE_CODE")
         
         # 사용 횟수 제한 검증
-        if invite_code.max_uses and invite_code.use_count >= invite_code.max_uses:
+        if invite_code.max_uses is not None and invite_code.used_count >= invite_code.max_uses:
             raise UserServiceException(f"초대코드 {code}의 사용 횟수가 초과되었습니다.", "MAX_USES_EXCEEDED")
         
         # 유효한 코드 반환
@@ -84,7 +84,7 @@ class InviteService:
             "created_at": invite_code.created_at,
             "expires_at": invite_code.expires_at,
             "max_uses": invite_code.max_uses,
-            "use_count": invite_code.use_count,
+            "use_count": invite_code.used_count,
             "is_special": invite_code.code in self.FIXED_CODES
         }
     
@@ -108,12 +108,12 @@ class InviteService:
                     created_at=datetime.utcnow(),
                     expires_at=None,
                     max_uses=None,
-                    use_count=0
+                    used_count=0
                 )
                 self.db.add(invite_code)
             
             # 사용 카운트만 증가시키고 is_used는 변경하지 않음
-            invite_code.use_count += 1
+            invite_code.used_count += 1
             invite_code.used_at = datetime.utcnow()
             invite_code.used_by_user_id = user_id
             self.db.commit()
@@ -132,7 +132,7 @@ class InviteService:
             return False
         
         # 사용 횟수 제한 확인
-        if invite_code.max_uses and invite_code.use_count >= invite_code.max_uses:
+        if invite_code.max_uses is not None and invite_code.used_count >= invite_code.max_uses:
             return False
         
         # 일회용 코드인 경우
@@ -141,7 +141,7 @@ class InviteService:
         
         # 초대코드 사용 처리
         invite_code.used_at = datetime.utcnow()
-        invite_code.use_count += 1
+        invite_code.used_count += 1
         invite_code.used_by_user_id = user_id
         self.db.commit()
         return True
@@ -164,7 +164,7 @@ class InviteService:
                     created_at=datetime.utcnow(),
                     expires_at=None,
                     max_uses=None,
-                    use_count=0
+                    used_count=0
                 )
                 self.db.add(invite_code)
                 self.db.commit()
@@ -226,7 +226,7 @@ class InviteService:
             created_at=datetime.utcnow(),
             expires_at=expires_at,
             max_uses=max_uses,
-            use_count=0
+            used_count=0
         )
         
         # DB에 저장

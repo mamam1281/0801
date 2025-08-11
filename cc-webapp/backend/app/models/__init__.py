@@ -22,6 +22,9 @@ from .auth_models import (
     SecurityEvent,
 )
 
+# Token blacklist model
+from .token_blacklist import TokenBlacklist
+
 # Game 모델들
 from .game_models import (
     Game,
@@ -97,6 +100,7 @@ __all__ = [
     "RefreshToken",
     "UserSession",
     "SecurityEvent",
+    "TokenBlacklist",
     
     # Game
     "Game",

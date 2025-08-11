@@ -137,7 +137,7 @@ class InviteCodeRepository(BaseRepository[InviteCode]):
                 and_(
                     InviteCode.code == code,
                     InviteCode.is_used == False,
-                    InviteCode.expires_at > datetime.utcnow()
+                    or_(InviteCode.expires_at == None, InviteCode.expires_at > datetime.utcnow())
                 )
             ).first()
         except Exception as e:
@@ -161,7 +161,7 @@ class InviteCodeRepository(BaseRepository[InviteCode]):
                 "created_by": creator_id,
                 "expires_at": expires_at,
                 "max_uses": max_uses,
-                "current_uses": 0,
+                "used_count": 0,
                 "is_used": False,
                 "created_at": datetime.utcnow()
             }
@@ -182,12 +182,12 @@ class InviteCodeRepository(BaseRepository[InviteCode]):
             if not invite:
                 return False
 
-            invite.current_uses += 1
+            invite.used_count += 1
             invite.used_at = datetime.utcnow()
             invite.used_by_user_id = user_id
             
             # 최대 사용 횟수 도달 시 비활성화
-            if invite.current_uses >= invite.max_uses:
+            if invite.max_uses is not None and invite.used_count >= invite.max_uses:
                 invite.is_used = True
             
             self.db_session.commit()

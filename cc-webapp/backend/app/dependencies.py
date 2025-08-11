@@ -29,7 +29,7 @@ async def get_current_user(
     """현재 인증된 사용자 정보 반환"""
     try:
         token = credentials.credentials
-        token_data = AuthService.verify_token(token)
+        token_data = AuthService.verify_token(token, db=db)
         user = db.query(User).filter(User.id == token_data.user_id).first()
         
         if not user:
@@ -58,3 +58,23 @@ async def get_current_admin_user(
             detail="Not enough permissions"
         )
     return current_user
+
+def require_min_rank(required_rank: str):
+    """Dependency factory that ensures the current user has at least the required rank.
+
+    Usage:
+        @router.get("/vip-only")
+        async def vip_only(current_user = Depends(require_min_rank("VIP"))):
+            return {"ok": True}
+    """
+    async def _dep(current_user: User = Depends(get_current_user)) -> User:
+        user_rank = getattr(current_user, "user_rank", None) or getattr(current_user, "rank", "STANDARD")
+        # Normalize to str
+        user_rank_str = str(user_rank)
+        if not AuthService.check_rank_access(user_rank_str, required_rank):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Insufficient rank: requires {required_rank}"
+            )
+        return current_user
+    return _dep

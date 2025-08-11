@@ -25,6 +25,7 @@ __all__ = [
     "feedback",
     "games",
     "invite_router",
+    "rbac_demo",
     "analyze",
     "segments",
     "tracking",
