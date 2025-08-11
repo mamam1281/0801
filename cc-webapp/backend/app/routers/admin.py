@@ -8,8 +8,6 @@ from pydantic import BaseModel
 from ..database import get_db
 from ..dependencies import get_current_user
 from ..services.admin_service import AdminService
-from ..repositories.invite_codes import InviteCodeRepository
-from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/api/admin", tags=["Admin"])
 
@@ -140,46 +138,3 @@ async def add_user_tokens(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to add tokens: {str(e)}"
         )
-
-# ---------------- Invite Codes Admin -----------------
-class InviteCodesSeedRequest(BaseModel):
-    codes: list[str]
-    active: Optional[bool] = True
-    overwrite: Optional[bool] = False
-
-class InviteCodeItem(BaseModel):
-    code: str
-    is_used: bool
-    is_active: bool
-    used_by_user_id: Optional[int] = None
-    used_at: Optional[str] = None
-
-@router.get("/invite-codes", response_model=list[InviteCodeItem])
-async def list_invite_codes(
-    admin_user = Depends(require_admin_access),
-    db: Session = Depends(get_db),
-):
-    repo = InviteCodeRepository(db)
-    items = repo.list_codes(include_used=True)
-    return [
-        InviteCodeItem(
-            code=i.code,
-            is_used=i.is_used,
-            is_active=i.is_active,
-            used_by_user_id=i.used_by_user_id,
-            used_at=i.used_at.isoformat() if i.used_at else None,
-        )
-        for i in items
-    ]
-
-@router.post("/invite-codes")
-async def seed_invite_codes(
-    payload: InviteCodesSeedRequest,
-    admin_user = Depends(require_admin_access),
-    db: Session = Depends(get_db),
-):
-    if not payload.codes:
-        raise HTTPException(status_code=400, detail="codes list required")
-    repo = InviteCodeRepository(db)
-    created = repo.seed_many(payload.codes, active=bool(payload.active), overwrite=bool(payload.overwrite))
-    return {"created_or_updated": created}

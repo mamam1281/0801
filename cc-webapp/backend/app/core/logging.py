@@ -1,9 +1,9 @@
 ﻿import logging
-import json
+import os
 import sys
+from typing import Dict, Any
 import time
 from datetime import datetime
-from typing import Dict, Any
 
 def get_logger(name: str):
     return logging.getLogger(name)
@@ -28,25 +28,12 @@ def log_service_call(service_name: str, operation: str, duration: float = None, 
     
     logger.info(f"Service call: {service_name}.{operation} - {status}", extra=log_data)
 
-class JsonFormatter(logging.Formatter):
-    def format(self, record: logging.LogRecord) -> str:
-        payload = {
-            "ts": datetime.utcnow().isoformat() + "Z",
-            "logger": record.name,
-            "level": record.levelname,
-            "msg": record.getMessage(),
-        }
-        for key in ("request_id", "path", "method", "status_code", "duration_ms", "user_id"):
-            if hasattr(record, key):
-                payload[key] = getattr(record, key)
-        return json.dumps(payload, ensure_ascii=False)
-
 def setup_logging(level: str = "INFO"):
-    root = logging.getLogger()
-    root.setLevel(getattr(logging, level.upper(), logging.INFO))
-    handler = logging.StreamHandler(sys.stdout)
-    handler.setFormatter(JsonFormatter())
-    root.handlers = [handler]
+    logging.basicConfig(
+        level=getattr(logging, level.upper()),
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        handlers=[logging.StreamHandler(sys.stdout)]
+    )
 
 class LoggingContextMiddleware:
     def __init__(self, app):

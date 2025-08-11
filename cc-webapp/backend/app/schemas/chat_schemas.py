@@ -154,9 +154,6 @@ class AIAssistantCreate(BaseModel):
     can_make_recommendations: bool = True
     can_provide_rewards: bool = False
 
-    class Config:
-        protected_namespaces = ()
-
 
 class AIAssistantResponse(BaseModel):
     id: int
@@ -202,7 +199,6 @@ class AIConversationResponse(BaseModel):
     
     class Config:
         from_attributes = True
-        protected_namespaces = ()
 
 
 class AIMessageCreate(BaseModel):

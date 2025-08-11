@@ -23,7 +23,7 @@ from pydantic import BaseModel
 from app.database import get_db
 from app.core.logging import setup_logging
 from app.middleware.simple_logging import SimpleLoggingMiddleware
-from app.core.exceptions import add_exception_handlers
+# from app.core.exceptions import add_exception_handlers  # Disabled - empty file
 # from app.middleware.error_handling import error_handling_middleware  # Disabled
 # from app.middleware.logging import LoggingContextMiddleware  # Disabled
 
@@ -165,8 +165,8 @@ origins = (
     if _env_origins else _default_origins
 )
 
-# Error handlers
-add_exception_handlers(app)
+# Error handlers (disabled - files empty)
+# add_exception_handlers(app)
 
 # 간단한 API 로깅 미들웨어 추가
 app.add_middleware(SimpleLoggingMiddleware)

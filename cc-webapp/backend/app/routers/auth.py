@@ -12,7 +12,6 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..schemas.auth import UserCreate, UserLogin, AdminLogin, UserResponse, Token
 from ..services.auth_service import AuthService, security
-from ..repositories.invite_codes import InviteCodeRepository
 from ..models.auth_models import User
 
 logger = logging.getLogger(__name__)
@@ -21,33 +20,23 @@ router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 
 
 def _build_user_response(user: User) -> UserResponse:
-    # Only include fields that exist in UserResponse schema
     return UserResponse(
         id=user.id,
         site_id=user.site_id,
         nickname=user.nickname,
         phone_number=getattr(user, "phone_number", None),
-        is_active=getattr(user, "is_active", True),
-        is_admin=getattr(user, "is_admin", False),
+        cyber_token_balance=getattr(user, "cyber_token_balance", 0),
         created_at=user.created_at,
-        last_login=user.last_login,
+        last_login=user.last_login or user.created_at,
+        is_admin=getattr(user, "is_admin", False),
+        is_active=getattr(user, "is_active", True),
     )
 
 
 @router.post("/signup", response_model=Token)
 async def signup(data: UserCreate, db: Session = Depends(get_db)):
     try:
-        # validate invite before creating
-        inv_repo = InviteCodeRepository(db)
-        inv_check = inv_repo.validate(data.invite_code)
-        if not inv_check.get("valid"):
-            raise HTTPException(status_code=400, detail="Invalid invite code")
         user = AuthService.create_user(db, data)
-        # consume non-infinite invites
-        if not inv_check.get("infinite"):
-            ok = inv_repo.consume(data.invite_code)
-            if not ok:
-                raise HTTPException(status_code=400, detail="Invite code no longer available")
         access_token = AuthService.create_access_token(
             {"sub": user.site_id, "user_id": user.id, "is_admin": user.is_admin}
         )
@@ -127,26 +116,3 @@ async def refresh(
 async def logout(credentials: HTTPAuthorizationCredentials = Depends(security)):
     # Stateless JWT: simply acknowledge; implement blacklist if needed.
     return {"message": "Logged out"}
-
-
-@router.get("/check-invite/{code}")
-async def check_invite(code: str, db: Session = Depends(get_db)):
-    """Invite code validation with repository.
-    - Code '5858' remains always valid and infinitely reusable.
-    - Other codes are validated against DB with expiry/max-uses/active checks.
-    """
-    inv_repo = InviteCodeRepository(db)
-    result = inv_repo.validate(code)
-    return {"code": code, **result}
-
-
-@router.get("/me", response_model=UserResponse)
-async def me(credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)):
-    token = credentials.credentials if credentials else None
-    if not token:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing token")
-    token_data = AuthService.verify_token(token)
-    user = db.query(User).filter(User.id == token_data.user_id).first()
-    if not user:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
-    return _build_user_response(user)
