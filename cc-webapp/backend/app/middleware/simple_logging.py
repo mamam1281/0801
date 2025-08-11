@@ -1,7 +1,6 @@
 """간단한 API 로깅 미들웨어"""
 import logging
 import time
-import uuid
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
@@ -52,58 +51,31 @@ API_TITLES = {
 class SimpleLoggingMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         start_time = time.time()
-        request_id = str(uuid.uuid4())
-
+        
         # API 엔드포인트 키 생성
         endpoint_key = f"{request.method} {request.url.path}"
-
+        
         # 기능 타이틀 가져오기
         title = API_TITLES.get(endpoint_key, f"🔧 {request.method} {request.url.path}")
-
+        
         # API 시도 로그 (기능 타이틀 포함)
-        logger.info(
-            f"🚀 {title} - 시도",
-            extra={"request_id": request_id, "path": request.url.path, "method": request.method},
-        )
-
+        logger.info(f"🚀 {title} - 시도")
+        
         try:
             response = await call_next(request)
-
-            # 요청 추적을 위해 응답 헤더에 Request ID 부여
-            try:
-                response.headers["X-Request-ID"] = request_id
-            except Exception:
-                # 일부 StreamingResponse 등에서는 헤더 설정이 제한될 수 있음
-                pass
-
+            
             # 처리 시간 계산
             process_time = time.time() - start_time
-
-            # 성공/실패 로그
-            extra = {
-                "request_id": request_id,
-                "path": request.url.path,
-                "method": request.method,
-                "status_code": response.status_code,
-                "duration_ms": round(process_time * 1000, 2),
-            }
+            
+            # 성공 로그
             if response.status_code < 400:
-                logger.info(f"✅ {title} - 성공 ({response.status_code}) ({process_time:.2f}s)", extra=extra)
+                logger.info(f"✅ {title} - 성공 ({response.status_code}) ({process_time:.2f}s)")
             else:
-                logger.warning(f"⚠️ {title} - 실패 ({response.status_code}) ({process_time:.2f}s)", extra=extra)
-
+                logger.warning(f"⚠️ {title} - 실패 ({response.status_code}) ({process_time:.2f}s)")
+            
             return response
-
+            
         except Exception as e:
             process_time = time.time() - start_time
-            logger.error(
-                f"❌ {title} - 에러: {str(e)} ({process_time:.2f}s)",
-                extra={
-                    "request_id": request_id,
-                    "path": request.url.path,
-                    "method": request.method,
-                    "status_code": 500,
-                    "duration_ms": round(process_time * 1000, 2),
-                },
-            )
+            logger.error(f"❌ {title} - 에러: {str(e)} ({process_time:.2f}s)")
             raise

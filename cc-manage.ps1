@@ -46,11 +46,8 @@ function Compose {
     param([Parameter(ValueFromRemainingArguments=$true)][string[]]$Args)
     $envArgs = @()
     if (Test-Path ".env.local") { $envArgs += @('--env-file', '.env.local') }
-    $files = @('-f', $ComposeFile)
-    $override = "docker-compose.override.local.yml"
-    if (Test-Path $override) { $files += @('-f', $override) }
-    if ($UseComposeV2) { & docker @('compose') @envArgs @files @Args }
-    else { & docker-compose @envArgs @files @Args }
+    if ($UseComposeV2) { & docker @('compose') @envArgs @Args }
+    else { & docker-compose @envArgs @Args }
 }
 
 # Normalize legacy service aliases to actual compose service names
@@ -64,7 +61,8 @@ function Resolve-ServiceName($name) {
 function Start-Environment {
     Detect-Compose
     Write-Host "Starting Casino-Club F2P environment..." -ForegroundColor Cyan
-    Compose up -d --build
+    $composeArgs = Get-ComposeArgs
+    Compose @composeArgs up -d --build
     if ($LASTEXITCODE -ne 0) {
         Write-Host "Failed to start containers. Check Docker Desktop is running and try logs." -ForegroundColor Red
         exit $LASTEXITCODE
@@ -86,7 +84,8 @@ function Start-Environment {
 function Stop-Environment {
     Detect-Compose
     Write-Host "Stopping Casino-Club F2P environment..." -ForegroundColor Cyan
-    Compose down
+    $composeArgs = Get-ComposeArgs
+    Compose @composeArgs down
     Write-Host "Environment stopped!" -ForegroundColor Green
 }
 
@@ -95,17 +94,20 @@ function Show-Logs {
     $resolved = Resolve-ServiceName $Service
     if ($resolved) {
         Write-Host "Showing logs for $resolved..." -ForegroundColor Cyan
-        Compose logs -f $resolved
+    $composeArgs = Get-ComposeArgs
+    Compose @composeArgs logs -f $resolved
     } else {
         Write-Host "Showing all logs..." -ForegroundColor Cyan
-        Compose logs -f
+    $composeArgs = Get-ComposeArgs
+    Compose @composeArgs logs -f
     }
 }
 
 function Show-Status {
     Detect-Compose
     Write-Host "Checking environment status..." -ForegroundColor Cyan
-    Compose ps
+    $composeArgs = Get-ComposeArgs
+    Compose @composeArgs ps
 }
 
 function Enter-Container {
@@ -119,9 +121,11 @@ function Enter-Container {
     $resolved = Resolve-ServiceName $Service
     Write-Host "Entering $resolved container..." -ForegroundColor Cyan
     if ($resolved -eq "postgres") {
-        Compose exec postgres psql -U cc_user -d cc_webapp
+    $composeArgs = Get-ComposeArgs
+    Compose @composeArgs exec postgres psql -U cc_user -d cc_webapp
     } elseif ($resolved -eq "backend" -or $resolved -eq "frontend") {
-        Compose exec $resolved /bin/sh
+    $composeArgs = Get-ComposeArgs
+    Compose @composeArgs exec $resolved /bin/sh
     } else {
         Write-Host "Error: Unknown service '$Service'" -ForegroundColor Red
         Write-Host "Available services: postgres, backend, frontend" -ForegroundColor Yellow
@@ -133,7 +137,7 @@ function Check-Prerequisites {
     Write-Host "Running environment checks..." -ForegroundColor Cyan
     Detect-Compose
     Write-Host "✔ Docker detected" -ForegroundColor Green
-    try { Compose config *> $null; Write-Host "✔ Compose config valid" -ForegroundColor Green } catch { Write-Host "✖ Compose config invalid" -ForegroundColor Red; exit 1 }
+    try { Compose -f $ComposeFile config *> $null; Write-Host "✔ Compose file valid" -ForegroundColor Green } catch { Write-Host "✖ Compose file invalid" -ForegroundColor Red; exit 1 }
     # Quick port checks
     $ports = 3000,8000,5432
     foreach ($p in $ports) {
@@ -177,13 +181,15 @@ function Check-DBConnection {
     # Container readiness
     try {
         Write-Host "→ Running pg_isready in postgres container" -ForegroundColor Yellow
-    Compose exec postgres pg_isready -U cc_user -d cc_webapp
+    $composeArgs = Get-ComposeArgs
+    Compose @composeArgs exec postgres pg_isready -U cc_user -d cc_webapp
     } catch { Write-Host "✖ pg_isready failed (Is postgres container running?)" -ForegroundColor Red }
 
     # Simple SQL query
     try {
         Write-Host "→ Running SELECT 1; via psql" -ForegroundColor Yellow
-    Compose exec postgres psql -U cc_user -d cc_webapp -c 'SELECT 1;'
+    $composeArgs = Get-ComposeArgs
+    Compose @composeArgs exec postgres psql -U cc_user -d cc_webapp -c 'SELECT 1;'
     } catch { Write-Host "✖ psql test query failed" -ForegroundColor Red }
 
     Write-Host "DB check complete." -ForegroundColor Cyan
