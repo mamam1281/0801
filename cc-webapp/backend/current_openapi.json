@@ -144,12 +144,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/Body_refresh_api_auth_refresh_post"
-                  }
-                ],
-                "title": "Body"
+                "$ref": "#/components/schemas/Body_refresh_api_auth_refresh_post"
               }
             }
           }
@@ -197,6 +192,34 @@
             "content": {
               "application/json": {
                 "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/auth/me": {
+      "get": {
+        "tags": [
+          "Authentication",
+          "Authentication"
+        ],
+        "summary": "Me",
+        "description": "Alias to current user profile for clients expecting /api/auth/me.",
+        "operationId": "me_api_auth_me_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/app__schemas__auth__UserResponse"
+                }
               }
             }
           }
@@ -401,31 +424,6 @@
             }
           }
         }
-      }
-    },
-    "/api/users/vip-only": {
-      "get": {
-        "tags": [
-          "Users"
-        ],
-        "summary": "Vip Only Feature",
-        "description": "Example VIP-only endpoint to validate tier-based access control.",
-        "operationId": "vip_only_feature_api_users_vip_only_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
       }
     },
     "/api/users/{user_id}": {
@@ -1061,6 +1059,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "additionalProperties": true,
                   "title": "Response Get Connection Status Api Chat Status  User Id  Get"
                 }
               }
@@ -1531,6 +1530,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "additionalProperties": true,
                   "title": "Response Get Recommendation Stats Api Ai Recommendations Stats Get"
                 }
               }
@@ -1591,6 +1591,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "additionalProperties": true,
                   "title": "Response Submit Ai Feedback Api Ai Feedback Post"
                 }
               }
@@ -1624,6 +1625,7 @@
             "content": {
               "application/json": {
                 "schema": {
+                  "additionalProperties": true,
                   "type": "object",
                   "title": "Response Get Learning Progress Api Ai Learning Progress Get"
                 }
@@ -1786,6 +1788,7 @@
           "content": {
             "application/json": {
               "schema": {
+                "additionalProperties": true,
                 "type": "object",
                 "title": "Request"
               }
@@ -3277,6 +3280,7 @@
             "content": {
               "application/json": {
                 "schema": {
+                  "additionalProperties": true,
                   "type": "object",
                   "title": "Response Update Mission Progress Api Events Missions Progress Put"
                 }
@@ -3765,6 +3769,7 @@
             "title": "Success"
           },
           "rewards": {
+            "additionalProperties": true,
             "type": "object",
             "title": "Rewards"
           },
@@ -3859,6 +3864,7 @@
       "EmotionFeedbackRequest": {
         "properties": {
           "emotion_result_data": {
+            "additionalProperties": true,
             "type": "object",
             "title": "Emotion Result Data",
             "description": "EmotionResult as dict."
@@ -3927,6 +3933,7 @@
           "progress": {
             "anyOf": [
               {
+                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -3994,6 +4001,7 @@
       "EventProgressUpdate": {
         "properties": {
           "progress": {
+            "additionalProperties": true,
             "type": "object",
             "title": "Progress"
           }
@@ -4036,12 +4044,14 @@
             "title": "End Date"
           },
           "rewards": {
+            "additionalProperties": true,
             "type": "object",
             "title": "Rewards"
           },
           "requirements": {
             "anyOf": [
               {
+                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -4095,6 +4105,7 @@
           "user_participation": {
             "anyOf": [
               {
+                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -4222,6 +4233,7 @@
           },
           "items": {
             "items": {
+              "additionalProperties": true,
               "type": "object"
             },
             "type": "array",
@@ -4624,12 +4636,14 @@
             "title": "Target Type"
           },
           "rewards": {
+            "additionalProperties": true,
             "type": "object",
             "title": "Rewards"
           },
           "requirements": {
             "anyOf": [
               {
+                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -4681,6 +4695,7 @@
           "user_progress": {
             "anyOf": [
               {
+                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -4723,11 +4738,13 @@
             "title": "Prediction Type"
           },
           "input_features": {
+            "additionalProperties": true,
             "type": "object",
             "title": "Input Features",
             "default": {}
           },
           "prediction_result": {
+            "additionalProperties": true,
             "type": "object",
             "title": "Prediction Result",
             "default": {}
@@ -4740,6 +4757,7 @@
           "actual_result": {
             "anyOf": [
               {
+                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -4836,6 +4854,7 @@
           "context_data": {
             "anyOf": [
               {
+                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -4869,6 +4888,7 @@
             "title": "Recommendations"
           },
           "personalization_factors": {
+            "additionalProperties": true,
             "type": "object",
             "title": "Personalization Factors"
           },
@@ -4903,6 +4923,7 @@
             "title": "Topic"
           },
           "payload": {
+            "additionalProperties": true,
             "type": "object",
             "title": "Payload"
           }
@@ -5063,6 +5084,7 @@
           "interaction_data": {
             "anyOf": [
               {
+                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -5085,6 +5107,7 @@
           "result_data": {
             "anyOf": [
               {
+                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -5120,6 +5143,7 @@
           "interaction_data": {
             "anyOf": [
               {
+                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -5142,6 +5166,7 @@
           "result_data": {
             "anyOf": [
               {
+                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -5803,6 +5828,7 @@
           "preferred_games": {
             "anyOf": [
               {
+                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -5824,6 +5850,7 @@
           "preferred_reward_types": {
             "anyOf": [
               {
+                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -5835,6 +5862,7 @@
           "spending_pattern": {
             "anyOf": [
               {
+                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -5846,6 +5874,7 @@
           "active_hours": {
             "anyOf": [
               {
+                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -5868,6 +5897,7 @@
           "content_categories": {
             "anyOf": [
               {
+                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -5934,6 +5964,7 @@
           "preferred_games": {
             "anyOf": [
               {
+                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -5969,6 +6000,7 @@
           "preferred_reward_types": {
             "anyOf": [
               {
+                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -5980,6 +6012,7 @@
           "spending_pattern": {
             "anyOf": [
               {
+                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -5991,6 +6024,7 @@
           "active_hours": {
             "anyOf": [
               {
+                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -6013,6 +6047,7 @@
           "content_categories": {
             "anyOf": [
               {
+                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -6111,6 +6146,7 @@
           "content_data": {
             "anyOf": [
               {
+                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -6132,6 +6168,7 @@
           "personalization_factors": {
             "anyOf": [
               {
+                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -6141,11 +6178,7 @@
             "title": "Personalization Factors"
           },
           "status": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/RecommendationStatus"
-              }
-            ],
+            "$ref": "#/components/schemas/RecommendationStatus",
             "default": "pending"
           },
           "shown_at": {

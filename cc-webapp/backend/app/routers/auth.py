@@ -5,7 +5,7 @@ Delegates business logic to services.auth_service.AuthService.
 """
 
 import logging
-from fastapi import APIRouter, Depends, HTTPException, status, Body
+from fastapi import APIRouter, Depends, HTTPException, status, Body, Request
 from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 
@@ -49,12 +49,40 @@ async def signup(data: UserCreate, db: Session = Depends(get_db)):
 
 
 @router.post("/login", response_model=Token)
-async def login(data: UserLogin, db: Session = Depends(get_db)):
+async def login(data: UserLogin, request: Request, db: Session = Depends(get_db)):
     try:
+        # Lockout check
+        if AuthService.is_login_locked(db, data.site_id):
+            AuthService.record_login_attempt(
+                db,
+                site_id=data.site_id,
+                success=False,
+                ip_address=request.client.host if request and request.client else None,
+                user_agent=request.headers.get("User-Agent") if request else None,
+                failure_reason="locked_out",
+            )
+            raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Too many failed attempts")
         user = AuthService.authenticate_user(db, data.site_id, data.password)
         if not user:
+            # Record failure
+            AuthService.record_login_attempt(
+                db,
+                site_id=data.site_id,
+                success=False,
+                ip_address=request.client.host if request and request.client else None,
+                user_agent=request.headers.get("User-Agent") if request else None,
+                failure_reason="invalid_credentials",
+            )
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
         AuthService.update_last_login(db, user)
+        # Record success
+        AuthService.record_login_attempt(
+            db,
+            site_id=data.site_id,
+            success=True,
+            ip_address=request.client.host if request and request.client else None,
+            user_agent=request.headers.get("User-Agent") if request else None,
+        )
         access_token = AuthService.create_access_token(
             {"sub": user.site_id, "user_id": user.id, "is_admin": user.is_admin}
         )
@@ -116,3 +144,13 @@ async def refresh(
 async def logout(credentials: HTTPAuthorizationCredentials = Depends(security)):
     # Stateless JWT: simply acknowledge; implement blacklist if needed.
     return {"message": "Logged out"}
+
+
+@router.get("/me", response_model=UserResponse)
+async def me(credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)):
+    """Alias to current user profile for clients expecting /api/auth/me."""
+    token_data = AuthService.verify_token(credentials.credentials)
+    user = db.query(User).filter(User.id == token_data.user_id).first()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+    return _build_user_response(user)

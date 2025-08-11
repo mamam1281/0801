@@ -2,19 +2,24 @@ import logging
 """인증 관련 서비스"""
 import os
 from datetime import datetime, timedelta
+import uuid
 from typing import Optional
 from fastapi import HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from sqlalchemy.orm import Session
-from ..models.auth_models import User
+from ..models.auth_models import User, LoginAttempt
 from ..schemas.auth import TokenData, UserCreate, UserLogin, AdminLogin
 
 # 보안 설정
 SECRET_KEY = os.getenv("JWT_SECRET_KEY", "your-secret-key-here")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("JWT_EXPIRE_MINUTES", "30"))
+
+# Login protection settings (env override)
+LOGIN_MAX_FAILED_ATTEMPTS = int(os.getenv("LOGIN_MAX_FAILED_ATTEMPTS", "5"))
+LOGIN_LOCKOUT_MINUTES = int(os.getenv("LOGIN_LOCKOUT_MINUTES", "10"))
 
 # 비밀번호 해싱
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -54,11 +59,17 @@ class AuthService:
     def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
         """액세스 토큰 생성"""
         to_encode = data.copy()
+        now = datetime.utcnow()
         if expires_delta:
-            expire = datetime.utcnow() + expires_delta
+            expire = now + expires_delta
         else:
-            expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-        to_encode.update({"exp": expire})
+            expire = now + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        # Ensure uniqueness across refreshes by including iat/jti
+        to_encode.update({
+            "exp": expire,
+            "iat": now,
+            "jti": str(uuid.uuid4()),
+        })
         encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
         return encoded_jwt
     
@@ -113,6 +124,41 @@ class AuthService:
         if not user or not AuthService.verify_password(password, user.password_hash):
             return None
         return user
+
+    @staticmethod
+    def is_login_locked(db: Session, site_id: str) -> bool:
+        """최근 실패 횟수로 로그인 잠금 여부 판단"""
+        cutoff = datetime.utcnow() - timedelta(minutes=LOGIN_LOCKOUT_MINUTES)
+        failed_count = (
+            db.query(LoginAttempt)
+            .filter(
+                LoginAttempt.site_id == site_id,
+                LoginAttempt.success == False,
+                LoginAttempt.created_at >= cutoff,
+            )
+            .count()
+        )
+        return failed_count >= LOGIN_MAX_FAILED_ATTEMPTS
+
+    @staticmethod
+    def record_login_attempt(
+        db: Session,
+        site_id: str,
+        success: bool,
+        ip_address: Optional[str] = None,
+        user_agent: Optional[str] = None,
+        failure_reason: Optional[str] = None,
+    ) -> None:
+        """로그인 시도를 기록 (성공/실패)"""
+        attempt = LoginAttempt(
+            site_id=site_id,
+            success=success,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            failure_reason=failure_reason,
+        )
+        db.add(attempt)
+        db.commit()
     
     @staticmethod
     def authenticate_admin(db: Session, site_id: str, password: str) -> Optional[User]:
