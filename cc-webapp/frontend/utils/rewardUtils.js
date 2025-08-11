@@ -5,7 +5,7 @@
  * This client-side gacha logic is a simplification for this subtask.
  * In a real-world application, gacha mechanics (determining the reward)
  * should be handled by the backend to ensure security and prevent manipulation.
- * This would typically involve the frontend calling a backend endpoint (e.g., POST /api/gacha/spin),
+ * This would typically involve the frontend calling a backend endpoint (e.g., POST /api/games/gacha/pull),
  * which then uses the backend's reward_utils.py::spin_gacha function.
  */
 
