@@ -221,7 +221,7 @@ class RPSPlayResponse(BaseModel):
 # 가챠 게임 스키마
 class GachaPullRequest(BaseModel):
     """가챠 뽑기 요청 모델"""
-    gacha_id: str
+    gacha_id: Optional[str] = None
     pull_count: int = 1
     use_premium_currency: bool = False
 
@@ -232,6 +232,8 @@ class GachaPullResponse(BaseModel):
     items: List[Dict[str, Any]]
     rare_item_count: int = 0
     ultra_rare_item_count: int = 0
+    pull_count: int
+    balance: int
     special_animation: Optional[str] = None
     message: str
     currency_balance: Dict[str, int]
