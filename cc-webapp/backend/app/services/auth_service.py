@@ -20,7 +20,7 @@ ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("JWT_EXPIRE_MINUTES", "30"))
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # HTTP Bearer 토큰
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)
 
 class AuthService:
     """인증 서비스 클래스"""
