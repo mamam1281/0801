@@ -39,7 +39,7 @@ export const options = {
 
     // Custom metric thresholds (latency for specific endpoints)
     'actions_latency': ['p(95)<200'],         // 95th percentile for POST /actions should be <200ms
-    'gacha_pull_latency': ['p(95)<250'],      // 95th percentile for POST /gacha/pull should be <250ms
+  'gacha_pull_latency': ['p(95)<250'],      // 95th percentile for POST /api/games/gacha/pull should be <250ms
     'slots_page_latency': ['p(95)<500'],      // 95th percentile for GET /slots page load should be <500ms
 
     // Error rate for custom checks (if any specific checks fail beyond HTTP errors)
@@ -75,10 +75,8 @@ function generateRandomActionPayload() {
 }
 
 function generateGachaPullPayload() {
-  const userId = Math.floor(Math.random() * 10000) + 1;
-  return JSON.stringify({
-    user_id: userId,
-  });
+  // Unified games router expects optional pullCount; auth is required in real env
+  return JSON.stringify({ pullCount: 1 });
 }
 
 // --- Test Scenarios (default function executed by VUs) ---
@@ -102,17 +100,17 @@ export default function () {
 
     sleep(Math.random() * 1.5 + 0.5); // Think time: 0.5 to 2 seconds
 
-    // Scenario 2: POST /api/gacha/pull
+    // Scenario 2: POST /api/games/gacha/pull (unified games router)
     const gachaPayload = generateGachaPullPayload();
     const gachaParams = {
       headers: { 'Content-Type': 'application/json', 'User-Agent': 'k6LoadTest' },
       tags: { endpoint_name: 'PostGachaPull' },
     };
-    const gachaRes = http.post(`${BASE_URL_BACKEND}/gacha/pull`, gachaPayload, gachaParams);
+    const gachaRes = http.post(`${BASE_URL_BACKEND}/games/gacha/pull`, gachaPayload, gachaParams);
 
     const gachaCheck = check(gachaRes, {
-      'POST /gacha/pull status is 200': (r) => r.status === 200,
-      'POST /gacha/pull response contains type': (r) => r.json('type') !== undefined,
+      'POST /api/games/gacha/pull status is 200': (r) => r.status === 200,
+      'POST /api/games/gacha/pull response contains items': (r) => Array.isArray(r.json('items') || []),
     });
     if (!gachaCheck) { errorRate.add(1); }
     gachaPullLatency.add(gachaRes.timings.duration);

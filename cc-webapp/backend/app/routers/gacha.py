@@ -1,3 +1,14 @@
+"""
+DEPRECATED: Legacy Gacha router
+
+This module provided /api/gacha/* endpoints prior to consolidating all game
+APIs under the unified router app/routers/games.py.
+
+Status: Do NOT include this router in app.main. All gacha functionality lives
+at POST /api/games/gacha/pull. This file remains only for historical context
+and should not be imported by the running application.
+"""
+
 # cc-webapp/backend/app/routers/gacha.py
 from fastapi import APIRouter, Depends, HTTPException
 

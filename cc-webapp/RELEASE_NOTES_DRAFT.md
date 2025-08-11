@@ -8,7 +8,7 @@ This landmark v1.0.0 release of CC Webapp brings the application to a feature-co
     *   Implemented Reward History endpoint (`GET /api/users/{user_id}/rewards`) with pagination.
     *   Full Content Unlock logic (`GET /api/unlock`) including stage progression, segment validation, and `UserReward` creation.
     *   Pending Notifications endpoint (`GET /api/notification/pending/{user_id}`) to fetch and mark notifications.
-    *   New Gacha Pull endpoint (`POST /api/gacha/pull`) for server-side gacha spin logic.
+    *   New Gacha Pull endpoint (`POST /api/games/gacha/pull`) for server-side gacha spin logic.
     *   Refined `reward_utils.py` for decoupled reward calculation and gacha item determination.
     *   Implemented Kafka integration for user actions, RFM batch job for user segmentation, corporate site visit logging, and a personalized recommendation endpoint.
     *   Added `/health` endpoint for Docker health checks and `/metrics` endpoint for Prometheus monitoring.
@@ -16,7 +16,7 @@ This landmark v1.0.0 release of CC Webapp brings the application to a feature-co
     *   Finalized `EmotionFeedback.jsx` with enhanced styling, icons, and Framer Motion animations.
     *   Full integration of `EmotionFeedback`, sound effects, and confetti into mini-games (`SlotMachine.jsx`, `RPSGame.jsx`, `Roulette.jsx`). (Note: `useEmotionFeedback` hook currently uses mocked API responses).
     *   Completed `AdultContentViewer.jsx` with API-driven content unlock, blurred thumbnails, and full media reveal in a modal.
-    *   Implemented `Gacha.jsx` using the new backend `/api/gacha/pull` endpoint, with UI feedback for COIN, CONTENT_UNLOCK, and BADGE rewards.
+    *   Implemented `Gacha.jsx` using the new backend `/api/games/gacha/pull` endpoint, with UI feedback for COIN, CONTENT_UNLOCK, and BADGE rewards.
     *   Finalized `Profile.jsx` page to display personalized recommendations fetched from the backend.
     *   Implemented `NotificationBanner.jsx` for displaying pending user notifications globally.
 *   **Dockerization & Staging Setup:**
