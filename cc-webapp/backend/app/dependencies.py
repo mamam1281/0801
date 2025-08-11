@@ -20,14 +20,19 @@ if not logger.handlers:
     handler.setFormatter(formatter)
     logger.addHandler(handler)
 
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)
 
 async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
+    credentials: HTTPAuthorizationCredentials | None = Depends(security),
     db: Session = Depends(get_db),
 ) -> User:
     """현재 인증된 사용자 정보 반환"""
     try:
+        if credentials is None or not credentials.scheme or credentials.scheme.lower() != "bearer":
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Not authenticated",
+            )
         token = credentials.credentials
         token_data = AuthService.verify_token(token)
         user = db.query(User).filter(User.id == token_data.user_id).first()
@@ -58,3 +63,21 @@ async def get_current_admin_user(
             detail="Not enough permissions"
         )
     return current_user
+
+# ===== Role/Tier based access helpers =====
+
+_TIER_ORDER = {"STANDARD": 1, "PREMIUM": 2, "VIP": 3}
+
+def _tier_meets(user_tier: str, required: str) -> bool:
+    return _TIER_ORDER.get(str(user_tier).upper(), 0) >= _TIER_ORDER.get(str(required).upper(), 0)
+
+def require_min_tier(required_tier: str):
+    async def _dep(current_user: User = Depends(get_current_user)) -> User:
+        user_tier = getattr(current_user, "user_rank", "STANDARD")
+        if not _tier_meets(user_tier, required_tier):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Requires {required_tier} tier",
+            )
+        return current_user
+    return _dep

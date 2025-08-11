@@ -8,6 +8,16 @@ param (
 # Compose file to use
 $ComposeFile = "docker-compose.yml"
 
+# Build compose args with optional local override
+function Get-ComposeArgs {
+    $argsList = @('-f', $ComposeFile)
+    $localOverride = "docker-compose.override.local.yml"
+    if (Test-Path $localOverride) {
+        $argsList += @('-f', $localOverride)
+    }
+    return ,$argsList
+}
+
 # Detect Docker & Compose (v2 preferred, fallback to v1)
 $UseComposeV2 = $true
 function Test-DockerInstalled {
@@ -34,8 +44,13 @@ function Detect-Compose {
 }
 function Compose {
     param([Parameter(ValueFromRemainingArguments=$true)][string[]]$Args)
-    if ($UseComposeV2) { & docker @('compose') @Args }
-    else { & docker-compose @Args }
+    $envArgs = @()
+    if (Test-Path ".env.local") { $envArgs += @('--env-file', '.env.local') }
+    $files = @('-f', $ComposeFile)
+    $override = "docker-compose.override.local.yml"
+    if (Test-Path $override) { $files += @('-f', $override) }
+    if ($UseComposeV2) { & docker @('compose') @envArgs @files @Args }
+    else { & docker-compose @envArgs @files @Args }
 }
 
 # Normalize legacy service aliases to actual compose service names
@@ -49,22 +64,29 @@ function Resolve-ServiceName($name) {
 function Start-Environment {
     Detect-Compose
     Write-Host "Starting Casino-Club F2P environment..." -ForegroundColor Cyan
-    Compose -f $ComposeFile up -d --build
+    Compose up -d --build
     if ($LASTEXITCODE -ne 0) {
         Write-Host "Failed to start containers. Check Docker Desktop is running and try logs." -ForegroundColor Red
         exit $LASTEXITCODE
     }
     Write-Host "Environment started!" -ForegroundColor Green
     Show-Status
-    Write-Host "Frontend: http://localhost:3000" -ForegroundColor Yellow
-    Write-Host "Backend API: http://localhost:8000" -ForegroundColor Yellow
-    Write-Host "Database: localhost:5432 (User: cc_user, Password: cc_password, DB: cc_webapp)" -ForegroundColor Yellow
+    $usingOverride = Test-Path "docker-compose.override.local.yml"
+    if ($usingOverride) {
+        Write-Host "Frontend: http://localhost:3001" -ForegroundColor Yellow
+        Write-Host "Backend API: http://localhost:8001" -ForegroundColor Yellow
+        Write-Host "Database: localhost:55432 (User: cc_user, Password: cc_password, DB: cc_webapp)" -ForegroundColor Yellow
+    } else {
+        Write-Host "Frontend: http://localhost:3000" -ForegroundColor Yellow
+        Write-Host "Backend API: http://localhost:8000" -ForegroundColor Yellow
+        Write-Host "Database: localhost:5432 (User: cc_user, Password: cc_password, DB: cc_webapp)" -ForegroundColor Yellow
+    }
 }
 
 function Stop-Environment {
     Detect-Compose
     Write-Host "Stopping Casino-Club F2P environment..." -ForegroundColor Cyan
-    Compose -f $ComposeFile down
+    Compose down
     Write-Host "Environment stopped!" -ForegroundColor Green
 }
 
@@ -73,17 +95,17 @@ function Show-Logs {
     $resolved = Resolve-ServiceName $Service
     if ($resolved) {
         Write-Host "Showing logs for $resolved..." -ForegroundColor Cyan
-        Compose -f $ComposeFile logs -f $resolved
+        Compose logs -f $resolved
     } else {
         Write-Host "Showing all logs..." -ForegroundColor Cyan
-        Compose -f $ComposeFile logs -f
+        Compose logs -f
     }
 }
 
 function Show-Status {
     Detect-Compose
     Write-Host "Checking environment status..." -ForegroundColor Cyan
-    Compose -f $ComposeFile ps
+    Compose ps
 }
 
 function Enter-Container {
@@ -97,9 +119,9 @@ function Enter-Container {
     $resolved = Resolve-ServiceName $Service
     Write-Host "Entering $resolved container..." -ForegroundColor Cyan
     if ($resolved -eq "postgres") {
-        Compose -f $ComposeFile exec postgres psql -U cc_user -d cc_webapp
+        Compose exec postgres psql -U cc_user -d cc_webapp
     } elseif ($resolved -eq "backend" -or $resolved -eq "frontend") {
-        Compose -f $ComposeFile exec $resolved /bin/sh
+        Compose exec $resolved /bin/sh
     } else {
         Write-Host "Error: Unknown service '$Service'" -ForegroundColor Red
         Write-Host "Available services: postgres, backend, frontend" -ForegroundColor Yellow
@@ -111,7 +133,7 @@ function Check-Prerequisites {
     Write-Host "Running environment checks..." -ForegroundColor Cyan
     Detect-Compose
     Write-Host "✔ Docker detected" -ForegroundColor Green
-    try { Compose -f $ComposeFile config *> $null; Write-Host "✔ Compose file valid" -ForegroundColor Green } catch { Write-Host "✖ Compose file invalid" -ForegroundColor Red; exit 1 }
+    try { Compose config *> $null; Write-Host "✔ Compose config valid" -ForegroundColor Green } catch { Write-Host "✖ Compose config invalid" -ForegroundColor Red; exit 1 }
     # Quick port checks
     $ports = 3000,8000,5432
     foreach ($p in $ports) {
@@ -123,8 +145,17 @@ function Check-Prerequisites {
 
 function Check-Health {
     Write-Host "Probing service health..." -ForegroundColor Cyan
-    try { $api = Invoke-RestMethod -Uri "http://localhost:8000/health" -TimeoutSec 5; Write-Host ("API /health => {0}" -f ($api.status)) -ForegroundColor Green } catch { Write-Host "API not responding on http://localhost:8000/health" -ForegroundColor Yellow }
-    try { $web = Invoke-WebRequest -Uri "http://localhost:3000" -UseBasicParsing -TimeoutSec 5; Write-Host ("Web / => {0}" -f $web.StatusCode) -ForegroundColor Green } catch { Write-Host "Web not responding on http://localhost:3000" -ForegroundColor Yellow }
+    $apiPort = 8000
+    $webPort = 3000
+    if (Test-Path ".env.local") {
+        $lines = Get-Content .env.local
+        foreach ($l in $lines) {
+            if ($l -match '^BACKEND_PORT=(\d+)$') { $apiPort = [int]$Matches[1] }
+            if ($l -match '^FRONTEND_PORT=(\d+)$') { $webPort = [int]$Matches[1] }
+        }
+    }
+    try { $api = Invoke-RestMethod -Uri "http://localhost:$apiPort/health" -TimeoutSec 5; Write-Host ("API /health => {0}" -f ($api.status)) -ForegroundColor Green } catch { Write-Host "API not responding on http://localhost:$apiPort/health" -ForegroundColor Yellow }
+    try { $web = Invoke-WebRequest -Uri "http://localhost:$webPort" -UseBasicParsing -TimeoutSec 5; Write-Host ("Web / => {0}" -f $web.StatusCode) -ForegroundColor Green } catch { Write-Host "Web not responding on http://localhost:$webPort" -ForegroundColor Yellow }
 }
 
 function Check-DBConnection {
@@ -132,22 +163,27 @@ function Check-DBConnection {
     Detect-Compose
 
     # Host port check
+    $dbPort = 5432
+    if (Test-Path ".env.local") {
+        $lines = Get-Content .env.local
+        foreach ($l in $lines) { if ($l -match '^POSTGRES_PORT=(\d+)$') { $dbPort = [int]$Matches[1] } }
+    }
     try {
-        $tcp = Test-NetConnection -ComputerName 'localhost' -Port 5432 -WarningAction SilentlyContinue
-        if ($tcp.TcpTestSucceeded) { Write-Host "✔ Host port 5432 reachable" -ForegroundColor Green }
-        else { Write-Host "✖ Host port 5432 not reachable" -ForegroundColor Red }
+        $tcp = Test-NetConnection -ComputerName 'localhost' -Port $dbPort -WarningAction SilentlyContinue
+        if ($tcp.TcpTestSucceeded) { Write-Host "✔ Host port $dbPort reachable" -ForegroundColor Green }
+        else { Write-Host "✖ Host port $dbPort not reachable" -ForegroundColor Red }
     } catch { Write-Host "⚠ Unable to run Test-NetConnection (PowerShell version?)" -ForegroundColor Yellow }
 
     # Container readiness
     try {
         Write-Host "→ Running pg_isready in postgres container" -ForegroundColor Yellow
-        Compose -f $ComposeFile exec postgres pg_isready -U cc_user -d cc_webapp
+    Compose exec postgres pg_isready -U cc_user -d cc_webapp
     } catch { Write-Host "✖ pg_isready failed (Is postgres container running?)" -ForegroundColor Red }
 
     # Simple SQL query
     try {
         Write-Host "→ Running SELECT 1; via psql" -ForegroundColor Yellow
-        Compose -f $ComposeFile exec postgres psql -U cc_user -d cc_webapp -c 'SELECT 1;'
+    Compose exec postgres psql -U cc_user -d cc_webapp -c 'SELECT 1;'
     } catch { Write-Host "✖ psql test query failed" -ForegroundColor Red }
 
     Write-Host "DB check complete." -ForegroundColor Cyan

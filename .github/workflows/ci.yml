@@ -48,6 +48,26 @@ jobs:
           # Run only curated green path tests for gating
           docker exec -e KAFKA_TEST_TOPIC=cc_test_ci -e KAFKA_ENABLED=1 cc_backend_test pytest -q app/tests/test_user_journey.py app/tests/test_kafka_roundtrip.py
 
+      - name: Non-blocking Kafka smoke (produce/peek)
+        continue-on-error: true
+        run: |
+          # Execute a tiny python httpx script inside the backend container
+          docker exec cc_backend_test sh -lc 'python - <<"PY"
+          import os, time, json
+          import httpx
+          base = "http://127.0.0.1:8000"
+          with httpx.Client(timeout=5.0) as c:
+              r1 = c.get(f"{base}/health"); print("health:", r1.status_code)
+              r2 = c.get(f"{base}/api/kafka/_debug/ready"); print("ready:", r2.text)
+              marker = f"ci-{int(time.time())}"
+              pr = c.post(f"{base}/api/kafka/produce", json={"topic":"cc_test_ci","payload":{"marker":marker}})
+              print("produce:", pr.status_code)
+              time.sleep(1)
+              pk = c.get(f"{base}/api/kafka/debug/peek", params={"topic":"cc_test_ci","max_messages":200,"from_beginning":1})
+              ok = marker in pk.text
+              print("peek contains marker:", ok)
+          PY'
+
       - name: Teardown
         if: always()
         run: docker compose -f docker-compose.yml -f docker-compose.test.yml --env-file .env.test down -v

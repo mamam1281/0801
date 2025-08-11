@@ -403,6 +403,31 @@
         }
       }
     },
+    "/api/users/vip-only": {
+      "get": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Vip Only Feature",
+        "description": "Example VIP-only endpoint to validate tier-based access control.",
+        "operationId": "vip_only_feature_api_users_vip_only_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/users/{user_id}": {
       "get": {
         "tags": [
