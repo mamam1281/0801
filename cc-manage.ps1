@@ -190,7 +190,8 @@ function Check-DBConnection {
     try {
         Write-Host "→ Running pg_isready in postgres container" -ForegroundColor Yellow
     $composeArgs = Get-ComposeArgs
-    Compose @composeArgs exec postgres pg_isready -U cc_user -d cc_webapp
+    # Use shell wrapper to avoid Windows/PowerShell arg parsing oddities
+    Compose @composeArgs exec postgres /bin/sh -lc "pg_isready -U cc_user -d cc_webapp"
     } catch { Write-Host "✖ pg_isready failed (Is postgres container running?)" -ForegroundColor Red }
 
     # Simple SQL query
