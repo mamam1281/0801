@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..schemas.auth import UserCreate, UserLogin, AdminLogin, UserResponse, Token
 from ..services.auth_service import AuthService, security
+from ..repositories.invite_codes import InviteCodeRepository
 from ..models.auth_models import User
 
 logger = logging.getLogger(__name__)
@@ -36,7 +37,17 @@ def _build_user_response(user: User) -> UserResponse:
 @router.post("/signup", response_model=Token)
 async def signup(data: UserCreate, db: Session = Depends(get_db)):
     try:
+        # validate invite before creating
+        inv_repo = InviteCodeRepository(db)
+        inv_check = inv_repo.validate(data.invite_code)
+        if not inv_check.get("valid"):
+            raise HTTPException(status_code=400, detail="Invalid invite code")
         user = AuthService.create_user(db, data)
+        # consume non-infinite invites
+        if not inv_check.get("infinite"):
+            ok = inv_repo.consume(data.invite_code)
+            if not ok:
+                raise HTTPException(status_code=400, detail="Invite code no longer available")
         access_token = AuthService.create_access_token(
             {"sub": user.site_id, "user_id": user.id, "is_admin": user.is_admin}
         )
@@ -120,14 +131,13 @@ async def logout(credentials: HTTPAuthorizationCredentials = Depends(security)):
 
 @router.get("/check-invite/{code}")
 async def check_invite(code: str, db: Session = Depends(get_db)):
-    """Invite code validation.
-    - Code '5858' is always valid and infinitely reusable.
-    - For other codes, respond as not implemented yet (reserved for future repository-backed logic).
+    """Invite code validation with repository.
+    - Code '5858' remains always valid and infinitely reusable.
+    - Other codes are validated against DB with expiry/max-uses/active checks.
     """
-    if code == "5858":
-        return {"code": code, "valid": True, "infinite": True}
-    # Placeholder response for non-5858 codes (can be wired to InviteCodeRepository later)
-    return {"code": code, "valid": False, "reason": "UNKNOWN_OR_UNSUPPORTED_CODE"}
+    inv_repo = InviteCodeRepository(db)
+    result = inv_repo.validate(code)
+    return {"code": code, **result}
 
 
 @router.get("/me", response_model=UserResponse)
