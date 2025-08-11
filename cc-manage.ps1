@@ -152,8 +152,12 @@ function Check-Prerequisites {
 
 function Check-Health {
     Write-Host "Probing service health..." -ForegroundColor Cyan
-    $apiPort = (Test-Path "docker-compose.override.local.yml") ? 8001 : 8000
-    $webPort = (Test-Path "docker-compose.override.local.yml") ? 3001 : 3000
+    $apiPort = 8000
+    $webPort = 3000
+    if (Test-Path "docker-compose.override.local.yml") {
+        $apiPort = 8001
+        $webPort = 3001
+    }
     if (Test-Path ".env.local") {
         $lines = Get-Content .env.local
         foreach ($l in $lines) {
@@ -170,7 +174,8 @@ function Check-DBConnection {
     Detect-Compose
 
     # Host port check
-    $dbPort = (Test-Path "docker-compose.override.local.yml") ? 5433 : 5432
+    $dbPort = 5432
+    if (Test-Path "docker-compose.override.local.yml") { $dbPort = 5433 }
     if (Test-Path ".env.local") {
         $lines = Get-Content .env.local
         foreach ($l in $lines) { if ($l -match '^POSTGRES_PORT=(\d+)$') { $dbPort = [int]$Matches[1] } }
