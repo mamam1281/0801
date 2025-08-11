@@ -8,6 +8,7 @@ from ..database import get_db
 from ..models.auth_models import User
 from ..dependencies import get_current_user
 from ..services.user_service import UserService
+from ..services.token_service import TokenService
 from ..schemas.user import UserResponse, UserUpdate
 
 logger = logging.getLogger(__name__)
@@ -143,7 +144,9 @@ async def add_tokens(
     try:
         if amount <= 0:
             raise ValueError("Amount must be positive")
-        updated_balance = user_service.add_tokens(current_user.id, amount)
+        # Use TokenService to persist token balance updates
+        token_service = TokenService(db)
+        updated_balance = token_service.add_tokens(current_user.id, amount)
         return {
             "success": True,
             "message": f"Added {amount} tokens",
@@ -161,10 +164,44 @@ async def add_tokens(
 @router.get("/{user_id}", response_model=UserResponse)
 async def get_user(
     user_id: int,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """특정 사용자 정보 조회"""
+    """특정 사용자 정보 조회 (본인=전체, 타인=제한적 정보)"""
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다")
-    return user
+
+    # 본인은 전체 정보 반환, 관리자는 전체 열람 허용
+    if user.id == current_user.id or getattr(current_user, "is_admin", False):
+        return user
+
+    # 타인 프로필: 민감 필드 마스킹하여 제한적 정보 반환
+    try:
+        masked = {
+            "id": user.id,
+            "site_id": user.site_id,
+            "nickname": user.nickname,
+            # 민감 정보 마스킹
+            "phone_number": "hidden",
+            "cyber_token_balance": 0,
+            "created_at": getattr(user, "created_at", None),
+            "is_active": getattr(user, "is_active", True),
+            # 타인에 대해 관리자 여부는 노출하지 않음
+            "is_admin": False,
+            "rank": getattr(user, "rank", "STANDARD"),
+        }
+        return masked
+    except Exception:
+        # 실패 시 최소 정보만 노출
+        return {
+            "id": user.id,
+            "site_id": user.site_id,
+            "nickname": user.nickname,
+            "phone_number": "hidden",
+            "cyber_token_balance": 0,
+            "created_at": getattr(user, "created_at", None),
+            "is_active": True,
+            "is_admin": False,
+            "rank": "STANDARD",
+        }

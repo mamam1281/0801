@@ -256,6 +256,8 @@ async def pull_gacha(
         'items': items,
         'rare_item_count': rare_count,
         'ultra_rare_item_count': ultra_rare_count,
+    'pull_count': pull_count,
+    'balance': new_balance,
         'special_animation': None,
         'message': 'Gacha pull completed',
         'currency_balance': {

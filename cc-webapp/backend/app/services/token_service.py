@@ -24,7 +24,8 @@ class TokenService:
             repository (Optional[GameRepository]): Game data repository
         """
         self.db = db
-        self.repository = repository or GameRepository()
+        # Initialize repository with provided DB session if not supplied
+        self.repository = repository or (GameRepository(db) if db is not None else None)
 
     def add_tokens(self, user_id: int, amount: int) -> int:
         """
