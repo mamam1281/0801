@@ -40,6 +40,13 @@ jobs:
           docker exec cc_backend_test sh -lc "alembic downgrade -1 || true"
           docker exec cc_backend_test alembic upgrade head
 
+      - name: Run Alembic guard (inside container)
+        env:
+          CI_ENFORCE_ALEMBIC_UPGRADE: "1"
+        run: |
+          # Enforce that 'alembic upgrade head' succeeds when the guard env is set
+          docker exec -e CI_ENFORCE_ALEMBIC_UPGRADE=1 cc_backend_test pytest -q app/tests/test_ci_alembic_guard.py -q
+
       - name: Run minimal tests (inside container)
         env:
           KAFKA_TEST_TOPIC: cc_test_ci
