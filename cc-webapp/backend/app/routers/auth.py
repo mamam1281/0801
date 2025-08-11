@@ -20,16 +20,16 @@ router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 
 
 def _build_user_response(user: User) -> UserResponse:
+    # Only include fields that exist in UserResponse schema
     return UserResponse(
         id=user.id,
         site_id=user.site_id,
         nickname=user.nickname,
         phone_number=getattr(user, "phone_number", None),
-        cyber_token_balance=getattr(user, "cyber_token_balance", 0),
-        created_at=user.created_at,
-        last_login=user.last_login or user.created_at,
-        is_admin=getattr(user, "is_admin", False),
         is_active=getattr(user, "is_active", True),
+        is_admin=getattr(user, "is_admin", False),
+        created_at=user.created_at,
+        last_login=user.last_login,
     )
 
 
@@ -116,3 +116,27 @@ async def refresh(
 async def logout(credentials: HTTPAuthorizationCredentials = Depends(security)):
     # Stateless JWT: simply acknowledge; implement blacklist if needed.
     return {"message": "Logged out"}
+
+
+@router.get("/check-invite/{code}")
+async def check_invite(code: str, db: Session = Depends(get_db)):
+    """Invite code validation.
+    - Code '5858' is always valid and infinitely reusable.
+    - For other codes, respond as not implemented yet (reserved for future repository-backed logic).
+    """
+    if code == "5858":
+        return {"code": code, "valid": True, "infinite": True}
+    # Placeholder response for non-5858 codes (can be wired to InviteCodeRepository later)
+    return {"code": code, "valid": False, "reason": "UNKNOWN_OR_UNSUPPORTED_CODE"}
+
+
+@router.get("/me", response_model=UserResponse)
+async def me(credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)):
+    token = credentials.credentials if credentials else None
+    if not token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing token")
+    token_data = AuthService.verify_token(token)
+    user = db.query(User).filter(User.id == token_data.user_id).first()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+    return _build_user_response(user)
