@@ -7,6 +7,11 @@ APIs under the unified router app/routers/games.py.
 Status: Do NOT include this router in app.main. All gacha functionality lives
 at POST /api/games/gacha/pull. This file remains only for historical context
 and should not be imported by the running application.
+
+Removal plan (pending team confirmation):
+1) Verify there are no remaining references to /api/gacha in code/tests/docs.
+2) Delete this file (app/routers/gacha.py) on the cleanup branch.
+3) Re-export OpenAPI and re-run pytest suites; update docs to remove legacy mentions.
 """
 
 # cc-webapp/backend/app/routers/gacha.py

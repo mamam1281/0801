@@ -71,7 +71,8 @@
 |------------|-----------------|---------|------|
 | `games.py` | `/api/games` | 게임 컬렉션 | 활성화 |
 | `prize_roulette.py` | `/api/games/roulette` | 룰렛 게임 | 활성화 |
-| `gacha.py` | `/api/gacha` | 가챠 시스템 | 활성화 |
+| `gacha.py` | `/api/gacha` | 가챠 시스템 (레거시) | Deprecated/삭제 예정 |
+| `games.py` | `/api/games/gacha` | 가챠 시스템(통합) | 활성화 |
 | `rps.py` | `/api/games/rps` | 가위바위보 게임 | 활성화 |
 | `game_api.py` | `/api/game` | 통합 게임 API | 개발 중 |
 

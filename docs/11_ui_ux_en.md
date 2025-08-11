@@ -320,7 +320,7 @@ Always return to main dashboard; guide users between app and site via CTA
   - 언락 성공 시 /adult-unlock에서 풀 해상도 콘텐츠 모달 팝업 → CJ AI 축하 메시지
 - Dashboard → Gacha
   - /dashboard → "Gacha" 탭 클릭 → /gacha
-  - "Spin Gacha" → /api/gacha → Ticket/Coin 결과 + Feedback
+  - "Spin Gacha" → /api/games/gacha/pull → Ticket/Coin 결과 + Feedback
   - 티켓이 있을 경우 /adult-unlock로 자동 리다이렉트 제안
 
 ## 8. 결론 🎯

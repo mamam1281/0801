@@ -294,7 +294,7 @@ async def api_info():
             "auth": "/api/auth",
             "users": "/api/users",
             "admin": "/api/admin",
-            "games": "/api/actions, /api/gacha, /api/games/*",
+            "games": "/api/actions, /api/games/*",
             "shop": "/api/shop, /api/rewards",
             "missions": "/api/missions",
             "quiz": "/api/quiz",

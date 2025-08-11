@@ -75,7 +75,7 @@
 2. **Users**: `/api/users` 
 3. **Admin**: `/api/admin`
 4. **Game Actions**: `/api/actions`
-5. **Gacha**: `/api/gacha`
+5. **Gacha**: `/api/games/gacha/pull` (통합, 레거시 `/api/gacha`는 Deprecated)
 6. **Rewards**: `/api/rewards`
 7. **Shop**: `/api/shop`
 8. **Missions**: `/api/missions`
