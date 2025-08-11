@@ -34,12 +34,16 @@ def _build_user_response(user: User) -> UserResponse:
 
 
 @router.post("/signup", response_model=Token)
-async def signup(data: UserCreate, db: Session = Depends(get_db)):
+async def signup(data: UserCreate, request: Request, db: Session = Depends(get_db)):
     try:
         user = AuthService.create_user(db, data)
         access_token = AuthService.create_access_token(
             {"sub": user.site_id, "user_id": user.id, "is_admin": user.is_admin}
         )
+        try:
+            AuthService.create_session(db, user, access_token, request)
+        except Exception:
+            logger.exception("create_session (signup) failed (non-fatal)")
         return Token(access_token=access_token, token_type="bearer", user=_build_user_response(user))
     except HTTPException:
         raise
@@ -86,6 +90,10 @@ async def login(data: UserLogin, request: Request, db: Session = Depends(get_db)
         access_token = AuthService.create_access_token(
             {"sub": user.site_id, "user_id": user.id, "is_admin": user.is_admin}
         )
+        try:
+            AuthService.create_session(db, user, access_token, request)
+        except Exception:
+            logger.exception("create_session (login) failed (non-fatal)")
         return Token(access_token=access_token, token_type="bearer", user=_build_user_response(user))
     except HTTPException:
         raise
@@ -104,6 +112,10 @@ async def admin_login(data: AdminLogin, db: Session = Depends(get_db)):
         access_token = AuthService.create_access_token(
             {"sub": user.site_id, "user_id": user.id, "is_admin": True}
         )
+        try:
+            AuthService.create_session(db, user, access_token, None)
+        except Exception:
+            logger.exception("create_session (admin) failed (non-fatal)")
         return Token(access_token=access_token, token_type="bearer", user=_build_user_response(user))
     except HTTPException:
         raise
@@ -124,14 +136,18 @@ async def refresh(
         provided_token = refresh_token or (credentials.credentials if credentials else None)
         if not provided_token:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token required")
-
-        token_data = AuthService.verify_token(provided_token)
+        token_data = AuthService.verify_token(provided_token, db=db)
         user = db.query(User).filter(User.id == token_data.user_id).first()
         if not user:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
         new_access_token = AuthService.create_access_token(
             {"sub": user.site_id, "user_id": user.id, "is_admin": user.is_admin}
         )
+        try:
+            # Create a session for the refreshed token so it is accepted by session checks
+            AuthService.create_session(db, user, new_access_token, None)
+        except Exception:
+            logger.exception("create_session (refresh) failed (non-fatal)")
         return Token(access_token=new_access_token, token_type="bearer", user=_build_user_response(user), refresh_token=provided_token)
     except HTTPException:
         raise
@@ -141,15 +157,30 @@ async def refresh(
 
 
 @router.post("/logout")
-async def logout(credentials: HTTPAuthorizationCredentials = Depends(security)):
-    # Stateless JWT: simply acknowledge; implement blacklist if needed.
+async def logout(credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)):
+    # Blacklist current token
+    try:
+        AuthService.blacklist_token(db, credentials.credentials, reason="logout")
+    except Exception:
+        logger.exception("logout blacklist failed")
     return {"message": "Logged out"}
+
+@router.post("/logout-all")
+async def logout_all(credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)):
+    # Blacklist current token and revoke all sessions for this user
+    token_data = AuthService.verify_token(credentials.credentials, db=db)
+    try:
+        AuthService.blacklist_token(db, credentials.credentials, reason="logout_all", by_user_id=token_data.user_id)
+        AuthService.revoke_all_sessions(db, token_data.user_id)
+    except Exception:
+        logger.exception("logout_all failed")
+    return {"message": "Logged out from all sessions"}
 
 
 @router.get("/me", response_model=UserResponse)
 async def me(credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)):
     """Alias to current user profile for clients expecting /api/auth/me."""
-    token_data = AuthService.verify_token(credentials.credentials)
+    token_data = AuthService.verify_token(credentials.credentials, db=db)
     user = db.query(User).filter(User.id == token_data.user_id).first()
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")

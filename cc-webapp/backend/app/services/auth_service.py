@@ -5,17 +5,20 @@ from datetime import datetime, timedelta
 import uuid
 from typing import Optional
 from fastapi import HTTPException, status
+from fastapi import Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from sqlalchemy.orm import Session
-from ..models.auth_models import User, LoginAttempt
+from ..models.auth_models import User, LoginAttempt, UserSession
+from ..models.token_blacklist import TokenBlacklist
 from ..schemas.auth import TokenData, UserCreate, UserLogin, AdminLogin
 
 # 보안 설정
 SECRET_KEY = os.getenv("JWT_SECRET_KEY", "your-secret-key-here")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("JWT_EXPIRE_MINUTES", "30"))
+MAX_CONCURRENT_SESSIONS = int(os.getenv("MAX_CONCURRENT_SESSIONS", "1"))
 
 # Login protection settings (env override)
 LOGIN_MAX_FAILED_ATTEMPTS = int(os.getenv("LOGIN_MAX_FAILED_ATTEMPTS", "5"))
@@ -74,7 +77,7 @@ class AuthService:
         return encoded_jwt
     
     @staticmethod
-    def verify_token(token: str) -> TokenData:
+    def verify_token(token: str, db: Session | None = None) -> TokenData:
         print("=== DEBUG: verify_token called ===")
         print(f"Token: {token[:30]}...")
         try:
@@ -101,6 +104,25 @@ class AuthService:
         """토큰 검증"""
         try:
             payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+            # Blacklist check (optional when db provided)
+            jti = payload.get("jti")
+            if db is not None and jti:
+                black = db.query(TokenBlacklist).filter(TokenBlacklist.jti == jti).first()
+                if black is not None:
+                    raise HTTPException(
+                        status_code=status.HTTP_401_UNAUTHORIZED,
+                        detail="토큰이 취소되었습니다"
+                    )
+                # Active session check for concurrency control
+                sess = db.query(UserSession).filter(
+                    UserSession.session_token == jti,
+                    UserSession.is_active == True
+                ).first()
+                if sess is None:
+                    raise HTTPException(
+                        status_code=status.HTTP_401_UNAUTHORIZED,
+                        detail="세션이 만료되었거나 로그아웃되었습니다"
+                    )
             site_id: str = payload.get("sub")
             user_id: int = payload.get("user_id")
             is_admin: bool = payload.get("is_admin", False)
@@ -235,7 +257,7 @@ class AuthService:
     @staticmethod
     def get_current_user(db: Session, credentials: HTTPAuthorizationCredentials) -> User:
         """현재 사용자 가져오기"""
-        token_data = AuthService.verify_token(credentials.credentials)
+        token_data = AuthService.verify_token(credentials.credentials, db=db)
         user = db.query(User).filter(User.id == token_data.user_id).first()
         if user is None:
             raise HTTPException(
@@ -254,3 +276,63 @@ class AuthService:
                 detail="관리자 권한이 필요합니다"
             )
         return user
+
+    # ===== Session & Blacklist helpers =====
+    @staticmethod
+    def blacklist_token(db: Session, token: str, reason: str | None = None, by_user_id: int | None = None) -> None:
+        """Store token jti into blacklist until its exp."""
+        try:
+            payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        except JWTError:
+            # Can't decode -> nothing to do
+            return
+        jti = payload.get("jti")
+        exp = payload.get("exp")
+        if not jti or not exp:
+            return
+        expires_at = datetime.utcfromtimestamp(exp) if isinstance(exp, (int, float)) else exp
+        item = TokenBlacklist(
+            token=token[:255],
+            jti=jti,
+            expires_at=expires_at,
+            blacklisted_by=by_user_id,
+            reason=reason or "logout",
+        )
+        # upsert-like: ignore if exists
+        if not db.query(TokenBlacklist).filter(TokenBlacklist.jti == jti).first():
+            db.add(item)
+            db.commit()
+
+    @staticmethod
+    def create_session(db: Session, user: User, token: str, request: Request | None = None) -> UserSession:
+        """Record a user session minimally for concurrency controls."""
+        try:
+            payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        except JWTError:
+            payload = {}
+        # Enforce single-session if configured
+        if MAX_CONCURRENT_SESSIONS <= 1:
+            for s in db.query(UserSession).filter(UserSession.user_id == user.id, UserSession.is_active == True).all():
+                s.is_active = False
+        session = UserSession(
+            user_id=user.id,
+            session_token=payload.get("jti", str(uuid.uuid4())),
+            refresh_token=None,
+            expires_at=datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
+            user_agent=getattr(request.headers, 'get', lambda *_: None)("User-Agent") if request else None,
+            ip_address=getattr(getattr(request, 'client', None), 'host', None) if request else None,
+        )
+        db.add(session)
+        db.commit()
+        return session
+
+    @staticmethod
+    def revoke_all_sessions(db: Session, user_id: int) -> int:
+        """Deactivate all sessions for user (soft)."""
+        cnt = 0
+        for s in db.query(UserSession).filter(UserSession.user_id == user_id, UserSession.is_active == True).all():
+            s.is_active = False
+            cnt += 1
+        if cnt:
+            db.commit()
+        return cnt

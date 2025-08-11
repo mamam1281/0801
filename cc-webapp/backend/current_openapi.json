@@ -203,6 +203,31 @@
         ]
       }
     },
+    "/api/auth/logout-all": {
+      "post": {
+        "tags": [
+          "Authentication",
+          "Authentication"
+        ],
+        "summary": "Logout All",
+        "operationId": "logout_all_api_auth_logout_all_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/auth/me": {
       "get": {
         "tags": [
@@ -2522,6 +2547,54 @@
         "summary": "Get Invite Stats",
         "description": "Get invite code statistics\nShows usage metrics for the current user's codes",
         "operationId": "get_invite_stats_api_invite_stats_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/rbac/premium": {
+      "get": {
+        "tags": [
+          "RBAC Demo"
+        ],
+        "summary": "Premium Only",
+        "operationId": "premium_only_api_rbac_premium_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/rbac/vip": {
+      "get": {
+        "tags": [
+          "RBAC Demo"
+        ],
+        "summary": "Vip Only",
+        "operationId": "vip_only_api_rbac_vip_get",
         "responses": {
           "200": {
             "description": "Successful Response",

@@ -15,7 +15,8 @@ except Exception as e:
 
 @pytest.fixture(scope="session", autouse=True)
 def _ensure_schema():
-	# Create all tables once for the test session (SQLite file by default)
+	# Recreate schema for test session to ensure latest columns exist
+	Base.metadata.drop_all(bind=engine)
 	Base.metadata.create_all(bind=engine)
 	yield
 	# Optional teardown: keep data for debugging; drop if needed

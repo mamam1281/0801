@@ -56,6 +56,7 @@ from app.routers import (
     chat,        # Chat system added
     ai_router,   # AI recommendation system
     events,      # 추가 - 이벤트/미션 라우터
+    rbac_demo,   # RBAC demo router
 )
 from app.routers import kafka_api
 from app.kafka_client import start_consumer, stop_consumer, get_last_messages, is_consumer_ready
@@ -224,6 +225,7 @@ app.include_router(games.router, tags=["Game Collection"])
 
 # Phase 5: Invite System (no prefix - routers have their own)
 app.include_router(invite_router.router)  # 태그 오버라이드 제거 - 이미 invite_router.py에서 "Invite Codes" 태그를 지정함
+app.include_router(rbac_demo.router)  # New RBAC demo router included
 
 # Phase 6: Analytics (no prefix - routers have their own)
 app.include_router(analyze.router, tags=["Analytics"])
