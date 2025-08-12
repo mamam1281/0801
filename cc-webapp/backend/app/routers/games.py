@@ -23,6 +23,7 @@ from ..schemas.game_schemas import (
 )
 from app import models
 from sqlalchemy import text
+from ..utils.redis import update_streak_counter
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/games", tags=["Games"])
@@ -91,6 +92,20 @@ async def spin_slot(
     elif reels[0] == reels[1] or reels[1] == reels[2]:
         win_amount = int(bet_amount * 1.5)
     
+    # 스트릭/변동 보상: 플레이 스트릭 증가(24h TTL) 및 소폭 보너스 가중치
+    # 슬롯 플레이 스트릭은 "플레이 연속 시도" 기준으로 증가(승패 무관). 보너스는 승리 시에만 적용.
+    streak_count = 0
+    try:
+        streak_count = update_streak_counter(str(current_user.id), "SLOT_SPIN", increment=True)
+    except Exception:
+        streak_count = 0
+
+    if win_amount > 0:
+        # 최대 +20%까지 승리 보너스 (연속 시도 기반) + 경미한 랜덤 변동(±5%)
+        bonus_multiplier = 1.0 + min(max(streak_count, 0) * 0.02, 0.20)
+        rng_variation = random.uniform(0.95, 1.05)
+        win_amount = int(win_amount * bonus_multiplier * rng_variation)
+
     # 잔액 업데이트
     new_balance = SimpleUserService.update_user_tokens(db, current_user.id, -bet_amount + win_amount)
     
@@ -106,16 +121,21 @@ async def spin_slot(
     user_action = UserAction(
         user_id=current_user.id,
         action_type="SLOT_SPIN",
-        action_data=str(action_data)
+        action_data=str({**action_data, "streak": streak_count})
     )
     db.add(user_action)
     db.commit()
     
+    message = "Jackpot!" if action_data["is_jackpot"] else ("Win" if win_amount > 0 else "Better luck next time")
     return {
+        'success': True,
         'reels': reels,
         'win_amount': win_amount,
-        'is_jackpot': reels[0] == '7️⃣' and reels[0] == reels[1] == reels[2],
-        'balance': new_balance
+        'is_jackpot': action_data["is_jackpot"],
+        'balance': new_balance,
+        'message': message,
+        'streak': streak_count,
+        'special_animation': 'near_miss' if win_amount == 0 and (reels[0] == reels[1] or reels[1] == reels[2]) else None
     }
 
 # 가위바위보 엔드포인트
@@ -258,7 +278,9 @@ async def pull_gacha(
         'ultra_rare_item_count': ultra_rare_count,
     'pull_count': pull_count,
     'balance': new_balance,
-        'special_animation': None,
+    'special_animation': None,
+    'animation_type': 'normal',
+    'psychological_message': '다음 뽑기에 더 좋은 결과가 기다리고 있을지도 몰라요!',
         'message': 'Gacha pull completed',
         'currency_balance': {
             'tokens': new_balance
