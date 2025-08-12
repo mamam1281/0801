@@ -217,7 +217,20 @@ class GachaService:
         )
 
         balance = self.token_service.get_token_balance(user_id)
-        self.repo.record_action(db, user_id, "GACHA_PULL", -cost)
+        # 기록: 가챠 상세 결과/비용/연출 정보를 함께 저장하여 히스토리 및 검증 용이성 확보
+        try:
+            action_payload = {
+                "game_type": "gacha",
+                "pulls": pulls,
+                "cost": cost,
+                "results": results,  # 예: ["Rare", "Epic_near_miss_legendary", ...]
+                "animation_type": animation_type,
+                "near_miss": near_miss_occurred,
+            }
+            self.repo.record_action(db, user_id, "GACHA_PULL", json.dumps(action_payload))
+        except Exception:
+            # 최소한 비용 차감 기록은 남기되, 상세 페이로드 실패는 무시(로깅만)
+            self.repo.record_action(db, user_id, "GACHA_PULL", str(-cost))
         
         self.logger.debug(
             "User %s gacha results %s, balance %s, near_miss: %s", 

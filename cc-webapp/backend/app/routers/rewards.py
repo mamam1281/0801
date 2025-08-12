@@ -1,7 +1,7 @@
 # cc-webapp/backend/app/routers/rewards.py
 from fastapi import APIRouter, Depends, HTTPException, Query, Path
 
-from typing import List, Any # Any might not be needed if using specific Pydantic models
+from typing import List, Any, Optional # Any might not be needed if using specific Pydantic models
 from pydantic import BaseModel, ConfigDict, Field, field_serializer
 from datetime import timezone
 from datetime import datetime
@@ -21,6 +21,8 @@ class RewardDistributionRequest(BaseModel):
     reward_type: str
     amount: int
     source_description: str
+    idempotency_key: Optional[str] = None
+    metadata: Optional[dict] = None
 
 # Pydantic model for individual reward item in the response
 class RewardItem(BaseModel):
@@ -91,19 +93,29 @@ async def get_user_rewards(
              detail=f"Page not found. Total items: {total_rewards_count}, total pages: {total_pages}. Requested page: {page}."
         )
 
-    # Query for the paginated list of rewards
-    rewards_query_result = db.query(models.UserReward).filter(
-        models.UserReward.user_id == user_id
-    ).order_by(
-        models.UserReward.awarded_at.desc() # Order by most recent
-    ).offset(offset).limit(page_size).all()
+    # Query for the paginated list of rewards joined with Reward to shape the response
+    rows = (
+        db.query(models.UserReward, models.Reward)
+        .join(models.Reward, models.UserReward.reward_id == models.Reward.id)
+        .filter(models.UserReward.user_id == user_id)
+        .order_by(models.UserReward.claimed_at.desc())  # most recent first
+        .offset(offset)
+        .limit(page_size)
+        .all()
+    )
 
-    # FastAPI will handle the conversion of rewards_query_result (list of UserReward
-    # SQLAlchemy objects) to a list of RewardItem Pydantic objects because of the
-    # defined response_model configuration.
+    rewards_list = [
+        {
+            "reward_id": reward.id,
+            "reward_type": reward.reward_type,
+            "reward_value": str(int(reward.value) if reward.value is not None else 0),
+            "awarded_at": link.claimed_at,
+        }
+        for link, reward in rows
+    ]
 
     return PaginatedRewardsResponse(
-        rewards=rewards_query_result,
+        rewards=rewards_list,
         page=page,
         page_size=page_size,
         total_rewards=total_rewards_count,
@@ -121,21 +133,15 @@ async def distribute_reward_to_user(
     """
     reward_service = RewardService(db=db)
     try:
-        user_reward = reward_service.distribute_reward(
+        result = reward_service.distribute_reward(
             user_id=request.user_id,
             reward_type=request.reward_type,
             amount=request.amount,
-            source_description=request.source_description
+            source_description=request.source_description,
+            idempotency_key=request.idempotency_key,
+            metadata=request.metadata,
         )
-        # We need to map the UserReward SQLAlchemy model to the RewardItem Pydantic model.
-        # The alias in RewardItem helps, but we need to ensure all fields match.
-        # Let's create a dictionary that matches the RewardItem structure.
-        return {
-            "reward_id": user_reward.id,
-            "reward_type": user_reward.reward_type,
-            "reward_value": user_reward.reward_value,
-            "awarded_at": user_reward.awarded_at,
-        }
+        return result
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 

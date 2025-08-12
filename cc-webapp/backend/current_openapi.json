@@ -144,7 +144,12 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/Body_refresh_api_auth_refresh_post"
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/Body_refresh_api_auth_refresh_post"
+                  }
+                ],
+                "title": "Body"
               }
             }
           }
@@ -186,12 +191,39 @@
         ],
         "summary": "Logout",
         "operationId": "logout_api_auth_logout_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/RefreshTokenRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
               }
             }
           }
@@ -481,7 +513,15 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/app__schemas__user__UserResponse"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/app__schemas__user__UserResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PublicUserResponse"
+                    }
+                  ],
+                  "title": "Response Get User Api Users  User Id  Get"
                 }
               }
             }
@@ -912,7 +952,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/missions/{mission_id}/claim": {
@@ -923,6 +968,11 @@
         "summary": "Claim Mission Reward",
         "description": "Claim the reward for a completed mission.",
         "operationId": "claim_mission_reward_api_missions__mission_id__claim_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "mission_id",
@@ -1089,7 +1139,6 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "additionalProperties": true,
                   "title": "Response Get Connection Status Api Chat Status  User Id  Get"
                 }
               }
@@ -1560,7 +1609,6 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "additionalProperties": true,
                   "title": "Response Get Recommendation Stats Api Ai Recommendations Stats Get"
                 }
               }
@@ -1621,7 +1669,6 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "additionalProperties": true,
                   "title": "Response Submit Ai Feedback Api Ai Feedback Post"
                 }
               }
@@ -1655,7 +1702,6 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
                   "type": "object",
                   "title": "Response Get Learning Progress Api Ai Learning Progress Get"
                 }
@@ -1818,7 +1864,6 @@
           "content": {
             "application/json": {
               "schema": {
-                "additionalProperties": true,
                 "type": "object",
                 "title": "Request"
               }
@@ -1842,6 +1887,56 @@
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
                 }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/games/gacha/config": {
+      "get": {
+        "tags": [
+          "Game Collection",
+          "Games"
+        ],
+        "summary": "Get Gacha Config",
+        "operationId": "get_gacha_config_api_games_gacha_config_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/games/gacha/stats": {
+      "get": {
+        "tags": [
+          "Game Collection",
+          "Games"
+        ],
+        "summary": "Get Gacha Stats",
+        "operationId": "get_gacha_stats_api_games_gacha_stats_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
               }
             }
           }
@@ -1903,7 +1998,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/SlotSpinResponse"
+                }
               }
             }
           },
@@ -1980,7 +2077,7 @@
           "Games"
         ],
         "summary": "Pull Gacha",
-        "description": "가챠 뽑기",
+        "description": "가챠 뽑기 (서비스 레이어 위임: 피티, 근접실패, 10연 할인 적용)",
         "operationId": "pull_gacha_api_games_gacha_pull_post",
         "requestBody": {
           "content": {
@@ -3358,7 +3455,6 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
                   "type": "object",
                   "title": "Response Update Mission Progress Api Events Missions Progress Put"
                 }
@@ -3847,7 +3943,6 @@
             "title": "Success"
           },
           "rewards": {
-            "additionalProperties": true,
             "type": "object",
             "title": "Rewards"
           },
@@ -3942,7 +4037,6 @@
       "EmotionFeedbackRequest": {
         "properties": {
           "emotion_result_data": {
-            "additionalProperties": true,
             "type": "object",
             "title": "Emotion Result Data",
             "description": "EmotionResult as dict."
@@ -4011,7 +4105,6 @@
           "progress": {
             "anyOf": [
               {
-                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -4079,7 +4172,6 @@
       "EventProgressUpdate": {
         "properties": {
           "progress": {
-            "additionalProperties": true,
             "type": "object",
             "title": "Progress"
           }
@@ -4122,14 +4214,12 @@
             "title": "End Date"
           },
           "rewards": {
-            "additionalProperties": true,
             "type": "object",
             "title": "Rewards"
           },
           "requirements": {
             "anyOf": [
               {
-                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -4183,7 +4273,6 @@
           "user_participation": {
             "anyOf": [
               {
-                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -4305,7 +4394,11 @@
         },
         "type": "object",
         "title": "GachaPullRequest",
-        "description": "가챠 뽑기 요청 모델"
+        "description": "가챠 뽑기 요청 모델",
+        "example": {
+          "pull_count": 10,
+          "use_premium_currency": false
+        }
       },
       "GachaPullResponse": {
         "properties": {
@@ -4315,7 +4408,6 @@
           },
           "items": {
             "items": {
-              "additionalProperties": true,
               "type": "object"
             },
             "type": "array",
@@ -4350,6 +4442,30 @@
             ],
             "title": "Special Animation"
           },
+          "animation_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Animation Type",
+            "description": "애니메이션 타입: normal|epic|legendary|near_miss|pity"
+          },
+          "psychological_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Psychological Message",
+            "description": "즉시 피드백용 메시지"
+          },
           "message": {
             "type": "string",
             "title": "Message"
@@ -4372,7 +4488,35 @@
           "currency_balance"
         ],
         "title": "GachaPullResponse",
-        "description": "가챠 뽑기 응답 모델"
+        "description": "가챠 뽑기 응답 모델",
+        "example": {
+          "animation_type": "near_miss",
+          "balance": 12345,
+          "currency_balance": {
+            "gems": 0,
+            "tokens": 11895
+          },
+          "items": [
+            {
+              "name": "Neon Chip",
+              "rarity": "common"
+            },
+            {
+              "name": "Cyber Ring",
+              "rarity": "rare"
+            },
+            {
+              "name": "Blade of Flux",
+              "rarity": "epic"
+            }
+          ],
+          "message": "Gacha pull completed",
+          "psychological_message": "거의 다 왔어요! 한 번만 더 도전해보세요!",
+          "pull_count": 10,
+          "rare_item_count": 1,
+          "success": true,
+          "ultra_rare_item_count": 1
+        }
       },
       "GameLeaderboard": {
         "properties": {
@@ -4728,14 +4872,12 @@
             "title": "Target Type"
           },
           "rewards": {
-            "additionalProperties": true,
             "type": "object",
             "title": "Rewards"
           },
           "requirements": {
             "anyOf": [
               {
-                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -4787,7 +4929,6 @@
           "user_progress": {
             "anyOf": [
               {
-                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -4830,13 +4971,11 @@
             "title": "Prediction Type"
           },
           "input_features": {
-            "additionalProperties": true,
             "type": "object",
             "title": "Input Features",
             "default": {}
           },
           "prediction_result": {
-            "additionalProperties": true,
             "type": "object",
             "title": "Prediction Result",
             "default": {}
@@ -4849,7 +4988,6 @@
           "actual_result": {
             "anyOf": [
               {
-                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -4946,7 +5084,6 @@
           "context_data": {
             "anyOf": [
               {
-                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -4980,7 +5117,6 @@
             "title": "Recommendations"
           },
           "personalization_factors": {
-            "additionalProperties": true,
             "type": "object",
             "title": "Personalization Factors"
           },
@@ -5015,7 +5151,6 @@
             "title": "Topic"
           },
           "payload": {
-            "additionalProperties": true,
             "type": "object",
             "title": "Payload"
           }
@@ -5093,6 +5228,74 @@
         ],
         "title": "ProfileGameStats",
         "description": "프로필 게임 통계 응답"
+      },
+      "PublicUserResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "site_id": {
+            "type": "string",
+            "title": "Site Id"
+          },
+          "nickname": {
+            "type": "string",
+            "title": "Nickname"
+          },
+          "phone_number": {
+            "type": "string",
+            "title": "Phone Number",
+            "default": "hidden"
+          },
+          "cyber_token_balance": {
+            "type": "integer",
+            "title": "Cyber Token Balance",
+            "default": 0
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active",
+            "default": true
+          },
+          "is_admin": {
+            "type": "boolean",
+            "title": "Is Admin",
+            "default": false
+          },
+          "rank": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rank",
+            "default": "STANDARD"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "site_id",
+          "nickname"
+        ],
+        "title": "PublicUserResponse",
+        "description": "타인 보기용 제한 정보 스키마"
       },
       "RPSPlayRequest": {
         "properties": {
@@ -5176,7 +5379,6 @@
           "interaction_data": {
             "anyOf": [
               {
-                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -5199,7 +5401,6 @@
           "result_data": {
             "anyOf": [
               {
-                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -5235,7 +5436,6 @@
           "interaction_data": {
             "anyOf": [
               {
-                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -5258,7 +5458,6 @@
           "result_data": {
             "anyOf": [
               {
-                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -5304,6 +5503,20 @@
         ],
         "title": "RecommendationType"
       },
+      "RefreshTokenRequest": {
+        "properties": {
+          "refresh_token": {
+            "type": "string",
+            "title": "Refresh Token"
+          }
+        },
+        "type": "object",
+        "required": [
+          "refresh_token"
+        ],
+        "title": "RefreshTokenRequest",
+        "description": "리프레시 토큰 요청"
+      },
       "RewardDistributionRequest": {
         "properties": {
           "user_id": {
@@ -5321,6 +5534,28 @@
           "source_description": {
             "type": "string",
             "title": "Source Description"
+          },
+          "idempotency_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Idempotency Key"
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata"
           }
         },
         "type": "object",
@@ -5532,6 +5767,80 @@
         "title": "SlotSpinRequest",
         "description": "슬롯 머신 스핀 요청 모델"
       },
+      "SlotSpinResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "reels": {
+            "items": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "type": "array",
+            "title": "Reels"
+          },
+          "win_amount": {
+            "type": "integer",
+            "title": "Win Amount",
+            "default": 0
+          },
+          "win_lines": {
+            "items": {
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Win Lines",
+            "default": []
+          },
+          "multiplier": {
+            "type": "number",
+            "title": "Multiplier",
+            "default": 1.0
+          },
+          "is_jackpot": {
+            "type": "boolean",
+            "title": "Is Jackpot",
+            "default": false
+          },
+          "free_spins_awarded": {
+            "type": "integer",
+            "title": "Free Spins Awarded",
+            "default": 0
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "balance": {
+            "type": "integer",
+            "title": "Balance"
+          },
+          "special_animation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Special Animation"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success",
+          "reels",
+          "message",
+          "balance"
+        ],
+        "title": "SlotSpinResponse",
+        "description": "슬롯 머신 스핀 응답 모델"
+      },
       "Token": {
         "properties": {
           "access_token": {
@@ -5545,6 +5854,17 @@
           },
           "user": {
             "$ref": "#/components/schemas/app__schemas__auth__UserResponse"
+          },
+          "refresh_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Refresh Token"
           }
         },
         "type": "object",
@@ -5920,7 +6240,6 @@
           "preferred_games": {
             "anyOf": [
               {
-                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -5942,7 +6261,6 @@
           "preferred_reward_types": {
             "anyOf": [
               {
-                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -5954,7 +6272,6 @@
           "spending_pattern": {
             "anyOf": [
               {
-                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -5966,7 +6283,6 @@
           "active_hours": {
             "anyOf": [
               {
-                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -5989,7 +6305,6 @@
           "content_categories": {
             "anyOf": [
               {
-                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -6056,7 +6371,6 @@
           "preferred_games": {
             "anyOf": [
               {
-                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -6092,7 +6406,6 @@
           "preferred_reward_types": {
             "anyOf": [
               {
-                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -6104,7 +6417,6 @@
           "spending_pattern": {
             "anyOf": [
               {
-                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -6116,7 +6428,6 @@
           "active_hours": {
             "anyOf": [
               {
-                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -6139,7 +6450,6 @@
           "content_categories": {
             "anyOf": [
               {
-                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -6238,7 +6548,6 @@
           "content_data": {
             "anyOf": [
               {
-                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -6260,7 +6569,6 @@
           "personalization_factors": {
             "anyOf": [
               {
-                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -6270,7 +6578,11 @@
             "title": "Personalization Factors"
           },
           "status": {
-            "$ref": "#/components/schemas/RecommendationStatus",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RecommendationStatus"
+              }
+            ],
             "default": "pending"
           },
           "shown_at": {

@@ -4,6 +4,7 @@
 PrizeRoulette 게임 및 프로필 API에서 사용하는 요청/응답 스키마 정의
 """
 from typing import Dict, List, Optional, Any
+from pydantic import ConfigDict
 from pydantic import BaseModel, Field
 from datetime import datetime
 import uuid
@@ -224,6 +225,13 @@ class GachaPullRequest(BaseModel):
     gacha_id: Optional[str] = None
     pull_count: int = 1
     use_premium_currency: bool = False
+    # OpenAPI 예시
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "pull_count": 10,
+            "use_premium_currency": False
+        }
+    })
 
 
 class GachaPullResponse(BaseModel):
@@ -235,8 +243,31 @@ class GachaPullResponse(BaseModel):
     pull_count: int
     balance: int
     special_animation: Optional[str] = None
+    # Added for UX feedback and OpenAPI example clarity
+    animation_type: Optional[str] = Field(default=None, description="애니메이션 타입: normal|epic|legendary|near_miss|pity")
+    psychological_message: Optional[str] = Field(default=None, description="즉시 피드백용 메시지")
     message: str
     currency_balance: Dict[str, int]
+    # OpenAPI 예시
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "success": True,
+            "items": [
+                {"name": "Neon Chip", "rarity": "common"},
+                {"name": "Cyber Ring", "rarity": "rare"},
+                {"name": "Blade of Flux", "rarity": "epic"}
+            ],
+            "rare_item_count": 1,
+            "ultra_rare_item_count": 1,
+            "pull_count": 10,
+            "balance": 12345,
+            "special_animation": None,
+            "animation_type": "near_miss",
+            "psychological_message": "거의 다 왔어요! 한 번만 더 도전해보세요!",
+            "message": "Gacha pull completed",
+            "currency_balance": {"tokens": 11895, "gems": 0}
+        }
+    })
 
 
 # 크래시 게임 스키마

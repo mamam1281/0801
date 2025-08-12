@@ -73,6 +73,8 @@ class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
     user: UserResponse
+    # 선택: 리프레시 토큰 동봉(초기 로그인/회원가입 시)
+    refresh_token: Optional[str] = None
 
 
 class TokenData(BaseModel):

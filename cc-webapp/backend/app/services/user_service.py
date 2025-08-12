@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 import logging
+from types import SimpleNamespace
 
 from app import models
 from app.repositories import UserRepository, AuthRepository
@@ -75,22 +76,63 @@ class UserService:
         """이메일로 사용자 조회"""
         return self.user_repo.get_by_email(email)
 
-    def get_user_stats(self, user_id: int) -> Dict[str, Any]:
-        """사용자 통계 조회 (기본 구현)"""
+    def get_user_stats(self, user_id: int):
+        """사용자 상세 활동 통계 계산
+
+        - total_games_played: user_actions 카운트
+        - total_tokens_earned: game_stats.total_won 합계 (없으면 0)
+        - total_tokens_spent: game_stats.total_bet 합계 (없으면 0)
+        - win_rate: total_wins / total_games (game_stats 기준; 분모 0이면 0.0)
+        - level/experience: user의 battlepass_level/total_experience 사용(기본값)
+        """
         try:
             user = self.get_user(user_id)
             if not user:
-                return {}
-            
-            return {
-                "user_id": user_id,
-                "nickname": user.nickname,
-                "created_at": user.created_at,
-                "last_login": getattr(user, 'last_login', None)
-            }
+                return SimpleNamespace(
+                    total_games_played=0,
+                    total_tokens_earned=0,
+                    total_tokens_spent=0,
+                    win_rate=0.0,
+                    level=1,
+                    experience=0,
+                )
+
+            # UserAction 기반 플레이 수
+            total_games_played = self.db.query(models.UserAction).filter(
+                models.UserAction.user_id == user_id
+            ).count()
+
+            # GameStats 집계
+            stats_rows = self.db.query(models.GameStats).filter(
+                models.GameStats.user_id == user_id
+            ).all()
+            total_bet = sum(getattr(r, "total_bet", 0) or 0 for r in stats_rows)
+            total_won = sum(getattr(r, "total_won", 0) or 0 for r in stats_rows)
+            wins = sum(getattr(r, "total_wins", 0) or 0 for r in stats_rows)
+            games = sum(getattr(r, "total_games", 0) or 0 for r in stats_rows)
+            win_rate = float(wins) / games if games > 0 else 0.0
+
+            level = getattr(user, "battlepass_level", 1) or 1
+            experience = getattr(user, "total_experience", 0) or 0
+
+            return SimpleNamespace(
+                total_games_played=total_games_played,
+                total_tokens_earned=int(total_won),
+                total_tokens_spent=int(total_bet),
+                win_rate=round(win_rate, 4),
+                level=int(level),
+                experience=int(experience),
+            )
         except Exception as e:
             logger.error(f"Error getting user stats: {e}")
-            return {}
+            return SimpleNamespace(
+                total_games_played=0,
+                total_tokens_earned=0,
+                total_tokens_spent=0,
+                win_rate=0.0,
+                level=1,
+                experience=0,
+            )
 
     def update_last_login(self, user_id: int) -> bool:
         """마지막 로그인 시간 업데이트 (기본 구현)"""
