@@ -11,7 +11,7 @@ Features:
 """
 
 import os
-import jwt as PyJWT
+from jose import jwt as PyJWT
 import uuid
 import logging
 import hashlib
@@ -130,39 +130,52 @@ class TokenManager:
         """
         try:
             from ..models.auth_models import RefreshToken
-            
+
             # Generate a secure random token
             refresh_token = secrets.token_hex(32)
-            
-            # Hash the token for storage
-            token_hash = hashlib.sha256(refresh_token.encode()).hexdigest()
-            
-            # Create device fingerprint
-            device_fingerprint = hashlib.sha256(
-                f"{user_agent}:{ip_address}".encode()
-            ).hexdigest()
-            
-            # Set expiration
+
+            # Determine storage strategy by model columns
+            has_token_hash = hasattr(RefreshToken, 'token_hash')
+            has_is_active = hasattr(RefreshToken, 'is_active')
+            has_device_fingerprint = hasattr(RefreshToken, 'device_fingerprint')
+            has_ip = hasattr(RefreshToken, 'ip_address')
+            has_ua = hasattr(RefreshToken, 'user_agent')
+
+            # Common fields
             expires_at = datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
-            
-            # Create database record
-            refresh_token_record = RefreshToken(
-                user_id=user_id,
-                token_hash=token_hash,
-                device_fingerprint=device_fingerprint,
-                ip_address=ip_address,
-                user_agent=user_agent,
-                expires_at=expires_at,
-                is_active=True,
-                created_at=datetime.utcnow()
-            )
-            
+            kwargs = {
+                'user_id': user_id,
+                'expires_at': expires_at,
+                'created_at': datetime.utcnow(),
+            }
+
+            if has_token_hash:
+                token_hash = hashlib.sha256(refresh_token.encode()).hexdigest()
+                kwargs['token_hash'] = token_hash
+            else:
+                kwargs['token'] = refresh_token
+
+            if has_is_active:
+                kwargs['is_active'] = True
+            else:
+                # legacy schema uses is_revoked flag
+                if hasattr(RefreshToken, 'is_revoked'):
+                    kwargs['is_revoked'] = False
+
+            if has_device_fingerprint:
+                kwargs['device_fingerprint'] = hashlib.sha256(f"{user_agent}:{ip_address}".encode()).hexdigest()
+            if has_ip:
+                kwargs['ip_address'] = ip_address
+            if has_ua:
+                kwargs['user_agent'] = user_agent
+
+            refresh_token_record = RefreshToken(**kwargs)
             db.add(refresh_token_record)
             db.commit()
-            
+
             logger.info(f"Refresh token created for user {user_id}, expires: {expires_at}")
             return refresh_token
-            
+
         except Exception as e:
             logger.error(f"Failed to create refresh token: {str(e)}")
             raise HTTPException(
@@ -191,31 +204,42 @@ class TokenManager:
         """
         try:
             from ..models.auth_models import RefreshToken
-            
-            # Calculate token hash
-            token_hash = hashlib.sha256(refresh_token.encode()).hexdigest()
-            
-            # Find token in database
-            refresh_record = db.query(RefreshToken).filter(
-                RefreshToken.token_hash == token_hash,
-                RefreshToken.is_active == True,
-                RefreshToken.expires_at > datetime.utcnow()
-            ).first()
-            
+
+            has_token_hash = hasattr(RefreshToken, 'token_hash')
+            has_is_active = hasattr(RefreshToken, 'is_active')
+            has_is_revoked = hasattr(RefreshToken, 'is_revoked')
+            has_device_fingerprint = hasattr(RefreshToken, 'device_fingerprint')
+
+            q = db.query(RefreshToken)
+            if has_token_hash:
+                token_hash = hashlib.sha256(refresh_token.encode()).hexdigest()
+                q = q.filter(RefreshToken.token_hash == token_hash)
+            else:
+                q = q.filter(RefreshToken.token == refresh_token)
+
+            # Active/not revoked
+            if has_is_active:
+                q = q.filter(RefreshToken.is_active == True)
+            elif has_is_revoked:
+                q = q.filter(RefreshToken.is_revoked == False)
+
+            # Not expired
+            q = q.filter(RefreshToken.expires_at > datetime.utcnow())
+
+            refresh_record = q.first()
+
             if not refresh_record:
                 logger.warning(f"Invalid refresh token attempt from {ip_address}")
                 return False, None, "유효하지 않은 리프레시 토큰입니다"
-            
-            # Calculate device fingerprint
-            device_fingerprint = hashlib.sha256(f"{user_agent}:{ip_address}".encode()).hexdigest()
-            
-            # Optional: Check device fingerprint match
-            if refresh_record.device_fingerprint != device_fingerprint:
-                logger.warning(f"Device fingerprint mismatch for user {refresh_record.user_id}")
-                # For security logging only, not enforcing match to improve user experience
-            
+
+            # Optional device fingerprint check
+            if has_device_fingerprint:
+                device_fingerprint = hashlib.sha256(f"{user_agent}:{ip_address}".encode()).hexdigest()
+                if getattr(refresh_record, 'device_fingerprint', None) and refresh_record.device_fingerprint != device_fingerprint:
+                    logger.warning(f"Device fingerprint mismatch for user {refresh_record.user_id}")
+
             return True, refresh_record.user_id, ""
-            
+
         except Exception as e:
             logger.error(f"Refresh token verification failed: {str(e)}")
             return False, None, "토큰 검증 중 오류가 발생했습니다"
@@ -243,22 +267,31 @@ class TokenManager:
         """
         try:
             from ..models.auth_models import RefreshToken
-            
-            # Calculate current token hash
-            current_token_hash = hashlib.sha256(current_token.encode()).hexdigest()
-            
-            # Find and invalidate the current token
-            current_record = db.query(RefreshToken).filter(
-                RefreshToken.token_hash == current_token_hash,
-                RefreshToken.is_active == True
-            ).first()
-            
+
+            has_token_hash = hasattr(RefreshToken, 'token_hash')
+            has_is_active = hasattr(RefreshToken, 'is_active')
+            has_is_revoked = hasattr(RefreshToken, 'is_revoked')
+
+            q = db.query(RefreshToken)
+            if has_token_hash:
+                current_token_hash = hashlib.sha256(current_token.encode()).hexdigest()
+                q = q.filter(RefreshToken.token_hash == current_token_hash)
+            else:
+                q = q.filter(RefreshToken.token == current_token)
+
+            current_record = q.first()
             if current_record:
-                current_record.is_active = False
-                current_record.revoked_at = datetime.utcnow()
-                current_record.revoke_reason = "token_rotation"
+                if has_is_active:
+                    current_record.is_active = False
+                elif has_is_revoked:
+                    current_record.is_revoked = True
+                # optional audit fields
+                if hasattr(current_record, 'revoked_at'):
+                    current_record.revoked_at = datetime.utcnow()
+                if hasattr(current_record, 'revoke_reason'):
+                    current_record.revoke_reason = 'token_rotation'
                 db.commit()
-            
+
             # Create new refresh token
             new_token = TokenManager.create_refresh_token(
                 user_id=user_id,
@@ -266,13 +299,78 @@ class TokenManager:
                 user_agent=user_agent,
                 db=db
             )
-            
+
             logger.info(f"Rotated refresh token for user {user_id}")
             return new_token
-            
+
         except Exception as e:
             logger.error(f"Token rotation failed: {str(e)}")
             return None
+
+    @staticmethod
+    def revoke_refresh_token(refresh_token: str, db: Session) -> bool:
+        """Revoke a single refresh token if present."""
+        try:
+            from ..models.auth_models import RefreshToken
+            has_token_hash = hasattr(RefreshToken, 'token_hash')
+            has_is_active = hasattr(RefreshToken, 'is_active')
+            has_is_revoked = hasattr(RefreshToken, 'is_revoked')
+
+            q = db.query(RefreshToken)
+            if has_token_hash:
+                token_hash = hashlib.sha256(refresh_token.encode()).hexdigest()
+                q = q.filter(RefreshToken.token_hash == token_hash)
+            else:
+                q = q.filter(RefreshToken.token == refresh_token)
+
+            rec = q.first()
+            if not rec:
+                return False
+            if has_is_active:
+                rec.is_active = False
+            elif has_is_revoked:
+                rec.is_revoked = True
+            if hasattr(rec, 'revoked_at'):
+                rec.revoked_at = datetime.utcnow()
+            if hasattr(rec, 'revoke_reason'):
+                rec.revoke_reason = 'logout'
+            db.commit()
+            return True
+        except Exception as e:
+            logger.error(f"Failed to revoke refresh token: {e}")
+            return False
+
+    @staticmethod
+    def revoke_all_refresh_tokens(user_id: int, db: Session) -> int:
+        """Revoke all refresh tokens for a given user."""
+        try:
+            from ..models.auth_models import RefreshToken
+            has_is_active = hasattr(RefreshToken, 'is_active')
+            has_is_revoked = hasattr(RefreshToken, 'is_revoked')
+
+            q = db.query(RefreshToken).filter(RefreshToken.user_id == user_id)
+            tokens = q.all()
+            count = 0
+            for rec in tokens:
+                changed = False
+                if has_is_active and getattr(rec, 'is_active', None) is not False:
+                    rec.is_active = False
+                    changed = True
+                elif has_is_revoked and getattr(rec, 'is_revoked', None) is not True:
+                    rec.is_revoked = True
+                    changed = True
+                if changed:
+                    if hasattr(rec, 'revoked_at'):
+                        rec.revoked_at = datetime.utcnow()
+                    if hasattr(rec, 'revoke_reason'):
+                        rec.revoke_reason = 'logout_all'
+                    count += 1
+            if count:
+                db.commit()
+            return count
+        except Exception as e:
+            logger.error(f"Failed to revoke all refresh tokens: {e}")
+            return 0
     
     @staticmethod
     def blacklist_token(token: str, reason: str = "logout") -> bool:

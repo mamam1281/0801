@@ -45,6 +45,18 @@ class UserResponse(BaseModel):
     # rank를 Optional로 변경
     rank: Optional[str] = "STANDARD"
 
+class PublicUserResponse(BaseModel):
+    """타인 보기용 제한 정보 스키마"""
+    id: int
+    site_id: str
+    nickname: str
+    phone_number: str = "hidden"
+    cyber_token_balance: int = 0
+    created_at: Optional[datetime] = None
+    is_active: bool = True
+    is_admin: bool = False
+    rank: Optional[str] = "STANDARD"
+
 class User(UserBase):
     model_config = ConfigDict(from_attributes=True)
     id: int

@@ -263,7 +263,7 @@ async def get_recommendation_stats(
 @router.post("/feedback", response_model=dict)
 async def submit_ai_feedback(
     recommendation_id: int,
-    feedback: str = Query(..., regex="^(helpful|not_helpful|irrelevant)$"),
+    feedback: str = Query(..., pattern="^(helpful|not_helpful|irrelevant)$"),
     db = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):

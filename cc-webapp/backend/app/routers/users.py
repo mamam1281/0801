@@ -9,7 +9,7 @@ from ..models.auth_models import User
 from ..dependencies import get_current_user
 from ..services.user_service import UserService
 from ..services.token_service import TokenService
-from ..schemas.user import UserResponse, UserUpdate
+from ..schemas.user import UserResponse, UserUpdate, PublicUserResponse
 
 logger = logging.getLogger(__name__)
 
@@ -161,7 +161,7 @@ async def add_tokens(
             detail=f"Token addition failed: {str(e)}"
         )
 
-@router.get("/{user_id}", response_model=UserResponse)
+@router.get("/{user_id}", response_model=UserResponse | PublicUserResponse)
 async def get_user(
     user_id: int,
     current_user: User = Depends(get_current_user),
@@ -178,30 +178,27 @@ async def get_user(
 
     # 타인 프로필: 민감 필드 마스킹하여 제한적 정보 반환
     try:
-        masked = {
-            "id": user.id,
-            "site_id": user.site_id,
-            "nickname": user.nickname,
-            # 민감 정보 마스킹
-            "phone_number": "hidden",
-            "cyber_token_balance": 0,
-            "created_at": getattr(user, "created_at", None),
-            "is_active": getattr(user, "is_active", True),
-            # 타인에 대해 관리자 여부는 노출하지 않음
-            "is_admin": False,
-            "rank": getattr(user, "rank", "STANDARD"),
-        }
-        return masked
+        return PublicUserResponse(
+            id=user.id,
+            site_id=user.site_id,
+            nickname=user.nickname,
+            phone_number="hidden",
+            cyber_token_balance=0,
+            created_at=getattr(user, "created_at", None),
+            is_active=getattr(user, "is_active", True),
+            is_admin=False,
+            rank=getattr(user, "rank", "STANDARD"),
+        )
     except Exception:
         # 실패 시 최소 정보만 노출
-        return {
-            "id": user.id,
-            "site_id": user.site_id,
-            "nickname": user.nickname,
-            "phone_number": "hidden",
-            "cyber_token_balance": 0,
-            "created_at": getattr(user, "created_at", None),
-            "is_active": True,
-            "is_admin": False,
-            "rank": "STANDARD",
-        }
+        return PublicUserResponse(
+            id=user.id,
+            site_id=user.site_id,
+            nickname=user.nickname,
+            phone_number="hidden",
+            cyber_token_balance=0,
+            created_at=getattr(user, "created_at", None),
+            is_active=True,
+            is_admin=False,
+            rank="STANDARD",
+        )
