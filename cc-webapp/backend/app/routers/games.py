@@ -12,6 +12,7 @@ from ..dependencies import get_current_user
 from ..models.auth_models import User
 from ..models.game_models import Game, UserAction
 from ..services.simple_user_service import SimpleUserService
+from ..services.game_service import GameService
 from ..schemas.game_schemas import (
     GameListResponse, GameDetailResponse,
     GameSessionStart, GameSessionEnd,
@@ -24,9 +25,27 @@ from ..schemas.game_schemas import (
 from app import models
 from sqlalchemy import text
 from ..utils.redis import update_streak_counter
+from ..core.config import settings
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/games", tags=["Games"])
+# 가챠 확률 공개/구성 조회
+@router.get("/gacha/config")
+async def get_gacha_config(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    svc = GameService(db)
+    return svc.gacha_service.get_config()
+
+# 유저별 가챠 통계/히스토리 요약
+@router.get("/gacha/stats")
+async def get_gacha_stats(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    svc = GameService(db)
+    return svc.gacha_service.get_user_gacha_stats(current_user.id)
 
 # ================= Existing Simple Game Feature Endpoints =================
 
@@ -63,7 +82,7 @@ async def get_games_list(
     return Response(content=json.dumps(result), media_type="application/json")
 
 # 슬롯 게임 엔드포인트
-@router.post("/slot/spin")
+@router.post("/slot/spin", response_model=SlotSpinResponse)
 async def spin_slot(
     request: SlotSpinRequest,
     current_user: User = Depends(get_current_user),
@@ -80,8 +99,13 @@ async def spin_slot(
         raise HTTPException(status_code=400, detail="토큰이 부족합니다")
     
     # 슬롯 결과 생성
+    # Load symbol weights from settings with safe fallback
+    cfg_weights = getattr(settings, 'SLOT_SYMBOL_WEIGHTS', None) or {
+        '🍒': 30, '🍋': 25, '🍊': 20, '🍇': 15, '💎': 8, '7️⃣': 2
+    }
+    # keep order stable for reproducibility in tests
     symbols = ['🍒', '🍋', '🍊', '🍇', '💎', '7️⃣']
-    weights = [30, 25, 20, 15, 8, 2]
+    weights = [cfg_weights.get(sym, 1) for sym in symbols]
     reels = [random.choices(symbols, weights=weights)[0] for _ in range(3)]
     
     # 승리 판정
@@ -127,14 +151,20 @@ async def spin_slot(
     db.commit()
     
     message = "Jackpot!" if action_data["is_jackpot"] else ("Win" if win_amount > 0 else "Better luck next time")
+    # SlotSpinResponse expects reels as List[List[str]]
+    reels_matrix = [reels]
+    # Derive an effective multiplier for reference (0 on lose)
+    eff_multiplier = 0.0 if bet_amount <= 0 else round(win_amount / float(bet_amount), 2)
     return {
         'success': True,
-        'reels': reels,
+        'reels': reels_matrix,
         'win_amount': win_amount,
+        'win_lines': [],
+        'multiplier': eff_multiplier if win_amount > 0 else 0.0,
         'is_jackpot': action_data["is_jackpot"],
-        'balance': new_balance,
+        'free_spins_awarded': 0,
         'message': message,
-        'streak': streak_count,
+        'balance': new_balance,
         'special_animation': 'near_miss' if win_amount == 0 and (reels[0] == reels[1] or reels[1] == reels[2]) else None
     }
 
@@ -224,67 +254,71 @@ async def pull_gacha(
     db: Session = Depends(get_db)
 ):
     """
-    가챠 뽑기
+    가챠 뽑기 (서비스 레이어 위임: 피티, 근접실패, 10연 할인 적용)
     """
-    pull_count = request.pull_count
-    cost_per_pull = 300
-    total_cost = cost_per_pull * pull_count
-    
-    # 잔액 확인
-    current_tokens = SimpleUserService.get_user_tokens(db, current_user.id)
-    if current_tokens < total_cost:
-        raise HTTPException(status_code=400, detail="토큰이 부족합니다")
-    
-    # 가챠 아이템 생성
-    rarities = ['common', 'rare', 'epic', 'legendary']
-    weights = [60, 30, 9, 1]
-    items = []
-    
-    for _ in range(pull_count):
-        rarity = random.choices(rarities, weights=weights)[0]
-        items.append({
-            'name': f'{rarity.capitalize()} Item',
-            'rarity': rarity,
-            'value': {'common': 100, 'rare': 500, 'epic': 2000, 'legendary': 10000}[rarity]
-        })
-    
-    # 잔액 업데이트
-    new_balance = SimpleUserService.update_user_tokens(db, current_user.id, -total_cost)
-    
-    # 플레이 기록 저장
-    action_data = {
-        "game_type": "gacha",
-        "cost": total_cost,
-        "pull_count": pull_count,
-        "items": items
-    }
-    
-    user_action = UserAction(
-        user_id=current_user.id,
-        action_type="GACHA_PULL",
-        action_data=str(action_data)
-    )
-    db.add(user_action)
-    db.commit()
-    
-    # Count rarities
-    rare_count = sum(1 for it in items if it['rarity'] == 'rare')
-    ultra_rare_count = sum(1 for it in items if it['rarity'] in ('epic', 'legendary'))
+    pull_count = max(1, int(request.pull_count or 1))
+
+    # 서비스 초기화
+    game_service = GameService(db)
+
+    # pull_count을 10연 단위와 단일 뽑기로 배치 실행
+    batches_of_10 = pull_count // 10
+    singles = pull_count % 10
+
+    all_results: list[str] = []
+    last_animation: str | None = None
+    last_message: str | None = None
+
+    # 10연 배치 실행
+    for _ in range(batches_of_10):
+        res = game_service.gacha_pull(current_user.id, 10)
+        all_results.extend(res.results)
+        last_animation = res.animation_type or last_animation
+        last_message = res.psychological_message or last_message
+
+    # 단일 실행
+    for _ in range(singles):
+        res = game_service.gacha_pull(current_user.id, 1)
+        all_results.extend(res.results)
+        last_animation = res.animation_type or last_animation
+        last_message = res.psychological_message or last_message
+
+    # 현재 잔액 조회
+    new_balance = SimpleUserService.get_user_tokens(db, current_user.id)
+
+    # 결과를 응답 스키마에 맞게 매핑
+    def _to_item(result_token: str) -> Dict[str, Any]:
+        # 결과 토큰에서 실제 희귀도 추출 (near_miss 접미사 제거)
+        base = (
+            result_token.replace("_near_miss_epic", "")
+            .replace("_near_miss_legendary", "")
+            .replace("_near_miss", "")
+        )
+        rarity = base.lower()
+        name = f"{rarity.capitalize()} Item"
+        return {"name": name, "rarity": rarity}
+
+    items = [_to_item(tok) for tok in all_results[:pull_count]]
+
+    # 카운트 집계
+    rare_count = sum(1 for it in items if it["rarity"] == "rare")
+    ultra_rare_count = sum(1 for it in items if it["rarity"] in ("epic", "legendary"))
+
+    # special_animation: mirror animation_type for non-normal states for easier FE handling
+    special_anim = last_animation if (last_animation in {"near_miss", "epic", "legendary", "pity"}) else None
 
     return {
-        'success': True,
-        'items': items,
-        'rare_item_count': rare_count,
-        'ultra_rare_item_count': ultra_rare_count,
-    'pull_count': pull_count,
-    'balance': new_balance,
-    'special_animation': None,
-    'animation_type': 'normal',
-    'psychological_message': '다음 뽑기에 더 좋은 결과가 기다리고 있을지도 몰라요!',
-        'message': 'Gacha pull completed',
-        'currency_balance': {
-            'tokens': new_balance
-        }
+        "success": True,
+        "items": items,
+        "rare_item_count": rare_count,
+        "ultra_rare_item_count": ultra_rare_count,
+        "pull_count": pull_count,
+        "balance": new_balance,
+        "special_animation": special_anim,
+        "animation_type": last_animation or "normal",
+        "psychological_message": last_message or "다음 뽑기에 더 좋은 결과가 기다리고 있을지도 몰라요!",
+        "message": "Gacha pull completed",
+        "currency_balance": {"tokens": new_balance},
     }
 
 # 크래시 게임 엔드포인트

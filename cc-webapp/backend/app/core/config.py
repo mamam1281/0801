@@ -52,6 +52,16 @@ class Settings(BaseSettings):
     VIP_DAILY_RPS_PLAYS: int = 5
     VIP_DAILY_GACHA_PULLS: int = 5
 
+    # Slot configuration (symbol weights as JSON-like string env or default mapping)
+    SLOT_SYMBOL_WEIGHTS: dict = {
+        "🍒": 30,
+        "🍋": 25,
+        "🍊": 20,
+        "🍇": 15,
+        "💎": 8,
+        "7️⃣": 2,
+    }
+
     class Config:
         case_sensitive = True
 
