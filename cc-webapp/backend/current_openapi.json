@@ -1898,6 +1898,56 @@
         ]
       }
     },
+    "/api/games/gacha/config": {
+      "get": {
+        "tags": [
+          "Game Collection",
+          "Games"
+        ],
+        "summary": "Get Gacha Config",
+        "operationId": "get_gacha_config_api_games_gacha_config_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/games/gacha/stats": {
+      "get": {
+        "tags": [
+          "Game Collection",
+          "Games"
+        ],
+        "summary": "Get Gacha Stats",
+        "operationId": "get_gacha_stats_api_games_gacha_stats_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/games/": {
       "get": {
         "tags": [
@@ -1948,7 +1998,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/SlotSpinResponse"
+                }
               }
             }
           },
@@ -2025,7 +2077,7 @@
           "Games"
         ],
         "summary": "Pull Gacha",
-        "description": "가챠 뽑기",
+        "description": "가챠 뽑기 (서비스 레이어 위임: 피티, 근접실패, 10연 할인 적용)",
         "operationId": "pull_gacha_api_games_gacha_pull_post",
         "requestBody": {
           "content": {
@@ -5482,6 +5534,28 @@
           "source_description": {
             "type": "string",
             "title": "Source Description"
+          },
+          "idempotency_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Idempotency Key"
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata"
           }
         },
         "type": "object",
@@ -5692,6 +5766,80 @@
         ],
         "title": "SlotSpinRequest",
         "description": "슬롯 머신 스핀 요청 모델"
+      },
+      "SlotSpinResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "reels": {
+            "items": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "type": "array",
+            "title": "Reels"
+          },
+          "win_amount": {
+            "type": "integer",
+            "title": "Win Amount",
+            "default": 0
+          },
+          "win_lines": {
+            "items": {
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Win Lines",
+            "default": []
+          },
+          "multiplier": {
+            "type": "number",
+            "title": "Multiplier",
+            "default": 1.0
+          },
+          "is_jackpot": {
+            "type": "boolean",
+            "title": "Is Jackpot",
+            "default": false
+          },
+          "free_spins_awarded": {
+            "type": "integer",
+            "title": "Free Spins Awarded",
+            "default": 0
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "balance": {
+            "type": "integer",
+            "title": "Balance"
+          },
+          "special_animation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Special Animation"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success",
+          "reels",
+          "message",
+          "balance"
+        ],
+        "title": "SlotSpinResponse",
+        "description": "슬롯 머신 스핀 응답 모델"
       },
       "Token": {
         "properties": {

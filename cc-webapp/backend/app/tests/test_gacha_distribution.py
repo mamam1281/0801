@@ -1,4 +1,5 @@
 import time
+import random
 from collections import Counter
 
 
@@ -50,42 +51,45 @@ def _expected_from_table():
 
 
 def test_gacha_distribution_sanity_approx(client):
-    """Pull 1000 items via 100x 10-pulls and validate rarity distribution within ±5% of expected.
+        """Pull 1000 items via 100x 10-pulls and validate rarity distribution within ±5% of expected.
 
-    This uses the service's DEFAULT_RARITY_TABLE and accounts for near-miss mapping
-    (Near_Miss_Epic→Rare, Near_Miss_Legendary→Epic). Pity/discount effects may slightly
-    shift probabilities; a ±5% absolute band is allowed.
-    """
-    access_token, _ = _signup(client)
-    headers = {"Authorization": f"Bearer {access_token}"}
+        Notes:
+        - RNG is seeded to ensure determinism across CI runs.
+        - Uses the service's DEFAULT_RARITY_TABLE and accounts for near-miss mapping
+            (Near_Miss_Epic→Rare, Near_Miss_Legendary→Epic).
+        - Pity/discount/history damping can shift probabilities slightly; ±5% absolute band allowed.
+        """
+        # Seed RNG for deterministic distribution in CI
+        random.seed(42)
+        access_token, _ = _signup(client)
+        headers = {"Authorization": f"Bearer {access_token}"}
 
-    # Ensure enough tokens for bulk pulls
-    client.post("/api/users/tokens/add", headers=headers, params={"amount": 500_000})
+        # Ensure enough tokens for bulk pulls
+        client.post("/api/users/tokens/add", headers=headers, params={"amount": 500_000})
 
-    counts = Counter({"common": 0, "rare": 0, "epic": 0, "legendary": 0})
-    batches = 100  # 100 x 10-pull = 1000 pulls total
-    for _ in range(batches):
-        r = client.post("/api/games/gacha/pull", headers=headers, json={"pull_count": 10})
-        assert r.status_code == 200, r.text
-        body = r.json()
-        items = body.get("items", [])
-        assert len(items) == 10
-        for it in items:
-            rarity = str(it.get("rarity", "common")).lower()
-            if rarity not in counts:
-                rarity = "common"
-            counts[rarity] += 1
+        counts = Counter({"common": 0, "rare": 0, "epic": 0, "legendary": 0})
+        batches = 100  # 100 x 10-pull = 1000 pulls total
+        for _ in range(batches):
+            r = client.post("/api/games/gacha/pull", headers=headers, json={"pull_count": 10})
+            assert r.status_code == 200, r.text
+            body = r.json()
+            items = body.get("items", [])
+            assert len(items) == 10
+            for it in items:
+                rarity = str(it.get("rarity", "common")).lower()
+                if rarity not in counts:
+                    rarity = "common"
+                counts[rarity] += 1
 
-    total = sum(counts.values())
-    assert total == 1000
+        total = sum(counts.values())
+        assert total == 1000
 
-    ratios = {k: counts[k] / total for k in counts}
-    exp = _expected_from_table()
+        ratios = {k: counts[k] / total for k in counts}
+        exp = _expected_from_table()
 
-    # Validate within ±10% absolute tolerance for the main three categories
-    # Note: The service dynamically adjusts near-miss probabilities and pity, and history-based damping,
-    # so allow a wider band to avoid flakes across environments.
-    for k in ("common", "rare", "epic"):
-        low = max(0.0, exp.get(k, 0.0) - 0.10)
-        high = min(1.0, exp.get(k, 0.0) + 0.10)
-        assert low <= ratios[k] <= high, f"{k} ratio {ratios[k]:.3f} not in [{low:.3f}, {high:.3f}] (exp~{exp.get(k,0):.3f})"
+        # Validate within ±5% absolute tolerance for the main three categories
+        # With RNG seeded, the dynamic adjustments should remain stable.
+        for k in ("common", "rare", "epic"):
+            low = max(0.0, exp.get(k, 0.0) - 0.05)
+            high = min(1.0, exp.get(k, 0.0) + 0.05)
+            assert low <= ratios[k] <= high, f"{k} ratio {ratios[k]:.3f} not in [{low:.3f}, {high:.3f}] (exp~{exp.get(k,0):.3f})"
