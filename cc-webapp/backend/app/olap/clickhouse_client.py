@@ -51,6 +51,20 @@ class ClickHouseClient:
         PARTITION BY toYYYYMM(day)
         ORDER BY (day, user_id, reward_type)
         """)
+        self.execute("""
+        CREATE TABLE IF NOT EXISTS purchases (
+            user_id Int32,
+            code LowCardinality(String),
+            quantity Int32,
+            total_price_cents Int64,
+            gems_granted Int32,
+            charge_id String,
+            purchased_at DateTime64(3) DEFAULT now(),
+            day Date DEFAULT today()
+        ) ENGINE = MergeTree()
+        PARTITION BY toYYYYMM(day)
+        ORDER BY (day, user_id, code)
+        """)
 
     def insert_actions(self, rows: List[Dict[str, Any]]):
         if not rows:
@@ -76,4 +90,19 @@ class ClickHouseClient:
             str(r.get("awarded_at") or ""),
         ]) for r in rows)
         sql = "INSERT INTO rewards (user_id, reward_type, reward_value, source, awarded_at) FORMAT TSV\n" + data
+        self.execute(sql)
+
+    def insert_purchases(self, rows: List[Dict[str, Any]]):
+        if not rows:
+            return
+        data = "\n".join("\t".join([
+            str(int(r.get("user_id") or 0)),
+            str(r.get("code") or ""),
+            str(int(r.get("quantity") or 0)),
+            str(int(r.get("total_price_cents") or 0)),
+            str(int(r.get("gems_granted") or 0)),
+            str(r.get("charge_id") or ""),
+            str(r.get("purchased_at") or ""),
+        ]) for r in rows)
+        sql = "INSERT INTO purchases (user_id, code, quantity, total_price_cents, gems_granted, charge_id, purchased_at) FORMAT TSV\n" + data
         self.execute(sql)

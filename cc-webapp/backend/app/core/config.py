@@ -37,6 +37,7 @@ class Settings(BaseSettings):
     kafka_bootstrap_servers: str = ""
     KAFKA_ACTIONS_TOPIC: str = "cc_user_actions"
     KAFKA_REWARDS_TOPIC: str = "cc_rewards"
+    KAFKA_PURCHASES_TOPIC: str = "buy_package"  # topic used by limited buy analytics
     # Optional comma-separated list of topics used by debug endpoints; may be empty
     KAFKA_TOPICS: str = ""
 

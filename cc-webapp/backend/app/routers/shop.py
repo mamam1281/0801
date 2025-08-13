@@ -246,19 +246,6 @@ def buy_gems(
     ))
     db.commit()
 
-    # Emit Kafka event for analytics (best-effort)
-    try:
-        send_kafka_message("buy_package", {
-            "type": "BUY_PACKAGE",
-            "user_id": req.user_id,
-            "code": pkg.code,
-            "quantity": req.quantity,
-            "total_price_cents": total_price_cents,
-            "gems_granted": total_gems,
-        })
-    except Exception:
-        pass
-
     return BuyReceipt(
         success=True,
         message="Purchase completed",
@@ -360,6 +347,22 @@ def buy_limited(req: LimitedBuyRequest, db = Depends(get_db)):
     LimitedPackageService.finalize_user_purchase(pkg.code, req.user_id, req.quantity)
 
     db.commit()
+
+    # Emit Kafka event for analytics (best-effort)
+    try:
+        from datetime import datetime
+        send_kafka_message("buy_package", {
+            "type": "BUY_PACKAGE",
+            "user_id": req.user_id,
+            "code": pkg.code,
+            "quantity": req.quantity,
+            "total_price_cents": total_price_cents,
+            "gems_granted": total_gems,
+            "charge_id": cap.charge_id,
+            "server_ts": datetime.utcnow().isoformat(),
+        })
+    except Exception:
+        pass
 
     return LimitedBuyReceipt(
         success=True,

@@ -143,15 +143,22 @@ def test_buy_limited_with_promo_code_discount():
     purchased_key = f"limited:WEEKEND_STARTER:user:{user_id}:purchased"
     r.store[purchased_key] = 0
 
-    # Use AUG50 to apply $0.50 discount per unit
-    random.seed(7)
-    resp = client.post(
-        "/api/shop/limited/buy",
-        json={"user_id": user_id, "code": "WEEKEND_STARTER", "quantity": 1, "promo_code": "AUG50"},
-    )
-    assert resp.status_code == 200
-    body = resp.json()
-    assert body["success"] is True
+    # Register promo code via service (50 cents off per unit)
+    LimitedPackageService.set_promo_discount("WEEKEND_STARTER", "AUG50", 50)
+    try:
+        # Use AUG50 to apply $0.50 discount per unit; base price=499 -> expected=449
+        random.seed(7)
+        resp = client.post(
+            "/api/shop/limited/buy",
+            json={"user_id": user_id, "code": "WEEKEND_STARTER", "quantity": 1, "promo_code": "AUG50"},
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["success"] is True
+        assert body["total_price_cents"] == 449
+    finally:
+        # Clean up promo to avoid affecting other tests
+        LimitedPackageService.clear_promo_discount("WEEKEND_STARTER", "AUG50")
 
 
 def test_buy_limited_happy_and_per_user_limit():

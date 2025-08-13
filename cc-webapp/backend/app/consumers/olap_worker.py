@@ -20,7 +20,7 @@ def run():
     client = ClickHouseClient()
     client.init_schema()
 
-    topics = [settings.KAFKA_ACTIONS_TOPIC, settings.KAFKA_REWARDS_TOPIC]
+    topics = [settings.KAFKA_ACTIONS_TOPIC, settings.KAFKA_REWARDS_TOPIC, getattr(settings, "KAFKA_PURCHASES_TOPIC", "buy_package")]
     consumer = KafkaConsumer(
         *topics,
         bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS.split(","),
@@ -35,6 +35,7 @@ def run():
 
     buf_actions: List[Dict] = []
     buf_rewards: List[Dict] = []
+    buf_purchases: List[Dict] = []
     last_flush = time.time()
 
     def flush():
@@ -45,6 +46,9 @@ def run():
         if buf_rewards:
             client.insert_rewards(buf_rewards)
             buf_rewards = []
+        if buf_purchases:
+            client.insert_purchases(buf_purchases)
+            buf_purchases = []
         last_flush = time.time()
 
     try:
@@ -69,7 +73,17 @@ def run():
                             "source": payload.get("source"),
                             "awarded_at": payload.get("awarded_at"),
                         })
-            if (len(buf_actions) + len(buf_rewards) >= settings.OLAP_BATCH_SIZE) or (time.time() - last_flush >= settings.OLAP_FLUSH_SECONDS):
+                    elif m.topic == getattr(settings, "KAFKA_PURCHASES_TOPIC", "buy_package"):
+                        buf_purchases.append({
+                            "user_id": payload.get("user_id"),
+                            "code": payload.get("code"),
+                            "quantity": payload.get("quantity"),
+                            "total_price_cents": payload.get("total_price_cents"),
+                            "gems_granted": payload.get("gems_granted"),
+                            "charge_id": payload.get("charge_id"),
+                            "purchased_at": payload.get("server_ts"),
+                        })
+            if (len(buf_actions) + len(buf_rewards) + len(buf_purchases) >= settings.OLAP_BATCH_SIZE) or (time.time() - last_flush >= settings.OLAP_FLUSH_SECONDS):
                 flush()
                 consumer.commit()
     except KeyboardInterrupt:
