@@ -48,6 +48,9 @@ from ..services.shop_service import ShopService
 from ..services.catalog_service import CatalogService
 from ..services.payment_gateway import PaymentGateway
 from ..services.token_service import TokenService
+from ..services.limited_package_service import LimitedPackageService
+from ..schemas.limited_package import LimitedPackageOut, LimitedBuyRequest, LimitedBuyReceipt
+from ..kafka_client import send_kafka_message
 
 def get_shop_service(db = Depends(get_db)) -> ShopService:
     """Dependency provider for ShopService."""
@@ -82,6 +85,40 @@ def list_catalog():
             min_rank=p.min_rank,
         ))
     return items
+
+
+@router.get("/limited/catalog", response_model=list[LimitedPackageOut], summary="List active limited packages")
+def list_limited_catalog(db = Depends(get_db)):
+    packages = []
+    for p in LimitedPackageService.list_active():
+        user_id = None
+        user_purchased = 0
+        try:
+            # best-effort: if an auth middleware added user_id to request state, use it
+            user_id = getattr(db, "current_user_id", None)  # placeholder; not critical
+        except Exception:
+            user_id = None
+        if user_id is not None:
+            user_purchased = LimitedPackageService.get_user_purchased(p.code, user_id)
+        remaining_stock = LimitedPackageService.get_stock(p.code)
+        user_remaining = None
+        if p.per_user_limit:
+            user_remaining = max(p.per_user_limit - user_purchased, 0)
+        packages.append(LimitedPackageOut(
+            code=p.code,
+            name=p.name,
+            description=p.description,
+            price_cents=p.price_cents,
+            gems=p.gems,
+            start_at=p.start_at,
+            end_at=p.end_at,
+            is_active=p.is_active,
+            per_user_limit=p.per_user_limit,
+            remaining_stock=remaining_stock,
+            user_purchased=user_purchased,
+            user_remaining=user_remaining,
+        ))
+    return packages
 
 @router.post("/purchase", response_model=ShopPurchaseResponse, summary="Purchase Item", description="Purchase shop item using user's gold tokens")
 def purchase_shop_item(
@@ -209,12 +246,126 @@ def buy_gems(
     ))
     db.commit()
 
+    # Emit Kafka event for analytics (best-effort)
+    try:
+        send_kafka_message("buy_package", {
+            "type": "BUY_PACKAGE",
+            "user_id": req.user_id,
+            "code": pkg.code,
+            "quantity": req.quantity,
+            "total_price_cents": total_price_cents,
+            "gems_granted": total_gems,
+        })
+    except Exception:
+        pass
+
     return BuyReceipt(
         success=True,
         message="Purchase completed",
         user_id=req.user_id,
         product_id=req.product_id,
         sku=product.sku,
+        quantity=req.quantity,
+        total_price_cents=total_price_cents,
+        gems_granted=total_gems,
+        new_gem_balance=new_balance,
+        charge_id=cap.charge_id,
+    )
+
+
+@router.post("/limited/buy", response_model=LimitedBuyReceipt, summary="Buy limited-time package (real money)")
+def buy_limited(req: LimitedBuyRequest, db = Depends(get_db)):
+    pkg = LimitedPackageService.get(req.code)
+    if not pkg:
+        raise HTTPException(status_code=404, detail="Package not found")
+    now = datetime.utcnow()
+    # normalize to naive for comparison if needed
+    if hasattr(pkg.start_at, 'tzinfo') and pkg.start_at.tzinfo is not None:
+        now = datetime.now(pkg.start_at.tzinfo)
+    if not (pkg.is_active and pkg.start_at <= now <= pkg.end_at):
+        raise HTTPException(status_code=403, detail="Package not available")
+
+    user = db.query(models.User).filter(models.User.id == req.user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # per-user limit
+    already = LimitedPackageService.get_user_purchased(pkg.code, req.user_id)
+    if pkg.per_user_limit and already + req.quantity > pkg.per_user_limit:
+        raise HTTPException(status_code=403, detail="Per-user limit exceeded")
+
+    # stock reservation
+    if not LimitedPackageService.try_reserve(pkg.code, req.quantity):
+        raise HTTPException(status_code=409, detail="Out of stock")
+
+    # Promo code handling via service table (per-unit cents off)
+    unit_price = pkg.price_cents
+    if req.promo_code:
+        off = LimitedPackageService.get_promo_discount(pkg.code, req.promo_code)
+        unit_price = max(pkg.price_cents - int(off), 0)
+    total_price_cents = unit_price * req.quantity
+    gateway = PaymentGateway()
+    auth = gateway.authorize(total_price_cents, req.currency, card_token=req.card_token)
+    if not auth.success:
+        LimitedPackageService.release_reservation(pkg.code, req.quantity)
+        return LimitedBuyReceipt(
+            success=False,
+            message=f"Payment failed: {auth.message}",
+            user_id=req.user_id,
+            code=pkg.code,
+            quantity=req.quantity,
+            total_price_cents=total_price_cents,
+            gems_granted=0,
+            new_gem_balance=getattr(user, "cyber_token_balance", 0),
+            charge_id=None,
+        )
+    cap = gateway.capture(auth.charge_id or "")
+    if not cap.success:
+        LimitedPackageService.release_reservation(pkg.code, req.quantity)
+        return LimitedBuyReceipt(
+            success=False,
+            message=f"Capture failed: {cap.message}",
+            user_id=req.user_id,
+            code=pkg.code,
+            quantity=req.quantity,
+            total_price_cents=total_price_cents,
+            gems_granted=0,
+            new_gem_balance=getattr(user, "cyber_token_balance", 0),
+            charge_id=auth.charge_id,
+        )
+
+    token_service = TokenService(db)
+    total_gems = pkg.gems * req.quantity
+    new_balance = token_service.add_tokens(req.user_id, total_gems)
+
+    # Reward ledger row + link
+    reward = models.Reward(
+        name=f"BUY_PACKAGE:{pkg.code}",
+        description=f"Purchase {req.quantity}x {pkg.name}",
+        reward_type="TOKEN",
+        value=float(total_gems),
+    )
+    db.add(reward)
+    db.flush()
+    db.add(models.UserReward(user_id=req.user_id, reward_id=reward.id))
+
+    # Action log
+    db.add(models.UserAction(
+        user_id=req.user_id,
+        action_type="BUY_PACKAGE",
+        action_data=f"{{'code':'{pkg.code}','price_cents':{total_price_cents},'quantity':{req.quantity},'charge_id':'{cap.charge_id}'}}",
+    ))
+
+    # finalize user limit counters
+    LimitedPackageService.finalize_user_purchase(pkg.code, req.user_id, req.quantity)
+
+    db.commit()
+
+    return LimitedBuyReceipt(
+        success=True,
+        message="Purchase completed",
+        user_id=req.user_id,
+        code=pkg.code,
         quantity=req.quantity,
         total_price_cents=total_price_cents,
         gems_granted=total_gems,

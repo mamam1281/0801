@@ -1024,6 +1024,32 @@
         }
       }
     },
+    "/api/shop/limited/catalog": {
+      "get": {
+        "tags": [
+          "Shop",
+          "Shop"
+        ],
+        "summary": "List active limited packages",
+        "operationId": "list_limited_catalog_api_shop_limited_catalog_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/LimitedPackageOut"
+                  },
+                  "type": "array",
+                  "title": "Response List Limited Catalog Api Shop Limited Catalog Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/shop/purchase": {
       "post": {
         "tags": [
@@ -1092,6 +1118,48 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/BuyReceipt"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/shop/limited/buy": {
+      "post": {
+        "tags": [
+          "Shop",
+          "Shop"
+        ],
+        "summary": "Buy limited-time package (real money)",
+        "operationId": "buy_limited_api_shop_limited_buy_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LimitedBuyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LimitedBuyReceipt"
                 }
               }
             }
@@ -5389,6 +5457,197 @@
         ],
         "title": "LeaderboardEntry",
         "description": "리더보드 항목"
+      },
+      "LimitedBuyReceipt": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "user_id": {
+            "type": "integer",
+            "title": "User Id"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "quantity": {
+            "type": "integer",
+            "title": "Quantity"
+          },
+          "total_price_cents": {
+            "type": "integer",
+            "title": "Total Price Cents"
+          },
+          "gems_granted": {
+            "type": "integer",
+            "title": "Gems Granted"
+          },
+          "new_gem_balance": {
+            "type": "integer",
+            "title": "New Gem Balance"
+          },
+          "charge_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Charge Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success",
+          "message",
+          "user_id",
+          "code",
+          "quantity",
+          "total_price_cents",
+          "gems_granted",
+          "new_gem_balance"
+        ],
+        "title": "LimitedBuyReceipt"
+      },
+      "LimitedBuyRequest": {
+        "properties": {
+          "user_id": {
+            "type": "integer",
+            "title": "User Id"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code",
+            "description": "Limited package code"
+          },
+          "quantity": {
+            "type": "integer",
+            "maximum": 10.0,
+            "minimum": 1.0,
+            "title": "Quantity",
+            "default": 1
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency",
+            "default": "USD"
+          },
+          "card_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Card Token"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id",
+          "code"
+        ],
+        "title": "LimitedBuyRequest"
+      },
+      "LimitedPackageOut": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "price_cents": {
+            "type": "integer",
+            "title": "Price Cents"
+          },
+          "gems": {
+            "type": "integer",
+            "title": "Gems",
+            "description": "Number of premium gems granted",
+            "default": 0
+          },
+          "start_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start At"
+          },
+          "end_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "End At"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active"
+          },
+          "per_user_limit": {
+            "type": "integer",
+            "title": "Per User Limit",
+            "default": 1
+          },
+          "remaining_stock": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remaining Stock",
+            "description": "None means unlimited"
+          },
+          "user_purchased": {
+            "type": "integer",
+            "title": "User Purchased",
+            "default": 0
+          },
+          "user_remaining": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Remaining"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "name",
+          "price_cents",
+          "start_at",
+          "end_at",
+          "is_active"
+        ],
+        "title": "LimitedPackageOut"
       },
       "MissionResponse": {
         "properties": {

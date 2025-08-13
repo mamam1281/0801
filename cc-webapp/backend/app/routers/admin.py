@@ -8,6 +8,8 @@ from pydantic import BaseModel
 from ..database import get_db
 from ..dependencies import get_current_user
 from ..services.admin_service import AdminService
+from ..services.limited_package_service import LimitedPackageService
+from datetime import datetime
 
 router = APIRouter(prefix="/api/admin", tags=["Admin"])
 
@@ -23,6 +25,28 @@ class UserBanRequest(BaseModel):
     user_id: int
     reason: str
     duration_hours: Optional[int] = None
+
+class LimitedToggleRequest(BaseModel):
+    code: str
+    active: bool
+
+class LimitedPeriodRequest(BaseModel):
+    code: str
+    start_at: datetime
+    end_at: datetime
+
+class LimitedStockRequest(BaseModel):
+    code: str
+    initial_stock: Optional[int] = None
+
+class LimitedPerUserLimitRequest(BaseModel):
+    code: str
+    per_user_limit: int
+
+class LimitedPromoRequest(BaseModel):
+    code: str
+    promo_code: str
+    cents_off: int
 
 # Dependency injection
 def get_admin_service(db = Depends(get_db)) -> AdminService:
@@ -138,3 +162,41 @@ async def add_user_tokens(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to add tokens: {str(e)}"
         )
+
+# --- Limited Packages Admin (MVP in-memory) ---
+@router.post("/limited/toggle")
+async def admin_limited_toggle(req: LimitedToggleRequest, admin_user = Depends(require_admin_access)):
+    if not LimitedPackageService.set_active(req.code, req.active):
+        raise HTTPException(status_code=404, detail="Package not found")
+    return {"success": True}
+
+@router.post("/limited/period")
+async def admin_limited_period(req: LimitedPeriodRequest, admin_user = Depends(require_admin_access)):
+    ok = LimitedPackageService.set_period(req.code, req.start_at, req.end_at)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Package not found")
+    return {"success": True}
+
+@router.post("/limited/stock")
+async def admin_limited_stock(req: LimitedStockRequest, admin_user = Depends(require_admin_access)):
+    ok = LimitedPackageService.set_initial_stock(req.code, req.initial_stock)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Package not found")
+    return {"success": True}
+
+@router.post("/limited/per-user-limit")
+async def admin_limited_per_user_limit(req: LimitedPerUserLimitRequest, admin_user = Depends(require_admin_access)):
+    ok = LimitedPackageService.set_per_user_limit(req.code, req.per_user_limit)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Package not found")
+    return {"success": True}
+
+@router.post("/limited/promo/set")
+async def admin_limited_promo_set(req: LimitedPromoRequest, admin_user = Depends(require_admin_access)):
+    LimitedPackageService.set_promo_discount(req.code, req.promo_code, req.cents_off)
+    return {"success": True}
+
+@router.post("/limited/promo/clear")
+async def admin_limited_promo_clear(req: LimitedPromoRequest, admin_user = Depends(require_admin_access)):
+    LimitedPackageService.clear_promo_discount(req.code, req.promo_code)
+    return {"success": True}
