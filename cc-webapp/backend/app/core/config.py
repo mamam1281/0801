@@ -1,5 +1,5 @@
 import os
-from pydantic import BaseSettings
+from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     """Application Settings"""
@@ -33,8 +33,12 @@ class Settings(BaseSettings):
     # Prefer uppercase attribute for clarity, keep lowercase alias for backward-compat
     KAFKA_ENABLED: bool = False
     KAFKA_BOOTSTRAP_SERVERS: str = "cc_kafka_local:9092"
+    # Some modules reference a lowercase variant; provide it as an optional alias.
+    kafka_bootstrap_servers: str = ""
     KAFKA_ACTIONS_TOPIC: str = "cc_user_actions"
     KAFKA_REWARDS_TOPIC: str = "cc_rewards"
+    # Optional comma-separated list of topics used by debug endpoints; may be empty
+    KAFKA_TOPICS: str = ""
 
     # ClickHouse Settings
     CLICKHOUSE_ENABLED: bool = False

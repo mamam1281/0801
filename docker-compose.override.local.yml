@@ -3,8 +3,6 @@ services:
     container_name: cc_backend_local
     ports:
       - "8001:8000"
-    environment:
-      KAFKA_ENABLED: "0"
 
   frontend:
     container_name: cc_frontend_local
@@ -26,3 +24,8 @@ services:
 
   zookeeper:
     container_name: cc_zookeeper_local
+
+  olap_worker:
+    # env comes from .env.local via cc-manage.ps1
+    labels:
+      - "override=true"

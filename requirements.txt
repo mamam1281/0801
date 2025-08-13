@@ -36,6 +36,7 @@ sentry-sdk[fastapi]==1.39.1
 # HTTP 클라이언트
 httpx==0.27.0
 aiohttp==3.9.1
+requests==2.32.3
 
 # 유틸리티
 python-dotenv==1.0.0
