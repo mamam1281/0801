@@ -1,89 +1,172 @@
 import os
 import json
-from fastapi import APIRouter, Depends, HTTPException
-#  # Will be needed later
+import logging
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional
+
+from fastapi import APIRouter, Depends
+from pydantic import BaseModel, ConfigDict, Field
+from sqlalchemy.orm import Session
+
+from app.core.config import settings
+
 try:
-    from confluent_kafka import Producer
-except ImportError:  # In case library is not installed during lightweight tests
-    Producer = None
-# from .. import models, schemas, database # Assuming these exist and will be used later
-from datetime import datetime
+    from kafka import KafkaProducer
+    _producer = None
+    def get_producer():
+        global _producer
+        if _producer is None and settings.KAFKA_ENABLED:
+            _producer = KafkaProducer(
+                bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS.split(","),
+                value_serializer=lambda v: json.dumps(v).encode("utf-8"),
+            )
+        return _producer
+except Exception:
+    def get_producer(): return None
+
+from .. import models
+from ..database import get_db
+from ..websockets import manager
 
 router = APIRouter(prefix="/api/actions", tags=["Game Actions"])
 
-# Kafka Producer Configuration
-KAFKA_BROKER = os.getenv("KAFKA_BROKER", "localhost:9092")
-KAFKA_ENABLED = os.getenv("KAFKA_ENABLED", "0") == "1"
-conf = {"bootstrap.servers": KAFKA_BROKER}
-producer = None
-if KAFKA_ENABLED and Producer is not None:
-    try:
-        producer = Producer(conf)
-    except Exception as e:
-        print(f"Kafka producer init failed: {e}")
-        producer = None
-TOPIC_USER_ACTIONS = "topic_user_actions"
 
-def delivery_report(err, msg):
-    """ Called once for each message produced to indicate delivery result.
-        Triggered by poll() or flush(). """
-    if err is not None:
-        print(f'Message delivery failed: {err}')
-    else:
-        print(f'Message delivered to {msg.topic()} [{msg.partition()}] at offset {msg.offset()}')
+class ActionCreate(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    user_id: int
+    action_type: str = Field(..., examples=["SLOT_SPIN", "GACHA_SPIN", "LOGIN", "REWARD_GRANT"])
+    context: Optional[Dict[str, Any]] = None
+    client_ts: Optional[str] = None
 
-# Example placeholder for a database session dependency - to be implemented later
-# def get_db():
-#     db = database.SessionLocal()
-#     try:
-#         yield db
-#     finally:
-#         db.close()
 
-@router.post("/actions", tags=["actions"])
-# async def create_action(action: schemas.ActionCreate, db = Depends(get_db)): # Full version with Pydantic and DB
-async def create_action(user_id: int, action_type: str): # Simplified for now, matching current subtask request
-    """
-    Logs an action and publishes it to Kafka.
-    For now, this is a simplified stub.
-    Replace user_id and action_type with a Pydantic model (e.g., schemas.ActionCreate) later.
-    """
-    action_timestamp = datetime.utcnow().isoformat()
+class ActionLoggedResponse(BaseModel):
+    id: int
+    user_id: int
+    action_type: str
+    created_at: datetime
 
-    # Placeholder for saving to DB - to be implemented later
-    # db_action = models.Action(**action.dict(), timestamp=action_timestamp) # Assuming action is Pydantic
-    # db.add(db_action)
-    # db.commit()
-    # db.refresh(db_action)
 
+PII_KEYS = {"password", "phone", "phone_number", "email"}
+
+
+def _scrub_context(ctx: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    if not ctx:
+        return {}
+    scrubbed = {}
+    for k, v in ctx.items():
+        if k.lower() in PII_KEYS:
+            continue
+        scrubbed[k] = v
+    return scrubbed
+
+
+@router.post("", response_model=ActionLoggedResponse)
+async def log_action(action: ActionCreate, db=Depends(get_db)):
+    now = datetime.now(timezone.utc)
     payload = {
-        "user_id": user_id, # Replace with action.user_id if using Pydantic model
-        "action_type": action_type, # Replace with action.action_type
-        "action_timestamp": action_timestamp
+        "user_id": action.user_id,
+        "action_type": action.action_type,
+        "client_ts": action.client_ts,
+        "context": _scrub_context(action.context),
+        "server_ts": now.isoformat().replace("+00:00", "Z"),
     }
 
-    if producer:
-        try:
-            producer.produce(
-                TOPIC_USER_ACTIONS,
-                key=str(user_id),
-                value=json.dumps(payload).encode("utf-8"),
-                callback=delivery_report,
-            )
-            producer.poll(0)
-            print(
-                f"Produced message to Kafka topic {TOPIC_USER_ACTIONS}: {payload}"
-            )
-        except BufferError:
-            print(
-                f"Kafka local queue full ({len(producer)} messages), messages will be dropped."
-            )
-    else:
-        print(f"Kafka disabled - action logged locally: {payload}")
-    # producer.flush() # Optional: wait for all messages to be delivered. Can be blocking.
+    # persist to DB (Text column for action_data)
+    db_row = models.UserAction(
+        user_id=action.user_id,
+        action_type=action.action_type,
+        action_data=json.dumps(payload, ensure_ascii=False),
+        created_at=now,
+    )
+    db.add(db_row)
+    db.commit()
+    db.refresh(db_row)
 
-    # return db_action # Or a schema.Action if returning DB object
-    return {"message": "Action logged and potentially published to Kafka", "data": payload}
+    # fire-and-forget to Kafka if enabled
+    prod = get_producer()
+    if prod is not None:
+        try:
+            prod.send(settings.KAFKA_ACTIONS_TOPIC, payload)
+        except Exception as e:
+            print(f"Kafka produce failed: {e}")
+
+    # realtime fanout (personal)
+    try:
+        await manager.send_personal_message({"type": "USER_ACTION", "payload": payload}, action.user_id)
+    except Exception:
+        pass
+
+    return ActionLoggedResponse(
+        id=db_row.id,
+        user_id=db_row.user_id,
+        action_type=db_row.action_type,
+        created_at=db_row.created_at,
+    )
+
+
+class BulkActions(BaseModel):
+    items: List[ActionCreate]
+
+
+@router.post("/bulk", response_model=dict)
+async def log_actions_bulk(batch: BulkActions, db=Depends(get_db)):
+    now = datetime.now(timezone.utc)
+    rows: List[models.UserAction] = []
+    prod = get_producer()
+    for item in batch.items:
+        payload = {
+            "user_id": item.user_id,
+            "action_type": item.action_type,
+            "client_ts": item.client_ts,
+            "context": _scrub_context(item.context),
+            "server_ts": now.isoformat().replace("+00:00", "Z"),
+        }
+        rows.append(
+            models.UserAction(
+                user_id=item.user_id,
+                action_type=item.action_type,
+                action_data=json.dumps(payload, ensure_ascii=False),
+                created_at=now,
+            )
+        )
+        if prod is not None:
+            try:
+                prod.send(settings.KAFKA_ACTIONS_TOPIC, payload)
+            except Exception:
+                pass
+    if rows:
+        db.add_all(rows)
+        db.commit()
+    # optional Kafka flush is skipped to avoid blocking
+    return {"logged": len(rows)}
+
+
+class ActionItem(BaseModel):
+    id: int
+    action_type: str
+    created_at: datetime
+    action_data: Dict[str, Any]
+
+
+@router.get("/recent/{user_id}", response_model=List[ActionItem])
+async def recent_actions(user_id: int, limit: int = 20, db=Depends(get_db)):
+    q = (
+        db.query(models.UserAction)
+        .filter(models.UserAction.user_id == user_id)
+        .order_by(models.UserAction.created_at.desc())
+        .limit(max(1, min(200, limit)))
+        .all()
+    )
+    out: List[ActionItem] = []
+    for r in q:
+        try:
+            data = json.loads(r.action_data or "{}")
+        except Exception:
+            data = {}
+        out.append(
+            ActionItem(id=r.id, action_type=r.action_type, created_at=r.created_at, action_data=data)
+        )
+    return out
 
 # Ensure this router is included in app/main.py:
 # from .routers import actions

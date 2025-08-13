@@ -723,20 +723,103 @@
         }
       }
     },
-    "/api/actions/actions": {
+    "/api/actions": {
       "post": {
         "tags": [
           "Game Actions",
-          "Game Actions",
-          "actions"
+          "Game Actions"
         ],
-        "summary": "Create Action",
-        "description": "Logs an action and publishes it to Kafka.\nFor now, this is a simplified stub.\nReplace user_id and action_type with a Pydantic model (e.g., schemas.ActionCreate) later.",
-        "operationId": "create_action_api_actions_actions_post",
+        "summary": "Log Action",
+        "operationId": "log_action_api_actions_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActionCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActionLoggedResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/actions/bulk": {
+      "post": {
+        "tags": [
+          "Game Actions",
+          "Game Actions"
+        ],
+        "summary": "Log Actions Bulk",
+        "operationId": "log_actions_bulk_api_actions_bulk_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkActions"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "title": "Response Log Actions Bulk Api Actions Bulk Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/actions/recent/{user_id}": {
+      "get": {
+        "tags": [
+          "Game Actions",
+          "Game Actions"
+        ],
+        "summary": "Recent Actions",
+        "operationId": "recent_actions_api_actions_recent__user_id__get",
         "parameters": [
           {
             "name": "user_id",
-            "in": "query",
+            "in": "path",
             "required": true,
             "schema": {
               "type": "integer",
@@ -744,12 +827,13 @@
             }
           },
           {
-            "name": "action_type",
+            "name": "limit",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
-              "type": "string",
-              "title": "Action Type"
+              "type": "integer",
+              "default": 20,
+              "title": "Limit"
             }
           }
         ],
@@ -758,7 +842,13 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ActionItem"
+                  },
+                  "title": "Response Recent Actions Api Actions Recent  User Id  Get"
+                }
               }
             }
           },
@@ -1770,6 +1860,99 @@
             "content": {
               "application/json": {
                 "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ws/notify/{user_id}": {
+      "post": {
+        "tags": [
+          "Real-time Notifications",
+          "websockets",
+          "websockets"
+        ],
+        "summary": "Push Notification",
+        "operationId": "push_notification_ws_notify__user_id__post",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "User Id"
+            }
+          },
+          {
+            "name": "message",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Message"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ws/sse/notifications": {
+      "get": {
+        "tags": [
+          "Real-time Notifications",
+          "websockets"
+        ],
+        "summary": "Sse Notifications",
+        "description": "Simple SSE stream; filters messages by user_id in payload when present.",
+        "operationId": "sse_notifications_ws_sse_notifications_get",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "User Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
               }
             }
           }
@@ -3849,6 +4032,110 @@
         "title": "Achievement",
         "description": "사용자 업적"
       },
+      "ActionCreate": {
+        "properties": {
+          "user_id": {
+            "type": "integer",
+            "title": "User Id"
+          },
+          "action_type": {
+            "type": "string",
+            "title": "Action Type",
+            "examples": [
+              "SLOT_SPIN",
+              "GACHA_SPIN",
+              "LOGIN",
+              "REWARD_GRANT"
+            ]
+          },
+          "context": {
+            "anyOf": [
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context"
+          },
+          "client_ts": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Ts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id",
+          "action_type"
+        ],
+        "title": "ActionCreate"
+      },
+      "ActionItem": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "action_type": {
+            "type": "string",
+            "title": "Action Type"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "action_data": {
+            "type": "object",
+            "title": "Action Data"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "action_type",
+          "created_at",
+          "action_data"
+        ],
+        "title": "ActionItem"
+      },
+      "ActionLoggedResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "user_id": {
+            "type": "integer",
+            "title": "User Id"
+          },
+          "action_type": {
+            "type": "string",
+            "title": "Action Type"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "user_id",
+          "action_type",
+          "created_at"
+        ],
+        "title": "ActionLoggedResponse"
+      },
       "AdminLogin": {
         "properties": {
           "site_id": {
@@ -3935,6 +4222,22 @@
         },
         "type": "object",
         "title": "Body_refresh_api_auth_refresh_post"
+      },
+      "BulkActions": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ActionCreate"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "BulkActions"
       },
       "ClaimRewardResponse": {
         "properties": {

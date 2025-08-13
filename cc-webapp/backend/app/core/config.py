@@ -1,6 +1,5 @@
 import os
-from pydantic import Field
-from pydantic_settings import BaseSettings
+from pydantic import BaseSettings
 
 class Settings(BaseSettings):
     """Application Settings"""
@@ -32,13 +31,19 @@ class Settings(BaseSettings):
 
     # Kafka Settings
     # Prefer uppercase attribute for clarity, keep lowercase alias for backward-compat
-    KAFKA_BOOTSTRAP_SERVERS: str = os.getenv("KAFKA_BOOTSTRAP_SERVERS", os.getenv("KAFKA_BROKER", ""))
-    KAFKA_ENABLED: bool = os.getenv("KAFKA_ENABLED", "0") == "1"
-    # Comma-separated topics for background consumer; default to cc_test
-    KAFKA_TOPICS: str = os.getenv("KAFKA_TOPICS", "cc_test")
-    KAFKA_CONSUMER_GROUP: str = os.getenv("KAFKA_CONSUMER_GROUP", "cc_backend_group")
-    # Back-compat alias used in some modules
-    kafka_bootstrap_servers: str = KAFKA_BOOTSTRAP_SERVERS
+    KAFKA_ENABLED: bool = False
+    KAFKA_BOOTSTRAP_SERVERS: str = "cc_kafka_local:9092"
+    KAFKA_ACTIONS_TOPIC: str = "cc_user_actions"
+    KAFKA_REWARDS_TOPIC: str = "cc_rewards"
+
+    # ClickHouse Settings
+    CLICKHOUSE_ENABLED: bool = False
+    CLICKHOUSE_URL: str = "http://cc_clickhouse_local:8123"
+    CLICKHOUSE_DATABASE: str = "cc_olap"
+    CLICKHOUSE_USER: str = "default"
+    CLICKHOUSE_PASSWORD: str = ""
+    OLAP_BATCH_SIZE: int = 500
+    OLAP_FLUSH_SECONDS: int = 2
 
     # Game Settings
     DAILY_SLOT_SPINS: int = 30

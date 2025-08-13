@@ -5,6 +5,8 @@ from typing import List, Any, Optional # Any might not be needed if using specif
 from pydantic import BaseModel, ConfigDict, Field, field_serializer
 from datetime import timezone
 from datetime import datetime
+import json, logging
+from app.core.config import settings
 
 # Assuming models and database session setup are in these locations
 from .. import models  # This should import UserReward and User
@@ -141,9 +143,38 @@ async def distribute_reward_to_user(
             idempotency_key=request.idempotency_key,
             metadata=request.metadata,
         )
+        # Kafka 프로듀서 가져오기
+        prod = get_producer()
+        if prod:
+            try:
+                # Kafka에 메시지 전송
+                prod.send(settings.KAFKA_REWARDS_TOPIC, {
+                    "user_id": request.user_id,
+                    "reward_type": request.reward_type,
+                    "reward_value": request.amount,
+                    "source": request.source_description or "",
+                    "awarded_at": datetime.now(timezone.utc).isoformat(),
+                })
+            except Exception as e:
+                logger.warning("Kafka produce failed: %s", e)
         return result
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+# Kafka producer 설정
+try:
+    from kafka import KafkaProducer
+    _producer = None
+    def get_producer():
+        global _producer
+        if _producer is None and settings.KAFKA_ENABLED:
+            _producer = KafkaProducer(
+                bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS.split(","),
+                value_serializer=lambda v: json.dumps(v).encode("utf-8"),
+            )
+        return _producer
+except Exception:
+    def get_producer(): return None
 
 # Ensure this router is included in app/main.py:
 # from .routers import rewards
