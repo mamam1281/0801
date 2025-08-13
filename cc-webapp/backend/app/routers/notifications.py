@@ -67,9 +67,14 @@ async def websocket_endpoint(websocket: WebSocket, user_id: int):
                     await manager.update_ws_topics(user_id, websocket, topics)
                 # else ping/noop
                 await manager.touch_ws(user_id, websocket)
+            except WebSocketDisconnect:
+                # Propagate to outer handler so we can cleanup and exit loop
+                raise
             except Exception:
                 # ignore transient receive issues; loop continues until disconnect
                 await manager.touch_ws(user_id, websocket)
+                # yield control to event loop to avoid tight spin if client closed abruptly
+                await asyncio.sleep(0)
     except WebSocketDisconnect:
         await manager.disconnect_ws(user_id, websocket)
 

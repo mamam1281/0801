@@ -1,13 +1,19 @@
 import os
 import json
+from typing import List, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException
-#  # Will be needed later
-try:
-    from confluent_kafka import Producer
-except ImportError:  # In case library is not installed during lightweight tests
-    Producer = None
-# from .. import models, schemas, database # Assuming these exist and will be used later
+from sqlalchemy.orm import Session
 from datetime import datetime
+
+from ..database import get_db
+from .. import models
+from ..schemas.actions import ActionCreate, ActionBatchCreate, ActionResponse
+
+# Optional Kafka producer
+try:
+    from confluent_kafka import Producer  # type: ignore
+except ImportError:
+    Producer = None
 
 router = APIRouter(prefix="/api/actions", tags=["Game Actions"])
 
@@ -32,59 +38,76 @@ def delivery_report(err, msg):
     else:
         print(f'Message delivered to {msg.topic()} [{msg.partition()}] at offset {msg.offset()}')
 
-# Example placeholder for a database session dependency - to be implemented later
-# def get_db():
-#     db = database.SessionLocal()
-#     try:
-#         yield db
-#     finally:
-#         db.close()
+SENSITIVE_KEYS = {"password", "pass", "pwd", "ssn", "phone", "phone_number", "email"}
 
-# Canonical endpoint: POST /api/actions
-@router.post("")
-# async def create_action(action: schemas.ActionCreate, db = Depends(get_db)): # Full version with Pydantic and DB
-async def create_action(user_id: int, action_type: str): # Simplified for now, matching current subtask request
-    """
-    Logs an action and publishes it to Kafka.
-    For now, this is a simplified stub.
-    Replace user_id and action_type with a Pydantic model (e.g., schemas.ActionCreate) later.
-    """
-    action_timestamp = datetime.utcnow().isoformat()
+def _sanitize_context(ctx: Dict[str, Any] | None) -> Dict[str, Any] | None:
+    if not ctx:
+        return None
+    sanitized: Dict[str, Any] = {}
+    for k, v in ctx.items():
+        lk = str(k).lower()
+        if lk in SENSITIVE_KEYS or lk.endswith("_token") or lk.endswith("_secret"):
+            sanitized[k] = "***"
+        else:
+            sanitized[k] = v
+    return sanitized
 
-    # Placeholder for saving to DB - to be implemented later
-    # db_action = models.Action(**action.dict(), timestamp=action_timestamp) # Assuming action is Pydantic
-    # db.add(db_action)
-    # db.commit()
-    # db.refresh(db_action)
+@router.post("", response_model=ActionResponse)
+async def create_action(action: ActionCreate, db: Session = Depends(get_db)):
+    """Create a single action record and optionally publish to Kafka."""
+    ctx = _sanitize_context(action.context)
+    # Persist
+    db_action = models.UserAction(
+        user_id=action.user_id,
+        action_type=action.action_type,
+        action_data=json.dumps({"context": ctx, "timestamp": (action.timestamp or datetime.utcnow()).isoformat()})
+    )
+    db.add(db_action)
+    db.commit()
+    db.refresh(db_action)
 
+    # Kafka publish (best-effort)
     payload = {
-        "user_id": user_id, # Replace with action.user_id if using Pydantic model
-        "action_type": action_type, # Replace with action.action_type
-        "action_timestamp": action_timestamp
+        "id": db_action.id,
+        "user_id": action.user_id,
+        "action_type": action.action_type,
+        "timestamp": action.timestamp.isoformat() if action.timestamp else db_action.created_at.isoformat(),
+        "context": ctx,
     }
-
     if producer:
         try:
             producer.produce(
                 TOPIC_USER_ACTIONS,
-                key=str(user_id),
+                key=str(action.user_id),
                 value=json.dumps(payload).encode("utf-8"),
                 callback=delivery_report,
             )
             producer.poll(0)
-            print(
-                f"Produced message to Kafka topic {TOPIC_USER_ACTIONS}: {payload}"
-            )
-        except BufferError:
-            print(
-                f"Kafka local queue full ({len(producer)} messages), messages will be dropped."
-            )
-    else:
-        print(f"Kafka disabled - action logged locally: {payload}")
-    # producer.flush() # Optional: wait for all messages to be delivered. Can be blocking.
+        except Exception as e:
+            print(f"Kafka publish failed: {e}")
+    return db_action
 
-    # return db_action # Or a schema.Action if returning DB object
-    return {"message": "Action logged and potentially published to Kafka", "data": payload}
+
+@router.post("/batch")
+async def create_actions_batch(batch: ActionBatchCreate, db: Session = Depends(get_db)):
+    """Bulk insert actions. Returns count inserted."""
+    objs: List[models.UserAction] = []
+    now = datetime.utcnow()
+    for a in batch.actions:
+        ctx = _sanitize_context(a.context)
+        objs.append(
+            models.UserAction(
+                user_id=a.user_id,
+                action_type=a.action_type,
+                action_data=json.dumps({"context": ctx, "timestamp": (a.timestamp or now).isoformat()})
+            )
+        )
+    if not objs:
+        return {"inserted": 0}
+    db.bulk_save_objects(objs)
+    db.commit()
+    # Optional: do not publish Kafka per-item for batch to avoid spam
+    return {"inserted": len(objs)}
 
 # Ensure this router is included in app/main.py:
 # from .routers import actions

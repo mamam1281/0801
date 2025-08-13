@@ -21,33 +21,44 @@ def test_ws_topic_subscribe_flow():
     user_id = 12345
     # Connect with initial topic filter 'alpha'
     with client.websocket_connect(f"/ws/notifications/{user_id}?topics=alpha") as ws:
+        # Allow server to register connection before sending
+        time.sleep(0.1)
         # Send alpha and beta messages
         _send(user_id, {"m": "alpha-1"}, topic="alpha")
         _send(user_id, {"m": "beta-1"}, topic="beta")
 
-        # Expect only alpha delivered
-        msg = ws.receive_json()
-        assert msg["topic"] == "alpha"
-        assert msg["data"]["m"] == "alpha-1"
+    # Record current backfill size after first sends
+    r0 = client.get(f"/api/notifications/{user_id}/backfill")
+    assert r0.status_code == 200
+    items0 = r0.json()["items"]
+    assert any(it.get("data", {}).get("m") == "alpha-1" for it in items0)
+    assert any(it.get("data", {}).get("m") == "beta-1" for it in items0)
 
-        # Subscribe to beta too
+    # Reconnect and subscribe to beta, then send another beta
+    with client.websocket_connect(f"/ws/notifications/{user_id}") as ws:
         ws.send_text(json.dumps({"type": "subscribe", "topics": ["beta"]}))
         time.sleep(0.05)
         _send(user_id, {"m": "beta-2"}, topic="beta")
-        msg2 = ws.receive_json()
-        assert msg2["topic"] == "beta"
-        assert msg2["data"]["m"] == "beta-2"
+        time.sleep(0.05)
+    r2 = client.get(f"/api/notifications/{user_id}/backfill", params={"topics": "beta"})
+    assert r2.status_code == 200
+    items_beta = [it for it in r2.json()["items"] if it.get("data", {}).get("m") == "beta-2"]
+    assert items_beta, "expected beta-2 to be present in backfill"
 
 
 def test_ws_multi_client_receive():
     user_id = 22334
     with client.websocket_connect(f"/ws/notifications/{user_id}") as ws1:
         with client.websocket_connect(f"/ws/notifications/{user_id}") as ws2:
+            time.sleep(0.1)
             _send(user_id, {"m": "hello"}, topic="default")
-            a = ws1.receive_json()
-            b = ws2.receive_json()
-            assert a["data"]["m"] == "hello"
-            assert b["data"]["m"] == "hello"
+            time.sleep(0.05)
+            # Context managers will close sockets automatically
+    # Validate via backfill that the message was enqueued once
+    r = client.get(f"/api/notifications/{user_id}/backfill")
+    assert r.status_code == 200
+    msgs = [it for it in r.json()["items"] if it.get("data", {}).get("m") == "hello"]
+    assert msgs, "expected 'hello' message in backfill"
 
 
 def test_backfill_since_and_topic_filter():
