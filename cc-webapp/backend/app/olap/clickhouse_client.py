@@ -65,6 +65,26 @@ class ClickHouseClient:
         PARTITION BY toYYYYMM(day)
         ORDER BY (day, user_id, code)
         """)
+        # Aggregates: daily revenue/quantity by code
+        self.execute("""
+        CREATE TABLE IF NOT EXISTS purchases_daily_agg (
+            day Date,
+            code LowCardinality(String),
+            total_revenue_cents Int64,
+            total_quantity Int64
+        ) ENGINE = SummingMergeTree()
+        PARTITION BY toYYYYMM(day)
+        ORDER BY (day, code)
+        """)
+        self.execute("""
+        CREATE MATERIALIZED VIEW IF NOT EXISTS mv_purchases_daily_agg
+        TO purchases_daily_agg AS
+        SELECT day, code,
+               sum(total_price_cents) AS total_revenue_cents,
+               sum(quantity) AS total_quantity
+        FROM purchases
+        GROUP BY day, code
+        """)
 
     def insert_actions(self, rows: List[Dict[str, Any]]):
         if not rows:

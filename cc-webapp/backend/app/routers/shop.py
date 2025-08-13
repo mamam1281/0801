@@ -350,7 +350,6 @@ def buy_limited(req: LimitedBuyRequest, db = Depends(get_db)):
 
     # Emit Kafka event for analytics (best-effort)
     try:
-        from datetime import datetime
         send_kafka_message("buy_package", {
             "type": "BUY_PACKAGE",
             "user_id": req.user_id,
