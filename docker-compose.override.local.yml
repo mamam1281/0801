@@ -23,6 +23,8 @@ services:
 
   kafka:
     container_name: cc_kafka_local
+    ports: []  # override to avoid binding host ports (e.g., 9092)
 
   zookeeper:
     container_name: cc_zookeeper_local
+    ports: []  # override to avoid binding host ports (e.g., 2181)
