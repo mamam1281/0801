@@ -14,7 +14,7 @@ from datetime import datetime, timedelta
 from sqlalchemy import func
 import json
 
-router = APIRouter(prefix="/api/analytics", tags=["analytics"])
+router = APIRouter(prefix="/api/analytics", tags=["Analytics"])
 
 # Request/Response Models
 class AnalyticsQuery(BaseModel):

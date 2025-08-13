@@ -231,16 +231,16 @@ app.include_router(invite_router.router)  # 태그 오버라이드 제거 - 이�
 app.include_router(rbac_demo.router)  # New RBAC demo router included
 
 # Phase 6: Analytics (no prefix - routers have their own)
-app.include_router(analyze.router, tags=["Analytics"])
+app.include_router(analyze.router)
 
 # Phase 8: User Segmentation (no prefix - routers have their own)  
 app.include_router(segments.router)  # 태그 오버라이드 제거 - 이미 segments.py에서 "Segments" 태그를 지정함
 
 # Phase 9: User Tracking (no prefix - routers have their own)
-app.include_router(tracking.router, tags=["Tracking"])
+app.include_router(tracking.router)
 
 # Phase 10: Unlock System (no prefix - routers have their own)
-app.include_router(unlock.router, tags=["Unlock"])
+app.include_router(unlock.router)
 
 # 이벤트/미션 라우터 추가
 app.include_router(events.router)  # 태그 오버라이드 제거 - 이미 events.py에서 "Events & Missions" 태그를 지정함
