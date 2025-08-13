@@ -176,6 +176,11 @@ __all__ = [
     "Event",
     "EventParticipation", 
     "UserMission",
+
+    # Shop Models
+    "ShopProduct",
+    "ShopDiscount",
+    "ShopTransaction",
 ]
 
 # Content 모델들 추가
@@ -200,3 +205,10 @@ from .analytics_models import (
 
 # Emotion 모델들 추가
 from .emotion_models import SupportedEmotion
+
+# Shop 모델들 추가
+from .shop_models import (
+    ShopProduct,
+    ShopDiscount,
+    ShopTransaction,
+)

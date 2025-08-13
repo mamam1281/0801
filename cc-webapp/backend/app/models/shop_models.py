@@ -14,7 +14,8 @@ class ShopProduct(Base):
     description = Column(String(1000))
     price = Column(Integer, nullable=False)  # base price in coins
     is_active = Column(Boolean, default=True)
-    metadata = Column(JSON)
+    # Avoid SQLAlchemy reserved attribute name 'metadata' on declarative models
+    extra = Column(JSON)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow)
 
@@ -47,6 +48,7 @@ class ShopTransaction(Base):
     status = Column(String(20), nullable=False, default="success")  # pending|success|failed|refunded
     receipt_code = Column(String(64), unique=True, index=True)
     failure_reason = Column(String(500))
-    metadata = Column(JSON)
+    # Avoid SQLAlchemy reserved attribute name 'metadata' on declarative models
+    extra = Column(JSON)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow)

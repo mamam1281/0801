@@ -12,7 +12,8 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = '20250813_user_actions_ix_type_created'
-down_revision: Union[str, None] = '20250811_add_invite_codes'
+# Chain after the current single head merge revision to keep a single head
+down_revision: Union[str, None] = 'f79d04ea1016'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
