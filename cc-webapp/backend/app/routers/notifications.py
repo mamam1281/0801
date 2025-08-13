@@ -5,7 +5,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Request
 from fastapi.responses import StreamingResponse, JSONResponse
 from pydantic import BaseModel
 
-from ..websockets import manager
+from ..realtime import manager
 
 # WebSocket router
 router = APIRouter(prefix="/ws", tags=["websockets"])
@@ -25,14 +25,51 @@ async def websocket_endpoint(websocket: WebSocket, user_id: int):
     ) if topics_param else None
 
     await manager.connect_ws(websocket, user_id, topics=topics)
+    # Optional backfill for WS via query param lastEventId
+    last_event_id_param = websocket.query_params.get("lastEventId")
+    if last_event_id_param:
+        try:
+            last_event_id = int(last_event_id_param)
+            for ev in list(manager.get_backfill(user_id, last_event_id)):
+                if topics and ev.get("topic") not in topics:
+                    continue
+                try:
+                    await websocket.send_json(ev)
+                except Exception:
+                    break
+        except Exception:
+            # best-effort, ignore parsing errors
+            pass
     try:
         while True:
-            # Basic keepalive handling: ignore any received pings
-            _ = await websocket.receive_text()
-            # Clients can optionally send commands like:
-            # {"type":"subscribe","topics":["a","b"]}
-            # We keep it simple here and just keep the connection alive.
-            # Advanced control can be added later.
+            # Wait for client messages with keepalive handling
+            try:
+                msg_text = await websocket.receive_text()
+                # minimal command handling for subscribe/unsubscribe
+                # Expected payloads (JSON):
+                # {"type":"subscribe","topics":["a","b"]}
+                # {"type":"unsubscribe","topics":["a"]}
+                # {"type":"ping"}
+                import json
+                try:
+                    msg = json.loads(msg_text)
+                except Exception:
+                    msg = {"type": "ping"}
+
+                t = str(msg.get("type", "ping")).lower()
+                if t == "subscribe":
+                    new_topics = set(map(str, msg.get("topics", []) or []))
+                    topics = (topics or set()) | new_topics
+                    await manager.update_ws_topics(user_id, websocket, topics)
+                elif t == "unsubscribe":
+                    remove_topics = set(map(str, msg.get("topics", []) or []))
+                    topics = (topics or set()) - remove_topics
+                    await manager.update_ws_topics(user_id, websocket, topics)
+                # else ping/noop
+                await manager.touch_ws(user_id, websocket)
+            except Exception:
+                # ignore transient receive issues; loop continues until disconnect
+                await manager.touch_ws(user_id, websocket)
     except WebSocketDisconnect:
         await manager.disconnect_ws(user_id, websocket)
 
@@ -130,3 +167,18 @@ class SendNotificationRequest(BaseModel):
 async def send_notification(user_id: int, body: SendNotificationRequest):
     await manager.enqueue(user_id, message=body.message, priority=body.priority, topic=body.topic)
     return {"ok": True}
+
+
+@api_router.get("/{user_id}/backfill")
+async def get_backfill(user_id: int, since: Optional[int] = None, topics: Optional[str] = None):
+        """Debug/validation helper: return current in-memory backfill for a user.
+
+        Query:
+            - since: return events with id > since
+            - topics: comma-separated filter
+        """
+        topic_set: Optional[Set[str]] = set(t.strip() for t in topics.split(",") if t.strip()) if topics else None
+        buf = list(manager.get_backfill(user_id, since))
+        if topic_set:
+                buf = [e for e in buf if e.get("topic") in topic_set]
+        return {"count": len(buf), "items": buf[-200:]}  # keep bounded

@@ -8,7 +8,7 @@ from sqlalchemy.exc import SQLAlchemyError  # Import SQLAlchemyError
 
 from app import models
 from .token_service import TokenService
-from ..websockets import manager
+from ..realtime import manager
 
 class RewardService:
     """Service for handling reward distribution and management"""
@@ -102,7 +102,8 @@ class RewardService:
             try:
                 loop = asyncio.get_running_loop()
                 loop.create_task(
-                    manager.send_personal_message(
+                    manager.enqueue(
+                        user_id,
                         {
                             "type": "REWARD_RECEIVED",
                             "payload": {
@@ -112,7 +113,8 @@ class RewardService:
                                 "meta": metadata or {},
                             },
                         },
-                        user_id,
+                        priority=3,
+                        topic="rewards",
                     )
                 )
             except RuntimeError:

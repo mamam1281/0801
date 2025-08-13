@@ -221,7 +221,7 @@ app.include_router(doc_titles.router, tags=["Document Titles"])
 app.include_router(feedback.router, tags=["Feedback"])
 
 # Phase 3: Game Collection (no prefix - routers have their own) - 통합된 게임 API
-app.include_router(games.router, tags=["Game Collection"])
+app.include_router(games.router)
 
 # Phase 4: Unified Game API (no prefix - routers have their own) - 중복 제거
 # app.include_router(game_api.router, tags=["Game API"])  # 중복 제거: games.router에 통합됨
@@ -297,7 +297,7 @@ async def api_info():
             "auth": "/api/auth",
             "users": "/api/users",
             "admin": "/api/admin",
-            "games": "/api/actions, /api/games/*",
+            "games": "/api/games/*",
             "shop": "/api/shop, /api/rewards",
             "missions": "/api/missions",
             "quiz": "/api/quiz",

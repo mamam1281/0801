@@ -122,7 +122,7 @@ async def get_user_rewards(
         total_pages=total_pages
     )
 
-@router.post("/distribute", response_model=RewardItem, tags=["rewards"])
+@router.post("/distribute", response_model=RewardItem, tags=["Rewards"])
 async def distribute_reward_to_user(
     request: RewardDistributionRequest,
     db = Depends(get_db)

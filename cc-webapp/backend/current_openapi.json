@@ -718,16 +718,15 @@
         }
       }
     },
-    "/api/actions/actions": {
+    "/api/actions": {
       "post": {
         "tags": [
           "Game Actions",
-          "Game Actions",
-          "actions"
+          "Game Actions"
         ],
         "summary": "Create Action",
         "description": "Logs an action and publishes it to Kafka.\nFor now, this is a simplified stub.\nReplace user_id and action_type with a Pydantic model (e.g., schemas.ActionCreate) later.",
-        "operationId": "create_action_api_actions_actions_post",
+        "operationId": "create_action_api_actions_post",
         "parameters": [
           {
             "name": "user_id",
@@ -848,7 +847,7 @@
         "tags": [
           "Rewards",
           "Rewards",
-          "rewards"
+          "Rewards"
         ],
         "summary": "Distribute Reward To User",
         "description": "Distributes a specific reward to a user.\nThis is the central endpoint for granting rewards from games or events.",
@@ -1775,6 +1774,186 @@
         }
       }
     },
+    "/sse/notifications/{user_id}": {
+      "get": {
+        "tags": [
+          "sse"
+        ],
+        "summary": "Sse Notifications",
+        "description": "SSE notifications stream for a user.\n\nHeaders:\n  - Last-Event-ID: resume from this id if provided\nQuery:\n  - topics: comma-separated topic filters (optional)",
+        "operationId": "sse_notifications_sse_notifications__user_id__get",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "User Id"
+            }
+          },
+          {
+            "name": "topics",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Topics"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/notifications/{user_id}/send": {
+      "post": {
+        "tags": [
+          "Real-time Notifications"
+        ],
+        "summary": "Send Notification",
+        "operationId": "send_notification_api_notifications__user_id__send_post",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "User Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendNotificationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/notifications/{user_id}/backfill": {
+      "get": {
+        "tags": [
+          "Real-time Notifications"
+        ],
+        "summary": "Get Backfill",
+        "description": "Debug/validation helper: return current in-memory backfill for a user.\n\nQuery:\n    - since: return events with id > since\n    - topics: comma-separated filter",
+        "operationId": "get_backfill_api_notifications__user_id__backfill_get",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "User Id"
+            }
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Since"
+            }
+          },
+          {
+            "name": "topics",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Topics"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/doc-titles/docs/titles": {
       "get": {
         "tags": [
@@ -1901,7 +2080,6 @@
     "/api/games/gacha/config": {
       "get": {
         "tags": [
-          "Game Collection",
           "Games"
         ],
         "summary": "Get Gacha Config",
@@ -1926,7 +2104,6 @@
     "/api/games/gacha/stats": {
       "get": {
         "tags": [
-          "Game Collection",
           "Games"
         ],
         "summary": "Get Gacha Stats",
@@ -1951,7 +2128,6 @@
     "/api/games/": {
       "get": {
         "tags": [
-          "Game Collection",
           "Games"
         ],
         "summary": "Get Games List",
@@ -1977,7 +2153,6 @@
     "/api/games/slot/spin": {
       "post": {
         "tags": [
-          "Game Collection",
           "Games"
         ],
         "summary": "Spin Slot",
@@ -2025,7 +2200,6 @@
     "/api/games/rps/play": {
       "post": {
         "tags": [
-          "Game Collection",
           "Games"
         ],
         "summary": "Play Rps",
@@ -2073,7 +2247,6 @@
     "/api/games/gacha/pull": {
       "post": {
         "tags": [
-          "Game Collection",
           "Games"
         ],
         "summary": "Pull Gacha",
@@ -2121,7 +2294,6 @@
     "/api/games/crash/bet": {
       "post": {
         "tags": [
-          "Game Collection",
           "Games"
         ],
         "summary": "Place Crash Bet",
@@ -2169,7 +2341,6 @@
     "/api/games/stats/{user_id}": {
       "get": {
         "tags": [
-          "Game Collection",
           "Games"
         ],
         "summary": "Get Game Stats",
@@ -2213,7 +2384,6 @@
     "/api/games/profile/{user_id}/stats": {
       "get": {
         "tags": [
-          "Game Collection",
           "Games"
         ],
         "summary": "Get Profile Game Stats",
@@ -2257,7 +2427,6 @@
     "/api/games/leaderboard": {
       "get": {
         "tags": [
-          "Game Collection",
           "Games"
         ],
         "summary": "Get Game Leaderboard",
@@ -2322,7 +2491,6 @@
     "/api/games/achievements/{user_id}": {
       "get": {
         "tags": [
-          "Game Collection",
           "Games"
         ],
         "summary": "Get User Achievements",
@@ -2370,7 +2538,6 @@
     "/api/games/session/start": {
       "post": {
         "tags": [
-          "Game Collection",
           "Games"
         ],
         "summary": "Start Game Session",
@@ -2419,7 +2586,6 @@
     "/api/games/session/end": {
       "post": {
         "tags": [
-          "Game Collection",
           "Games"
         ],
         "summary": "End Game Session",
@@ -5646,6 +5812,34 @@
           "activity_level"
         ],
         "title": "SegmentStatsResponse"
+      },
+      "SendNotificationRequest": {
+        "properties": {
+          "message": {
+            "title": "Message"
+          },
+          "topic": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Topic"
+          },
+          "priority": {
+            "type": "integer",
+            "title": "Priority",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "title": "SendNotificationRequest"
       },
       "ShopPurchaseRequest": {
         "properties": {
