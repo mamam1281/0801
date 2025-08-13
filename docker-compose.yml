@@ -19,8 +19,6 @@ services:
     volumes:
       - ./cc-webapp/backend:/app
       - ./logs/backend:/app/logs:rw
-    ports:
-      - "${BACKEND_PORT:-8000}:8000"
     depends_on:
       - postgres
       - redis
@@ -45,8 +43,6 @@ services:
       - ./cc-webapp/frontend:/app
       - ./logs/frontend:/app/logs:rw
       - /app/node_modules
-    ports:
-      - "${FRONTEND_PORT:-3000}:3000"
     depends_on:
       - backend
     restart: unless-stopped
@@ -70,8 +66,6 @@ services:
       - ./data/postgres:/var/lib/postgresql/data:rw
       - ./logs/postgres:/var/log/postgresql:rw
       - ./data/init:/docker-entrypoint-initdb.d:ro
-    ports:
-      - "${POSTGRES_PORT:-5432}:5432"
     networks:
       - ccnet
     restart: unless-stopped
@@ -99,8 +93,6 @@ services:
     container_name: cc_zookeeper
     environment:
       ALLOW_ANONYMOUS_LOGIN: "yes"
-    ports:
-      - "2181:2181"
     networks:
       - ccnet
     restart: unless-stopped
@@ -116,8 +108,6 @@ services:
       ALLOW_PLAINTEXT_LISTENER: "yes"
     depends_on:
       - zookeeper
-    ports:
-      - "9092:9092"
     networks:
       - ccnet
     restart: unless-stopped

@@ -59,6 +59,7 @@ from app.routers import (
     rbac_demo,   # RBAC demo router
 )
 from app.routers import kafka_api
+from app.routers.notifications import sse_router as notifications_sse_router, api_router as notifications_api_router
 from app.kafka_client import start_consumer, stop_consumer, get_last_messages, is_consumer_ready
 
 # AI recommendation system router separate import (removed duplicate)
@@ -205,6 +206,8 @@ app.include_router(ai_router.router, tags=["AI Recommendation"])
 # Management & Monitoring (no prefix - routers have their own)
 app.include_router(dashboard.router)  # 태그 오버라이드 제거 - 이미 dashboard.py에서 "Dashboard" 태그를 지정함
 app.include_router(notifications.router, tags=["Real-time Notifications"])
+app.include_router(notifications_sse_router)
+app.include_router(notifications_api_router)
 
 # Individual Games (removed - consolidated into games.router)
 # app.include_router(rps.router, tags=["Rock Paper Scissors"])  # duplicated in games.router

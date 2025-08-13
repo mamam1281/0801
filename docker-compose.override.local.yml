@@ -27,4 +27,6 @@ services:
 
   zookeeper:
     container_name: cc_zookeeper_local
-    ports: []  # override to avoid binding host ports (e.g., 2181)
+    # Bind zookeeper to a non-default host port to avoid 2181 conflicts on Windows
+    ports:
+      - "22181:2181"
