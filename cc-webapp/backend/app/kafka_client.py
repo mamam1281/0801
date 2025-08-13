@@ -15,6 +15,7 @@ from kafka import KafkaProducer, KafkaConsumer
 from app.core.config import settings
 
 KAFKA_BOOTSTRAP_SERVERS = settings.kafka_bootstrap_servers or settings.KAFKA_BOOTSTRAP_SERVERS
+KAFKA_BOOTSTRAP_SERVERS = getattr(settings, "kafka_bootstrap_servers", None) or settings.KAFKA_BOOTSTRAP_SERVERS
 
 # --- Producer (kafka-python; lazy) ---
 _producer = None

@@ -26,7 +26,7 @@ class ShopRepository(BaseRepository[models.UserAction]):
         try:
             return self.db.query(models.UserAction)\
                 .filter(models.UserAction.user_id == user_id)\
-                .filter(models.UserAction.action_type.in_(['PURCHASE_GEMS', 'BUY_PACKAGE', 'SHOP_BUY']))\
+                .filter(models.UserAction.action_type.in_(['PURCHASE_GEMS', 'BUY_PACKAGE']))\
                 .order_by(models.UserAction.created_at.desc())\
                 .limit(limit)\
                 .all()

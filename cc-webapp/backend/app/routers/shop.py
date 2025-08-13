@@ -1,7 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
-import json
 from pydantic import BaseModel, Field
-from typing import Optional, List
+from typing import Optional
 from datetime import datetime
 
 from .. import models
@@ -49,8 +48,6 @@ from ..services.shop_service import ShopService
 from ..services.catalog_service import CatalogService
 from ..services.payment_gateway import PaymentGateway
 from ..services.token_service import TokenService
-from ..core.config import settings
-from ..kafka_client import send_kafka_message
 
 def get_shop_service(db = Depends(get_db)) -> ShopService:
     """Dependency provider for ShopService."""
@@ -62,29 +59,27 @@ class CatalogItem(BaseModel):
     sku: str
     name: str
     price_cents: int
+    discounted_price_cents: int
     gems: int
     discount_percent: int = 0
-    discount_ends_at: Optional[str] = None
+    discount_ends_at: Optional[datetime] = None
     min_rank: Optional[str] = None
-    effective_price_cents: int
 
 
-@router.get("/catalog", response_model=List[CatalogItem], summary="List shop catalog")
+@router.get("/catalog", response_model=list[CatalogItem], summary="List shop catalog")
 def list_catalog():
     items = []
-    now = datetime.utcnow()
     for p in CatalogService.list_products():
-        effective = CatalogService.compute_price_cents(p, 1)
         items.append(CatalogItem(
             id=p.id,
             sku=p.sku,
             name=p.name,
             price_cents=p.price_cents,
+            discounted_price_cents=CatalogService.compute_price_cents(p, 1),
             gems=p.gems,
             discount_percent=p.discount_percent or 0,
-            discount_ends_at=p.discount_ends_at.isoformat() if p.discount_ends_at else None,
+            discount_ends_at=p.discount_ends_at,
             min_rank=p.min_rank,
-            effective_price_cents=effective,
         ))
     return items
 
@@ -207,35 +202,12 @@ def buy_gems(
     db.add(models.UserReward(user_id=req.user_id, reward_id=reward.id))
 
     # Transaction log
-    action_payload = {
-        "sku": product.sku,
-        "price_cents": total_price_cents,
-        "quantity": req.quantity,
-        "charge_id": cap.charge_id,
-    }
     db.add(models.UserAction(
         user_id=req.user_id,
         action_type="SHOP_BUY",
-        action_data=json.dumps(action_payload),
+        action_data=f"{{'sku':'{product.sku}','price_cents':{total_price_cents},'quantity':{req.quantity},'charge_id':'{cap.charge_id}'}}",
     ))
     db.commit()
-
-    # Optional Kafka publish for analytics pipeline
-    try:
-        if settings.KAFKA_ENABLED:
-            send_kafka_message(settings.KAFKA_ACTIONS_TOPIC, {
-                "type": "SHOP_BUY",
-                "user_id": req.user_id,
-                "sku": product.sku,
-                "price_cents": total_price_cents,
-                "quantity": req.quantity,
-                "charge_id": cap.charge_id,
-                "gems_granted": total_gems,
-                "ts": datetime.utcnow().isoformat(),
-            })
-    except Exception as _e:
-        # Non-fatal in local/dev; logged by kafka_client
-        pass
 
     return BuyReceipt(
         success=True,

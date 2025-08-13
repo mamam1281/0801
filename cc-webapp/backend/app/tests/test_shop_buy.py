@@ -65,3 +65,13 @@ def test_buy_gems_payment_fail():
     else:
         # if the seed still passed, at least success is coherent
         assert body["gems_granted"] == 100
+
+
+def test_catalog_listing_and_price_structure():
+    resp = client.get("/api/shop/catalog")
+    assert resp.status_code == 200
+    items = resp.json()
+    assert isinstance(items, list) and len(items) >= 3
+    required = {"id", "sku", "name", "price_cents", "discounted_price_cents", "gems"}
+    for it in items:
+        assert required.issubset(set(it.keys()))

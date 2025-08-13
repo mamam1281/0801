@@ -723,6 +723,22 @@
         }
       }
     },
+    "/api/olap/health": {
+      "get": {
+        "summary": "Olap Health",
+        "operationId": "olap_health_api_olap_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/actions": {
       "post": {
         "tags": [
@@ -982,6 +998,32 @@
         }
       }
     },
+    "/api/shop/catalog": {
+      "get": {
+        "tags": [
+          "Shop",
+          "Shop"
+        ],
+        "summary": "List shop catalog",
+        "operationId": "list_catalog_api_shop_catalog_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CatalogItem"
+                  },
+                  "type": "array",
+                  "title": "Response List Catalog Api Shop Catalog Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/shop/purchase": {
       "post": {
         "tags": [
@@ -1008,6 +1050,48 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ShopPurchaseResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/shop/buy": {
+      "post": {
+        "tags": [
+          "Shop",
+          "Shop"
+        ],
+        "summary": "Buy premium gems (real money)",
+        "operationId": "buy_gems_api_shop_buy_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BuyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BuyReceipt"
                 }
               }
             }
@@ -4238,6 +4322,178 @@
           "items"
         ],
         "title": "BulkActions"
+      },
+      "BuyReceipt": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "user_id": {
+            "type": "integer",
+            "title": "User Id"
+          },
+          "product_id": {
+            "type": "integer",
+            "title": "Product Id"
+          },
+          "sku": {
+            "type": "string",
+            "title": "Sku"
+          },
+          "quantity": {
+            "type": "integer",
+            "title": "Quantity"
+          },
+          "total_price_cents": {
+            "type": "integer",
+            "title": "Total Price Cents"
+          },
+          "gems_granted": {
+            "type": "integer",
+            "title": "Gems Granted"
+          },
+          "new_gem_balance": {
+            "type": "integer",
+            "title": "New Gem Balance"
+          },
+          "charge_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Charge Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success",
+          "message",
+          "user_id",
+          "product_id",
+          "sku",
+          "quantity",
+          "total_price_cents",
+          "gems_granted",
+          "new_gem_balance"
+        ],
+        "title": "BuyReceipt"
+      },
+      "BuyRequest": {
+        "properties": {
+          "user_id": {
+            "type": "integer",
+            "title": "User Id"
+          },
+          "product_id": {
+            "type": "integer",
+            "title": "Product Id",
+            "description": "Catalog product id"
+          },
+          "quantity": {
+            "type": "integer",
+            "maximum": 99.0,
+            "minimum": 1.0,
+            "title": "Quantity",
+            "default": 1
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency",
+            "default": "USD"
+          },
+          "card_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Card Token"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id",
+          "product_id"
+        ],
+        "title": "BuyRequest"
+      },
+      "CatalogItem": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "sku": {
+            "type": "string",
+            "title": "Sku"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "price_cents": {
+            "type": "integer",
+            "title": "Price Cents"
+          },
+          "discounted_price_cents": {
+            "type": "integer",
+            "title": "Discounted Price Cents"
+          },
+          "gems": {
+            "type": "integer",
+            "title": "Gems"
+          },
+          "discount_percent": {
+            "type": "integer",
+            "title": "Discount Percent",
+            "default": 0
+          },
+          "discount_ends_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Discount Ends At"
+          },
+          "min_rank": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Rank"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "sku",
+          "name",
+          "price_cents",
+          "discounted_price_cents",
+          "gems"
+        ],
+        "title": "CatalogItem"
       },
       "ClaimRewardResponse": {
         "properties": {
