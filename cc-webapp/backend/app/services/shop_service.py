@@ -404,12 +404,15 @@ class ShopService:
             return {"success": False, "message": "Per-user limit reached"}
 
         price = int(pkg.price)
-        # Determine if promo is valid and track usage
+        # Determine if promo is valid and track usage; if promo provided but not applied, treat as invalid
         promo_applied = False
         if promo_code:
             old_price = price
-            price = self._apply_promo(price, promo_code, package_id, now)
-            promo_applied = price < old_price
+            new_price = self._apply_promo(price, promo_code, package_id, now)
+            promo_applied = new_price < old_price
+            if not promo_applied:
+                return {"success": False, "message": "Invalid or exhausted promo code"}
+            price = new_price
 
         # deduct tokens
         new_balance = TokenService(self.db).deduct_tokens(user_id, price)

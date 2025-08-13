@@ -7,10 +7,28 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 
 from ..database import get_db
+from ..core.config import settings
 from ..dependencies import get_current_user
 from ..services.admin_service import AdminService
 from ..services.shop_service import ShopService
 from .. import models
+
+# --- Dependency injection (place BEFORE router to avoid NameError in default deps) ---
+def get_admin_service(db = Depends(get_db)) -> AdminService:
+    """Admin service dependency"""
+    return AdminService(db)
+
+def get_shop_service(db = Depends(get_db)) -> ShopService:
+    return ShopService(db)
+
+async def require_admin_access(current_user = Depends(get_current_user)):
+    """Require admin access"""
+    if not getattr(current_user, "is_admin", False):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required"
+        )
+    return current_user
 
 router = APIRouter(prefix="/api/admin", tags=["Admin"])
 
@@ -44,6 +62,34 @@ class AdminUserUpdate(BaseModel):
     is_admin: Optional[bool] = None
     is_active: Optional[bool] = None
     user_rank: Optional[str] = None
+
+
+class ElevateUserRequest(BaseModel):
+    site_id: str
+
+
+@router.post("/users/elevate")
+async def elevate_user_dev_only(
+    payload: ElevateUserRequest,
+    db = Depends(get_db),
+):
+    """Development-only helper to elevate a user to admin for tests.
+
+    Allows setting is_admin=True for the given site_id without prior admin auth.
+    Guarded by ENVIRONMENT; only works in development/test.
+    """
+    if str(getattr(settings, "ENVIRONMENT", "development")).lower() not in ("dev", "development", "test", "testing"):
+        raise HTTPException(status_code=403, detail="Elevate allowed only in development/test")
+    u = db.query(models.User).filter(models.User.site_id == payload.site_id).first()
+    if not u:
+        raise HTTPException(status_code=404, detail="User not found")
+    u.is_admin = True
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to elevate user")
+    return {"success": True}
 
 
 @router.get("/users", response_model=List[AdminUserOut])
@@ -129,22 +175,7 @@ async def admin_delete_user(
         raise HTTPException(status_code=404, detail="User not found")
     return {"success": True}
 
-# Dependency injection
-def get_admin_service(db = Depends(get_db)) -> AdminService:
-    """Admin service dependency"""
-    return AdminService(db)
-
-def get_shop_service(db = Depends(get_db)) -> ShopService:
-    return ShopService(db)
-
-async def require_admin_access(current_user = Depends(get_current_user)):
-    """Require admin access"""
-    if not current_user.is_admin:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin access required"
-        )
-    return current_user
+# (dependencies defined above)
 
 # API endpoints
 @router.get("/stats", response_model=AdminStatsResponse)
@@ -407,3 +438,55 @@ async def admin_limited_disable(
         db.rollback()
         raise HTTPException(status_code=500, detail="Failed to disable package")
     return {"success": True, "message": "Disabled"}
+
+
+# ----- Promo Codes (admin) -----
+class PromoCodeUpsertRequest(BaseModel):
+    code: str
+    package_id: Optional[str] = None
+    discount_type: str = "flat"  # percent | flat
+    value: int = 0
+    starts_at: Optional[str] = None
+    ends_at: Optional[str] = None
+    is_active: Optional[bool] = True
+    max_uses: Optional[int] = None
+
+
+@router.post("/promo-codes/upsert")
+async def admin_promo_upsert(
+    req: PromoCodeUpsertRequest,
+    admin_user = Depends(require_admin_access),
+    db = Depends(get_db),
+):
+    from ..models.shop_models import ShopPromoCode
+    starts_at = datetime.fromisoformat(req.starts_at) if req.starts_at else None
+    ends_at = datetime.fromisoformat(req.ends_at) if req.ends_at else None
+    row = db.query(ShopPromoCode).filter(ShopPromoCode.code == req.code).first()
+    if not row:
+        row = ShopPromoCode(
+            code=req.code,
+            package_id=req.package_id,
+            discount_type=req.discount_type,
+            value=int(req.value),
+            starts_at=starts_at,
+            ends_at=ends_at,
+            is_active=True if req.is_active is None else bool(req.is_active),
+            max_uses=req.max_uses,
+            used_count=0,
+        )
+        db.add(row)
+    else:
+        row.package_id = req.package_id
+        row.discount_type = req.discount_type
+        row.value = int(req.value)
+        row.starts_at = starts_at
+        row.ends_at = ends_at
+        if req.is_active is not None:
+            row.is_active = bool(req.is_active)
+        row.max_uses = req.max_uses
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to upsert promo code")
+    return {"success": True, "message": "Upserted"}
