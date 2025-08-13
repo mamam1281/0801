@@ -181,6 +181,8 @@ __all__ = [
     "ShopProduct",
     "ShopDiscount",
     "ShopTransaction",
+    "ShopLimitedPackage",
+    "ShopPromoCode",
 ]
 
 # Content 모델들 추가
@@ -211,4 +213,6 @@ from .shop_models import (
     ShopProduct,
     ShopDiscount,
     ShopTransaction,
+    ShopLimitedPackage,
+    ShopPromoCode,
 )

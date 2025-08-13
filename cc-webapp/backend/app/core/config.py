@@ -52,6 +52,9 @@ class Settings(BaseSettings):
     VIP_DAILY_RPS_PLAYS: int = 5
     VIP_DAILY_GACHA_PULLS: int = 5
 
+    # Payments (dev/test adapter)
+    PAYMENT_GATEWAY_MODE: str = os.getenv("PAYMENT_GATEWAY_MODE", "always_success")
+
     # Slot configuration (symbol weights as JSON-like string env or default mapping)
     SLOT_SYMBOL_WEIGHTS: dict = {
         "🍒": 30,

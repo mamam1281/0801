@@ -52,3 +52,40 @@ class ShopTransaction(Base):
     extra = Column(JSON)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow)
+
+
+class ShopLimitedPackage(Base):
+    __tablename__ = "shop_limited_packages"
+
+    id = Column(Integer, primary_key=True)
+    package_id = Column(String(100), unique=True, index=True, nullable=False)
+    name = Column(String(200), nullable=False)
+    description = Column(String(1000))
+    price = Column(Integer, nullable=False)  # price in tokens
+    starts_at = Column(DateTime, nullable=True)
+    ends_at = Column(DateTime, nullable=True)
+    stock_total = Column(Integer, nullable=True)
+    stock_remaining = Column(Integer, nullable=True)
+    per_user_limit = Column(Integer, nullable=True)  # e.g., 1 means once per user
+    emergency_disabled = Column(Boolean, default=False)
+    contents = Column(JSON)  # e.g., {"bonus_tokens": 100, "items": [{"id":"x","qty":1}]}
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow)
+
+
+class ShopPromoCode(Base):
+    __tablename__ = "shop_promo_codes"
+
+    id = Column(Integer, primary_key=True)
+    code = Column(String(64), unique=True, index=True, nullable=False)
+    package_id = Column(String(100), index=True, nullable=True)  # null means global
+    discount_type = Column(String(20), nullable=False, default='flat')  # percent|flat
+    value = Column(Integer, nullable=False, default=0)
+    starts_at = Column(DateTime, nullable=True)
+    ends_at = Column(DateTime, nullable=True)
+    is_active = Column(Boolean, default=True)
+    max_uses = Column(Integer, nullable=True)
+    used_count = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow)
