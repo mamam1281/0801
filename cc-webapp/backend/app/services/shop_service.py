@@ -404,7 +404,12 @@ class ShopService:
             return {"success": False, "message": "Per-user limit reached"}
 
         price = int(pkg.price)
-        price = self._apply_promo(price, promo_code, package_id, now)
+        # Determine if promo is valid and track usage
+        promo_applied = False
+        if promo_code:
+            old_price = price
+            price = self._apply_promo(price, promo_code, package_id, now)
+            promo_applied = price < old_price
 
         # deduct tokens
         new_balance = TokenService(self.db).deduct_tokens(user_id, price)
@@ -431,6 +436,11 @@ class ShopService:
         )
         try:
             self.db.add(t)
+            # If promo used, increment usage counter (best-effort)
+            if promo_applied and self._table_exists('shop_promo_codes'):
+                pc = self.db.query(models.ShopPromoCode).filter(models.ShopPromoCode.code == promo_code).first()
+                if pc:
+                    pc.used_count = int(pc.used_count or 0) + 1
             self.db.commit()
         except Exception:
             self.db.rollback()

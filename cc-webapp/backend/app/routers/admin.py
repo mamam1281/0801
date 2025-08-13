@@ -27,6 +27,108 @@ class UserBanRequest(BaseModel):
     reason: str
     duration_hours: Optional[int] = None
 
+
+# ---- Admin Users API ----
+class AdminUserOut(BaseModel):
+    id: int
+    site_id: str
+    nickname: str
+    phone_number: Optional[str] = None
+    is_admin: bool
+    is_active: bool
+    user_rank: Optional[str] = None
+    cyber_token_balance: int
+
+
+class AdminUserUpdate(BaseModel):
+    is_admin: Optional[bool] = None
+    is_active: Optional[bool] = None
+    user_rank: Optional[str] = None
+
+
+@router.get("/users", response_model=List[AdminUserOut])
+async def admin_list_users(
+    search: Optional[str] = None,
+    skip: int = 0,
+    limit: int = 50,
+    admin_user = Depends(require_admin_access),
+    admin_service: AdminService = Depends(get_admin_service),
+):
+    users = admin_service.list_users(skip=skip, limit=min(limit, 200), search=search)
+    out: List[AdminUserOut] = []
+    for u in users:
+        out.append(AdminUserOut(
+            id=u.id,
+            site_id=u.site_id,
+            nickname=u.nickname,
+            phone_number=getattr(u, 'phone_number', None),
+            is_admin=bool(getattr(u, 'is_admin', False)),
+            is_active=bool(getattr(u, 'is_active', True)),
+            user_rank=str(getattr(u, 'user_rank', None) or getattr(u, 'rank', None) or ''),
+            cyber_token_balance=int(getattr(u, 'cyber_token_balance', 0) or 0),
+        ))
+    return out
+
+
+@router.get("/users/{user_id}", response_model=AdminUserOut)
+async def admin_get_user(
+    user_id: int,
+    admin_user = Depends(require_admin_access),
+    admin_service: AdminService = Depends(get_admin_service),
+):
+    u = admin_service.get_user_details(user_id)
+    if not u:
+        raise HTTPException(status_code=404, detail="User not found")
+    return AdminUserOut(
+        id=u.id,
+        site_id=u.site_id,
+        nickname=u.nickname,
+        phone_number=getattr(u, 'phone_number', None),
+        is_admin=bool(getattr(u, 'is_admin', False)),
+        is_active=bool(getattr(u, 'is_active', True)),
+        user_rank=str(getattr(u, 'user_rank', None) or getattr(u, 'rank', None) or ''),
+        cyber_token_balance=int(getattr(u, 'cyber_token_balance', 0) or 0),
+    )
+
+
+@router.put("/users/{user_id}", response_model=AdminUserOut)
+async def admin_update_user(
+    user_id: int,
+    payload: AdminUserUpdate,
+    admin_user = Depends(require_admin_access),
+    admin_service: AdminService = Depends(get_admin_service),
+):
+    u = admin_service.update_user_fields(
+        user_id,
+        is_admin=payload.is_admin,
+        is_active=payload.is_active,
+        user_rank=payload.user_rank,
+    )
+    if not u:
+        raise HTTPException(status_code=404, detail="User not found")
+    return AdminUserOut(
+        id=u.id,
+        site_id=u.site_id,
+        nickname=u.nickname,
+        phone_number=getattr(u, 'phone_number', None),
+        is_admin=bool(getattr(u, 'is_admin', False)),
+        is_active=bool(getattr(u, 'is_active', True)),
+        user_rank=str(getattr(u, 'user_rank', None) or getattr(u, 'rank', None) or ''),
+        cyber_token_balance=int(getattr(u, 'cyber_token_balance', 0) or 0),
+    )
+
+
+@router.delete("/users/{user_id}")
+async def admin_delete_user(
+    user_id: int,
+    admin_user = Depends(require_admin_access),
+    admin_service: AdminService = Depends(get_admin_service),
+):
+    ok = admin_service.delete_user(user_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="User not found")
+    return {"success": True}
+
 # Dependency injection
 def get_admin_service(db = Depends(get_db)) -> AdminService:
     """Admin service dependency"""
