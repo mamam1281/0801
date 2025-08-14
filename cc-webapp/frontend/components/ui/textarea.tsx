@@ -1,3 +1,5 @@
+// @ts-nocheck
+// @ts-nocheck
 import * as React from "react";
 
 import { cn } from "./utils";

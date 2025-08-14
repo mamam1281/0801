@@ -41,7 +41,7 @@ from .game_models import (
 from .user_models import UserSegment, VIPAccessLog
 
 # 알림 모델 추가
-from .notification_models import Notification
+from .notification_models import Notification, NotificationCampaign
 
 # Quiz 모델들 추가
 from .quiz_models import (
@@ -119,6 +119,7 @@ __all__ = [
     
     # Notifications
     "Notification",
+    "NotificationCampaign",
     
     # Quiz
     "QuizCategory",

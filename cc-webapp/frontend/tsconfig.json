@@ -60,6 +60,9 @@
       ],
       "types/*": [
         "./types/*"
+      ],
+      "next-themes": [
+        "./types/shims/next-themes.ts"
       ]
     }
   },
@@ -68,7 +71,8 @@
     "**/*.ts",
     "**/*.tsx",
     ".next/types/**/*.ts",
-    "components/ui/alert-dialog.tsx"
+  "components/ui/alert-dialog.tsx",
+  "types/react-namespace-compat.d.ts"
   ],
   "exclude": [
     "node_modules"

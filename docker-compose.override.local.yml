@@ -24,8 +24,8 @@ services:
 
   zookeeper:
     container_name: cc_zookeeper_local
+    ports: []  # remove host binding for 2181
 
   olap_worker:
-    # env comes from .env.local via cc-manage.ps1
     labels:
       - "override=true"

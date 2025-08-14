@@ -25,6 +25,7 @@ aiokafka==0.9.0
 # 백그라운드 작업
 celery==5.3.4
 flower==2.0.1
+apscheduler==3.10.4
 
 # 로깅 및 모니터링
 structlog==23.2.0
