@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
-import { Label } from './ui/label';
+import { Label } from './ui/Label';
 
 interface SignupFormData {
   userId: string;
@@ -42,18 +42,18 @@ export function SignupScreen({
   onBackToLogin,
   isLoading = false 
 }: SignupScreenProps) {
-  const [formData, setFormData] = useState<SignupFormData>({
+  const [formData, setFormData] = useState({
     userId: '',
     nickname: '',
     phoneNumber: '',
     password: '',
     confirmPassword: '',
     inviteCode: ''
-  });
+  } as SignupFormData);
   
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [errors, setErrors] = useState<Partial<SignupFormData>>({});
+  const [errors, setErrors] = useState({} as Partial<SignupFormData>);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
 

@@ -32,7 +32,8 @@ const buttonVariants = cva(
   }
 );
 type ButtonVariants = VariantProps<typeof buttonVariants>;
-interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement>, ButtonVariants {
+type NativeButtonProps = React.ComponentPropsWithoutRef<'button'>;
+interface ButtonProps extends NativeButtonProps, ButtonVariants {
   asChild?: boolean;
 }
 

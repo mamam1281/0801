@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
-import { Label } from './ui/label';
+import { Label } from './ui/Label';
 
 interface AdminLoginProps {
   onAdminLogin?: (adminId: string, password: string) => Promise<boolean>;
@@ -45,7 +45,7 @@ export function AdminLoginScreen({
   useEffect(() => {
     if (lockdownTime > 0) {
       const timer = setInterval(() => {
-        setLockdownTime(prev => {
+        setLockdownTime((prev: number) => {
           if (prev <= 1) {
             setIsLocked(false);
             setAttempts(0);
@@ -98,9 +98,9 @@ export function AdminLoginScreen({
   };
 
   const handleInputChange = (field: keyof typeof formData) => (
-    e: React.ChangeEvent<HTMLInputElement>
+    e: { target: { value: string } }
   ) => {
-    setFormData(prev => ({ ...prev, [field]: e.target.value }));
+    setFormData((prev: typeof formData) => ({ ...prev, [field]: e.target.value }));
     if (error) setError('');
   };
 

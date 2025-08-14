@@ -9,7 +9,7 @@ const nextConfig = {
     domains: ['images.unsplash.com'],
   },
   typescript: {
-    ignoreBuildErrors: true,
+  ignoreBuildErrors: false,
   },
   eslint: {
   ignoreDuringBuilds: false,

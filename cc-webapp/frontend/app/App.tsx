@@ -32,6 +32,8 @@ import {
 } from '../constants/appConstants';
 import { NOTIFICATION_STYLES } from '../constants/notificationConstants';
 
+type NotificationItem = { id: string | number; message: React.ReactNode };
+
 export default function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [hasInitialized, setHasInitialized] = useState(false);
@@ -115,7 +117,7 @@ export default function App() {
       {/* 📱 🎯 VIP 알림 시스템 */}
       <div className={NOTIFICATION_STYLES.CONTAINER}>
         <AnimatePresence>
-          {notifications.map((notification) => (
+          {notifications.map((notification: NotificationItem) => (
             <motion.div
               key={notification.id}
               initial={NOTIFICATION_STYLES.ANIMATION.INITIAL}
@@ -144,44 +146,48 @@ export default function App() {
       {/* 📱 메인 화면들 */}
       <AnimatePresence mode="wait">
         {currentScreen === 'loading' && (
+          <React.Fragment key="loading">
           <LoadingScreen
-            key="loading"
             onComplete={navigationHandlers.toLogin}
             gameTitle={APP_CONFIG.GAME_TITLE}
           />
+          </React.Fragment>
         )}
 
         {currentScreen === 'login' && (
+          <React.Fragment key="login">
           <LoginScreen
-            key="login"
             onLogin={handleLogin}
             onSwitchToSignup={navigationHandlers.toSignup}
             onAdminAccess={navigationHandlers.toAdminLogin}
             isLoading={isLoading}
           />
+          </React.Fragment>
         )}
 
         {currentScreen === 'signup' && (
+          <React.Fragment key="signup">
           <SignupScreen
-            key="signup"
             onSignup={handleSignup}
             onBackToLogin={navigationHandlers.toLogin}
             isLoading={isLoading}
           />
+          </React.Fragment>
         )}
 
         {currentScreen === 'admin-login' && (
+          <React.Fragment key="admin-login">
           <AdminLoginScreen
-            key="admin-login"
             onAdminLogin={handleAdminLogin}
             onBackToLogin={navigationHandlers.toLogin}
             isLoading={isLoading}
           />
+          </React.Fragment>
         )}
 
         {currentScreen === 'home-dashboard' && user && (
+          <React.Fragment key="home-dashboard">
           <HomeDashboard
-            key="home-dashboard"
             user={user}
             onLogout={handleLogout}
             onNavigateToGames={navigationHandlers.toGames}
@@ -192,11 +198,12 @@ export default function App() {
             onAddNotification={addNotification}
             onToggleSideMenu={toggleSideMenu}
           />
+          </React.Fragment>
         )}
 
         {currentScreen === 'game-dashboard' && user && (
+          <React.Fragment key="game-dashboard">
           <GameDashboard
-            key="game-dashboard"
             user={user}
             onNavigateToHome={navigationHandlers.toHome}
             onNavigateToSlot={navigationHandlers.toSlot}
@@ -207,11 +214,12 @@ export default function App() {
             onAddNotification={addNotification}
             onToggleSideMenu={toggleSideMenu}
           />
+          </React.Fragment>
         )}
 
         {currentScreen === 'shop' && user && (
+          <React.Fragment key="shop">
           <ShopScreen
-            key="shop"
             user={user}
             onBack={navigationHandlers.backToHome}
             onNavigateToInventory={navigationHandlers.toInventory}
@@ -219,105 +227,116 @@ export default function App() {
             onUpdateUser={updateUser}
             onAddNotification={addNotification}
           />
+          </React.Fragment>
         )}
 
         {currentScreen === 'inventory' && user && (
+          <React.Fragment key="inventory">
           <InventoryScreen
-            key="inventory"
             user={user}
             onBack={navigationHandlers.backToHome}
             onUpdateUser={updateUser}
             onAddNotification={addNotification}
           />
+          </React.Fragment>
         )}
 
         {currentScreen === 'profile' && user && (
+          <React.Fragment key="profile">
           <ProfileScreen
-            key="profile"
             onBack={navigationHandlers.backToHome}
             onAddNotification={addNotification}
           />
+          </React.Fragment>
         )}
 
         {currentScreen === 'settings' && user && (
+          <React.Fragment key="settings">
           <SettingsScreen
-            key="settings"
             user={user}
             onBack={navigationHandlers.backToHome}
             onUpdateUser={updateUser}
             onAddNotification={addNotification}
           />
+          </React.Fragment>
         )}
 
         {currentScreen === 'admin-panel' && user && (
+          <React.Fragment key="admin-panel">
           <AdminPanel
-            key="admin-panel"
             user={user}
             onBack={navigationHandlers.backToHome}
             onUpdateUser={updateUser}
             onAddNotification={addNotification}
           />
+          </React.Fragment>
         )}
 
         {currentScreen === 'event-mission-panel' && user && (
+          <React.Fragment key="event-mission-panel">
           <EventMissionPanel
-            key="event-mission-panel"
             user={user}
             onBack={navigationHandlers.backToHome}
             onUpdateUser={updateUser}
             onAddNotification={addNotification}
           />
+          </React.Fragment>
         )}
 
         {/* 🎮 게임들 */}
         {currentScreen === 'neon-slot' && user && (
+          <React.Fragment key="neon-slot">
           <NeonSlotGame
-            key="neon-slot"
             user={user}
             onBack={navigationHandlers.backToGames}
             onUpdateUser={updateUser}
             onAddNotification={addNotification}
           />
+          </React.Fragment>
         )}
 
         {currentScreen === 'rock-paper-scissors' && user && (
+          <React.Fragment key="rock-paper-scissors">
           <RockPaperScissorsGame
-            key="rock-paper-scissors"
             user={user}
             onBack={navigationHandlers.backToGames}
             onUpdateUser={updateUser}
             onAddNotification={addNotification}
           />
+          </React.Fragment>
         )}
 
         {currentScreen === 'gacha-system' && user && (
+          <React.Fragment key="gacha-system">
           <GachaSystem
-            key="gacha-system"
             user={user}
             onBack={navigationHandlers.backToGames}
             onUpdateUser={updateUser}
             onAddNotification={addNotification}
           />
+          </React.Fragment>
         )}
 
         {currentScreen === 'neon-crash' && user && (
+          <React.Fragment key="neon-crash">
           <NeonCrashGame
-            key="neon-crash"
             user={user}
             onBack={navigationHandlers.backToGames}
             onUpdateUser={updateUser}
             onAddNotification={addNotification}
           />
+          </React.Fragment>
         )}
 
         {currentScreen === 'streaming' && user && (
+          <React.Fragment key="streaming">
           <StreamingScreen
-            key="streaming"
             user={user}
             onBack={navigationHandlers.backToHome}
             onUpdateUser={updateUser}
             onAddNotification={addNotification}
           />
+          </React.Fragment>
         )}
       </AnimatePresence>
 

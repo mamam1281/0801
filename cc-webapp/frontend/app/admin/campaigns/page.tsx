@@ -15,7 +15,7 @@ type NewCampaign = {
 export default function AdminCampaignsPage() {
   const [msg, setMsg] = React.useState('');
   const [title, setTitle] = React.useState('Hello');
-  const [target, setTarget] = React.useState<'all'|'segment'|'user_ids'>('all');
+  const [target, setTarget] = React.useState('all' as 'all'|'segment'|'user_ids');
   const [segment, setSegment] = React.useState('');
   const [userIds, setUserIds] = React.useState('');
   const [result, setResult] = React.useState('');

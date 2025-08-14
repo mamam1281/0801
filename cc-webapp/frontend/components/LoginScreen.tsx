@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
-import { Label } from './ui/label';
+import { Label } from './ui/Label';
 
 interface LoginScreenProps {
   onLogin?: (nickname: string, password: string) => Promise<boolean>;
@@ -71,8 +71,8 @@ export function LoginScreen({
   };
 
   const handleInputChange =
-    (field: keyof typeof formData) => (e: React.ChangeEvent<HTMLInputElement>) => {
-      setFormData((prev) => ({ ...prev, [field]: e.target.value }));
+    (field: keyof typeof formData) => (e: { target: { value: string } }) => {
+      setFormData((prev: typeof formData) => ({ ...prev, [field]: e.target.value }));
       if (error) setError('');
     };
 
