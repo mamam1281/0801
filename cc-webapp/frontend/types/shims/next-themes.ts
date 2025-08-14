@@ -11,7 +11,7 @@ export type ThemeProviderProps = {
 
 export function ThemeProvider({ children }: ThemeProviderProps) {
   // No-op provider for build-time types; at runtime, do nothing
-  return children as React.ReactNode;
+  return children as any;
 }
 
 export function useTheme(): { theme?: Theme; setTheme: (t: Theme) => void } {

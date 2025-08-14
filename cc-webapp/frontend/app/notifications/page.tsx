@@ -1,30 +1,20 @@
-"use client";
 import React from "react";
 import NotificationClient from "@/components/NotificationClient";
 
-function decodeJwt(token: string): any {
-  try {
-    const [, payload] = token.split('.');
-    const json = atob(payload.replace(/-/g, '+').replace(/_/g, '/'));
-    return JSON.parse(json);
-  } catch { return null; }
-}
-
 export default function NotificationsPage() {
-  const [userId, setUserId] = React.useState(1 as number);
-  React.useEffect(() => {
-    try {
-      const token = localStorage.getItem('access_token') || localStorage.getItem('auth_token') || '';
-      const p = token ? decodeJwt(token) : null;
-      const uid = p?.sub || p?.user_id || p?.uid;
-      if (uid && !Number.isNaN(Number(uid))) setUserId(Number(uid));
-    } catch {}
-  }, []);
+  // Simple demo userId; in real app derive from auth context
+  const userId = 1;
   return (
     <main className="min-h-screen bg-black text-white p-6">
-      <h1 className="text-2xl mb-4">Real-time Notifications</h1>
-      <p className="opacity-70 mb-8">Receiving notifications for user {userId}.</p>
+      <h1 className="text-2xl mb-4">Real-time Notifications Demo</h1>
+      <p className="opacity-70 mb-8">This page opens a WebSocket to receive notifications for user {userId}.</p>
       <NotificationClient userId={userId} />
+      <div className="mt-6 text-sm opacity-80">
+        Use the backend endpoint to push a test message:
+        <pre className="mt-2 bg-zinc-900 p-3 rounded border border-zinc-800">
+          POST /ws/notify/{"{"}user_id{"}"}?message=hello
+        </pre>
+      </div>
     </main>
   );
 }

@@ -26,36 +26,28 @@
     "baseUrl": ".",
     "paths": {
       "@/*": [
-        "./src/*",
         "./*"
       ],
       "@/components/*": [
-        "./components/*",
-        "./src/components/*"
+        "./components/*"
       ],
       "@/hooks/*": [
-        "./hooks/*",
-        "./src/hooks/*"
+        "./hooks/*"
       ],
       "@/utils/*": [
-        "./src/utils/*",
         "./utils/*"
       ],
       "@/types/*": [
-        "./src/types/*",
         "./types/*"
       ],
       "components/*": [
-        "./components/*",
-        "./src/components/*"
+        "./components/*"
       ],
       "utils/*": [
-        "./src/utils/*",
         "./utils/*"
       ],
       "hooks/*": [
-        "./hooks/*",
-        "./src/hooks/*"
+        "./hooks/*"
       ],
       "styles/*": [
         "./styles/*"
@@ -67,7 +59,6 @@
         "./constants/*"
       ],
       "types/*": [
-        "./src/types/*",
         "./types/*"
       ],
       "next-themes": [
@@ -85,8 +76,6 @@
   "types/vendor-shims.d.ts"
   ],
   "exclude": [
-  "node_modules",
-  ".next",
-  "0801/**"
+    "node_modules"
   ]
 }

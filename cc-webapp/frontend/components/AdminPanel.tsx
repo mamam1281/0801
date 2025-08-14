@@ -5,7 +5,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft,
   Users,
-  UserPlus,
   Plus,
   Gift,
   Shield,
@@ -53,7 +52,7 @@ interface QuickAction {
 }
 
 export function AdminPanel({ user, onBack, onUpdateUser, onAddNotification }: AdminPanelProps) {
-  const [activeView, setActiveView] = useState('menu' as 'menu' | 'dashboard' | 'users' | 'shop' | 'security' | 'system');
+  const [activeView, setActiveView] = useState<'menu' | 'dashboard' | 'users' | 'shop' | 'security' | 'system'>('menu');
   const [searchQuery, setSearchQuery] = useState('');
 
   // 📊 핵심 통계 (간소화)

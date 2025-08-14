@@ -5,7 +5,7 @@ import { apiLogger } from '../../../utils/api';
 const API = 'http://localhost:8000/api';
 
 export default function AdminStatsPage() {
-  const [data, setData] = React.useState(null as Record<string, any> | null);
+  const [data, setData] = React.useState(null as any);
   const [error, setError] = React.useState(null as string | null);
 
   React.useEffect(() => {

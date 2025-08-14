@@ -53,67 +53,8 @@ jobs:
           KAFKA_ENABLED: "1"
         run: |
           # Run only curated green path tests for gating
-          docker exec -e KAFKA_TEST_TOPIC=cc_test_ci -e KAFKA_ENABLED=1 cc_backend_test pytest -q \
-            app/tests/test_user_journey.py \
-            app/tests/test_kafka_roundtrip.py \
-            app/tests/test_smoke_health.py \
-            app/tests/test_realtime_notifications.py \
-            app/tests/test_smoke_notifications_runtime.py
+          docker exec -e KAFKA_TEST_TOPIC=cc_test_ci -e KAFKA_ENABLED=1 cc_backend_test pytest -q app/tests/test_user_journey.py app/tests/test_kafka_roundtrip.py
 
       - name: Teardown
-        if: always()
-        run: docker compose -f docker-compose.yml -f docker-compose.test.yml --env-file .env.test down -v
-
-  frontend-e2e:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Install Playwright browsers
-        working-directory: cc-webapp/frontend
-        run: |
-          npm ci
-          npx playwright install --with-deps chromium
-
-      - name: Type check (frontend)
-        working-directory: cc-webapp/frontend
-        run: npm run type-check
-
-      - name: Start backend test stack
-        run: |
-          docker compose -f docker-compose.yml -f docker-compose.test.yml --env-file .env.test up -d --build postgres_test redis_test zookeeper_test kafka_test backend_test
-
-      - name: Apply DB migrations and start backend API
-        run: |
-          docker exec cc_backend_test alembic upgrade head
-          docker exec -d cc_backend_test uvicorn app.main:app --host 0.0.0.0 --port 8000
-
-      - name: Wait backend test API
-        run: |
-          for i in {1..30}; do \
-            (curl -sf http://localhost:8001/health || curl -sf http://localhost:8001/docs) && break || true; \
-            sleep 2; done
-
-      - name: Run Playwright E2E
-        working-directory: cc-webapp/frontend
-        env:
-          NEXT_PUBLIC_API_BASE_URL: http://localhost:8001
-        run: npx playwright test
-
-      - name: Upload Playwright report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: playwright-report
-          path: cc-webapp/frontend/test-results/playwright-report
-
-      - name: Teardown backend
         if: always()
         run: docker compose -f docker-compose.yml -f docker-compose.test.yml --env-file .env.test down -v

@@ -8,19 +8,28 @@ import { cn } from './utils';
 
 const Dialog = DialogPrimitive.Root;
 
-const DialogTrigger = React.forwardRef(({ ...props }: any, ref: React.Ref<any>) => (
+const DialogTrigger = React.forwardRef<
+  React.ElementRef<typeof DialogPrimitive.Trigger>,
+  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Trigger>
+>(({ ...props }: any, ref: React.Ref<any>) => (
   <DialogPrimitive.Trigger ref={ref} data-slot="dialog-trigger" {...props} />
 ));
 DialogTrigger.displayName = DialogPrimitive.Trigger.displayName;
 
 const DialogPortal = DialogPrimitive.Portal;
 
-const DialogClose = React.forwardRef(({ ...props }: any, ref: React.Ref<any>) => (
+const DialogClose = React.forwardRef<
+  React.ElementRef<typeof DialogPrimitive.Close>,
+  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Close>
+>(({ ...props }: any, ref: React.Ref<any>) => (
   <DialogPrimitive.Close ref={ref} data-slot="dialog-close" {...props} />
 ));
 DialogClose.displayName = DialogPrimitive.Close.displayName;
 
-const DialogOverlay = React.forwardRef(({ className, ...props }: any, ref: React.Ref<any>) => (
+const DialogOverlay = React.forwardRef<
+  React.ElementRef<typeof DialogPrimitive.Overlay>,
+  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Overlay>
+>(({ className, ...props }: any, ref: React.Ref<any>) => (
   <DialogPrimitive.Overlay
     ref={ref}
     data-slot="dialog-overlay"
@@ -33,7 +42,10 @@ const DialogOverlay = React.forwardRef(({ className, ...props }: any, ref: React
 ));
 DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
 
-const DialogContent = React.forwardRef(({ className, children, ...props }: any, ref: React.Ref<any>) => (
+const DialogContent = React.forwardRef<
+  React.ElementRef<typeof DialogPrimitive.Content>,
+  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
+>(({ className, children, ...props }: any, ref: React.Ref<any>) => (
   <DialogPortal>
     <DialogOverlay />
     <DialogPrimitive.Content
@@ -55,7 +67,8 @@ const DialogContent = React.forwardRef(({ className, children, ...props }: any, 
 ));
 DialogContent.displayName = DialogPrimitive.Content.displayName;
 
-const DialogHeader = React.forwardRef(( { className, ...props }: any, ref: React.Ref<any>) => (
+const DialogHeader = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
+  ({ className, ...props }: any, ref: React.Ref<any>) => (
     <div
       ref={ref}
       data-slot="dialog-header"
@@ -66,7 +79,8 @@ const DialogHeader = React.forwardRef(( { className, ...props }: any, ref: React
 );
 DialogHeader.displayName = 'DialogHeader';
 
-const DialogFooter = React.forwardRef(({ className, ...props }: any, ref: React.Ref<any>) => (
+const DialogFooter = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
+  ({ className, ...props }: any, ref: React.Ref<any>) => (
     <div
       ref={ref}
       data-slot="dialog-footer"

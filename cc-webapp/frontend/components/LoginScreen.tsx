@@ -55,7 +55,7 @@ export function LoginScreen({
 
     setIsSubmitting(true);
     try {
-      const success = await (onLogin ? onLogin(nickname, password) : Promise.resolve(true));
+      const success = await onLogin(nickname, password);
       if (success) {
         apiLogSuccess('POST /api/auth/login');
       } else {
