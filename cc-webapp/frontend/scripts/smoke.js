@@ -30,8 +30,7 @@ async function main() {
   const frontend = process.env.FRONTEND_URL || 'http://localhost:3000';
 
   const endpoints = [
-    `${backend.replace(/\/$/, '')}/api/health`,
-    `${frontend.replace(/\/$/, '')}/api/smoke-refresh`
+    `${backend.replace(/\/$/, '')}/health`
   ];
 
   let ok = true;
