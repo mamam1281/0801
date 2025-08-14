@@ -659,6 +659,8 @@ export function ShopScreen({
               onClick={(e: any) => e.stopPropagation()}
             >
               <div className="p-6">
+                {/* 미세 효과: 상단 얇은 네온 라인 */}
+                <div className="h-1 w-full mb-3 bg-gradient-to-r from-primary/40 via-gold/40 to-primary/40 rounded-full opacity-60" />
                 <div className="flex items-center gap-3 mb-4">
                   <div className="text-2xl">{selectedItem.icon}</div>
                   <div>

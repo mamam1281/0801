@@ -1,17 +1,31 @@
-export const dynamic = 'force-dynamic';
+"use client";
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { apiGet } from '@/utils/shopApi';
 
-export default async function PurchaseHistoryPage() {
-  let data: any[] = [];
-  let error: string | null = null;
-  try {
-    data = await apiGet('/api/shop/transactions?limit=50');
-  } catch (e: any) {
-    error = e?.message || '구매 내역을 불러오지 못했습니다.';
-  }
+export default function PurchaseHistoryPage() {
+  const [data, setData] = useState([] as any[]);
+  const [error, setError] = useState(null as string | null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const res = await apiGet('/api/shop/transactions?limit=50');
+        if (mounted) setData(res || []);
+      } catch (e: any) {
+        if (mounted) setError(e?.message || '구매 내역을 불러오지 못했습니다.');
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-black to-primary/5 p-6">
       <div className="max-w-4xl mx-auto">
@@ -19,7 +33,9 @@ export default async function PurchaseHistoryPage() {
           <h1 className="text-2xl font-bold">구매 히스토리</h1>
           <Link href="/" className="underline opacity-80 hover:opacity-100">홈으로</Link>
         </div>
-        {error ? (
+        {loading ? (
+          <div className="text-muted-foreground">불러오는 중…</div>
+        ) : error ? (
           <div className="bg-destructive/10 text-destructive border border-destructive/30 rounded-md p-4 mb-4">
             {error}
           </div>
