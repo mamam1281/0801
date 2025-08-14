@@ -17,7 +17,12 @@ export function createDefaultGameStats(): GameSpecific {
     gacha: {
       totalPulls: 0,
       legendaryPulls: 0,
-      totalValue: 0
+      totalValue: 0,
+      // Runtime UI fields
+      pulls: [],
+      totalSpent: 0,
+      epicCount: 0,
+      legendaryCount: 0
     },
     crash: { // 🚀 새로운 크래시 게임 기본 통계
       totalGames: 0,
@@ -57,7 +62,11 @@ export function ensureUserCompatibility(userData: any): User {
       userData.gameStats.gacha = {
         totalPulls: 0,
         legendaryPulls: 0,
-        totalValue: 0
+        totalValue: 0,
+        pulls: [],
+        totalSpent: 0,
+        epicCount: 0,
+        legendaryCount: 0
       };
     }
     

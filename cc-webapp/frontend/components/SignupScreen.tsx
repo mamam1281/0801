@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
-import { Label } from './ui/label';
+import { Label } from './ui/Label';
 
 interface SignupFormData {
   userId: string;
@@ -42,18 +42,18 @@ export function SignupScreen({
   onBackToLogin,
   isLoading = false 
 }: SignupScreenProps) {
-  const [formData, setFormData] = useState<SignupFormData>({
+  const [formData, setFormData] = useState({
     userId: '',
     nickname: '',
     phoneNumber: '',
     password: '',
     confirmPassword: '',
     inviteCode: ''
-  });
+  } as SignupFormData);
   
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [errors, setErrors] = useState<Partial<SignupFormData>>({});
+  const [errors, setErrors] = useState({} as Partial<SignupFormData>);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
 
@@ -124,11 +124,11 @@ export function SignupScreen({
   };
 
   const handleInputChange = (field: keyof SignupFormData) => (
-    e: React.ChangeEvent<HTMLInputElement>
+    e: any
   ) => {
-    setFormData(prev => ({ ...prev, [field]: e.target.value }));
+    setFormData((prev: SignupFormData) => ({ ...prev, [field]: e.target.value }));
     if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: undefined }));
+      setErrors((prev: Partial<SignupFormData>) => ({ ...prev, [field]: undefined }));
     }
   };
 
@@ -136,10 +136,10 @@ export function SignupScreen({
     if (currentStep === 1) {
       // Validate first step
       const step1Fields = ['userId', 'nickname', 'phoneNumber'];
-      const hasErrors = step1Fields.some(field => {
+        const hasErrors = step1Fields.some(field => {
         const key = field as keyof SignupFormData;
         if (!formData[key].trim()) {
-          setErrors(prev => ({ ...prev, [key]: '필수 입력 항목입니다.' }));
+          setErrors((prev: Partial<SignupFormData>) => ({ ...prev, [key]: '필수 입력 항목입니다.' }));
           return true;
         }
         return false;

@@ -44,25 +44,21 @@ export function NeonCrashGame({
   const [hasCashedOut, setHasCashedOut] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [autoCashout, setAutoCashout] = useState(0);
-  const [gameHistory, setGameHistory] = useState<
-    Array<{ multiplier: number; win: boolean; amount: number }>
-  >([]);
-  const [lastCrashMultipliers, setLastCrashMultipliers] = useState<number[]>([
-    1.2, 3.7, 1.5, 8.2, 2.1,
-  ]);
+  const [gameHistory, setGameHistory] = useState([] as Array<{ multiplier: number; win: boolean; amount: number }>);
+  const [lastCrashMultipliers, setLastCrashMultipliers] = useState([1.2, 3.7, 1.5, 8.2, 2.1] as number[]);
   const [winAmount, setWinAmount] = useState(0);
   const [showGraph, setShowGraph] = useState(true);
-  const [gameDataPoints, setGameDataPoints] = useState<Array<{ x: number; y: number }>>([]);
-  const [lastGameCurve, setLastGameCurve] = useState<Array<{ x: number; y: number }>>([]);
-  const [manualAutoCashout, setManualAutoCashout] = useState<number>(2.0);
+  const [gameDataPoints, setGameDataPoints] = useState([] as Array<{ x: number; y: number }>);
+  const [lastGameCurve, setLastGameCurve] = useState([] as Array<{ x: number; y: number }>);
+  const [manualAutoCashout, setManualAutoCashout] = useState(2.0 as number);
   const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
   const [graphTimeScale, setGraphTimeScale] = useState(10); // 그래프 시간 스케일 (초)
   const [gameStartTime, setGameStartTime] = useState(0);
 
   // Canvas 및 애니메이션 관련 Refs
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const animationRef = useRef<number | null>(null);
-  const lastTimestamp = useRef<number | null>(null);
+  const canvasRef = useRef(null) as { current: HTMLCanvasElement | null };
+  const animationRef = useRef(null) as { current: number | null };
+  const lastTimestamp = useRef(null) as { current: number | null };
 
   // 게임 세션 통계
   const [sessionStats, setSessionStats] = useState({
@@ -115,7 +111,7 @@ export function NeonCrashGame({
     animationRef.current = requestAnimationFrame(updateGame);
 
     // 세션 통계 업데이트
-    setSessionStats((prev) => ({
+    setSessionStats((prev: any) => ({
       ...prev,
       totalBets: prev.totalBets + 1,
     }));
@@ -194,7 +190,7 @@ export function NeonCrashGame({
       ctx.lineWidth = 2;
       ctx.beginPath();
 
-      lastGameCurve.forEach((point, index) => {
+  lastGameCurve.forEach((point: { x: number; y: number }, index: number) => {
         const x = (point.x / graphTimeScale) * rect.width;
         const y = rect.height - (point.y / 5) * rect.height;
 
@@ -219,7 +215,7 @@ export function NeonCrashGame({
       ctx.lineWidth = 3;
       ctx.beginPath();
 
-      gameDataPoints.forEach((point, index) => {
+  gameDataPoints.forEach((point: { x: number; y: number }, index: number) => {
         const x = (point.x / graphTimeScale) * rect.width;
         const y = rect.height - (point.y / 5) * rect.height;
 
@@ -275,7 +271,10 @@ export function NeonCrashGame({
 
       // 데이터 포인트 추가 (10프레임마다 한번)
       if (gameDataPoints.length === 0 || gameDataPoints.length % 10 === 0) {
-        setGameDataPoints((prev) => [...prev, { x: elapsedGameTime, y: newMultiplier }]);
+        setGameDataPoints((prev: Array<{ x: number; y: number }>) => [
+          ...prev,
+          { x: elapsedGameTime, y: newMultiplier },
+        ]);
       }
 
       // 그래프 업데이트
@@ -347,7 +346,7 @@ export function NeonCrashGame({
     setIsRunning(false);
 
     // 게임 기록 업데이트
-    setGameHistory((prev) => [
+    setGameHistory((prev: Array<{ multiplier: number; win: boolean; amount: number }>) => [
       {
         multiplier: multiplier,
         win: true,
@@ -357,7 +356,7 @@ export function NeonCrashGame({
     ]);
 
     // 세션 통계 업데이트
-    setSessionStats((prev) => ({
+    setSessionStats((prev: any) => ({
       ...prev,
       wins: prev.wins + 1,
       highestMultiplier: Math.max(prev.highestMultiplier, multiplier),
@@ -375,11 +374,11 @@ export function NeonCrashGame({
     }
 
     // 최근 멀티플라이어 업데이트
-    setLastCrashMultipliers((prev) => [finalMultiplier, ...prev].slice(0, 5));
+  setLastCrashMultipliers((prev: number[]) => [finalMultiplier, ...prev].slice(0, 5));
 
     // 게임 기록 업데이트
     if (!hasCashedOut) {
-      setGameHistory((prev) => [
+      setGameHistory((prev: Array<{ multiplier: number; win: boolean; amount: number }>) => [
         {
           multiplier: finalMultiplier,
           win: false,
@@ -389,7 +388,7 @@ export function NeonCrashGame({
       ]);
 
       // 세션 통계 업데이트
-      setSessionStats((prev) => ({
+      setSessionStats((prev: any) => ({
         ...prev,
         losses: prev.losses + 1,
         totalProfit: prev.totalProfit - betAmount,
@@ -560,7 +559,7 @@ export function NeonCrashGame({
 
             {/* 최근 멀티플라이어 목록 */}
             <div className="flex space-x-2 my-4 justify-center">
-              {lastCrashMultipliers.map((crash, index) => (
+              {lastCrashMultipliers.map((crash: number, index: number) => (
                 <div
                   key={index}
                   className={`rounded-md px-3 py-1 text-sm ${
@@ -610,7 +609,7 @@ export function NeonCrashGame({
                       max={10}
                       step={0.01}
                       value={[manualAutoCashout]}
-                      onValueChange={(values) => setManualAutoCashout(values[0])}
+                      onValueChange={(values: number[]) => setManualAutoCashout(values[0])}
                       disabled={isRunning}
                       className="py-2"
                     />
@@ -652,7 +651,7 @@ export function NeonCrashGame({
                     max={Math.min(user.goldBalance, 1000)}
                     step={1}
                     value={[betAmount]}
-                    onValueChange={(values) => changeBetAmount(values[0])}
+                    onValueChange={(values: number[]) => changeBetAmount(values[0])}
                     disabled={isRunning}
                     className="my-2"
                   />
@@ -832,7 +831,7 @@ export function NeonCrashGame({
 
             <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2">
               {gameHistory.length > 0 ? (
-                gameHistory.slice(0, 8).map((game, index) => (
+                gameHistory.slice(0, 8).map((game: { multiplier: number; win: boolean; amount: number }, index: number) => (
                   <div
                     key={index}
                     className={`flex justify-between items-center p-3 rounded-lg ${

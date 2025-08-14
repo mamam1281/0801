@@ -58,23 +58,23 @@ interface SpinResult {
 }
 
 export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: NeonSlotGameProps) {
-  const [reels, setReels] = useState<SlotSymbol[]>([SLOT_SYMBOLS[0], SLOT_SYMBOLS[1], SLOT_SYMBOLS[2]]);
-  const [spinningReels, setSpinningReels] = useState<SlotSymbol[][]>([[], [], []]);
+  const [reels, setReels] = useState([SLOT_SYMBOLS[0], SLOT_SYMBOLS[1], SLOT_SYMBOLS[2]] as SlotSymbol[]);
+  const [spinningReels, setSpinningReels] = useState([[], [], []] as SlotSymbol[][]);
   const [isSpinning, setIsSpinning] = useState(false);
-  const [reelStopOrder, setReelStopOrder] = useState<number[]>([]);
+  const [reelStopOrder, setReelStopOrder] = useState([] as number[]);
   const [betAmount, setBetAmount] = useState(100);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [winAmount, setWinAmount] = useState(0);
   const [isWin, setIsWin] = useState(false);
-  const [winningPositions, setWinningPositions] = useState<boolean[]>([false, false, false]);
+  const [winningPositions, setWinningPositions] = useState([false, false, false] as boolean[]);
   const [currentJackpot, setCurrentJackpot] = useState(50000);
   const [consecutiveWins, setConsecutiveWins] = useState(0);
   const [showWinModal, setShowWinModal] = useState(false);
   const [multiplier, setMultiplier] = useState(1);
-  const [particles, setParticles] = useState<Array<{id: number, x: number, y: number, type: string}>>([]);
+  const [particles, setParticles] = useState([] as Array<{ id: number; x: number; y: number; type: string }>);
   const [isAutoSpinning, setIsAutoSpinning] = useState(false);
   const [autoSpinCount, setAutoSpinCount] = useState(0);
-  const [coinDrops, setCoinDrops] = useState<Array<{id: number, x: number, delay: number}>>([]);
+  const [coinDrops, setCoinDrops] = useState([] as Array<{ id: number; x: number; delay: number }>);
   
   // Jackpot calculation
   useEffect(() => {
@@ -86,7 +86,7 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
     if (isAutoSpinning && autoSpinCount > 0 && !isSpinning) {
       const timer = setTimeout(() => {
         handleSpin();
-        setAutoSpinCount((prev) => prev - 1);
+  setAutoSpinCount((prev: number) => prev - 1);
       }, 1500);
       return () => clearTimeout(timer);
     } else if (autoSpinCount === 0) {
@@ -248,12 +248,12 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
     // Stop reels one by one
     for (let i = 0; i < stopOrder.length; i++) {
       setTimeout(() => {
-        setReels((prev) => {
+    setReels((prev: SlotSymbol[]) => {
           const newReels = [...prev];
           newReels[stopOrder[i]] = result.finalReels[stopOrder[i]];
           return newReels;
         });
-        setReelStopOrder((prev) => [...prev, stopOrder[i]]);
+  setReelStopOrder((prev: number[]) => [...prev, stopOrder[i]]);
       }, reelStopTimes[i]);
     }
 
@@ -263,7 +263,7 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
         setIsWin(true);
         setWinAmount(result.winAmount);
         setWinningPositions(result.winningPositions);
-        setConsecutiveWins((prev) => prev + 1);
+  setConsecutiveWins((prev: number) => prev + 1);
 
         // Enhanced particle effects based on win type
         if (result.isJackpot) {
@@ -342,7 +342,7 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
     <div className="min-h-screen bg-gradient-to-br from-background via-black to-primary-soft relative overflow-hidden">
       {/* Enhanced Particle Effects */}
       <AnimatePresence>
-        {particles.map((particle) => (
+      {particles.map((particle: { id: number; x: number; y: number; type: string }) => (
           <motion.div
             key={particle.id}
             initial={{
@@ -372,7 +372,7 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
 
       {/* Coin Drop Effects */}
       <AnimatePresence>
-        {coinDrops.map((coin) => (
+  {coinDrops.map((coin: { id: number; x: number; delay: number }) => (
           <motion.div
             key={coin.id}
             initial={{
@@ -493,7 +493,7 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
 
           {/* 🎯 3개 개별 릴 - 각각 독립적으로 회전 */}
           <div className="grid grid-cols-3 gap-6 mb-6">
-            {reels.map((symbol, index) => (
+            {reels.map((symbol: SlotSymbol, index: number) => (
               <div
                 key={index}
                 className={`aspect-square glass-effect rounded-2xl relative overflow-hidden ${
@@ -518,7 +518,7 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
                         }}
                         className="absolute inset-0 flex flex-col justify-center"
                       >
-                        {spinningReels[index]?.slice(0, 3).map((spinSymbol, spinIndex) => (
+                        {spinningReels[index]?.slice(0, 3).map((spinSymbol: SlotSymbol, spinIndex: number) => (
                           <div
                             key={`spin-${index}-${spinIndex}`}
                             className="h-full flex items-center justify-center reel-blur"
@@ -624,7 +624,7 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
               <div className="flex items-center gap-4 mb-3">
                 <Slider
                   value={[betAmount]}
-                  onValueChange={(value) => setBetAmount(value[0])}
+                  onValueChange={(value: number[]) => setBetAmount(value[0])}
                   max={Math.min(user.goldBalance, 10000)}
                   min={50}
                   step={50}

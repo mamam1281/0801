@@ -35,7 +35,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/Tabs';
 import { Progress } from './ui/progress';
 import { Badge } from './ui/badge';
 import { Switch } from './ui/switch';
@@ -50,11 +50,11 @@ interface EventMissionPanelProps {
 export function EventMissionPanel({ user, onBack, onUpdateUser, onAddNotification }: EventMissionPanelProps) {
   const [activeTab, setActiveTab] = useState('events');
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [editingItem, setEditingItem] = useState<Event | Mission | null>(null);
+  const [editingItem, setEditingItem] = useState(null as Event | Mission | null);
   const [searchQuery, setSearchQuery] = useState('');
 
   // Mock events data
-  const [events, setEvents] = useState<Event[]>([
+  const [events, setEvents] = useState([
     {
       id: 'event_1',
       title: '🎄 크리스마스 특별 이벤트',
@@ -105,10 +105,10 @@ export function EventMissionPanel({ user, onBack, onUpdateUser, onAddNotificatio
       requirements: ['레벨 10 이상', '랭킹 상위 30%'],
       icon: '🏆'
     }
-  ]);
+  ] as Event[]);
 
   // Mock missions data
-  const [missions, setMissions] = useState<Mission[]>([
+  const [missions, setMissions] = useState([
     {
       id: 'mission_1',
       title: '일일 로그인',
@@ -161,7 +161,7 @@ export function EventMissionPanel({ user, onBack, onUpdateUser, onAddNotificatio
       icon: '⭐',
       requirements: ['레벨 10 달성']
     }
-  ]);
+  ] as Mission[]);
 
   // Fetch API data
   const fetchData = async () => {
@@ -279,13 +279,13 @@ export function EventMissionPanel({ user, onBack, onUpdateUser, onAddNotificatio
   }, []);
 
   // Statistics
-  const activeEvents = events.filter(e => e.status === 'active').length;
-  const completedMissions = missions.filter(m => m.status === 'completed').length;
-  const totalParticipants = events.reduce((sum, e) => sum + (e.participants || 0), 0);
+  const activeEvents = events.filter((e: Event) => e.status === 'active').length;
+  const completedMissions = missions.filter((m: Mission) => m.status === 'completed').length;
+  const totalParticipants = events.reduce((sum: number, e: Event) => sum + (e.participants || 0), 0);
 
   // Handle mission completion
   const handleCompleteMission = async (missionId: string) => {
-    const mission = missions.find(m => m.id === missionId);
+  const mission = missions.find((m: Mission) => m.id === missionId);
     if (!mission) return;
     
     try {
@@ -355,9 +355,9 @@ export function EventMissionPanel({ user, onBack, onUpdateUser, onAddNotificatio
       await eventMissionApi.events.join(parseInt(eventId));
       
       // 로컬 상태 업데이트
-      setEvents(prev => prev.map((e: Event) => 
+  setEvents((prev: Event[]) => prev.map((e: Event) => 
         e.id === eventId 
-          ? { ...e, participants: e.participants + 1, joined: true }
+          ? { ...e, participants: (e.participants || 0) + 1, joined: true }
           : e
       ));
       
@@ -528,7 +528,7 @@ export function EventMissionPanel({ user, onBack, onUpdateUser, onAddNotificatio
                 <Input
                   placeholder="이벤트 검색..."
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value as string)}
+                  onChange={(e: any) => setSearchQuery(e.target.value as string)}
                   className="pl-10"
                 />
               </div>
@@ -546,7 +546,7 @@ export function EventMissionPanel({ user, onBack, onUpdateUser, onAddNotificatio
 
             {/* Events Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {events.map((event, index) => (
+              {events.map((event: Event, index: number) => (
                 <motion.div
                   key={event.id}
                   initial={{ opacity: 0, y: 20 }}
@@ -555,10 +555,10 @@ export function EventMissionPanel({ user, onBack, onUpdateUser, onAddNotificatio
                   className="glass-effect rounded-xl p-6 card-hover-float relative overflow-hidden"
                 >
                   {/* Event Status Badge */}
-                  <div className={`absolute top-4 right-4 px-2 py-1 rounded-full text-xs font-bold text-white ${getStatusColor(event.status)}`}>
+                  <div className={`absolute top-4 right-4 px-2 py-1 rounded-full text-xs font-bold text-white ${getStatusColor(String(event.status || ''))}`}>
                     {event.status === 'active' ? '진행중' : 
                      event.status === 'scheduled' ? '예정' : 
-                     event.status === 'ended' ? '종료' : event.status}
+                     event.status === 'ended' ? '종료' : (event.status || '')}
                   </div>
 
                   {/* Event Header */}
@@ -572,12 +572,12 @@ export function EventMissionPanel({ user, onBack, onUpdateUser, onAddNotificatio
                       <div className="flex items-center gap-4 text-xs text-muted-foreground">
                         <div className="flex items-center gap-1">
                           <Clock className="w-3 h-3" />
-                          {event.endDate.toLocaleDateString()}
+                          {event.endDate ? (typeof event.endDate === 'string' ? new Date(event.endDate).toLocaleDateString() : event.endDate.toLocaleDateString()) : 'N/A'}
                         </div>
                         <div className="flex items-center gap-1">
                           <Users className="w-3 h-3" />
-                          {event.participants.toLocaleString()}
-                          {event.maxParticipants && `/${event.maxParticipants.toLocaleString()}`}
+                          {(event.participants || 0).toLocaleString()}
+                          {event.maxParticipants ? `/${event.maxParticipants.toLocaleString()}` : ''}
                         </div>
                       </div>
                     </div>
@@ -587,11 +587,11 @@ export function EventMissionPanel({ user, onBack, onUpdateUser, onAddNotificatio
                   {event.maxParticipants && (
                     <div className="mb-4">
                       <Progress 
-                        value={(event.participants / event.maxParticipants) * 100} 
+                        value={event.participants && event.maxParticipants ? (event.participants / event.maxParticipants) * 100 : 0} 
                         className="h-2"
                       />
                       <div className="text-xs text-muted-foreground mt-1 text-center">
-                        {Math.round((event.participants / event.maxParticipants) * 100)}% 달성
+                        {event.participants && event.maxParticipants ? `${Math.round((event.participants / event.maxParticipants) * 100)}% 달성` : '0% 달성'}
                       </div>
                     </div>
                   )}
@@ -600,7 +600,7 @@ export function EventMissionPanel({ user, onBack, onUpdateUser, onAddNotificatio
                   <div className="mb-4">
                     <div className="text-sm font-medium text-foreground mb-2">보상:</div>
                     <div className="flex flex-wrap gap-2">
-                      {event.rewards.map((reward: any, idx: number) => (
+                      {(event.rewards || []).map((reward: any, idx: number) => (
                         <Badge key={idx} variant="secondary" className="text-xs">
                           {reward.type === 'gold' ? `${reward.amount.toLocaleString()}G` :
                            reward.type === 'exp' ? `${reward.amount.toLocaleString()}XP` :
@@ -627,7 +627,7 @@ export function EventMissionPanel({ user, onBack, onUpdateUser, onAddNotificatio
 
                   {/* Action Button */}
                   <Button
-                    onClick={() => handleJoinEvent(event.id)}
+                    onClick={() => handleJoinEvent(String(event.id))}
                     disabled={event.status !== 'active'}
                     className={`w-full btn-hover-lift ${
                       event.type === 'limited' ? 'bg-gradient-to-r from-error to-warning' :
@@ -675,9 +675,9 @@ export function EventMissionPanel({ user, onBack, onUpdateUser, onAddNotificatio
           <TabsContent value="missions" className="space-y-6">
             {/* Mission Categories */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {['daily', 'weekly', 'achievement', 'special'].map((type) => {
-                const typeMissions = missions.filter(m => m.type === type);
-                const completed = typeMissions.filter(m => m.status === 'completed').length;
+              {['daily', 'weekly', 'achievement', 'special'].map((type: string) => {
+                const typeMissions = missions.filter((m: Mission) => m.type === type);
+                const completed = typeMissions.filter((m: Mission) => m.status === 'completed').length;
                 
                 return (
                   <div key={type} className="glass-effect rounded-xl p-4 text-center">
@@ -701,7 +701,7 @@ export function EventMissionPanel({ user, onBack, onUpdateUser, onAddNotificatio
 
             {/* Missions List */}
             <div className="space-y-4">
-              {missions.map((mission, index) => (
+              {missions.map((mission: Mission, index: number) => (
                 <motion.div
                   key={mission.id}
                   initial={{ opacity: 0, x: -20 }}
@@ -722,7 +722,7 @@ export function EventMissionPanel({ user, onBack, onUpdateUser, onAddNotificatio
                           
                           <Badge 
                             variant="outline" 
-                            className={`text-xs ${getDifficultyColor(mission.difficulty)}`}
+                            className={`text-xs ${getDifficultyColor(String(mission.difficulty || ''))}`}
                           >
                             {mission.difficulty === 'easy' ? '쉬움' :
                              mission.difficulty === 'medium' ? '보통' :
@@ -730,7 +730,7 @@ export function EventMissionPanel({ user, onBack, onUpdateUser, onAddNotificatio
                           </Badge>
                           
                           <Badge 
-                            className={`text-xs text-white ${getStatusColor(mission.status)}`}
+                            className={`text-xs text-white ${getStatusColor(String(mission.status || ''))}`}
                           >
                             {mission.status === 'completed' ? '완료' :
                              mission.status === 'locked' ? '잠금' : '진행중'}
@@ -747,15 +747,15 @@ export function EventMissionPanel({ user, onBack, onUpdateUser, onAddNotificatio
                               {mission.progress}/{mission.maxProgress}
                             </span>
                           </div>
-                          <Progress 
-                            value={(mission.progress / mission.maxProgress) * 100} 
+                            <Progress 
+                            value={mission.progress && mission.maxProgress ? (mission.progress / mission.maxProgress) * 100 : 0} 
                             className="h-2"
                           />
                         </div>
                         
                         {/* Rewards */}
                         <div className="flex flex-wrap gap-2 mb-3">
-                          {mission.rewards.map((reward, idx) => (
+                          {(mission.rewards || []).map((reward: any, idx: number) => (
                             <Badge key={idx} variant="secondary" className="text-xs">
                               {reward.type === 'gold' ? `${reward.amount.toLocaleString()}G` :
                                reward.type === 'exp' ? `${reward.amount.toLocaleString()}XP` :
@@ -768,7 +768,7 @@ export function EventMissionPanel({ user, onBack, onUpdateUser, onAddNotificatio
                         {mission.expiresAt && (
                           <div className="text-xs text-error flex items-center gap-1">
                             <Timer className="w-3 h-3" />
-                            {Math.ceil((mission.expiresAt.getTime() - Date.now()) / (1000 * 60 * 60))}시간 남음
+                            {mission.expiresAt ? Math.ceil(((typeof mission.expiresAt === 'string' ? new Date(mission.expiresAt) : mission.expiresAt).getTime() - Date.now()) / (1000 * 60 * 60)) : 0}시간 남음
                           </div>
                         )}
                       </div>
@@ -784,9 +784,9 @@ export function EventMissionPanel({ user, onBack, onUpdateUser, onAddNotificatio
                         <Button disabled variant="outline">
                           잠금
                         </Button>
-                      ) : mission.progress >= mission.maxProgress ? (
+                      ) : (mission.progress && mission.maxProgress && mission.progress >= mission.maxProgress) ? (
                         <Button
-                          onClick={() => handleCompleteMission(mission.id)}
+                          onClick={() => handleCompleteMission(String(mission.id))}
                           className="bg-gradient-game btn-hover-lift"
                         >
                           <Gift className="w-4 h-4 mr-2" />

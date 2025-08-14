@@ -25,3 +25,26 @@ class Notification(Base):
     
     # 관계
     user = relationship("User", back_populates="notifications")
+
+
+class NotificationCampaign(Base):
+    """알림/캠페인 스케줄 모델
+
+    - targeting_type: 'all' | 'segment' | 'user_ids'
+    - target_segment: 세그먼트 라벨 (segment 선택 시)
+    - user_ids: 콤마로 구분된 대상 유저 ID 목록 (user_ids 선택 시)
+    - scheduled_at: 예약 발송 시간 (UTC)
+    - status: 'scheduled' | 'sent' | 'cancelled'
+    """
+    __tablename__ = "notification_campaigns"
+
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String(200), nullable=False)
+    message = Column(Text, nullable=False)
+    targeting_type = Column(String(20), nullable=False, default="all")
+    target_segment = Column(String(50))
+    user_ids = Column(Text)
+    scheduled_at = Column(DateTime(timezone=True))
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    sent_at = Column(DateTime(timezone=True))
+    status = Column(String(20), nullable=False, default="scheduled")

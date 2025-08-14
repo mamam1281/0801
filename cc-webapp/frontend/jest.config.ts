@@ -4,6 +4,10 @@ const config: Config = {
 	testEnvironment: 'jsdom',
 	roots: ['<rootDir>'],
 	setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
+	globals: {
+		'test': true,
+		'expect': true,
+	},
 	moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json'],
 	transform: {
 		'^.+\\.(ts|tsx)$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.json' }],

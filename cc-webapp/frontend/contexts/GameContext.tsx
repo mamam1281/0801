@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useReducer, useCallback, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useReducer, useCallback, useEffect } from 'react';
 import { User } from '../types';
 import { ensureUserCompatibility, calculateDailyBonus } from '../utils/userUtils';
 import { validateUser, sanitizeInput } from '../utils/securityUtils';
@@ -113,10 +113,12 @@ interface GameContextType extends GameState {
   loadUser: () => Promise<User | null>;
 }
 
-const GameContext = createContext<GameContextType | undefined>(undefined);
+// React 19 disallows call-site generics on certain helper functions (createContext).
+// Use an assertion-style initializer to provide the type without using a call-site generic.
+const GameContext = createContext(undefined as unknown as GameContextType | undefined);
 
 interface GameProviderProps {
-  children: ReactNode;
+  children: React.ReactNode;
 }
 
 export function GameProvider({ children }: GameProviderProps) {

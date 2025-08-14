@@ -3,7 +3,8 @@ import { GameItem } from './index';
 export interface GachaItem extends GameItem {
   id: string;
   name: string;
-  type: string;
+  // Keep the same type union as GameItem to remain compatible
+  type: GameItem['type'];
   rarity: 'common' | 'rare' | 'epic' | 'legendary' | 'mythic';
   rate: number;
   quantity: number;

@@ -17,7 +17,7 @@ export function ProductionLoadingScreen({
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setProgress((prev) => {
+      setProgress((prev: number) => {
         const newValue = prev + 1;
         if (newValue >= 100) {
           clearInterval(interval);

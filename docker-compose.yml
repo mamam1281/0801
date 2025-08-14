@@ -106,8 +106,6 @@ services:
     container_name: cc_zookeeper
     environment:
       ALLOW_ANONYMOUS_LOGIN: "yes"
-    ports:
-      - "2181:2181"
     networks:
       - ccnet
     restart: unless-stopped

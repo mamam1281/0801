@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import { AppScreen } from '../types';
 
 export function useAppNavigation() {
-  const [currentScreen, setCurrentScreen] = useState<AppScreen>('loading');
+  const [currentScreen, setCurrentScreen] = useState('loading' as AppScreen);
   const [isSideMenuOpen, setIsSideMenuOpen] = useState(false);
 
   // 🎯 네비게이션 핸들러
@@ -40,7 +40,7 @@ export function useAppNavigation() {
 
   // 사이드 메뉴 핸들러
   const toggleSideMenu = useCallback(() => {
-    setIsSideMenuOpen(prev => !prev);
+    setIsSideMenuOpen((prev: boolean) => !prev);
   }, []);
 
   const closeSideMenu = useCallback(() => {

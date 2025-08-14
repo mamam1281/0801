@@ -122,12 +122,15 @@ export function getResponsivePopupClasses(popupType: PopupType): string {
     'dark:border-gray-700'
   ];
   
-  // 팝업 타입별 추가 클래스
-  const typeSpecificClasses = {
+  // 팝업 타입별 추가 클래스 (Typed to cover all PopupType keys)
+  const typeSpecificClasses: Record<PopupType, string[]> = {
     profile: ['overflow-y-auto', 'max-h-screen'],
     profileEdit: ['overflow-y-auto', 'max-h-screen'],
     settings: ['overflow-hidden'],
-    gacha: ['overflow-hidden', 'select-none']
+    gacha: ['overflow-hidden', 'select-none'],
+    rps: ['overflow-hidden', 'select-none'],
+    slots: ['overflow-hidden', 'select-none'],
+    roulette: ['overflow-hidden', 'select-none']
   };
   
   return [...baseClasses, ...typeSpecificClasses[popupType]].join(' ');

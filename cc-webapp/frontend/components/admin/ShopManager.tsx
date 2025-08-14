@@ -28,19 +28,19 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Badge } from '../ui/badge';
 import { Switch } from '../ui/switch';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
-import { Label } from '../ui/label';
+  import { Label } from '../ui/Label';
 
 interface ShopManagerProps {
   onAddNotification: (message: string) => void;
 }
 
 export function ShopManager({ onAddNotification }: ShopManagerProps) {
-  const [shopItems, setShopItems] = useState<ShopItem[]>([]);
+  const [shopItems, setShopItems] = useState([] as ShopItem[]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState<string>('all');
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [editingItem, setEditingItem] = useState<ShopItem | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [categoryFilter, setCategoryFilter] = useState('all' as string);
+  const [showCreateModal, setShowCreateModal] = useState(false as boolean);
+  const [editingItem, setEditingItem] = useState(null as ShopItem | null);
+  const [isLoading, setIsLoading] = useState(false as boolean);
 
   // Mock shop items
   useEffect(() => {
@@ -96,10 +96,10 @@ export function ShopManager({ onAddNotification }: ShopManagerProps) {
   }, []);
 
   // Filter items
-  const filteredItems = shopItems.filter(item => {
+  const filteredItems = shopItems.filter((item: ShopItem) => {
     const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          item.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         item.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()));
+                         item.tags.some((tag: string) => tag.toLowerCase().includes(searchQuery.toLowerCase()));
     
     const matchesCategory = categoryFilter === 'all' || item.category === categoryFilter;
     
@@ -115,7 +115,7 @@ export function ShopManager({ onAddNotification }: ShopManagerProps) {
       
       if (editingItem) {
         // Update existing item
-        setShopItems(prev => prev.map(item => 
+        setShopItems((prev: ShopItem[]) => prev.map((item: ShopItem) => 
           item.id === editingItem.id 
             ? { ...item, ...itemData, updatedAt: new Date() }
             : item
@@ -140,7 +140,7 @@ export function ShopManager({ onAddNotification }: ShopManagerProps) {
           tags: itemData.tags || []
         };
         
-        setShopItems(prev => [newItem, ...prev]);
+  setShopItems((prev: ShopItem[]) => [newItem, ...prev]);
         onAddNotification(`✅ "${newItem.name}" 아이템이 생성되었습니다.`);
       }
       
@@ -162,7 +162,7 @@ export function ShopManager({ onAddNotification }: ShopManagerProps) {
     try {
       await new Promise(resolve => setTimeout(resolve, 500));
       
-      setShopItems(prev => prev.filter(item => item.id !== itemId));
+  setShopItems((prev: ShopItem[]) => prev.filter((item: ShopItem) => item.id !== itemId));
       onAddNotification('🗑️ 아이템이 삭제되었습니다.');
     } catch (error) {
       onAddNotification('❌ 아이템 삭제에 실패했습니다.');
@@ -173,13 +173,13 @@ export function ShopManager({ onAddNotification }: ShopManagerProps) {
 
   // Toggle item active status
   const toggleItemStatus = async (itemId: string) => {
-    setShopItems(prev => prev.map(item => 
+    setShopItems((prev: ShopItem[]) => prev.map((item: ShopItem) => 
       item.id === itemId 
         ? { ...item, isActive: !item.isActive, updatedAt: new Date() }
         : item
     ));
     
-    const item = shopItems.find(i => i.id === itemId);
+    const item = shopItems.find((i: ShopItem) => i.id === itemId);
     onAddNotification(`${item?.isActive ? '⏸️' : '▶️'} "${item?.name}" 상태가 변경되었습니다.`);
   };
 
@@ -264,7 +264,7 @@ export function ShopManager({ onAddNotification }: ShopManagerProps) {
               </div>
               <div>
                 <div className="text-lg font-bold text-foreground">
-                  {shopItems.filter(item => item.isActive).length}
+                  {shopItems.filter((item: ShopItem) => item.isActive).length}
                 </div>
                 <div className="text-sm text-muted-foreground">활성 아이템</div>
               </div>
@@ -280,7 +280,7 @@ export function ShopManager({ onAddNotification }: ShopManagerProps) {
               </div>
               <div>
                 <div className="text-lg font-bold text-foreground">
-                  {shopItems.reduce((sum, item) => sum + (item.sales * item.price), 0).toLocaleString()}G
+                  {shopItems.reduce((sum: number, item: ShopItem) => sum + (item.sales * item.price), 0).toLocaleString()}G
                 </div>
                 <div className="text-sm text-muted-foreground">총 매출</div>
               </div>
@@ -296,7 +296,7 @@ export function ShopManager({ onAddNotification }: ShopManagerProps) {
               </div>
               <div>
                 <div className="text-lg font-bold text-foreground">
-                  {shopItems.reduce((sum, item) => sum + item.sales, 0).toLocaleString()}
+                  {shopItems.reduce((sum: number, item: ShopItem) => sum + item.sales, 0).toLocaleString()}
                 </div>
                 <div className="text-sm text-muted-foreground">총 판매량</div>
               </div>
@@ -312,7 +312,7 @@ export function ShopManager({ onAddNotification }: ShopManagerProps) {
           <Input
             placeholder="아이템 검색..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e: React.FormEvent<HTMLInputElement>) => setSearchQuery((e.currentTarget as HTMLInputElement).value)}
             className="pl-10"
           />
         </div>
@@ -334,7 +334,7 @@ export function ShopManager({ onAddNotification }: ShopManagerProps) {
 
       {/* Items Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-        {filteredItems.map((item, index) => (
+  {filteredItems.map((item: ShopItem, index: number) => (
           <motion.div
             key={item.id}
             initial={{ opacity: 0, y: 20 }}
@@ -472,7 +472,7 @@ function ItemModal({
   categories, 
   rarities 
 }: ItemModalProps) {
-  const [formData, setFormData] = useState<Partial<ShopItem>>({
+  const [formData, setFormData] = useState({
     name: '',
     description: '',
     price: 0,
@@ -481,7 +481,7 @@ function ItemModal({
     isActive: true,
     icon: '📦',
     tags: []
-  });
+  } as Partial<ShopItem>);
 
   useEffect(() => {
     if (editingItem) {
@@ -520,7 +520,7 @@ function ItemModal({
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 0.8, opacity: 0 }}
-          onClick={(e) => e.stopPropagation()}
+          onClick={(e: any) => e.stopPropagation()}
           className="glass-effect rounded-2xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto"
         >
           <div className="flex items-center justify-between mb-6">
@@ -539,7 +539,7 @@ function ItemModal({
                 <Input
                   id="name"
                   value={formData.name || ''}
-                  onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                  onChange={(e: any) => setFormData((prev: Partial<ShopItem>) => ({ ...prev, name: e.target.value }))}
                   placeholder="아이템 이름을 입력하세요"
                   required
                 />
@@ -550,7 +550,7 @@ function ItemModal({
                 <Input
                   id="icon"
                   value={formData.icon || ''}
-                  onChange={(e) => setFormData(prev => ({ ...prev, icon: e.target.value }))}
+                  onChange={(e: any) => setFormData((prev: Partial<ShopItem>) => ({ ...prev, icon: e.target.value }))}
                   placeholder="📦"
                   required
                 />
@@ -562,7 +562,7 @@ function ItemModal({
               <Textarea
                 id="description"
                 value={formData.description || ''}
-                onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                onChange={(e: any) => setFormData((prev: Partial<ShopItem>) => ({ ...prev, description: e.target.value }))}
                 placeholder="아이템 설명을 입력하세요"
                 rows={3}
               />
@@ -575,7 +575,7 @@ function ItemModal({
                   id="price"
                   type="number"
                   value={formData.price || 0}
-                  onChange={(e) => setFormData(prev => ({ ...prev, price: parseInt(e.target.value) || 0 }))}
+                  onChange={(e: any) => setFormData((prev: Partial<ShopItem>) => ({ ...prev, price: parseInt(e.target.value) || 0 }))}
                   placeholder="0"
                   min="0"
                   required
@@ -588,7 +588,7 @@ function ItemModal({
                   id="stock"
                   type="number"
                   value={formData.stock || ''}
-                  onChange={(e) => setFormData(prev => ({ ...prev, stock: e.target.value ? parseInt(e.target.value) : undefined }))}
+                  onChange={(e: any) => setFormData((prev: Partial<ShopItem>) => ({ ...prev, stock: e.target.value ? parseInt(e.target.value) : undefined }))}
                   placeholder="무제한"
                   min="0"
                 />
@@ -600,7 +600,7 @@ function ItemModal({
                   id="discount"
                   type="number"
                   value={formData.discount || ''}
-                  onChange={(e) => setFormData(prev => ({ ...prev, discount: e.target.value ? parseInt(e.target.value) : undefined }))}
+                  onChange={(e: any) => setFormData((prev: Partial<ShopItem>) => ({ ...prev, discount: e.target.value ? parseInt(e.target.value) : undefined }))}
                   placeholder="0"
                   min="0"
                   max="100"
@@ -613,7 +613,7 @@ function ItemModal({
                 <Label htmlFor="category">카테고리 *</Label>
                 <Select 
                   value={formData.category} 
-                  onValueChange={(value) => setFormData(prev => ({ ...prev, category: value as any }))}
+                  onValueChange={(value: string) => setFormData((prev: Partial<ShopItem>) => ({ ...prev, category: value }))}        
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -632,7 +632,7 @@ function ItemModal({
                 <Label htmlFor="rarity">희귀도 *</Label>
                 <Select 
                   value={formData.rarity} 
-                  onValueChange={(value) => setFormData(prev => ({ ...prev, rarity: value as any }))}
+                  onValueChange={(value: string) => setFormData((prev: Partial<ShopItem>) => ({ ...prev, rarity: value }))}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -653,9 +653,9 @@ function ItemModal({
               <Input
                 id="tags"
                 value={Array.isArray(formData.tags) ? formData.tags.join(', ') : ''}
-                onChange={(e) => setFormData(prev => ({ 
+                onChange={(e: any) => setFormData((prev: Partial<ShopItem>) => ({ 
                   ...prev, 
-                  tags: e.target.value.split(',').map(tag => tag.trim()).filter(Boolean)
+                  tags: e.target.value.split(',').map((tag: string) => tag.trim()).filter(Boolean)
                 }))}
                 placeholder="태그1, 태그2, 태그3"
               />
@@ -664,7 +664,7 @@ function ItemModal({
             <div className="flex items-center gap-3">
               <Switch
                 checked={formData.isActive ?? true}
-                onCheckedChange={(checked) => setFormData(prev => ({ ...prev, isActive: checked }))}
+                onCheckedChange={(checked: boolean) => setFormData((prev: Partial<ShopItem>) => ({ ...prev, isActive: checked }))}
               />
               <Label>아이템 활성화</Label>
             </div>

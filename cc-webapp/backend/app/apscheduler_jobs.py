@@ -2,6 +2,7 @@
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 # from apscheduler.schedulers.background import BackgroundScheduler # if not using asyncio for FastAPI
 from .utils.segment_utils import compute_rfm_and_update_segments
+from .services.campaign_dispatcher import dispatch_due_campaigns
 # Ensure database.py defines SessionLocal. If it's not created yet, this import will fail at runtime.
 # For now, assuming database.py and SessionLocal will be available.
 from .database import SessionLocal
@@ -23,6 +24,13 @@ def job_function():
         db = SessionLocal()
         print(f"[{datetime.utcnow()}] APScheduler: Running compute_rfm_and_update_segments job.")
         compute_rfm_and_update_segments(db)
+        # Also dispatch due campaigns
+        try:
+            dispatched = dispatch_due_campaigns(db)
+            if dispatched:
+                print(f"[{datetime.utcnow()}] APScheduler: Dispatched {dispatched} campaigns.")
+        except Exception as e:
+            print(f"[{datetime.utcnow()}] APScheduler: Error dispatching campaigns: {e}")
         print(f"[{datetime.utcnow()}] APScheduler: compute_rfm_and_update_segments job finished.")
     except Exception as e:
         print(f"[{datetime.utcnow()}] APScheduler: Error in job_function: {e}")
@@ -36,8 +44,9 @@ def start_scheduler():
         print(f"[{datetime.utcnow()}] APScheduler: Scheduler already running.")
         return
 
-    # Schedule to run daily at 2 AM UTC
+    # Schedule to run daily at 2 AM UTC and also every 5 minutes for campaign dispatch
     scheduler.add_job(job_function, 'cron', hour=2, minute=0, misfire_grace_time=3600) # Misfire grace time of 1hr
+    scheduler.add_job(job_function, 'interval', minutes=5, misfire_grace_time=300)
 
     # Run once on startup for local testing/verification (5 seconds after app start)
     # This helps confirm the job setup without waiting for 2 AM.

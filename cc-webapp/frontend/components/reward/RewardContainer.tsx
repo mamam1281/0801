@@ -62,8 +62,8 @@ interface PointTransaction {
 }
 
 export default function RewardContainer() {
-  const [selectedTab, setSelectedTab] = useState<'daily' | 'achievements' | 'level' | 'accumulated'>('daily');
-  const [modal, setModal] = useState<{
+  const [selectedTab, setSelectedTab] = useState('daily' as 'daily' | 'achievements' | 'level' | 'accumulated');
+  interface ModalState {
     isOpen: boolean;
     type: 'success' | 'error' | 'info';
     title: string;
@@ -74,12 +74,14 @@ export default function RewardContainer() {
       name?: string;
       icon?: React.ReactNode;
     };
-  }>({
+  }
+
+  const [modal, setModal] = useState({
     isOpen: false,
-    type: 'info',
+    type: 'info' as 'success' | 'error' | 'info',
     title: '',
     message: '',
-  });
+  } as ModalState);
 
   // 일일 출석 데이터
   const dailyRewards = [
@@ -244,7 +246,7 @@ export default function RewardContainer() {
   };
 
   const closeModal = () => {
-    setModal(prev => ({ ...prev, isOpen: false }));
+    setModal((prev: ModalState) => ({ ...prev, isOpen: false }));
   };
 
   const currentStreak = 7;

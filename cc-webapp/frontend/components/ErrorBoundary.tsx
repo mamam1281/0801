@@ -1,20 +1,20 @@
 'use client';
 
-import React, { Component, ErrorInfo, ReactNode } from 'react';
+import React, { Component } from 'react';
 import { motion } from 'framer-motion';
 import { AlertTriangle, RefreshCw, Home, Bug } from 'lucide-react';
 import { Button } from './ui/button';
 
 interface Props {
-  children: ReactNode;
-  fallback?: ReactNode;
-  onError?: (error: Error, errorInfo: ErrorInfo) => void;
+  children: React.ReactNode;
+  fallback?: React.ReactNode;
+  onError?: (error: Error, errorInfo: any) => void;
 }
 
 interface State {
   hasError: boolean;
   error: Error | null;
-  errorInfo: ErrorInfo | null;
+  errorInfo: any;
   errorId: string;
 }
 
@@ -37,7 +37,7 @@ class ErrorBoundary extends Component<Props, State> {
     };
   }
 
-  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+  componentDidCatch(error: Error, errorInfo: any) {
     this.setState({
       error,
       errorInfo,
@@ -58,7 +58,7 @@ class ErrorBoundary extends Component<Props, State> {
     }
   }
 
-  private reportError = (error: Error, errorInfo: ErrorInfo) => {
+  private reportError = (error: Error, errorInfo: any) => {
     // 실제 프로덕션에서는 Sentry, LogRocket 등의 서비스 사용
     const errorReport = {
       message: error.message,
@@ -189,7 +189,7 @@ export default ErrorBoundary;
 
 // Hook for functional components
 export function useErrorHandler() {
-  const handleError = React.useCallback((error: Error, errorInfo?: ErrorInfo) => {
+  const handleError = React.useCallback((error: Error, errorInfo?: any) => {
     console.error('Manual error handling:', error, errorInfo);
     
     // 에러를 상위 ErrorBoundary로 전파
@@ -201,7 +201,7 @@ export function useErrorHandler() {
 
 // 비동기 에러 처리용 훅
 export function useAsyncError() {
-  const [, setError] = React.useState<Error | null>(null);
+  const [, setError] = React.useState(null as Error | null);
   
   return React.useCallback((error: Error) => {
     setError(() => {
@@ -221,7 +221,7 @@ export function useErrorRecovery(onRecover?: () => void) {
     }
 
     setIsRecovering(true);
-    setRetryCount(prev => prev + 1);
+  setRetryCount((prev: number) => prev + 1);
 
     try {
       if (onRecover) {

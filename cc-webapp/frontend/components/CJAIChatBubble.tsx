@@ -33,17 +33,17 @@ export function CJAIChatBubble({
   onSendMessage 
 }: CJAIChatBubbleProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([
+  const [messages, setMessages] = useState([
     {
       id: '1',
       text: '안녕하세요! CJ AI 어시스턴트입니다. 무엇을 도와드릴까요? 😊',
       sender: 'ai',
       timestamp: new Date(),
     }
-  ]);
+  ] as Message[]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesEndRef = useRef(null as HTMLDivElement | null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -76,7 +76,7 @@ export function CJAIChatBubble({
       timestamp: new Date(),
     };
 
-    setMessages(prev => [...prev, userMessage]);
+  setMessages((prev: Message[]) => [...prev, userMessage]);
     setInputValue('');
     setIsLoading(true);
 
@@ -88,7 +88,7 @@ export function CJAIChatBubble({
       timestamp: new Date(),
       isTyping: true,
     };
-    setMessages(prev => [...prev, typingMessage]);
+  setMessages((prev: Message[]) => [...prev, typingMessage]);
 
     try {
       const response = onSendMessage 
@@ -96,8 +96,8 @@ export function CJAIChatBubble({
         : `네, "${inputValue}"에 대해 도움을 드릴 수 있습니다. CJ AI가 최선을 다해 답변드리겠습니다! ✨`;
 
       // Remove typing indicator and add real response
-      setMessages(prev => {
-        const filtered = prev.filter(m => m.id !== 'typing');
+      setMessages((prev: Message[]) => {
+        const filtered = prev.filter((m: Message) => m.id !== 'typing');
         return [...filtered, {
           id: Date.now().toString(),
           text: response,
@@ -106,8 +106,8 @@ export function CJAIChatBubble({
         }];
       });
     } catch (error) {
-      setMessages(prev => {
-        const filtered = prev.filter(m => m.id !== 'typing');
+      setMessages((prev: Message[]) => {
+        const filtered = prev.filter((m: Message) => m.id !== 'typing');
         return [...filtered, {
           id: Date.now().toString(),
           text: '죄송합니다. 일시적인 오류가 발생했습니다. 다시 시도해 주세요.',
@@ -168,7 +168,7 @@ export function CJAIChatBubble({
 
             {/* Messages */}
             <div className="flex-1 p-4 overflow-y-auto max-h-64 space-y-4">
-              {messages.map((message) => (
+              {messages.map((message: Message) => (
                 <motion.div
                   key={message.id}
                   initial={{ opacity: 0, y: 10 }}
@@ -230,7 +230,7 @@ export function CJAIChatBubble({
                   <input
                     type="text"
                     value={inputValue}
-                    onChange={(e) => setInputValue(e.target.value)}
+                    onChange={(e: any) => setInputValue(e.target.value)}
                     onKeyPress={handleKeyPress}
                     placeholder="메시지를 입력하세요..."
                     disabled={isLoading}
