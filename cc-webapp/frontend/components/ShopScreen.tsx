@@ -285,21 +285,21 @@ export function ShopScreen({
         {[...Array(20)].map((_, i) => (
           <motion.div
             key={i}
-            initial={{ 
+            initial={{
               opacity: 0,
               x: Math.random() * (typeof window !== 'undefined' ? window.innerWidth : 1000),
-              y: Math.random() * (typeof window !== 'undefined' ? window.innerHeight : 1000)
+              y: Math.random() * (typeof window !== 'undefined' ? window.innerHeight : 1000),
             }}
-            animate={{ 
+            animate={{
               opacity: [0, 0.4, 0],
               scale: [0, 2, 0],
-              rotate: 360
+              rotate: 360,
             }}
             transition={{
               duration: 10,
               repeat: Infinity,
               delay: i * 0.3,
-              ease: "easeInOut"
+              ease: 'easeInOut',
             }}
             className="absolute w-1.5 h-1.5 bg-gradient-to-r from-primary/40 to-gold/40 rounded-full"
           />
@@ -322,7 +322,7 @@ export function ShopScreen({
               <ArrowLeft className="w-4 h-4 mr-2" />
               뒤로가기
             </Button>
-            
+
             <div>
               <h1 className="text-xl lg:text-2xl font-bold text-gradient-metal">
                 💎 프리미엄 상점
@@ -340,7 +340,9 @@ export function ShopScreen({
             </div>
           </div>
           <div>
-            <Link href="/shop/history" className="text-sm underline opacity-80 hover:opacity-100">구매 히스토리</Link>
+            <Link href="/shop/history" className="text-sm underline opacity-80 hover:opacity-100">
+              구매 히스토리
+            </Link>
           </div>
         </div>
       </motion.header>
@@ -359,8 +361,7 @@ export function ShopScreen({
               onClick={onNavigateToInventory}
               className="glass-metal-hover bg-gradient-to-r from-success to-primary text-white border-0 px-8 py-3 metal-shine"
             >
-              <Package className="w-5 h-5 mr-2" />
-              내 아이템 보기
+              <Package className="w-5 h-5 mr-2" />내 아이템 보기
             </Button>
             <Button
               onClick={onNavigateToProfile}
@@ -390,7 +391,7 @@ export function ShopScreen({
                   <p className="text-muted-foreground">현재 소유하고 있는 프리미엄 아이템들</p>
                 </div>
               </div>
-              
+
               <Button
                 variant="outline"
                 onClick={onNavigateToInventory}
@@ -433,7 +434,7 @@ export function ShopScreen({
                     </motion.div>
                   );
                 })}
-                
+
                 {user.inventory.length > 16 && (
                   <motion.div
                     initial={{ opacity: 0, scale: 0.8 }}
@@ -443,12 +444,8 @@ export function ShopScreen({
                     className="glass-metal-hover bg-muted/20 rounded-xl p-4 border-2 border-dashed border-muted cursor-pointer hover:border-primary transition-colors text-center metal-shine"
                   >
                     <div className="text-3xl mb-3">📦</div>
-                    <div className="text-xs font-bold text-muted-foreground mb-2">
-                      더보기
-                    </div>
-                    <div className="text-xs text-primary">
-                      +{user.inventory.length - 16}개
-                    </div>
+                    <div className="text-xs font-bold text-muted-foreground mb-2">더보기</div>
+                    <div className="text-xs text-primary">+{user.inventory.length - 16}개</div>
                   </motion.div>
                 )}
               </div>
@@ -464,7 +461,9 @@ export function ShopScreen({
           className="mb-6"
         >
           <div className="text-center">
-            <h2 className="text-2xl font-bold text-gradient-primary mb-2">🛍️ 프리미엄 아이템 상점</h2>
+            <h2 className="text-2xl font-bold text-gradient-primary mb-2">
+              🛍️ 프리미엄 아이템 상점
+            </h2>
             <p className="text-muted-foreground">특별한 아이템으로 게임을 더욱 즐겁게!</p>
           </div>
         </motion.div>
@@ -475,7 +474,7 @@ export function ShopScreen({
             const styles = getRarityStyles(item.rarity);
             const finalPrice = Math.floor(item.price * (1 - item.discount / 100));
             const canAfford = user.goldBalance >= finalPrice;
-            
+
             return (
               <motion.div
                 key={item.id}
@@ -484,7 +483,9 @@ export function ShopScreen({
                 transition={{ delay: 0.3 + index * 0.1 }}
                 className="relative"
               >
-                <Card className={`glass-metal p-8 border-2 ${styles.borderColor} glass-metal-hover ${styles.glowColor} relative overflow-hidden metal-shine`}>
+                <Card
+                  className={`glass-metal p-8 border-2 ${styles.borderColor} glass-metal-hover ${styles.glowColor} relative overflow-hidden metal-shine`}
+                >
                   {/* 🏷️ 배지들 */}
                   <div className="absolute top-4 right-4 flex flex-col gap-2">
                     {item.discount > 0 && (
@@ -510,23 +511,29 @@ export function ShopScreen({
                   )}
 
                   {/* 🎨 아이템 아이콘 */}
-                  <div className={`glass-metal ${styles.bgColor} rounded-2xl w-20 h-20 mx-auto mb-6 flex items-center justify-center text-4xl border ${styles.borderColor} metal-shine`}>
+                  <div
+                    className={`glass-metal ${styles.bgColor} rounded-2xl w-20 h-20 mx-auto mb-6 flex items-center justify-center text-4xl border ${styles.borderColor} metal-shine`}
+                  >
                     {item.icon}
                   </div>
 
                   {/* 📝 아이템 정보 */}
                   <div className="text-center mb-6">
-                    <h3 className={`text-lg font-bold ${styles.textColor} mb-3`}>
-                      {item.name}
-                    </h3>
+                    <h3 className={`text-lg font-bold ${styles.textColor} mb-3`}>{item.name}</h3>
                     <p className="text-sm text-muted-foreground mb-4 leading-relaxed">
                       {item.description}
                     </p>
-                    
-                    <Badge className={`glass-metal text-white border ${styles.borderColor} bg-transparent px-3 py-1`}>
-                      {item.rarity === 'common' ? '일반' :
-                       item.rarity === 'rare' ? '레어' :
-                       item.rarity === 'epic' ? '에픽' : '전설'}
+
+                    <Badge
+                      className={`glass-metal text-white border ${styles.borderColor} bg-transparent px-3 py-1`}
+                    >
+                      {item.rarity === 'common'
+                        ? '일반'
+                        : item.rarity === 'rare'
+                          ? '레어'
+                          : item.rarity === 'epic'
+                            ? '에픽'
+                            : '전설'}
                     </Badge>
                   </div>
 
@@ -561,19 +568,22 @@ export function ShopScreen({
                         자세히
                       </Button>
                       <Button
-                      onClick={() => {
-                        setSelectedItem(item as any);
-                        setQty(1);
-                        setPurchaseError(null);
-                        setShowPurchaseModal(true);
-                      }}
-                      disabled={!canAfford}
-                      className={`w-full glass-metal-hover ${
-                        item.rarity === 'legendary' ? 'bg-gradient-to-r from-gold to-gold-light' :
-                        item.rarity === 'epic' ? 'bg-gradient-to-r from-primary to-primary-light' :
-                        item.rarity === 'rare' ? 'bg-gradient-to-r from-info to-primary' :
-                        'bg-gradient-metal'
-                      } hover:opacity-90 text-white font-bold py-3 disabled:opacity-50 disabled:cursor-not-allowed metal-shine`}
+                        onClick={() => {
+                          setSelectedItem(item as any);
+                          setQty(1);
+                          setPurchaseError(null);
+                          setShowPurchaseModal(true);
+                        }}
+                        disabled={!canAfford}
+                        className={`w-full glass-metal-hover ${
+                          item.rarity === 'legendary'
+                            ? 'bg-gradient-to-r from-gold to-gold-light'
+                            : item.rarity === 'epic'
+                              ? 'bg-gradient-to-r from-primary to-primary-light'
+                              : item.rarity === 'rare'
+                                ? 'bg-gradient-to-r from-info to-primary'
+                                : 'bg-gradient-metal'
+                        } hover:opacity-90 text-white font-bold py-3 disabled:opacity-50 disabled:cursor-not-allowed metal-shine`}
                       >
                         <ShoppingCart className="w-5 h-5 mr-2" />
                         {canAfford ? '구매하기' : '골드 부족'}
@@ -623,7 +633,13 @@ export function ShopScreen({
                   </div>
                 </div>
                 <div className="flex gap-3">
-                  <Button variant="outline" className="flex-1" onClick={() => setShowDetailModal(false)}>닫기</Button>
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => setShowDetailModal(false)}
+                  >
+                    닫기
+                  </Button>
                   <Button
                     className="flex-1 bg-gradient-to-r from-primary to-primary-light text-white"
                     onClick={() => {
@@ -632,7 +648,9 @@ export function ShopScreen({
                       setPurchaseError(null);
                       setShowPurchaseModal(true);
                     }}
-                  >구매하기</Button>
+                  >
+                    구매하기
+                  </Button>
                 </div>
               </div>
             </motion.div>
@@ -655,7 +673,7 @@ export function ShopScreen({
               animate={{ y: 0, opacity: 1, scale: 1 }}
               exit={{ y: 20, opacity: 0, scale: 0.98 }}
               transition={{ type: 'spring', stiffness: 260, damping: 22 }}
-              className="glass-metal w-full max-w-md rounded-2xl border border-metal shadow-2xl" 
+              className="glass-metal w-full max-w-md rounded-2xl border border-metal shadow-2xl"
               onClick={(e: any) => e.stopPropagation()}
             >
               <div className="p-6">
@@ -665,7 +683,9 @@ export function ShopScreen({
                   <div className="text-2xl">{selectedItem.icon}</div>
                   <div>
                     <div className="text-lg font-bold">구매 확인</div>
-                    <div className="text-muted-foreground text-sm">포인트가 차감됩니다. 진행하시겠습니까?</div>
+                    <div className="text-muted-foreground text-sm">
+                      포인트가 차감됩니다. 진행하시겠습니까?
+                    </div>
                   </div>
                 </div>
 
@@ -678,16 +698,33 @@ export function ShopScreen({
                     <div className="text-sm text-muted-foreground">수량</div>
                     {selectedItem.type === 'currency' ? (
                       <div className="flex items-center gap-2">
-                        <Button variant="outline" onClick={() => setQty((v: number) => Math.max(1, v - 1))} disabled={isPurchasing}>-</Button>
+                        <Button
+                          variant="outline"
+                          aria-label="수량 감소"
+                          onClick={() => setQty((v: number) => Math.max(1, v - 1))}
+                          disabled={isPurchasing}
+                        >
+                          -
+                        </Button>
                         <input
                           className="w-16 text-center rounded border bg-background"
                           type="number"
                           min={1}
                           value={qty}
-                          onChange={(e: any) => setQty(Math.max(1, parseInt(e.target.value || '1', 10)))}
+                          aria-label="수량 입력"
+                          onChange={(e: any) =>
+                            setQty(Math.max(1, parseInt(e.target.value || '1', 10)))
+                          }
                           disabled={isPurchasing}
                         />
-                        <Button variant="outline" onClick={() => setQty((v: number) => Math.min(99, v + 1))} disabled={isPurchasing}>+</Button>
+                        <Button
+                          variant="outline"
+                          aria-label="수량 증가"
+                          onClick={() => setQty((v: number) => Math.min(99, v + 1))}
+                          disabled={isPurchasing}
+                        >
+                          +
+                        </Button>
                       </div>
                     ) : (
                       <div className="opacity-70">1</div>
@@ -697,16 +734,21 @@ export function ShopScreen({
                     <div className="text-sm text-muted-foreground">가격</div>
                     <div className="font-bold text-gold">
                       {(
-                        Math.floor(selectedItem.price * (1 - selectedItem.discount / 100)) * Math.max(1, qty)
-                      ).toLocaleString()}G
+                        Math.floor(selectedItem.price * (1 - selectedItem.discount / 100)) *
+                        Math.max(1, qty)
+                      ).toLocaleString()}
+                      G
                     </div>
                   </div>
                   <div className="flex items-center justify-between">
                     <div className="text-sm text-muted-foreground">구매 후 잔액</div>
                     <div className="font-medium">
                       {(
-                        user.goldBalance - (Math.floor(selectedItem.price * (1 - selectedItem.discount / 100)) * Math.max(1, qty))
-                      ).toLocaleString()}G
+                        user.goldBalance -
+                        Math.floor(selectedItem.price * (1 - selectedItem.discount / 100)) *
+                          Math.max(1, qty)
+                      ).toLocaleString()}
+                      G
                     </div>
                   </div>
                 </div>
