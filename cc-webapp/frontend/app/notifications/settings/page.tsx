@@ -1,6 +1,6 @@
 "use client";
 import React from "react";
-import NotificationClient from "@/components/NotificationClient";
+import { NotificationSettings } from "@/components/NotificationSettings";
 
 function decodeJwt(token: string): any {
   try {
@@ -10,8 +10,9 @@ function decodeJwt(token: string): any {
   } catch { return null; }
 }
 
-export default function NotificationsPage() {
+export default function NotificationSettingsPage() {
   const [userId, setUserId] = React.useState(1 as number);
+  const baseUrl = React.useMemo(() => process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000', []);
   React.useEffect(() => {
     try {
       const token = localStorage.getItem('access_token') || localStorage.getItem('auth_token') || '';
@@ -22,9 +23,9 @@ export default function NotificationsPage() {
   }, []);
   return (
     <main className="min-h-screen bg-black text-white p-6">
-      <h1 className="text-2xl mb-4">Real-time Notifications</h1>
-      <p className="opacity-70 mb-8">Receiving notifications for user {userId}.</p>
-      <NotificationClient userId={userId} />
+      <h1 className="text-2xl mb-4">알림 설정</h1>
+      <p className="opacity-70 mb-8">사용자 {userId}의 알림 환경을 조정합니다.</p>
+      <NotificationSettings userId={userId} baseUrl={baseUrl} />
     </main>
   );
 }
