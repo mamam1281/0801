@@ -40,7 +40,7 @@ export function CJChatBubble({
       let index = 0;
       const timer = setInterval(() => {
         if (index < message.length) {
-          setDisplayedMessage(prev => prev + message[index]);
+          setDisplayedMessage((prev: string) => prev + message[index]);
           index++;
         } else {
           clearInterval(timer);

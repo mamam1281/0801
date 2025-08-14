@@ -13,10 +13,10 @@ export function useClientOnlyValue<T>(clientValue: T, serverValue: T): T {
   
   // 객체 생성을 한 번만 하기 위한 초기값 설정 (useRef는 서버/클라이언트 사이에 값 불일치 문제가 있음)
   // 따라서 useState를 사용하여 serverValue를 초기값으로 설정
-  const [initialValue] = useState<T>(serverValue);
+    const [initialValue] = useState(serverValue as T);
   
   // 클라이언트 사이드에서 한 번만 실행되는 플래그
-  const [hasClientRendered, setHasClientRendered] = useState<boolean>(false);
+    const [hasClientRendered, setHasClientRendered] = useState(false as boolean);
   
   // 클라이언트 사이드에서 마운트 후 1회만 실행
   useEffect(() => {

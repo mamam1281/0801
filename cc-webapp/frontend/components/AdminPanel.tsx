@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft,
   Users,
+  UserPlus,
   Plus,
   Gift,
   Shield,

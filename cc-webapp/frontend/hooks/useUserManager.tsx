@@ -8,7 +8,7 @@ import {
 import { ADMIN_ACCOUNTS, GAME_DEFAULTS, DEFAULT_ITEMS, NOTIFICATION_MESSAGES } from '../constants/appConstants';
 
 export function useUserManager() {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState(null as User | null);
 
   // 📱 사용자 데이터 업데이트 (메모이제이션)
   const updateUser = useCallback((updatedUser: User) => {

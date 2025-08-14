@@ -14,7 +14,7 @@ interface NotificationSystemProps {
 }
 
 export function NotificationSystem({ children }: NotificationSystemProps) {
-  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [notifications, setNotifications] = useState([] as Notification[]);
 
   // 🔧 고유 ID 생성기
   const generateNotificationId = useCallback(() => {
@@ -34,16 +34,16 @@ export function NotificationSystem({ children }: NotificationSystemProps) {
         timestamp: Date.now()
       };
       
-      setNotifications(prev => [newNotification, ...prev.slice(0, NOTIFICATION_CONFIG.MAX_COUNT - 1)]);
+  setNotifications((prev: Notification[]) => [newNotification, ...prev.slice(0, NOTIFICATION_CONFIG.MAX_COUNT - 1)]);
       
       setTimeout(() => {
-        setNotifications(prev => prev.filter(n => n.id !== newNotification.id));
+  setNotifications((prev: Notification[]) => prev.filter((n: Notification) => n.id !== newNotification.id));
       }, NOTIFICATION_CONFIG.DURATION);
     }
   }, [generateNotificationId]);
 
   // 알림 시스템을 children에게 전달하기 위한 렌더 프롭 패턴
-  const childrenWithNotifications = React.Children.map(children, child => {
+  const childrenWithNotifications = React.Children.map(children, (child: React.ReactNode) => {
     if (React.isValidElement(child)) {
       return React.cloneElement(child, { addNotification } as any);
     }
@@ -55,7 +55,7 @@ export function NotificationSystem({ children }: NotificationSystemProps) {
       {/* 📱 🎯 VIP 알림 시스템 (중요한 것만) - 고유 키 사용 */}
       <div className={NOTIFICATION_STYLES.CONTAINER}>
         <AnimatePresence>
-          {notifications.map((notification) => (
+          {notifications.map((notification: Notification) => (
             <motion.div
               key={notification.id}
               initial={NOTIFICATION_STYLES.ANIMATION.INITIAL}
@@ -76,7 +76,7 @@ export function NotificationSystem({ children }: NotificationSystemProps) {
 
 // Export the hook for external use
 export function useNotificationSystem() {
-  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [notifications, setNotifications] = useState([] as Notification[]);
 
   const generateNotificationId = useCallback(() => {
     const id = `notification-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
