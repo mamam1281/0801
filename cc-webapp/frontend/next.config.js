@@ -12,7 +12,7 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
   eslint: {
-    ignoreDuringBuilds: true,
+  ignoreDuringBuilds: false,
   },
   reactStrictMode: false,
   useFileSystemPublicRoutes: true,

@@ -2,11 +2,10 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  ArrowLeft, 
+import {
+  ArrowLeft,
   Heart,
   Eye,
-  Star,
   Gift,
   Crown,
   ThumbsUp,
@@ -14,18 +13,18 @@ import {
   Volume2,
   VolumeX,
   Send,
-  Diamond,
   Users,
   Play,
   Pause,
   Lock,
   Info,
-  Video,
   Image,
-  Calendar,
-  Clock,
   Sparkles,
-  Zap
+  Zap,
+  Clock,
+  Diamond,
+  Video,
+  Calendar,
 } from 'lucide-react';
 import { User } from '../types';
 import { Button } from './ui/button';
@@ -135,21 +134,23 @@ const VIDEO_GALLERY = [
   }
 ];
 
+type HeartAnim = { id: number; x: number; y: number; type: string };
+
 export function StreamingScreen({ user, onBack, onUpdateUser, onAddNotification }: StreamingScreenProps) {
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [isPlaying, setIsPlaying] = useState(true);
-  const [currentViewers, setCurrentViewers] = useState(EXCLUSIVE_VJ.currentViewers);
-  const [heartAnimations, setHeartAnimations] = useState<Array<{id: number, x: number, y: number, type: string}>>([]);
+  const [currentViewers, setCurrentViewers] = useState(EXCLUSIVE_VJ.currentViewers as number);
+  const [heartAnimations, setHeartAnimations] = useState([] as HeartAnim[]);
   const [showGiftMenu, setShowGiftMenu] = useState(false);
   const [showBenefitsModal, setShowBenefitsModal] = useState(false);
-  const [benefitType, setBenefitType] = useState<'gift' | 'vip' | 'private' | null>(null);
+  const [benefitType, setBenefitType] = useState(null as null | 'gift' | 'vip' | 'private');
   const [myHearts, setMyHearts] = useState(user.stats.gamesWon * 15);
-  const [selectedVideo, setSelectedVideo] = useState<typeof VIDEO_GALLERY[0] | null>(null);
+  const [selectedVideo, setSelectedVideo] = useState(null as (typeof VIDEO_GALLERY)[number] | null);
 
   // 실시간 뷰어 수 변화
   useEffect(() => {
     const interval = setInterval(() => {
-      setCurrentViewers(prev => prev + Math.floor(Math.random() * 100) - 50);
+      setCurrentViewers((prev: number) => prev + Math.floor(Math.random() * 100) - 50);
     }, 3000);
     return () => clearInterval(interval);
   }, []);
@@ -163,9 +164,9 @@ export function StreamingScreen({ user, onBack, onUpdateUser, onAddNotification 
       type
     }));
     
-    setHeartAnimations(prev => [...prev, ...newHearts]);
+    setHeartAnimations((prev: HeartAnim[]) => [...prev, ...newHearts]);
     setTimeout(() => {
-      setHeartAnimations(prev => prev.filter(heart => !newHearts.find(h => h.id === heart.id)));
+      setHeartAnimations((prev: HeartAnim[]) => prev.filter((heart: HeartAnim) => !newHearts.find(h => h.id === heart.id)));
     }, 3000);
   };
 
@@ -254,7 +255,7 @@ export function StreamingScreen({ user, onBack, onUpdateUser, onAddNotification 
     <div className="min-h-screen bg-gradient-to-br from-background via-black to-pink-900/10 relative overflow-hidden">
       {/* 하트 애니메이션 */}
       <AnimatePresence>
-        {heartAnimations.map((heart) => (
+        {heartAnimations.map((heart: HeartAnim) => (
           <motion.div
             key={heart.id}
             initial={{ 
@@ -620,7 +621,7 @@ export function StreamingScreen({ user, onBack, onUpdateUser, onAddNotification 
               initial={{ scale: 0.8, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.8, opacity: 0 }}
-              onClick={(e) => e.stopPropagation()}
+              onClick={(e: any) => e.stopPropagation()}
               className="glass-effect rounded-2xl p-8 max-w-md w-full"
             >
               {benefitType === 'gift' && (
@@ -815,7 +816,7 @@ export function StreamingScreen({ user, onBack, onUpdateUser, onAddNotification 
               initial={{ scale: 0.8, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.8, opacity: 0 }}
-              onClick={(e) => e.stopPropagation()}
+              onClick={(e: any) => e.stopPropagation()}
               className="glass-effect rounded-2xl overflow-hidden max-w-2xl w-full"
             >
               <div className="relative aspect-video">

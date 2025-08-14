@@ -1,30 +1,36 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  ArrowLeft, Users, TrendingUp, DollarSign, Activity, Search, Plus, Edit, Trash2, Ban, Gift,
-  BarChart3, AlertTriangle, Clock, Eye, Filter, Download, RefreshCw, Settings, Shield,
-  Mail, Phone, Calendar, Target, Award, Coins, Star, ChevronRight, ChevronDown, Database,
-  Server, X, Package, Upload, FileText, Save, Bell, Lock, Unlock, History, RotateCcw,
-  Zap, Monitor, HardDrive, Wifi, AlertCircle, CheckCircle, XCircle, Info, Video, Heart,
-  Crown, MessageSquare, Sparkles, PlayCircle, PauseCircle, Volume2, VolumeX, Camera, Mic, MicOff,
-  UserPlus, UserMinus, UserCheck, UserX, Headphones, Gamepad2, CreditCard, Gem,
-  User as UserIcon, ShoppingCart, Tag, Percent, Home, Terminal, Layers, ToggleLeft
+import {
+  ArrowLeft,
+  Users,
+  Plus,
+  Gift,
+  Shield,
+  ShoppingCart,
+  BarChart3,
+  Percent,
+  AlertTriangle,
+  Eye,
+  Wifi,
+  Settings,
+  Database,
+  Server,
+  Video,
+  MessageSquare,
+  ChevronRight,
+  Activity,
+  DollarSign,
+  RefreshCw,
+  Home,
+  Terminal,
 } from 'lucide-react';
 import { User } from '../types';
 import { Button } from './ui/button';
-import { Input } from './ui/input';
-import { Textarea } from './ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { Progress } from './ui/progress';
 import { Badge } from './ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
-import { Label } from './ui/label';
-import { Switch } from './ui/switch';
+import { Card, CardContent } from './ui/card';
 import { Alert, AlertDescription } from './ui/alert';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 
 interface AdminPanelProps {
   user: User;

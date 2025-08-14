@@ -10,6 +10,9 @@ import type {
   CSSProperties as _CSSProperties,
   KeyboardEvent as _KeyboardEvent,
   FormEvent as _FormEvent,
+  Ref as _Ref,
+  ForwardedRef as _ForwardedRef,
+  SVGProps as _SVGProps,
 } from "react";
 
 declare global {
@@ -23,6 +26,9 @@ declare global {
   type CSSProperties = _CSSProperties;
   type KeyboardEvent<T = Element> = _KeyboardEvent<T>;
   type FormEvent<T = Element> = _FormEvent<T>;
+  type Ref<T> = _Ref<T>;
+  type ForwardedRef<T> = _ForwardedRef<T>;
+  type SVGProps<T> = _SVGProps<T>;
   }
 }
 
@@ -40,4 +46,7 @@ declare module "react" {
   export type CSSProperties = _CSSProperties;
   export type KeyboardEvent<T = Element> = _KeyboardEvent<T>;
   export type FormEvent<T = Element> = _FormEvent<T>;
+  export type Ref<T> = _Ref<T>;
+  export type ForwardedRef<T> = _ForwardedRef<T>;
+  export type SVGProps<T> = _SVGProps<T>;
 }
