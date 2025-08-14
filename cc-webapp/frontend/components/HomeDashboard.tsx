@@ -60,7 +60,7 @@ export function HomeDashboard({
 
   useEffect(() => {
     const timer = setInterval(() => {
-      setTimeLeft(prev => {
+      setTimeLeft((prev: { hours: number; minutes: number; seconds: number }) => {
         if (prev.seconds > 0) {
           return { ...prev, seconds: prev.seconds - 1 };
         } else if (prev.minutes > 0) {
@@ -645,7 +645,7 @@ export function HomeDashboard({
               initial={{ scale: 0.8, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.8, opacity: 0 }}
-              onClick={(e) => e.stopPropagation()}
+              onClick={(e: any) => e.stopPropagation()}
               className="glass-effect rounded-2xl p-8 max-w-md w-full text-center"
             >
               <motion.div

@@ -50,8 +50,10 @@ declare module 'lucide-react' {
   export const Info: Icon;
   export const Key: Icon;
   export const LayoutGrid: Icon;
+  export const Grid3X3: Icon;
   export const Link: Icon;
   export const ExternalLink: Icon;
+  export const List: Icon;
   export const Loader2: Icon;
   export const Lock: Icon;
   export const LogIn: Icon;
@@ -97,6 +99,7 @@ declare module 'lucide-react' {
   export const Trash: Icon;
   export const Trash2: Icon;
   export const TrendingUp: Icon;
+  export const TrendingDown: Icon;
   export const Trophy: Icon;
   export const Upload: Icon;
   export const User: Icon;
@@ -115,10 +118,13 @@ declare module 'lucide-react' {
   export const UserX: Icon;
   export const Dice1: Icon;
   export const Swords: Icon;
+  export const Sword: Icon;
   export const Menu: Icon;
   export const Gift: Icon;
   export const Gem: Icon;
-  export const BarChart3: Icon;
+  export const BarChart2: Icon;
+  export const Medal: Icon;
+  export const History: Icon;
   export const ChevronLeft: Icon;
   export const ChevronRight: Icon;
   export const CheckIcon: Icon;

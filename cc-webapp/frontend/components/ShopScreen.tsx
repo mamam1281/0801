@@ -153,7 +153,7 @@ export function ShopScreen({
   onAddNotification
 }: ShopScreenProps) {
   const [showPurchaseModal, setShowPurchaseModal] = useState(false);
-  const [selectedItem, setSelectedItem] = useState<any>(null);
+  const [selectedItem, setSelectedItem] = useState(null as import('../types').GameItem | null);
 
   // 🎨 등급별 스타일링 (글래스메탈 버전)
   const getRarityStyles = (rarity: string) => {
@@ -545,7 +545,7 @@ export function ShopScreen({
               initial={{ scale: 0.8, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.8, opacity: 0 }}
-              onClick={(e) => e.stopPropagation()}
+              onClick={(e: any) => e.stopPropagation()}
               className="glass-metal rounded-3xl p-10 max-w-md w-full relative metal-shine"
             >
               <div className="text-center mb-8">

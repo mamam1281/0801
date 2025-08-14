@@ -20,7 +20,7 @@ interface LoadingState {
  */
 export const useLoadingController = () => {
   const router = useRouter();
-  const [state, setState] = useState<LoadingState>({
+  const [state, setState] = useState({
     status: 'checking',
     progress: 0,
     message: '시스템 초기화 중...',
@@ -30,11 +30,11 @@ export const useLoadingController = () => {
       auth: false,
       database: false
     }
-  });
+  } as LoadingState);
 
   // 리소스별 상태 업데이트 함수
   const updateResource = (type: ResourceType, isLoaded: boolean, errorMsg?: string) => {
-    setState(prev => {
+    setState((prev: LoadingState) => {
       const updatedResources = { ...prev.resources, [type]: isLoaded };
       const loadedCount = Object.values(updatedResources).filter(Boolean).length;
       const totalResources = Object.keys(updatedResources).length;
@@ -51,7 +51,7 @@ export const useLoadingController = () => {
         message = '완료! 페이지로 이동합니다...';
       }
       
-      return {
+  return {
         ...prev,
         status,
         progress,

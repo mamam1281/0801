@@ -26,7 +26,8 @@ export interface GameItem {
   id: string;
   name: string;
   type: 'powerup' | 'skin' | 'currency' | 'collectible';
-  rarity: 'common' | 'rare' | 'epic' | 'legendary';
+  // Include 'mythic' to support gacha-specific rarities
+  rarity: 'common' | 'rare' | 'epic' | 'legendary' | 'mythic';
   quantity: number;
   description: string;
   icon: string;

@@ -45,7 +45,10 @@ export function NotificationSystem({ children }: NotificationSystemProps) {
   // 알림 시스템을 children에게 전달하기 위한 렌더 프롭 패턴
   const childrenWithNotifications = React.Children.map(children, (child: React.ReactNode) => {
     if (React.isValidElement(child)) {
-      return React.cloneElement(child, { addNotification } as any);
+      if (React.isValidElement(child)) {
+        return React.cloneElement(child, { addNotification });
+      }
+      return child;
     }
     return child;
   });
@@ -93,10 +96,10 @@ export function useNotificationSystem() {
         timestamp: Date.now()
       };
       
-      setNotifications(prev => [newNotification, ...prev.slice(0, NOTIFICATION_CONFIG.MAX_COUNT - 1)]);
+  setNotifications((prev: Notification[]) => [newNotification, ...prev.slice(0, NOTIFICATION_CONFIG.MAX_COUNT - 1)]);
       
       setTimeout(() => {
-        setNotifications(prev => prev.filter(n => n.id !== newNotification.id));
+        setNotifications((prev: Notification[]) => prev.filter((n: Notification) => n.id !== newNotification.id));
       }, NOTIFICATION_CONFIG.DURATION);
     }
   }, [generateNotificationId]);

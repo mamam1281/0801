@@ -65,18 +65,18 @@ export function RockPaperScissorsGame({
   onUpdateUser, 
   onAddNotification 
 }: RockPaperScissorsGameProps) {
-  const [playerChoice, setPlayerChoice] = useState<Choice | null>(null);
-  const [aiChoice, setAiChoice] = useState<Choice | null>(null);
-  const [gameResult, setGameResult] = useState<GameResult | null>(null);
+  const [playerChoice, setPlayerChoice] = useState(null as Choice | null);
+  const [aiChoice, setAiChoice] = useState(null as Choice | null);
+  const [gameResult, setGameResult] = useState(null as GameResult | null);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [roundHistory, setRoundHistory] = useState<GameRound[]>([]);
+  const [roundHistory, setRoundHistory] = useState([] as GameRound[]);
   const [streak, setStreak] = useState(0);
   const [betAmount, setBetAmount] = useState(50);
-  const [countdown, setCountdown] = useState<number | null>(null);
+  const [countdown, setCountdown] = useState(null as number | null);
   const [showResult, setShowResult] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
-  const [currentSoundEffect, setCurrentSoundEffect] = useState<string | null>(null);
-  const [particles, setParticles] = useState<Array<{id: number, x: number, y: number, color: string}>>([]);
+  const [currentSoundEffect, setCurrentSoundEffect] = useState(null as string | null);
+  const [particles, setParticles] = useState([] as Array<{ id: number; x: number; y: number; color: string }>);
   const [comboCount, setComboCount] = useState(0);
   const [isSpecialMove, setIsSpecialMove] = useState(false);
 
@@ -211,7 +211,7 @@ export function RockPaperScissorsGame({
 
     // Update streak
     if (result === 'win') {
-      setStreak(prev => prev + 1);
+      setStreak((prev: number) => prev + 1);
     } else {
       setStreak(0);
       setComboCount(0);
@@ -230,7 +230,7 @@ export function RockPaperScissorsGame({
       winnings: winnings - betAmount,
       isSpecialMove: isSpecial
     };
-    setRoundHistory(prev => [round, ...prev.slice(0, 9)]);
+  setRoundHistory((prev: GameRound[]) => [round, ...prev.slice(0, 9)]);
 
     onUpdateUser(updatedUser);
 
@@ -273,7 +273,7 @@ export function RockPaperScissorsGame({
     <div className="min-h-screen bg-gradient-to-br from-background via-black to-success/10 relative overflow-hidden">
       {/* Particle Effects */}
       <AnimatePresence>
-        {particles.map((particle) => (
+  {particles.map((particle: { id: number; x: number; y: number; color: string }) => (
           <motion.div
             key={particle.id}
             initial={{ 
@@ -536,7 +536,7 @@ export function RockPaperScissorsGame({
                   isSpecialMove ? 'animate-pulse' : ''
                 }`}
               >
-                {playerChoice ? CHOICES[playerChoice].emoji : '❓'}
+                {playerChoice ? CHOICES[playerChoice as Choice].emoji : '❓'}
                 
                 {isSpecialMove && (
                   <motion.div
@@ -546,8 +546,8 @@ export function RockPaperScissorsGame({
                   />
                 )}
               </motion.div>
-              <div className={`text-lg font-bold ${playerChoice ? CHOICES[playerChoice].color : 'text-muted-foreground'}`}>
-                {playerChoice ? CHOICES[playerChoice].name : '선택하세요'}
+              <div className={`text-lg font-bold ${playerChoice ? CHOICES[playerChoice as Choice].color : 'text-muted-foreground'}`}>
+                {playerChoice ? CHOICES[playerChoice as Choice].name : '선택하세요'}
               </div>
             </div>
 
@@ -575,10 +575,10 @@ export function RockPaperScissorsGame({
                 }}
                 className="w-40 h-40 mx-auto bg-gradient-to-br from-warning to-gold rounded-full flex items-center justify-center text-8xl mb-6 shadow-2xl border-4 border-warning/30"
               >
-                {aiChoice ? CHOICES[aiChoice].emoji : '🤖'}
+                {aiChoice ? CHOICES[aiChoice as Choice].emoji : '🤖'}
               </motion.div>
-              <div className={`text-lg font-bold ${aiChoice ? CHOICES[aiChoice].color : 'text-muted-foreground'}`}>
-                {aiChoice ? CHOICES[aiChoice].name : isPlaying ? '생각 중...' : 'AI 대기'}
+              <div className={`text-lg font-bold ${aiChoice ? CHOICES[aiChoice as Choice].color : 'text-muted-foreground'}`}>
+                {aiChoice ? CHOICES[aiChoice as Choice].name : isPlaying ? '생각 중...' : 'AI 대기'}
               </div>
             </div>
           </div>
@@ -734,7 +734,7 @@ export function RockPaperScissorsGame({
                   아직 게임 기록이 없습니다
                 </div>
               ) : (
-                roundHistory.slice(0, 5).map((round, index) => (
+                roundHistory.slice(0, 5).map((round: GameRound, index: number) => (
                   <div
                     key={index}
                     className={`flex items-center justify-between p-2 rounded-lg text-sm ${

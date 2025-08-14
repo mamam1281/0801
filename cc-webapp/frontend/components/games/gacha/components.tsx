@@ -402,17 +402,19 @@ export function BackgroundEffects() {
 
 // 뽑기 결과 모달 컴포넌트
 export function SexyPullResultsModal({
-  isOpen,
-  onClose,
   results,
-  isPullAnimation,
+  showResults,
+  currentIndex,
+  onNext,
+  onClose,
 }: {
-  isOpen: boolean;
-  onClose: () => void;
   results: GachaItem[];
-  isPullAnimation: boolean;
+  showResults: boolean;
+  currentIndex: number;
+  onNext: () => void;
+  onClose: () => void;
 }) {
-  if (!isOpen) return null;
+  if (!showResults) return null;
 
   return (
     <AnimatePresence>

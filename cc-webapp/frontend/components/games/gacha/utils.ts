@@ -1,4 +1,4 @@
-import { User } from '../../../types';
+import { User, GameItem } from '../../../types';
 import { GachaItem, GachaBanner } from '../../../types/gacha';
 export type { HeartParticle } from '../../../types/gacha';
 import { ANIMATION_DURATIONS, SEXY_EMOJIS, GACHA_ITEMS } from './constants';
@@ -120,7 +120,8 @@ export const updateUserInventory = (user: User, item: GachaItem): User => {
   } else {
   // GachaItem may have a broader `type` than GameItem's narrower union.
   // Cast here to avoid spreading changes across global GameItem type.
-  updatedInventory.push(item as unknown as any);
+  // item should be compatible with GameItem shape — cast to a safer Record type
+  updatedInventory.push(item as unknown as GameItem);
   }
   
   return {

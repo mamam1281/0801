@@ -48,7 +48,7 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
   const [currentPullIndex, setCurrentPullIndex] = useState(0);
   const [showInventory, setShowInventory] = useState(false);
   const [pullAnimation, setPullAnimation] = useState(null as 'opening' | 'revealing' | null);
-  const [heartParticles, setHeartParticles] = useState([] as any[]);
+  const [heartParticles, setHeartParticles] = useState([] as Array<{ id: string; x: number; y: number }>);
 
   // Clear particles after animation
   useEffect(() => {
@@ -569,7 +569,6 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
       <AnimatePresence mode="wait">
         {showResults && (
           <SexyPullResultsModal
-            key="pull-results-modal"
             results={pullResults}
             showResults={showResults}
             currentIndex={currentPullIndex}
@@ -580,9 +579,8 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
 
         {showInventory && (
           <SexyInventoryModal
-            key="inventory-modal"
-            user={user}
-            showInventory={showInventory}
+            isOpen={showInventory}
+            inventory={user.inventory as unknown as GachaItem[]}
             onClose={() => setShowInventory(false)}
           />
         )}

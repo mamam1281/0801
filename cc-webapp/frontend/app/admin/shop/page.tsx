@@ -4,7 +4,7 @@ import React from 'react';
 const API = 'http://localhost:8000/api';
 
 export default function AdminShopPage() {
-  const [items, setItems] = React.useState([] as any[]);
+  const [items, setItems] = React.useState([] as unknown as Array<Record<string, any>>);
   const [error, setError] = React.useState(null as string | null);
 
   const load = async () => {

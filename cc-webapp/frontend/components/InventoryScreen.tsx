@@ -38,8 +38,8 @@ interface InventoryScreenProps {
 
 export function InventoryScreen({ user, onBack, onUpdateUser, onAddNotification }: InventoryScreenProps) {
   const [searchQuery, setSearchQuery] = useState('');
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [selectedItem, setSelectedItem] = useState<GameItem | null>(null);
+  const [viewMode, setViewMode] = useState('grid' as 'grid' | 'list');
+  const [selectedItem, setSelectedItem] = useState(null as GameItem | null);
   const [showItemModal, setShowItemModal] = useState(false);
 
   // 간단한 검색 필터링만
@@ -73,24 +73,23 @@ export function InventoryScreen({ user, onBack, onUpdateUser, onAddNotification 
     }
   };
 
-  const getTypeIcon = (type: string) => {
-    switch (type) {
-      case 'skin': return <Crown className="w-4 h-4" />;
-      case 'powerup': return <Sparkles className="w-4 h-4" />;
-      case 'currency': return <Gem className="w-4 h-4" />;
-      case 'collectible': return <Trophy className="w-4 h-4" />;
-      case 'character': return <Star className="w-4 h-4" />;
-      case 'weapon': return <Sword className="w-4 h-4" />;
-      case 'premium': return <Crown className="w-4 h-4" />;
-      case 'special': return <Gift className="w-4 h-4" />;
-      default: return <Package className="w-4 h-4" />;
-    }
+  const getTypeIcon = (type: any) => {
+  const t = String(type);
+  if (t === 'skin') return <Crown className="w-4 h-4" />;
+  if (t === 'powerup') return <Sparkles className="w-4 h-4" />;
+  if (t === 'currency') return <Gem className="w-4 h-4" />;
+  if (t === 'collectible') return <Trophy className="w-4 h-4" />;
+  if (t === 'character') return <Star className="w-4 h-4" />;
+  if (t === 'weapon') return <Sword className="w-4 h-4" />;
+  if (t === 'premium') return <Crown className="w-4 h-4" />;
+  if (t === 'special') return <Gift className="w-4 h-4" />;
+  return <Package className="w-4 h-4" />;
   };
 
   const getItemVectorIcon = (item: GameItem) => {
     const color = getRarityColor(item.rarity).split(' ')[0].replace('text-', '');
     
-    switch (item.type) {
+  switch (String(item.type)) {
       case 'skin':
         return (
           <svg width="48" height="48" viewBox="0 0 48 48" className={`text-${color}`}>
@@ -138,10 +137,10 @@ export function InventoryScreen({ user, onBack, onUpdateUser, onAddNotification 
     powerup: user.inventory.filter(item => item.type === 'powerup').length,
     currency: user.inventory.filter(item => item.type === 'currency').length,
     collectible: user.inventory.filter(item => item.type === 'collectible').length,
-    character: user.inventory.filter(item => item.type === 'character').length,
-    weapon: user.inventory.filter(item => item.type === 'weapon').length,
-    premium: user.inventory.filter(item => item.type === 'premium').length,
-    special: user.inventory.filter(item => item.type === 'special').length
+  character: user.inventory.filter(item => (item.type as string) === 'character').length,
+  weapon: user.inventory.filter(item => (item.type as string) === 'weapon').length,
+  premium: user.inventory.filter(item => (item.type as string) === 'premium').length,
+  special: user.inventory.filter(item => (item.type as string) === 'special').length
   };
 
   return (
@@ -243,7 +242,7 @@ export function InventoryScreen({ user, onBack, onUpdateUser, onAddNotification 
               <Input
                 placeholder="아이템 검색..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e: any) => setSearchQuery(e.target.value)}
                 className="pl-10"
               />
             </div>
@@ -333,7 +332,7 @@ export function InventoryScreen({ user, onBack, onUpdateUser, onAddNotification 
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={(e) => {
+                      onClick={(e: any) => {
                         e.stopPropagation();
                         setSelectedItem(item);
                         setShowItemModal(true);
@@ -363,7 +362,7 @@ export function InventoryScreen({ user, onBack, onUpdateUser, onAddNotification 
               initial={{ scale: 0.8, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.8, opacity: 0 }}
-              onClick={(e) => e.stopPropagation()}
+              onClick={(e: any) => e.stopPropagation()}
               className="glass-effect rounded-2xl p-8 max-w-md w-full relative"
             >
               <Button

@@ -5,7 +5,7 @@ export function useDebounce<T extends (...args: unknown[]) => unknown>(
   callback: T,
   delay: number
 ): T {
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const timeoutRef = useRef(null as NodeJS.Timeout | null);
   
   return useCallback((...args: Parameters<T>) => {
     if (timeoutRef.current) {
@@ -23,8 +23,8 @@ export function useThrottle<T extends (...args: unknown[]) => unknown>(
   callback: T,
   delay: number
 ): T {
-  const lastCallRef = useRef<number>(0);
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastCallRef = useRef(0 as number);
+  const timeoutRef = useRef(null as NodeJS.Timeout | null);
   
   return useCallback((...args: Parameters<T>) => {
     const now = Date.now();
@@ -47,8 +47,8 @@ export function useThrottle<T extends (...args: unknown[]) => unknown>(
 
 // 메모리 안전한 타이머 훅
 export function useSafeTimer() {
-  const timersRef = useRef<Set<NodeJS.Timeout>>(new Set());
-  const intervalsRef = useRef<Set<NodeJS.Timeout>>(new Set());
+  const timersRef = useRef(new Set() as Set<NodeJS.Timeout>);
+  const intervalsRef = useRef(new Set() as Set<NodeJS.Timeout>);
   
   const setTimeout = useCallback((callback: () => void, delay: number) => {
     const timer = globalThis.setTimeout(() => {
@@ -79,8 +79,8 @@ export function useSafeTimer() {
   // 컴포넌트 언마운트시 모든 타이머 정리
   useEffect(() => {
     return () => {
-      timersRef.current.forEach(timer => globalThis.clearTimeout(timer));
-      intervalsRef.current.forEach(interval => globalThis.clearInterval(interval));
+  timersRef.current.forEach((timer: NodeJS.Timeout) => globalThis.clearTimeout(timer));
+  intervalsRef.current.forEach((interval: NodeJS.Timeout) => globalThis.clearInterval(interval));
       timersRef.current.clear();
       intervalsRef.current.clear();
     };
@@ -91,7 +91,7 @@ export function useSafeTimer() {
 
 // 애니메이션 최적화를 위한 훅
 export function useAnimationFrame(callback: (time: number) => void, enabled: boolean = true) {
-  const requestRef = useRef<number | null>(null);
+  const requestRef = useRef(null as number | null);
   const callbackRef = useRef(callback);
   
   useEffect(() => {
@@ -156,17 +156,19 @@ interface MemoryInfo {
 }
 
 export function useMemoryMonitor() {
-  const [memoryInfo, setMemoryInfo] = useState<MemoryInfo | null>(null);
+  const [memoryInfo, setMemoryInfo] = useState(null as MemoryInfo | null);
   
   useEffect(() => {
     // performance.memory는 Chrome에서만 사용 가능
-    if ('memory' in performance && (performance as any).memory) {
+    const perf = performance as Performance & { memory?: { usedJSHeapSize?: number; totalJSHeapSize?: number; jsHeapSizeLimit?: number } };
+    if (perf.memory) {
       const updateMemoryInfo = () => {
-        const memory = (performance as any).memory;
+        const memory = perf.memory;
+        if (!memory) return;
         setMemoryInfo({
-          used: memory.usedJSHeapSize,
-          total: memory.totalJSHeapSize,
-          limit: memory.jsHeapSizeLimit
+          used: memory.usedJSHeapSize ?? 0,
+          total: memory.totalJSHeapSize ?? 0,
+          limit: memory.jsHeapSizeLimit ?? 0
         });
       };
       
@@ -208,8 +210,8 @@ export function useLazyImage(src: string, placeholder?: string) {
 // 배치 업데이트를 위한 훅
 export function useBatchUpdate<T>(initialValue: T, batchDelay: number = 100) {
   const [value, setValue] = useState(initialValue);
-  const pendingUpdatesRef = useRef<Array<(prev: T) => T>>([]);
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const pendingUpdatesRef = useRef([] as Array<(prev: T) => T>);
+  const timeoutRef = useRef(null as NodeJS.Timeout | null);
   
   const batchUpdate = useCallback((updater: (prev: T) => T | T) => {
     const updateFn = typeof updater === 'function' ? updater as (prev: T) => T : () => updater;
@@ -220,8 +222,8 @@ export function useBatchUpdate<T>(initialValue: T, batchDelay: number = 100) {
     }
     
     timeoutRef.current = setTimeout(() => {
-      setValue(prev => {
-        return pendingUpdatesRef.current.reduce((acc, update) => update(acc), prev);
+      setValue((prev: T) => {
+        return pendingUpdatesRef.current.reduce((acc: T, update: (p: T) => T) => update(acc), prev);
       });
       pendingUpdatesRef.current = [];
     }, batchDelay);
@@ -278,7 +280,7 @@ export function useWebWorker<T, R>(
   workerFunction: (data: T) => R,
   dependencies: unknown[] = []
 ) {
-  const workerRef = useRef<Worker | null>(null);
+  const workerRef = useRef(null as Worker | null);
   
   useEffect(() => {
     const workerCode = `
