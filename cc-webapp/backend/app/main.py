@@ -60,6 +60,7 @@ from app.routers import (
     rbac_demo,   # RBAC demo router
 )
 from app.routers import kafka_api
+from app.routers.notifications import sse_router as notifications_sse_router, api_router as notifications_api_router
 from app.kafka_client import start_consumer, stop_consumer, get_last_messages, is_consumer_ready
 
 # AI recommendation system router separate import (removed duplicate)
@@ -207,6 +208,8 @@ app.include_router(ai_router.router, tags=["AI Recommendation"])
 # Management & Monitoring (no prefix - routers have their own)
 app.include_router(dashboard.router)  # 태그 오버라이드 제거 - 이미 dashboard.py에서 "Dashboard" 태그를 지정함
 app.include_router(notifications.router, tags=["Real-time Notifications"])
+app.include_router(notifications_sse_router)
+app.include_router(notifications_api_router)
 
 # Individual Games (removed - consolidated into games.router)
 # app.include_router(rps.router, tags=["Rock Paper Scissors"])  # duplicated in games.router
@@ -220,7 +223,7 @@ app.include_router(doc_titles.router, tags=["Document Titles"])
 app.include_router(feedback.router, tags=["Feedback"])
 
 # Phase 3: Game Collection (no prefix - routers have their own) - 통합된 게임 API
-app.include_router(games.router, tags=["Game Collection"])
+app.include_router(games.router)
 
 # Phase 4: Unified Game API (no prefix - routers have their own) - 중복 제거
 # app.include_router(game_api.router, tags=["Game API"])  # 중복 제거: games.router에 통합됨
@@ -230,16 +233,16 @@ app.include_router(invite_router.router)  # 태그 오버라이드 제거 - 이�
 app.include_router(rbac_demo.router)  # New RBAC demo router included
 
 # Phase 6: Analytics (no prefix - routers have their own)
-app.include_router(analyze.router, tags=["Analytics"])
+app.include_router(analyze.router)
 
 # Phase 8: User Segmentation (no prefix - routers have their own)  
 app.include_router(segments.router)  # 태그 오버라이드 제거 - 이미 segments.py에서 "Segments" 태그를 지정함
 
 # Phase 9: User Tracking (no prefix - routers have their own)
-app.include_router(tracking.router, tags=["Tracking"])
+app.include_router(tracking.router)
 
 # Phase 10: Unlock System (no prefix - routers have their own)
-app.include_router(unlock.router, tags=["Unlock"])
+app.include_router(unlock.router)
 
 # 이벤트/미션 라우터 추가
 app.include_router(events.router)  # 태그 오버라이드 제거 - 이미 events.py에서 "Events & Missions" 태그를 지정함
@@ -296,7 +299,7 @@ async def api_info():
             "auth": "/api/auth",
             "users": "/api/users",
             "admin": "/api/admin",
-            "games": "/api/actions, /api/games/*",
+            "games": "/api/games/*",
             "shop": "/api/shop, /api/rewards",
             "missions": "/api/missions",
             "quiz": "/api/quiz",

@@ -1,0 +1,91 @@
+import pytest
+from fastapi.testclient import TestClient
+
+
+def _auth_headers(token: str):
+    return {"Authorization": f"Bearer {token}"}
+
+
+def signup_and_login(client: TestClient, site_id: str, password: str) -> str:
+    client.post(
+        "/api/auth/signup",
+        json={
+            "site_id": site_id,
+            "nickname": f"nick_{site_id}",
+            "password": password,
+            "invite_code": "5858",
+            # 고유 전화번호 생성: site_id 기반 9자리
+            "phone_number": "010" + str(abs(hash(site_id)) % 1_000_000_000).zfill(9),
+        },
+    )
+    r = client.post("/api/auth/login", json={"site_id": site_id, "password": password})
+    assert r.status_code == 200
+    return r.json()["access_token"]
+
+
+def test_limited_promos_and_limits(client: TestClient):
+    admin = signup_and_login(client, "admin_lpromo", "passw0rd!")
+    # 테스트 전용 관리자 권한 부여 (dev/test 환경에서만 허용)
+    client.post("/api/admin/users/elevate", json={"site_id": "admin_lpromo"})
+    headers = _auth_headers(admin)
+
+    # Attempt upsert as non-admin; if forbidden, skip suite (admin guard enforced)
+    up = client.post(
+        "/api/admin/limited-packages/upsert",
+        json={
+            "package_id": "PKG-PROMO-1",
+            "name": "Promo Pack",
+            "price": 100,
+            "stock_total": 2,
+            "stock_remaining": 2,
+            "per_user_limit": 2,
+            "is_active": True,
+            "contents": {"bonus_tokens": 10},
+        },
+        headers=headers,
+    )
+    if up.status_code == 403:
+        # 환경 가드로 elevate가 차단된 경우 방어적 스킵
+        pytest.skip("Admin guard enforced; skipping admin-required promo tests")
+    assert up.status_code == 200
+
+    # Create a promo code max_uses=1
+    pu = client.post(
+        "/api/admin/promo-codes/upsert",
+        json={
+            "code": "ONEUSE",
+            "package_id": "PKG-PROMO-1",
+            "discount_type": "flat",
+            "value": 50,
+            "max_uses": 1,
+            "is_active": True,
+        },
+        headers=headers,
+    )
+    assert pu.status_code == 200
+
+    u1 = signup_and_login(client, "user_lpromo1", "passw0rd!")
+    uh1 = _auth_headers(u1)
+
+    # First purchase with promo succeeds (price discounted to 50)
+    r1 = client.post("/api/shop/buy-limited", json={"package_id": "PKG-PROMO-1", "promo_code": "ONEUSE"}, headers=uh1)
+    assert r1.status_code == 200 and r1.json()["success"] is True
+
+    # Second purchase with promo should fail due to max_uses reached
+    r2 = client.post("/api/shop/buy-limited", json={"package_id": "PKG-PROMO-1", "promo_code": "ONEUSE"}, headers=uh1)
+    assert r2.status_code == 200 and r2.json()["success"] is False
+
+    # Per-user limit is 2. We have 1 success so far; next without promo should succeed (2nd purchase)
+    r3 = client.post("/api/shop/buy-limited", json={"package_id": "PKG-PROMO-1"}, headers=uh1)
+    assert r3.status_code == 200 and r3.json()["success"] is True
+
+    # Now the next attempt should fail due to per-user limit reached
+    r4 = client.post("/api/shop/buy-limited", json={"package_id": "PKG-PROMO-1"}, headers=uh1)
+    assert r4.status_code == 200 and r4.json()["success"] is False
+
+    # Emergency disable then verify still blocked
+    dis = client.post("/api/admin/limited-packages/PKG-PROMO-1/disable", headers=headers)
+    assert dis.status_code == 200
+    r5 = client.post("/api/shop/buy-limited", json={"package_id": "PKG-PROMO-1"}, headers=uh1)
+    assert r5.status_code == 200 and r5.json()["success"] is False
+

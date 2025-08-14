@@ -8,8 +8,8 @@ from ..database import get_db
 from ..services.tracking_service import TrackingService
 
 router = APIRouter(
-    prefix="/tracking", # Prefix for all routes in this router
-    tags=["tracking"]   # Tag for API documentation
+    prefix="/api/tracking",  # Route under /api consistently
+    tags=["Tracking"]         # Standardized tag casing
 )
 
 # Pydantic model for request body (moved from notification.py)

@@ -44,7 +44,8 @@ def get_segment_level(rfm_group: str | None) -> int:
     return 0 # Default for None or Unknown RFM groups
 
 # --- API Endpoint ---
-@router.get("/unlock", response_model=UnlockResponse, tags=["unlock", "content"])
+# Canonical path is exactly '/api/unlock' to avoid duplicate '/api/unlock/unlock'
+@router.get("", response_model=UnlockResponse)
 async def attempt_content_unlock(
     user_id: int = Query(..., description="ID of the user attempting to unlock content"),
     db = Depends(get_db),
