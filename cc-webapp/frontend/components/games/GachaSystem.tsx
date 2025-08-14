@@ -30,7 +30,7 @@ import {
   SexyInventoryModal,
   BackgroundEffects, // BackgroundEffects 컴포넌트 추가
 } from './gacha/components';
-import type { GachaBanner } from './gacha/constants';
+import type { GachaBanner } from '../../types/gacha';
 
 interface GachaSystemProps {
   user: User;
@@ -40,20 +40,20 @@ interface GachaSystemProps {
 }
 
 export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: GachaSystemProps) {
-  const [selectedBanner, setSelectedBanner] = useState<GachaBanner>(GACHA_BANNERS[0]);
+  const [selectedBanner, setSelectedBanner] = useState(GACHA_BANNERS[0] as GachaBanner);
   const [isPulling, setIsPulling] = useState(false);
-  const [pullResults, setPullResults] = useState<GachaItem[]>([]);
+  const [pullResults, setPullResults] = useState([] as GachaItem[]);
   const [showResults, setShowResults] = useState(false);
-  const [particles, setParticles] = useState<Particle[]>([]);
+  const [particles, setParticles] = useState([] as Particle[]);
   const [currentPullIndex, setCurrentPullIndex] = useState(0);
   const [showInventory, setShowInventory] = useState(false);
-  const [pullAnimation, setPullAnimation] = useState<'opening' | 'revealing' | null>(null);
-  const [heartParticles, setHeartParticles] = useState<HeartParticle[]>([]);
+  const [pullAnimation, setPullAnimation] = useState(null as 'opening' | 'revealing' | null);
+  const [heartParticles, setHeartParticles] = useState([] as any[]);
 
   // Clear particles after animation
   useEffect(() => {
     if (particles.length > 0) {
-      const timer = setTimeout(() => setParticles([]), ANIMATION_DURATIONS.particle);
+      const timer = setTimeout(() => setParticles([]), (ANIMATION_DURATIONS.sparkle || 2000));
       return () => clearTimeout(timer);
     }
   }, [particles]);
@@ -62,7 +62,7 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
   useEffect(() => {
     const generateHearts = () => {
       const newHearts = generateHeartParticles();
-      setHeartParticles((prev) => [...prev.slice(-10), ...newHearts]);
+      setHeartParticles((prev: any[]) => [...prev.slice(-10), ...newHearts]);
     };
 
     const interval = setInterval(generateHearts, 3000);
@@ -123,7 +123,7 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
     };
 
     // Opening animation with sexy vibes
-    await new Promise((resolve) => setTimeout(resolve, ANIMATION_DURATIONS.opening));
+  await new Promise((resolve) => setTimeout(resolve, ANIMATION_DURATIONS.fadeIn));
     setPullAnimation('revealing');
 
     // Get item
@@ -132,13 +132,13 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
     setParticles(newParticles);
 
     // Update inventory and stats
-    updatedUser = updateUserInventory(updatedUser, item);
+  updatedUser = updateUserInventory(updatedUser as unknown as User, item);
 
     // Update epic/legendary counts
     if (item.rarity === 'epic') {
-      updatedUser.gameStats.gacha.epicCount += 1;
+      updatedUser.gameStats.gacha.epicCount = (updatedUser.gameStats.gacha.epicCount || 0) + 1;
     } else if (item.rarity === 'legendary' || item.rarity === 'mythic') {
-      updatedUser.gameStats.gacha.legendaryCount += 1;
+      updatedUser.gameStats.gacha.legendaryCount = (updatedUser.gameStats.gacha.legendaryCount || 0) + 1;
     }
 
     setPullResults([item]);
@@ -165,7 +165,7 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
     setPullAnimation('opening');
 
     // Opening animation
-    await new Promise((resolve) => setTimeout(resolve, ANIMATION_DURATIONS.opening + 500));
+  await new Promise((resolve) => setTimeout(resolve, ANIMATION_DURATIONS.fadeIn + 500));
     setPullAnimation('revealing');
 
     const items: GachaItem[] = [];
@@ -187,14 +187,14 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
       const item = getRandomItem(selectedBanner, updatedUser);
       items.push(item);
 
-      // Update inventory
-      updatedUser = updateUserInventory(updatedUser, item);
+  // Update inventory
+  updatedUser = updateUserInventory(updatedUser as unknown as User, item);
 
       // Update stats
       if (item.rarity === 'epic') {
-        updatedUser.gameStats.gacha.epicCount += 1;
+        updatedUser.gameStats.gacha.epicCount = (updatedUser.gameStats.gacha.epicCount || 0) + 1;
       } else if (item.rarity === 'legendary' || item.rarity === 'mythic') {
-        updatedUser.gameStats.gacha.legendaryCount += 1;
+        updatedUser.gameStats.gacha.legendaryCount = (updatedUser.gameStats.gacha.legendaryCount || 0) + 1;
       }
     }
 
@@ -223,7 +223,7 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
   // Navigate to next result
   const handleNextResult = () => {
     if (currentPullIndex < pullResults.length - 1) {
-      setCurrentPullIndex((prev) => prev + 1);
+  setCurrentPullIndex((prev: number) => prev + 1);
     }
   };
 
@@ -238,7 +238,7 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
     <div className="min-h-screen bg-gradient-to-br from-black via-pink-900/20 to-purple-900/30 relative overflow-hidden">
       {/* Floating Heart Particles */}
       <AnimatePresence mode="wait">
-        {heartParticles.map((heart) => (
+  {heartParticles.map((heart: any) => (
           <motion.div
             key={heart.id} // 이미 고유 ID 사용 중
             initial={{
@@ -254,7 +254,7 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
               rotate: [0, 360],
             }}
             exit={{ opacity: 0 }}
-            transition={{ duration: ANIMATION_DURATIONS.heartFloat, ease: 'easeOut' }}
+            transition={{ duration: ANIMATION_DURATIONS.pulse, ease: 'easeOut' }}
             className="fixed text-pink-400 text-2xl pointer-events-none z-20"
           >
             💖
@@ -264,7 +264,7 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
 
       {/* Particle Effects */}
       <AnimatePresence>
-        {particles.map((particle) => (
+  {particles.map((particle: any) => (
           <motion.div
             key={particle.id}
             initial={{
@@ -280,7 +280,7 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
               rotate: 360,
             }}
             exit={{ opacity: 0 }}
-            transition={{ duration: ANIMATION_DURATIONS.particle, ease: 'easeOut' }}
+            transition={{ duration: ANIMATION_DURATIONS.sparkle, ease: 'easeOut' }}
             className="fixed rounded-full pointer-events-none z-30"
             style={{
               backgroundColor: particle.color,

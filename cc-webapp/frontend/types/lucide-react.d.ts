@@ -143,4 +143,12 @@ declare module 'lucide-react' {
   export const Database: Icon;
   export const Dice: Icon;
   export const CircleCheckBig: Icon;
+
+  // Backwards-compatible aliases (Icon suffix)
+  export const ChevronRightIcon: Icon;
+  export const ChevronLeftIcon: Icon;
+  export const MoreHorizontalIcon: Icon;
+  export const SearchIcon: Icon;
+  export const MinusIcon: Icon;
+  export const GripVerticalIcon: Icon;
 }

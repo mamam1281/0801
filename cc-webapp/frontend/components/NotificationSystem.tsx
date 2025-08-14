@@ -37,7 +37,7 @@ export function NotificationSystem({ children }: NotificationSystemProps) {
   setNotifications((prev: Notification[]) => [newNotification, ...prev.slice(0, NOTIFICATION_CONFIG.MAX_COUNT - 1)]);
       
       setTimeout(() => {
-  setNotifications((prev: Notification[]) => prev.filter((n: Notification) => n.id !== newNotification.id));
+        setNotifications((prev: Notification[]) => prev.filter((n: Notification) => n.id !== newNotification.id));
       }, NOTIFICATION_CONFIG.DURATION);
     }
   }, [generateNotificationId]);

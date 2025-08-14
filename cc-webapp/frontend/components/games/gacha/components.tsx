@@ -17,10 +17,12 @@ export function SexyBannerSelector({
   banners,
   onSelectBanner,
   selectedBanner,
+  isPulling,
 }: {
   banners: GachaBanner[];
   onSelectBanner: (banner: GachaBanner) => void;
   selectedBanner: GachaBanner;
+  isPulling?: boolean;
 }) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
@@ -183,7 +185,7 @@ export function SexyResultOverlay({
   isTenPull?: boolean;
   items?: GachaItem[];
 }) {
-  const [hearts, setHearts] = useState<HeartParticle[]>([]);
+  const [hearts, setHearts] = useState([] as HeartParticle[]);
 
   React.useEffect(() => {
     if (isVisible) {
@@ -264,7 +266,7 @@ export function SexyResultOverlay({
         ) : null}
 
         {/* 심장 파티클 */}
-        {hearts.map((heart) => (
+            {hearts.map((heart: HeartParticle) => (
           <motion.div
             key={heart.id}
             initial={{ x: heart.x + '%', y: heart.y + '%', opacity: 0 }}

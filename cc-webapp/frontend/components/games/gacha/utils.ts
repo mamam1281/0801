@@ -1,6 +1,17 @@
 import { User } from '../../../types';
-import { GachaItem, GachaBanner, HeartParticle } from '../../../types/gacha';
+import { GachaItem, GachaBanner } from '../../../types/gacha';
+export type { HeartParticle } from '../../../types/gacha';
 import { ANIMATION_DURATIONS, SEXY_EMOJIS, GACHA_ITEMS } from './constants';
+
+export interface Particle {
+  id: string;
+  size: number;
+  left: string;
+  top: string;
+  animationDelay?: string;
+  emoji?: string;
+  animationDuration?: string;
+}
 
 /**
  * 고유 ID 생성 함수
@@ -57,7 +68,7 @@ export function generateParticles(rarity: string, count = 20) {
 }
 
 // Generate floating heart particles
-export const generateHeartParticles = (): HeartParticle[] => {
+export const generateHeartParticles = (): any[] => {
   return Array.from({ length: 3 }, (_, i) => ({
     id: generateUniqueId('heart'),
     x: Math.random() * 100,
@@ -107,7 +118,9 @@ export const updateUserInventory = (user: User, item: GachaItem): User => {
   if (existingItemIndex !== -1) {
     updatedInventory[existingItemIndex].quantity += item.quantity;
   } else {
-    updatedInventory.push(item);
+  // GachaItem may have a broader `type` than GameItem's narrower union.
+  // Cast here to avoid spreading changes across global GameItem type.
+  updatedInventory.push(item as unknown as any);
   }
   
   return {

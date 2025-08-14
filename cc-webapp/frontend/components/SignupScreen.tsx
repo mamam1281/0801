@@ -124,11 +124,11 @@ export function SignupScreen({
   };
 
   const handleInputChange = (field: keyof SignupFormData) => (
-    e: React.ChangeEvent<HTMLInputElement>
+    e: any
   ) => {
-    setFormData(prev => ({ ...prev, [field]: e.target.value }));
+    setFormData((prev: SignupFormData) => ({ ...prev, [field]: e.target.value }));
     if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: undefined }));
+      setErrors((prev: Partial<SignupFormData>) => ({ ...prev, [field]: undefined }));
     }
   };
 

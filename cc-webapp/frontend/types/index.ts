@@ -3,6 +3,7 @@ export interface User {
   id: string;
   nickname: string;
   goldBalance: number;
+  vipTier?: number;
   level: number;
   experience: number;
   maxExperience: number;
@@ -57,9 +58,14 @@ export interface GameStatsDetail {
     bestStreak: number;
   };
   gacha: {
-    totalPulls: number;
-    legendaryPulls: number;
-    totalValue: number;
+  totalPulls: number;
+  legendaryPulls: number;
+  totalValue: number;
+  // Runtime fields used by the gacha UI
+  pulls: any;
+  totalSpent: number;
+  epicCount?: number;
+  legendaryCount?: number;
   };
   crash: {
     totalGames: number;
@@ -118,4 +124,41 @@ export type GameSpecific = GameStatsDetail;
 
 // Event 타입이 이미 추가되어 있는지 확인하고, 없으면 추가
 // Mission 타입도 이미 추가됨
+
+// 간단한 Event/Mission 타입 (프론트엔드용 간편 정의)
+export interface Event {
+  id: string | number;
+  title: string;
+  description?: string | null;
+  type?: string;
+  status?: string;
+  startDate?: string | Date | null;
+  endDate?: string | Date | null;
+  rewards?: Array<{ type: string; amount?: number; name?: string }>;
+  participants?: number;
+  maxParticipants?: number;
+  requirements?: string[];
+  icon?: string;
+  progress?: any;
+  completed?: boolean;
+  claimed?: boolean;
+  joined?: boolean;
+}
+
+export interface Mission {
+  id: string | number;
+  title: string;
+  description?: string | null;
+  type?: string;
+  category?: string;
+  status?: string;
+  target?: any;
+  progress?: number;
+  maxProgress?: number;
+  rewards?: Array<{ type: string; amount?: number; name?: string }>;
+  difficulty?: string;
+  icon?: string;
+  expiresAt?: Date | string | null;
+  claimed?: boolean;
+}
 
