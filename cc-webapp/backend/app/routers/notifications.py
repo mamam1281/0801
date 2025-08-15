@@ -12,13 +12,8 @@ router = APIRouter(prefix="/ws", tags=["websockets"])
 
 @router.websocket("/notifications/{user_id}")
 async def websocket_endpoint(websocket: WebSocket, user_id: int):
-    # In a real app, you would get the user_id from the token, not the path.
-    # token = websocket.query_params.get("token")
-    # user = await get_current_user_from_token(token, db)
-    # user_id = user.id
-
-@router.websocket("/notifications/{user_id}")
-async def websocket_endpoint(websocket: WebSocket, user_id: int):
+    # 실제 서비스에서는 path param 대신 토큰 기반 사용자 식별 필요
+    # 여기서는 단일 구현만 유지 (중복 제거)
     """WebSocket notifications endpoint with optional topic filtering.
 
     Query params:
