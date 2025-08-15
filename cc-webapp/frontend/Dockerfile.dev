@@ -3,7 +3,8 @@ FROM node:18-alpine
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm install
+# Use legacy peer deps to tolerate React 19 + older peer ranges (e.g., next-themes)
+RUN npm install --legacy-peer-deps
 
 COPY . .
 

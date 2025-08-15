@@ -22,7 +22,13 @@ class ClickHouseClient:
             data=sql.encode("utf-8"),
             timeout=10,
         )
-        r.raise_for_status()
+        if not r.ok:
+            # Log body for diagnostics and include a short preview of SQL
+            preview = sql.replace("\n", " ")
+            if len(preview) > 200:
+                preview = preview[:200] + "..."
+            log.error("ClickHouse HTTP %s: %s | sql: %s", r.status_code, r.text.strip(), preview)
+            r.raise_for_status()
         return r.text
 
     def init_schema(self):
@@ -86,43 +92,94 @@ class ClickHouseClient:
         GROUP BY day, code
         """)
 
+        # A/B flags assignments (optional, for analysis)
+        self.execute("""
+        CREATE TABLE IF NOT EXISTS ab_flags (
+            user_id Int32,
+            flag_key LowCardinality(String),
+            variant LowCardinality(String),
+            assigned_at DateTime64(3) DEFAULT now(),
+            day Date DEFAULT today()
+        ) ENGINE = MergeTree()
+        PARTITION BY toYYYYMM(day)
+        ORDER BY (day, flag_key, variant, user_id)
+        """)
+
+    def get_buy_funnel(self, days: int = 7) -> List[Dict[str, Any]]:
+        # Build a simple funnel from actions and purchases
+        sql = f"""
+        SELECT stage, cnt FROM (
+            SELECT 'open_shop' AS stage, uniqExact(user_id) AS cnt
+            FROM user_actions
+            WHERE action_type = 'OPEN_SHOP' AND day BETWEEN today()-{days-1} AND today()
+        )
+        UNION ALL
+        SELECT stage, cnt FROM (
+            SELECT 'buy_click' AS stage, uniqExact(user_id) AS cnt
+            FROM user_actions
+            WHERE action_type = 'BUY_CLICK' AND day BETWEEN today()-{days-1} AND today()
+        )
+        UNION ALL
+        SELECT stage, cnt FROM (
+            SELECT 'buy_success' AS stage, uniqExact(user_id) AS cnt
+            FROM purchases
+            WHERE day BETWEEN today()-{days-1} AND today()
+        )
+        ORDER BY stage
+        """
+        out = self.execute(sql).strip()
+        rows: List[Dict[str, Any]] = []
+        if not out:
+            return rows
+        for line in out.splitlines():
+            parts = line.split('\t')
+            if len(parts) != 2:
+                continue
+            stage, cnt = parts[0], parts[1]
+            try:
+                rows.append({"stage": stage, "count": int(cnt)})
+            except ValueError:
+                log.warning("Unexpected CH count value: %s", cnt)
+        return rows
+
     def insert_actions(self, rows: List[Dict[str, Any]]):
         if not rows:
             return
+        # Rely on ClickHouse defaults for Date/DateTime columns to avoid format issues
         data = "\n".join("\t".join([
             str(int(r.get("user_id") or 0)),
             str(r.get("action_type") or ""),
-            str(r.get("client_ts") or ""),
-            str(r.get("server_ts") or ""),
             str(r.get("context_json") or "{}"),
         ]) for r in rows)
-        sql = "INSERT INTO user_actions (user_id, action_type, client_ts, server_ts, context_json) FORMAT TSV\n" + data
+        sql = "INSERT INTO user_actions (user_id, action_type, context_json) FORMAT TSV\n" + data
         self.execute(sql)
 
     def insert_rewards(self, rows: List[Dict[str, Any]]):
         if not rows:
             return
+        # Let ClickHouse set awarded_at/day via defaults
         data = "\n".join("\t".join([
             str(int(r.get("user_id") or 0)),
             str(r.get("reward_type") or ""),
             str(int(r.get("reward_value") or 0)),
             str(r.get("source") or ""),
-            str(r.get("awarded_at") or ""),
         ]) for r in rows)
-        sql = "INSERT INTO rewards (user_id, reward_type, reward_value, source, awarded_at) FORMAT TSV\n" + data
+        sql = "INSERT INTO rewards (user_id, reward_type, reward_value, source) FORMAT TSV\n" + data
         self.execute(sql)
 
     def insert_purchases(self, rows: List[Dict[str, Any]]):
         if not rows:
             return
-        data = "\n".join("\t".join([
-            str(int(r.get("user_id") or 0)),
-            str(r.get("code") or ""),
-            str(int(r.get("quantity") or 0)),
-            str(int(r.get("total_price_cents") or 0)),
-            str(int(r.get("gems_granted") or 0)),
-            str(r.get("charge_id") or ""),
-            str(r.get("purchased_at") or ""),
-        ]) for r in rows)
-        sql = "INSERT INTO purchases (user_id, code, quantity, total_price_cents, gems_granted, charge_id, purchased_at) FORMAT TSV\n" + data
+        # Insert without explicit purchased_at to use DEFAULT now() and computed day
+        lines: List[str] = []
+        for r in rows:
+            user_id = str(int(r.get("user_id") or 0))
+            code = str(r.get("code") or "")
+            quantity = str(int(r.get("quantity") or 0))
+            total_price = str(int(r.get("total_price_cents") or 0))
+            gems = str(int(r.get("gems_granted") or 0))
+            charge_id = str(r.get("charge_id") or "")
+            lines.append("\t".join([user_id, code, quantity, total_price, gems, charge_id]))
+        data = "\n".join(lines)
+        sql = "INSERT INTO purchases (user_id, code, quantity, total_price_cents, gems_granted, charge_id) FORMAT TSV\n" + data
         self.execute(sql)

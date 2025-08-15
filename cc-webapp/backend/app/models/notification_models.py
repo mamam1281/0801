@@ -6,7 +6,7 @@
 
 from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, ForeignKey, func
 from sqlalchemy.orm import relationship
-from .auth_models import Base
+from ..database import Base
 
 
 class Notification(Base):

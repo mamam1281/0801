@@ -10,7 +10,7 @@
 """
 
 # Base 클래스 먼저 import
-from .auth_models import Base
+from ..database import Base
 
 # Auth 모델들
 from .auth_models import (

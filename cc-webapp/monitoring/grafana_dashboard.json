@@ -167,6 +167,95 @@
       ],
       "title": "Total Requests by Status Code (Last 1hr)", "type": "barchart"
     }
+    ,
+    {
+      "datasource": { "type": "prometheus", "uid": null },
+      "fieldConfig": {
+        "defaults": { "unit": "percent", "min": 0, "max": 100 },
+        "overrides": []
+      },
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 21 },
+      "id": 12,
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "single" }
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(http_requests_total{job=\"cc-webapp-backend\",handler=\"/api/shop/limited/buy\",status=~\"2..\"}[5m])) / sum(rate(http_requests_total{job=\"cc-webapp-backend\",handler=\"/api/shop/limited/buy\"}[5m])) * 100",
+          "legendFormat": "Limited Buy Conversion %",
+          "refId": "A"
+        }
+      ],
+      "title": "Buy Conversion (Limited)",
+      "type": "timeseries"
+    }
+    ,
+    {
+      "datasource": { "type": "prometheus", "uid": null },
+      "fieldConfig": {
+        "defaults": { "unit": "percent", "min": 0, "max": 100 },
+        "overrides": []
+      },
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 21 },
+      "id": 14,
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "single" }
+      },
+      "targets": [
+        {
+          "expr": "(sum(rate(http_requests_total{job=\"cc-webapp-backend\",handler=\"/api/shop/limited/buy\",status=~\"4..|5..\"}[5m])) / sum(rate(http_requests_total{job=\"cc-webapp-backend\",handler=\"/api/shop/limited/buy\"}[5m]))) * 100",
+          "legendFormat": "Limited Buy Error % (4xx/5xx)",
+          "refId": "A"
+        }
+      ],
+      "title": "Buy Error Rate (Limited)",
+      "type": "timeseries"
+    }
+    ,
+    {
+      "datasource": { "type": "prometheus", "uid": null },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "custom": { "stacking": { "mode": "normal" } }, "unit": "reqps" },
+        "overrides": []
+      },
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 28 },
+      "id": 16,
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+  { "expr": "sum(rate(http_requests_total{job=\"cc-webapp-backend\",handler=\"/api/shop/limited/buy\"}[5m]))", "legendFormat": "Attempts", "refId": "A" },
+  { "expr": "sum(rate(http_requests_total{job=\"cc-webapp-backend\",handler=\"/api/shop/limited/buy\",status=~\"2..\"}[5m]))", "legendFormat": "Success (2xx)", "refId": "B" }
+      ],
+      "title": "Buy Attempts vs Success (Limited)",
+      "type": "timeseries"
+    }
+    ,
+    {
+      "datasource": { "type": "prometheus", "uid": null },
+      "fieldConfig": {
+        "defaults": { "unit": "percent", "min": 0, "max": 100 },
+        "overrides": []
+      },
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 28 },
+      "id": 18,
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "single" }
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(http_requests_total{job=\"cc-webapp-backend\",handler=\"/api/shop/buy\",status=~\"2..\"}[5m])) / sum(rate(http_requests_total{job=\"cc-webapp-backend\",handler=\"/api/shop/buy\"}[5m])) * 100",
+          "legendFormat": "Auth Buy Conversion %",
+          "refId": "A"
+        }
+      ],
+      "title": "Buy Conversion (Auth /api/shop/buy)",
+      "type": "timeseries"
+    }
   ],
   "refresh": "10s",
   "schemaVersion": 36,

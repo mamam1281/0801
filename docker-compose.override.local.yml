@@ -1,6 +1,13 @@
 services:
   backend:
     container_name: cc_backend_local
+    environment:
+      KAFKA_ENABLED: "1"
+      KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
+      CLICKHOUSE_ENABLED: "1"
+      CLICKHOUSE_URL: "http://clickhouse:8123"
+      CLICKHOUSE_DATABASE: "cc_olap"
+      CLICKHOUSE_USER: "default"
     ports:
       - "8001:8000"
 
@@ -27,5 +34,12 @@ services:
     ports: []  # remove host binding for 2181
 
   olap_worker:
+    environment:
+      KAFKA_ENABLED: "1"
+      KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
+      CLICKHOUSE_ENABLED: "1"
+      CLICKHOUSE_URL: "http://clickhouse:8123"
+      CLICKHOUSE_DATABASE: "cc_olap"
+      CLICKHOUSE_USER: "default"
     labels:
       - "override=true"

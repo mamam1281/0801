@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from sqlalchemy.orm import Session
 from sqlalchemy import inspect
 from typing import Dict, Any, List, Optional
@@ -217,7 +219,10 @@ class ShopService:
         # Fallback: derive from UserAction logs
         logs = (
             self.db.query(models.UserAction)
-            .filter(models.UserAction.user_id == user_id, models.UserAction.action_type.in_(['PURCHASE_GEMS', 'BUY_PACKAGE']))
+            .filter(
+                models.UserAction.user_id == user_id,
+                models.UserAction.action_type.in_(['PURCHASE_GEMS', 'BUY_PACKAGE'])
+            )
             .order_by(models.UserAction.id.desc())
             .limit(limit)
             .all()
@@ -234,9 +239,9 @@ class ShopService:
                 "quantity": data.get('quantity', 1),
                 "unit_price": data.get('amount'),
                 "amount": data.get('amount'),
-                "status": "success",
+                "status": data.get('status') or "success",
                 "payment_method": data.get('payment_method'),
-                "receipt_code": None,
+                "receipt_code": data.get('receipt_code'),
                 "created_at": None,
             })
         return out
@@ -474,15 +479,60 @@ class ShopService:
 
     def settle_pending_gems_for_user(self, user_id: int, receipt_code: str, gateway: Optional[PaymentGatewayService] = None) -> Dict[str, Any]:
         tx = self.get_tx_by_receipt_for_user(user_id, receipt_code)
-        if not tx:
-            return {"success": False, "message": "Transaction not found"}
+        gateway = gateway or PaymentGatewayService()
+        if tx is None:
+            # Fallback when transactions table is absent: derive from UserAction log
+            a = (
+                self.db.query(models.UserAction)
+                .filter(
+                    models.UserAction.user_id == user_id,
+                    models.UserAction.action_type == 'PURCHASE_GEMS',
+                    models.UserAction.action_data.contains(f'"receipt_code":"{receipt_code}"'),
+                )
+                .order_by(models.UserAction.id.desc())
+                .first()
+            )
+            if not a:
+                return {"success": False, "message": "Transaction not found"}
+            try:
+                data = json.loads(a.action_data or '{}')
+            except Exception:
+                data = {}
+            # If already settled
+            if data.get('status') == 'success':
+                return {"success": True, "status": 'success'}
+            gw_ref = data.get('gateway_reference') or receipt_code
+            res = gateway.check_status(gw_ref)
+            status = res.get('status')
+            if status == 'pending':
+                return {"success": True, "status": 'pending'}
+            elif status == 'failed':
+                # Write a follow-up log to indicate failure
+                payload = {**data, 'status': 'failed'}
+                ua = models.UserAction(user_id=user_id, action_type='PURCHASE_GEMS', action_data=json.dumps(payload, ensure_ascii=False))
+                try:
+                    self.db.add(ua)
+                    self.db.commit()
+                except Exception:
+                    self.db.rollback()
+                return {"success": True, "status": 'failed'}
+            else:
+                # Credit tokens and write success log
+                amount = int(data.get('amount') or 0)
+                new_balance = TokenService(self.db).add_tokens(user_id, amount)
+                payload = {**data, 'status': 'success'}
+                ua = models.UserAction(user_id=user_id, action_type='PURCHASE_GEMS', action_data=json.dumps(payload, ensure_ascii=False))
+                try:
+                    self.db.add(ua)
+                    self.db.commit()
+                except Exception:
+                    self.db.rollback()
+                return {"success": True, "status": 'success', "new_balance": new_balance}
+        # Normal path: have transaction row
         if tx.status != 'pending':
-            # Already settled
             return {"success": True, "status": tx.status}
         if tx.kind != 'gems':
             return {"success": False, "message": "Only gems transactions can be auto-settled"}
-
-        gateway = gateway or PaymentGatewayService()
         res = gateway.check_status(receipt_code)
         status = res.get('status')
         if status == 'pending':
@@ -496,7 +546,6 @@ class ShopService:
                 self.db.rollback()
             return {"success": True, "status": 'failed'}
         else:
-            # success: credit tokens and mark success
             TokenService(self.db).add_tokens(user_id, tx.amount)
             tx.status = 'success'
             try:

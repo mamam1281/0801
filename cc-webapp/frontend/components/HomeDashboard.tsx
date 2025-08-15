@@ -2,12 +2,12 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Crown, 
-  TrendingUp, 
-  Gift, 
-  Zap, 
-  Trophy, 
+import {
+  Crown,
+  TrendingUp,
+  Gift,
+  Zap,
+  Trophy,
   Star,
   Settings,
   LogOut,
@@ -15,18 +15,19 @@ import {
   Coins,
   ChevronRight,
   BarChart3,
-  Medal,
   Gem,
   Sparkles,
   Menu,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Award,
 } from 'lucide-react';
 import { User } from '../types';
 import { calculateExperiencePercentage, calculateWinRate, checkLevelUp } from '../utils/userUtils';
 import { QUICK_ACTIONS, ACHIEVEMENTS_DATA } from '../constants/dashboardData';
 import { Button } from './ui/button';
 import { Progress } from './ui/progress';
+import { streakApi } from '../utils/apiClient';
 
 interface HomeDashboardProps {
   user: User;
@@ -49,7 +50,7 @@ export function HomeDashboard({
   onNavigateToStreaming,
   onUpdateUser,
   onAddNotification,
-  onToggleSideMenu
+  onToggleSideMenu,
 }: HomeDashboardProps) {
   const [timeLeft, setTimeLeft] = useState({ hours: 23, minutes: 45, seconds: 12 });
   const [showLevelUpModal, setShowLevelUpModal] = useState(false);
@@ -57,6 +58,59 @@ export function HomeDashboard({
   const [treasureProgress, setTreasureProgress] = useState(65);
   const [vipPoints, setVipPoints] = useState(1250);
   const [isAchievementsExpanded, setIsAchievementsExpanded] = useState(false);
+  const [streak, setStreak] = useState({
+    count: user?.dailyStreak ?? 0,
+    ttl_seconds: null as number | null,
+    next_reward: null as string | null,
+  });
+  const [streakProtection, setStreakProtection] = useState(null as boolean | null);
+  const [attendanceDays, setAttendanceDays] = useState(null as string[] | null);
+
+  // Fetch and tick daily login streak on mount (idempotent per backend TTL)
+  useEffect(() => {
+    let mounted = true;
+    const load = async () => {
+      try {
+        // Get status first
+        const status = await streakApi.status('DAILY_LOGIN');
+        if (mounted)
+          setStreak({
+            count: status.count,
+            ttl_seconds: status.ttl_seconds,
+            next_reward: status.next_reward,
+          });
+        // Best-effort tick (backend guards with TTL)
+        const after = await streakApi.tick('DAILY_LOGIN');
+        if (mounted)
+          setStreak({
+            count: after.count,
+            ttl_seconds: after.ttl_seconds,
+            next_reward: after.next_reward,
+          });
+        // Load protection & this month attendance (UTC now)
+        try {
+          const prot = await streakApi.protectionGet('DAILY_LOGIN');
+          if (mounted) setStreakProtection(!!prot?.enabled);
+        } catch {}
+        try {
+          const now = new Date();
+          const hist = await streakApi.history(
+            now.getUTCFullYear(),
+            now.getUTCMonth() + 1,
+            'DAILY_LOGIN'
+          );
+          if (mounted) setAttendanceDays(Array.isArray(hist?.days) ? hist.days : []);
+        } catch {}
+      } catch (e) {
+        // Non-fatal; keep UI fallback
+        console.warn('streak load failed', e);
+      }
+    };
+    load();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -79,14 +133,14 @@ export function HomeDashboard({
   const winRate = calculateWinRate(user);
 
   const claimDailyReward = () => {
-    const rewardGold = 1000 + (user.dailyStreak * 500);
-    const bonusExp = 50 + (user.dailyStreak * 25);
-    
+    const rewardGold = 1000 + user.dailyStreak * 500;
+    const bonusExp = 50 + user.dailyStreak * 25;
+
     const updatedUser = {
       ...user,
       goldBalance: user.goldBalance + rewardGold,
       experience: user.experience + bonusExp,
-      dailyStreak: user.dailyStreak + 1
+      dailyStreak: user.dailyStreak + 1,
     };
 
     const { updatedUser: finalUser, leveledUp } = checkLevelUp(updatedUser);
@@ -109,7 +163,7 @@ export function HomeDashboard({
     }
   };
 
-  const quickActionsWithHandlers = QUICK_ACTIONS.map(action => ({
+  const quickActionsWithHandlers = QUICK_ACTIONS.map((action) => ({
     ...action,
     onClick: () => {
       switch (action.title) {
@@ -134,25 +188,32 @@ export function HomeDashboard({
           onAddNotification('🏆 랭킹 기능 준비중!');
           break;
       }
-    }
+    },
   }));
 
-  const achievements = ACHIEVEMENTS_DATA.map(achievement => ({
+  const achievements = ACHIEVEMENTS_DATA.map((achievement) => ({
     ...achievement,
     unlocked: (() => {
       switch (achievement.id) {
-        case 'first_login': return true;
-        case 'level_5': return user.level >= 5;
-        case 'win_10': return user.stats.gamesWon >= 10;
-        case 'treasure_hunt': return treasureProgress >= 50;
-        case 'gold_100k': return user.goldBalance >= 100000;
-        case 'daily_7': return user.dailyStreak >= 7;
-        default: return false;
+        case 'first_login':
+          return true;
+        case 'level_5':
+          return user.level >= 5;
+        case 'win_10':
+          return user.stats.gamesWon >= 10;
+        case 'treasure_hunt':
+          return treasureProgress >= 50;
+        case 'gold_100k':
+          return user.goldBalance >= 100000;
+        case 'daily_7':
+          return (streak.count ?? user.dailyStreak) >= 7;
+        default:
+          return false;
       }
-    })()
+    })(),
   }));
 
-  const unlockedAchievements = achievements.filter(a => a.unlocked).length;
+  const unlockedAchievements = achievements.filter((a) => a.unlocked).length;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-black to-primary-soft relative overflow-hidden pb-20">
@@ -161,21 +222,21 @@ export function HomeDashboard({
         {[...Array(20)].map((_, i) => (
           <motion.div
             key={i}
-            initial={{ 
+            initial={{
               opacity: 0,
               x: Math.random() * window.innerWidth,
-              y: Math.random() * window.innerHeight
+              y: Math.random() * window.innerHeight,
             }}
-            animate={{ 
+            animate={{
               opacity: [0, 0.2, 0],
               scale: [0, 1.2, 0],
-              rotate: 360
+              rotate: 360,
             }}
             transition={{
               duration: 10,
               repeat: Infinity,
               delay: i * 0.3,
-              ease: "easeInOut"
+              ease: 'easeInOut',
             }}
             className="absolute w-1 h-1 bg-primary rounded-full"
           />
@@ -209,7 +270,7 @@ export function HomeDashboard({
 
             <motion.div
               animate={{ rotate: 360 }}
-              transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
+              transition={{ duration: 15, repeat: Infinity, ease: 'linear' }}
               className="w-12 h-12 bg-gradient-game rounded-full flex items-center justify-center level-glow"
             >
               <Crown className="w-6 h-6 text-white" />
@@ -218,12 +279,10 @@ export function HomeDashboard({
               <h1 className="text-xl lg:text-2xl font-bold text-gradient-primary">
                 {user.nickname}
               </h1>
-              {user.isAdmin && (
-                <div className="text-xs text-error font-bold">🔐 관리자</div>
-              )}
+              {user.isAdmin && <div className="text-xs text-error font-bold">🔐 관리자</div>}
             </div>
           </div>
-          
+
           <div className="flex items-center gap-3">
             <motion.div
               initial={{ scale: 0 }}
@@ -301,9 +360,7 @@ export function HomeDashboard({
             </div>
 
             <div className="text-center">
-              <motion.div
-                className="px-4 py-3 rounded-xl bg-gradient-to-r from-info to-success text-white treasure-bounce"
-              >
+              <motion.div className="px-4 py-3 rounded-xl bg-gradient-to-r from-info to-success text-white treasure-bounce">
                 <Gem className="w-6 h-6 mx-auto mb-1" />
                 <div className="text-xl lg:text-2xl">{treasureProgress}%</div>
                 <div className="text-xs opacity-80">보물찾기</div>
@@ -351,20 +408,24 @@ export function HomeDashboard({
                     }`}
                   >
                     {action.badge && (
-                      <div className={`absolute top-2 right-2 px-2 py-1 rounded-full text-xs font-bold animate-pulse ${
-                        action.badge === 'LIVE' ? 'bg-error text-white' : 'bg-error text-white'
-                      }`}>
+                      <div
+                        className={`absolute top-2 right-2 px-2 py-1 rounded-full text-xs font-bold animate-pulse ${
+                          action.badge === 'LIVE' ? 'bg-error text-white' : 'bg-error text-white'
+                        }`}
+                      >
                         {action.badge}
                       </div>
                     )}
-                    
-                    <div className={`w-12 h-12 bg-gradient-to-r ${action.color} rounded-lg flex items-center justify-center mb-3`}>
+
+                    <div
+                      className={`w-12 h-12 bg-gradient-to-r ${action.color} rounded-lg flex items-center justify-center mb-3`}
+                    >
                       <action.icon className="w-6 h-6 text-white" />
                     </div>
-                    
+
                     <h3 className="font-bold text-foreground mb-1">{action.title}</h3>
                     <p className="text-sm text-muted-foreground">{action.description}</p>
-                    
+
                     <ChevronRight className="absolute bottom-4 right-4 w-4 h-4 text-muted-foreground" />
                   </motion.div>
                 ))}
@@ -391,22 +452,149 @@ export function HomeDashboard({
                     <div className="text-sm text-muted-foreground">승리</div>
                   </div>
                   <div className="text-center">
-                    <div className="text-2xl font-bold text-gold">{user.stats.totalEarnings.toLocaleString()}</div>
+                    <div className="text-2xl font-bold text-gold">
+                      {user.stats.totalEarnings.toLocaleString()}
+                    </div>
                     <div className="text-sm text-muted-foreground">총 수익</div>
                   </div>
                   <div className="text-center">
-                    <div className="text-2xl font-bold text-warning">{user.stats.highestScore.toLocaleString()}</div>
+                    <div className="text-2xl font-bold text-warning">
+                      {user.stats.highestScore.toLocaleString()}
+                    </div>
                     <div className="text-sm text-muted-foreground">최고 점수</div>
                   </div>
                 </div>
-                
-
               </div>
             </motion.div>
           </div>
 
-          {/* Right Column - Achievements & Events */}
+          {/* Right Column - Streak & Events */}
           <div className="space-y-6">
+            {/* Streak Card */}
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.4 }}
+              className="glass-effect rounded-xl p-4 card-hover-float"
+            >
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-5 h-5 text-primary" />
+                  <h2 className="text-xl font-bold text-foreground">연속 보상</h2>
+                </div>
+                {typeof streak.ttl_seconds === 'number' && (
+                  <div className="text-xs text-muted-foreground">
+                    남은 시간 ~ {Math.max(0, Math.floor(streak.ttl_seconds / 3600))}h
+                  </div>
+                )}
+              </div>
+              <div className="grid grid-cols-3 gap-3 text-center">
+                <div className="bg-secondary/40 rounded-lg p-3">
+                  <div className="text-2xl font-bold text-primary">{streak.count}</div>
+                  <div className="text-xs text-muted-foreground">연속일</div>
+                </div>
+                <div className="bg-secondary/40 rounded-lg p-3">
+                  <div className="text-sm font-bold text-gold">
+                    {streak.next_reward || 'Coins + XP'}
+                  </div>
+                  <div className="text-xs text-muted-foreground">다음 보상</div>
+                </div>
+                <div className="bg-secondary/40 rounded-lg p-3">
+                  <Button size="sm" className="w-full" onClick={() => setShowDailyReward(true)}>
+                    보상 보기
+                  </Button>
+                </div>
+              </div>
+              {/* Mini benefits + protection CTA + attendance sketch */}
+              <div className="mt-3 grid grid-cols-1 gap-2 text-xs text-muted-foreground">
+                <div className="flex items-center justify-between">
+                  <div>혜택 패턴: 3일 Rare, 7일 Epic</div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={async () => {
+                      try {
+                        const next = !(streakProtection ?? false);
+                        const res = await streakApi.protectionSet(next, 'DAILY_LOGIN');
+                        setStreakProtection(!!res?.enabled);
+                      } catch (e) {
+                        console.warn('protection toggle failed', e);
+                      }
+                    }}
+                  >
+                    보호 {streakProtection ? 'ON' : 'OFF'}
+                  </Button>
+                </div>
+                {attendanceDays && attendanceDays.length > 0 && (
+                  <div className="text-[11px] text-muted-foreground/80">
+                    이번달 출석: {attendanceDays.length}일
+                  </div>
+                )}
+              </div>
+
+              {/* Minimal monthly attendance calendar (current month) */}
+              {attendanceDays && (
+                <div className="mt-2 border border-border-secondary/40 rounded-lg p-2">
+                  {(() => {
+                    const now = new Date();
+                    const y = now.getUTCFullYear();
+                    const m = now.getUTCMonth(); // 0-based
+                    const first = new Date(Date.UTC(y, m, 1));
+                    const last = new Date(Date.UTC(y, m + 1, 0));
+                    const daysInMonth = last.getUTCDate();
+                    const startWeekday = first.getUTCDay(); // 0=Sun
+                    const cells: Array<{ label: string; dateStr?: string; active?: boolean }[]> =
+                      [];
+                    const week: Array<{ label: string; dateStr?: string; active?: boolean }> = [];
+                    // push empty cells before first day
+                    for (let i = 0; i < (startWeekday === 0 ? 0 : startWeekday); i++) {
+                      week.push({ label: '' });
+                    }
+                    for (let d = 1; d <= daysInMonth; d++) {
+                      const iso = new Date(Date.UTC(y, m, d)).toISOString().slice(0, 10);
+                      const active = attendanceDays.includes(iso);
+                      week.push({ label: String(d), dateStr: iso, active });
+                      if (week.length === 7) {
+                        cells.push([...week]);
+                        week.length = 0;
+                      }
+                    }
+                    if (week.length) {
+                      while (week.length < 7) week.push({ label: '' });
+                      cells.push([...week]);
+                    }
+                    return (
+                      <div>
+                        <div className="grid grid-cols-7 gap-1 text-[10px] text-muted-foreground/70 mb-1">
+                          {['일', '월', '화', '수', '목', '금', '토'].map((d) => (
+                            <div key={d} className="text-center">
+                              {d}
+                            </div>
+                          ))}
+                        </div>
+                        <div
+                          className="grid gap-1"
+                          style={{ gridTemplateColumns: 'repeat(7, minmax(0, 1fr))' }}
+                        >
+                          {cells.flat().map((c, idx) => (
+                            <div
+                              key={idx}
+                              className={`h-6 rounded flex items-center justify-center text-[11px] ${
+                                c.active
+                                  ? 'bg-primary/30 text-foreground'
+                                  : 'bg-secondary/30 text-muted-foreground'
+                              }`}
+                            >
+                              {c.label}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+            </motion.div>
             <motion.div
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
@@ -432,7 +620,7 @@ export function HomeDashboard({
                     <ChevronDown className="w-5 h-5 text-muted-foreground" />
                   </motion.div>
                 </div>
-                
+
                 {/* 간단한 진행률 표시 */}
                 <div className="mt-3">
                   <div className="w-full bg-secondary/50 rounded-full h-2">
@@ -453,7 +641,7 @@ export function HomeDashboard({
                 {isAchievementsExpanded && (
                   <motion.div
                     initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: "auto" }}
+                    animate={{ opacity: 1, height: 'auto' }}
                     exit={{ opacity: 0, height: 0 }}
                     transition={{ duration: 0.3 }}
                     className="glass-effect rounded-xl p-4 space-y-3 overflow-hidden"
@@ -465,22 +653,22 @@ export function HomeDashboard({
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: index * 0.1 }}
                         className={`flex items-center gap-3 p-3 rounded-lg transition-all card-hover-float ${
-                          achievement.unlocked 
-                            ? 'bg-success-soft border border-success/30' 
+                          achievement.unlocked
+                            ? 'bg-success-soft border border-success/30'
                             : 'bg-secondary/50 opacity-60'
                         }`}
                       >
                         <div className="text-2xl">{achievement.icon}</div>
                         <div className="flex-1">
-                          <div className={`font-medium ${
-                            achievement.unlocked ? 'text-success' : 'text-muted-foreground'
-                          }`}>
+                          <div
+                            className={`font-medium ${
+                              achievement.unlocked ? 'text-success' : 'text-muted-foreground'
+                            }`}
+                          >
                             {achievement.name}
                           </div>
                         </div>
-                        {achievement.unlocked && (
-                          <Medal className="w-4 h-4 text-gold" />
-                        )}
+                        {achievement.unlocked && <Award className="w-4 h-4 text-gold" />}
                       </motion.div>
                     ))}
                   </motion.div>
@@ -494,18 +682,17 @@ export function HomeDashboard({
               transition={{ delay: 0.7 }}
             >
               <h2 className="text-xl font-bold text-foreground mb-4 flex items-center gap-2">
-                <Gift className="w-5 h-5 text-error" />
-                핫 이벤트
+                <Gift className="w-5 h-5 text-error" />핫 이벤트
               </h2>
               <div className="space-y-3">
                 <motion.div
-                  whileHover={{ 
-                    scale: 1.05, 
+                  whileHover={{
+                    scale: 1.05,
                     y: -5,
-                    boxShadow: "0 10px 25px rgba(230, 51, 107, 0.3)"
+                    boxShadow: '0 10px 25px rgba(230, 51, 107, 0.3)',
                   }}
                   whileTap={{ scale: 0.98 }}
-                  transition={{ duration: 0.2, ease: "easeOut" }}
+                  transition={{ duration: 0.2, ease: 'easeOut' }}
                   className="glass-effect rounded-xl p-4 border-2 border-error/30 soft-glow cursor-pointer card-hover-float relative overflow-hidden group"
                 >
                   {/* 호버시 배경 빛 효과 */}
@@ -514,27 +701,27 @@ export function HomeDashboard({
                     whileHover={{ opacity: 1 }}
                     className="absolute inset-0 bg-gradient-to-r from-error/10 to-warning/10 rounded-xl"
                   />
-                  
+
                   {/* 호버시 펄스 효과 */}
                   <motion.div
-                    animate={{ 
+                    animate={{
                       scale: [1, 1.02, 1],
-                      opacity: [0.3, 0.6, 0.3]
+                      opacity: [0.3, 0.6, 0.3],
                     }}
-                    transition={{ 
-                      duration: 2, 
+                    transition={{
+                      duration: 2,
                       repeat: Infinity,
-                      ease: "easeInOut"
+                      ease: 'easeInOut',
                     }}
                     className="absolute inset-0 bg-error/20 rounded-xl group-hover:bg-error/30"
                   />
-                  
+
                   <div className="relative z-10">
                     <div className="flex items-center gap-3">
-                      <motion.div 
-                        whileHover={{ 
+                      <motion.div
+                        whileHover={{
                           rotate: [0, -10, 10, -10, 0],
-                          scale: 1.1
+                          scale: 1.1,
                         }}
                         transition={{ duration: 0.5 }}
                         className="w-12 h-12 bg-gradient-to-r from-error to-warning rounded-lg flex items-center justify-center"
@@ -542,26 +729,25 @@ export function HomeDashboard({
                         <Gift className="w-6 h-6 text-white" />
                       </motion.div>
                       <div className="flex-1">
-                        <motion.div 
-                          whileHover={{ x: 5 }}
-                          className="font-bold text-error"
-                        >
+                        <motion.div whileHover={{ x: 5 }} className="font-bold text-error">
                           더블 골드 이벤트!
                         </motion.div>
-                        <div className="text-sm text-muted-foreground">모든 게임에서 골드 2배 획득</div>
+                        <div className="text-sm text-muted-foreground">
+                          모든 게임에서 골드 2배 획득
+                        </div>
                       </div>
                     </div>
-                    <motion.div 
+                    <motion.div
                       whileHover={{ scale: 1.02 }}
                       className="mt-3 bg-error-soft rounded-lg p-2 text-center"
                     >
-                      <motion.div 
-                        animate={{ 
-                          color: ["#e6336b", "#ff4d9a", "#e6336b"]
+                      <motion.div
+                        animate={{
+                          color: ['#e6336b', '#ff4d9a', '#e6336b'],
                         }}
-                        transition={{ 
-                          duration: 1.5, 
-                          repeat: Infinity 
+                        transition={{
+                          duration: 1.5,
+                          repeat: Infinity,
                         }}
                         className="text-error text-sm font-medium"
                       >
@@ -573,14 +759,14 @@ export function HomeDashboard({
                   </div>
                 </motion.div>
 
-                <motion.div 
-                  whileHover={{ 
-                    scale: 1.03, 
+                <motion.div
+                  whileHover={{
+                    scale: 1.03,
                     y: -3,
-                    boxShadow: "0 8px 20px rgba(230, 194, 0, 0.25)"
+                    boxShadow: '0 8px 20px rgba(230, 194, 0, 0.25)',
                   }}
                   whileTap={{ scale: 0.98 }}
-                  transition={{ duration: 0.2, ease: "easeOut" }}
+                  transition={{ duration: 0.2, ease: 'easeOut' }}
                   className="glass-effect rounded-xl p-4 card-hover-float cursor-pointer relative overflow-hidden group"
                 >
                   {/* 호버시 골드 그라데이션 효과 */}
@@ -589,13 +775,13 @@ export function HomeDashboard({
                     whileHover={{ opacity: 1 }}
                     className="absolute inset-0 bg-gradient-to-r from-gold/5 to-warning/5 rounded-xl"
                   />
-                  
+
                   <div className="relative z-10">
                     <div className="flex items-center gap-3">
-                      <motion.div 
-                        whileHover={{ 
+                      <motion.div
+                        whileHover={{
                           rotate: 360,
-                          scale: 1.1
+                          scale: 1.1,
                         }}
                         transition={{ duration: 0.8 }}
                         className="w-12 h-12 bg-gradient-to-r from-gold to-gold-light rounded-lg flex items-center justify-center"
@@ -603,10 +789,7 @@ export function HomeDashboard({
                         <Trophy className="w-6 h-6 text-black" />
                       </motion.div>
                       <div className="flex-1">
-                        <motion.div 
-                          whileHover={{ x: 5 }}
-                          className="font-bold text-gold"
-                        >
+                        <motion.div whileHover={{ x: 5 }} className="font-bold text-gold">
                           주간 챌린지
                         </motion.div>
                         <div className="text-sm text-muted-foreground">100승 달성시 특별 보상</div>
@@ -614,9 +797,9 @@ export function HomeDashboard({
                     </div>
                     <div className="mt-3">
                       <motion.div whileHover={{ scale: 1.02 }}>
-                        <Progress value={(user.stats.gamesWon % 100)} className="h-2" />
+                        <Progress value={user.stats.gamesWon % 100} className="h-2" />
                       </motion.div>
-                      <motion.div 
+                      <motion.div
                         whileHover={{ scale: 1.05 }}
                         className="text-xs text-muted-foreground mt-1 text-center"
                       >
@@ -650,26 +833,26 @@ export function HomeDashboard({
             >
               <motion.div
                 animate={{ rotate: 360 }}
-                transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
                 className="w-20 h-20 bg-gradient-gold rounded-full flex items-center justify-center mx-auto mb-4"
               >
                 <Gift className="w-10 h-10 text-black" />
               </motion.div>
-              
+
               <h3 className="text-2xl font-bold text-gold mb-2">일일 보상!</h3>
               <p className="text-muted-foreground mb-6">
-                연속 {user.dailyStreak}일 접속 보너스를 받으세요!
+                연속 {streak.count ?? user.dailyStreak}일 접속 보너스를 받으세요!
               </p>
-              
+
               <div className="bg-gold-soft rounded-lg p-4 mb-6">
                 <div className="text-gold font-bold text-xl">
-                  {(1000 + (user.dailyStreak * 500)).toLocaleString()}G
+                  {(1000 + (streak.count ?? user.dailyStreak) * 500).toLocaleString()}G
                 </div>
                 <div className="text-sm text-muted-foreground">
-                  + {50 + (user.dailyStreak * 25)} XP
+                  + {50 + (streak.count ?? user.dailyStreak) * 25} XP
                 </div>
               </div>
-              
+
               <Button
                 onClick={claimDailyReward}
                 className="w-full bg-gradient-gold hover:opacity-90 text-black font-bold py-3 btn-hover-lift"
@@ -703,13 +886,11 @@ export function HomeDashboard({
               >
                 ⭐
               </motion.div>
-              
+
               <h3 className="text-3xl font-bold text-gradient-primary mb-2">레벨업!</h3>
               <p className="text-xl text-gold font-bold mb-4">레벨 {user.level}</p>
-              <p className="text-muted-foreground mb-6">
-                축하합니다! 새로운 레벨에 도달했습니다!
-              </p>
-              
+              <p className="text-muted-foreground mb-6">축하합니다! 새로운 레벨에 도달했습니다!</p>
+
               <Button
                 onClick={() => setShowLevelUpModal(false)}
                 className="w-full bg-gradient-game hover:opacity-90 text-white font-bold py-3 btn-hover-lift"

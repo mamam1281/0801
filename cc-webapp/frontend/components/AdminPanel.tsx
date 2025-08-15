@@ -52,7 +52,9 @@ interface QuickAction {
 }
 
 export function AdminPanel({ user, onBack, onUpdateUser, onAddNotification }: AdminPanelProps) {
-  const [activeView, setActiveView] = useState<'menu' | 'dashboard' | 'users' | 'shop' | 'security' | 'system'>('menu');
+  const [activeView, setActiveView] = useState(
+    'menu' as 'menu' | 'dashboard' | 'users' | 'shop' | 'security' | 'system'
+  );
   const [searchQuery, setSearchQuery] = useState('');
 
   // 📊 핵심 통계 (간소화)
@@ -63,7 +65,7 @@ export function AdminPanel({ user, onBack, onUpdateUser, onAddNotification }: Ad
     totalRevenue: 1250000,
     todayRevenue: 45000,
     criticalAlerts: 2,
-    pendingActions: 7
+    pendingActions: 7,
   });
 
   // 💼 빠른 작업 메뉴 정의 (globals.css 클래스 사용)
@@ -77,7 +79,7 @@ export function AdminPanel({ user, onBack, onUpdateUser, onAddNotification }: Ad
       bgClass: 'bg-gradient-to-r from-success to-info',
       shortcut: 'Ctrl+U',
       category: 'user',
-      onClick: () => setActiveView('users')
+      onClick: () => setActiveView('users'),
     },
     {
       id: 'manage-users',
@@ -86,7 +88,7 @@ export function AdminPanel({ user, onBack, onUpdateUser, onAddNotification }: Ad
       icon: Users,
       bgClass: 'bg-gradient-to-r from-primary to-primary-light',
       category: 'user',
-      onClick: () => setActiveView('users')
+      onClick: () => setActiveView('users'),
     },
     {
       id: 'ban-management',
@@ -95,7 +97,7 @@ export function AdminPanel({ user, onBack, onUpdateUser, onAddNotification }: Ad
       icon: Shield,
       bgClass: 'bg-gradient-to-r from-error to-warning',
       category: 'user',
-      onClick: () => setActiveView('security')
+      onClick: () => setActiveView('security'),
     },
     {
       id: 'bulk-rewards',
@@ -104,7 +106,7 @@ export function AdminPanel({ user, onBack, onUpdateUser, onAddNotification }: Ad
       icon: Gift,
       bgClass: 'bg-gradient-gold',
       category: 'user',
-      onClick: () => onAddNotification('🎁 일괄 보상 지급 기능을 준비중입니다.')
+      onClick: () => onAddNotification('🎁 일괄 보상 지급 기능을 준비중입니다.'),
     },
 
     // 🛍️ 상점 관리
@@ -115,7 +117,7 @@ export function AdminPanel({ user, onBack, onUpdateUser, onAddNotification }: Ad
       icon: Plus,
       bgClass: 'bg-gradient-to-r from-warning to-gold',
       category: 'shop',
-      onClick: () => setActiveView('shop')
+      onClick: () => setActiveView('shop'),
     },
     {
       id: 'manage-shop',
@@ -124,7 +126,7 @@ export function AdminPanel({ user, onBack, onUpdateUser, onAddNotification }: Ad
       icon: ShoppingCart,
       bgClass: 'bg-gradient-to-r from-info to-primary',
       category: 'shop',
-      onClick: () => setActiveView('shop')
+      onClick: () => setActiveView('shop'),
     },
     {
       id: 'sales-analytics',
@@ -133,7 +135,7 @@ export function AdminPanel({ user, onBack, onUpdateUser, onAddNotification }: Ad
       icon: BarChart3,
       bgClass: 'bg-gradient-to-r from-success to-warning',
       category: 'shop',
-      onClick: () => onAddNotification('📊 판매 분석 리포트를 생성중입니다.')
+      onClick: () => onAddNotification('📊 판매 분석 리포트를 생성중입니다.'),
     },
     {
       id: 'promotions',
@@ -142,7 +144,7 @@ export function AdminPanel({ user, onBack, onUpdateUser, onAddNotification }: Ad
       icon: Percent,
       bgClass: 'bg-gradient-to-r from-error to-primary',
       category: 'shop',
-      onClick: () => onAddNotification('🏷️ 프로모션 설정 기능을 준비중입니다.')
+      onClick: () => onAddNotification('🏷️ 프로모션 설정 기능을 준비중입니다.'),
     },
 
     // 🛡️ 보안 관리
@@ -153,7 +155,7 @@ export function AdminPanel({ user, onBack, onUpdateUser, onAddNotification }: Ad
       icon: AlertTriangle,
       bgClass: 'bg-gradient-to-r from-error to-error-soft',
       category: 'security',
-      onClick: () => setActiveView('security')
+      onClick: () => setActiveView('security'),
     },
     {
       id: 'fraud-detection',
@@ -162,7 +164,7 @@ export function AdminPanel({ user, onBack, onUpdateUser, onAddNotification }: Ad
       icon: Eye,
       bgClass: 'bg-gradient-to-r from-warning to-error',
       category: 'security',
-      onClick: () => setActiveView('security')
+      onClick: () => setActiveView('security'),
     },
     {
       id: 'ip-management',
@@ -171,7 +173,7 @@ export function AdminPanel({ user, onBack, onUpdateUser, onAddNotification }: Ad
       icon: Wifi,
       bgClass: 'bg-gradient-to-r from-info to-success',
       category: 'security',
-      onClick: () => onAddNotification('🌐 IP 관리 패널을 준비중입니다.')
+      onClick: () => onAddNotification('🌐 IP 관리 패널을 준비중입니다.'),
     },
 
     // ⚙️ 시스템 관리
@@ -182,7 +184,7 @@ export function AdminPanel({ user, onBack, onUpdateUser, onAddNotification }: Ad
       icon: Settings,
       bgClass: 'bg-gradient-metal',
       category: 'system',
-      onClick: () => setActiveView('system')
+      onClick: () => setActiveView('system'),
     },
     {
       id: 'backup-restore',
@@ -191,7 +193,7 @@ export function AdminPanel({ user, onBack, onUpdateUser, onAddNotification }: Ad
       icon: Database,
       bgClass: 'bg-gradient-to-r from-info to-primary',
       category: 'system',
-      onClick: () => onAddNotification('💾 백업 시스템을 점검중입니다.')
+      onClick: () => onAddNotification('💾 백업 시스템을 점검중입니다.'),
     },
     {
       id: 'server-status',
@@ -200,7 +202,7 @@ export function AdminPanel({ user, onBack, onUpdateUser, onAddNotification }: Ad
       icon: Server,
       bgClass: 'bg-gradient-to-r from-success to-info',
       category: 'system',
-      onClick: () => onAddNotification('🖥️ 서버 상태가 정상입니다.')
+      onClick: () => onAddNotification('🖥️ 서버 상태가 정상입니다.'),
     },
 
     // 📺 방송 관리
@@ -211,7 +213,7 @@ export function AdminPanel({ user, onBack, onUpdateUser, onAddNotification }: Ad
       icon: Video,
       bgClass: 'bg-gradient-to-r from-primary to-error',
       category: 'broadcast',
-      onClick: () => onAddNotification('📺 방송 제어 패널을 준비중입니다.')
+      onClick: () => onAddNotification('📺 방송 제어 패널을 준비중입니다.'),
     },
     {
       id: 'chat-moderation',
@@ -220,8 +222,8 @@ export function AdminPanel({ user, onBack, onUpdateUser, onAddNotification }: Ad
       icon: MessageSquare,
       bgClass: 'bg-gradient-to-r from-warning to-primary',
       category: 'broadcast',
-      onClick: () => onAddNotification('💬 채팅 관리 기능을 준비중입니다.')
-    }
+      onClick: () => onAddNotification('💬 채팅 관리 기능을 준비중입니다.'),
+    },
   ];
 
   // 카테고리별 아이콘
@@ -230,22 +232,25 @@ export function AdminPanel({ user, onBack, onUpdateUser, onAddNotification }: Ad
     shop: ShoppingCart,
     security: Shield,
     system: Settings,
-    broadcast: Video
+    broadcast: Video,
   };
 
   // 카테고리별 그룹화
-  const actionsByCategory = quickActions.reduce((acc, action) => {
-    if (!acc[action.category]) acc[action.category] = [];
-    acc[action.category].push(action);
-    return acc;
-  }, {} as Record<string, QuickAction[]>);
+  const actionsByCategory = quickActions.reduce(
+    (acc, action) => {
+      if (!acc[action.category]) acc[action.category] = [];
+      acc[action.category].push(action);
+      return acc;
+    },
+    {} as Record<string, QuickAction[]>
+  );
 
   const categoryNames = {
     user: '👥 사용자 관리',
     shop: '🛍️ 상점 관리',
     security: '🛡️ 보안 관리',
     system: '⚙️ 시스템 관리',
-    broadcast: '📺 방송 관리'
+    broadcast: '📺 방송 관리',
   };
 
   const categoryBgClasses = {
@@ -253,7 +258,7 @@ export function AdminPanel({ user, onBack, onUpdateUser, onAddNotification }: Ad
     shop: 'bg-gradient-to-r from-warning to-gold',
     security: 'bg-gradient-to-r from-error to-warning',
     system: 'bg-gradient-metal',
-    broadcast: 'bg-gradient-to-r from-primary to-error'
+    broadcast: 'bg-gradient-to-r from-primary to-error',
   };
 
   return (
@@ -266,19 +271,13 @@ export function AdminPanel({ user, onBack, onUpdateUser, onAddNotification }: Ad
       >
         <div className="flex items-center justify-between max-w-7xl mx-auto">
           <div className="flex items-center gap-4">
-            <Button
-              variant="outline"
-              onClick={onBack}
-              className="glass-metal btn-hover-lift"
-            >
+            <Button variant="outline" onClick={onBack} className="glass-metal btn-hover-lift">
               <ArrowLeft className="w-4 h-4 mr-2" />
               뒤로가기
             </Button>
-            
+
             <div>
-              <h1 className="text-xl lg:text-2xl text-gradient-primary">
-                🔐 관리자 패널 v3.0
-              </h1>
+              <h1 className="text-xl lg:text-2xl text-gradient-primary">🔐 관리자 패널 v3.0</h1>
               <p className="text-sm text-muted-foreground">업무 효율성 최적화 버전</p>
             </div>
           </div>
@@ -290,14 +289,16 @@ export function AdminPanel({ user, onBack, onUpdateUser, onAddNotification }: Ad
               <div className="text-xs text-muted-foreground">온라인</div>
             </div>
             <div className="text-center">
-              <div className="text-lg text-gradient-gold">${(coreStats.todayRevenue/1000).toFixed(0)}K</div>
+              <div className="text-lg text-gradient-gold">
+                ${(coreStats.todayRevenue / 1000).toFixed(0)}K
+              </div>
               <div className="text-xs text-muted-foreground">오늘 수익</div>
             </div>
             <div className="text-center">
               <div className="text-lg text-error">{coreStats.criticalAlerts}</div>
               <div className="text-xs text-muted-foreground">긴급 알림</div>
             </div>
-            
+
             <div className="text-right">
               <div className="text-sm text-error">관리자: {user.nickname}</div>
               <div className="text-xs text-muted-foreground">최고 권한</div>
@@ -309,11 +310,7 @@ export function AdminPanel({ user, onBack, onUpdateUser, onAddNotification }: Ad
       {/* 🎯 메인 콘텐츠 */}
       <div className="relative z-10 max-w-7xl mx-auto p-4 lg:p-6">
         {/* 💼 빠른 네비게이션 바 */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-6"
-        >
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
           <div className="flex items-center gap-2 mb-4">
             <Button
               variant={activeView === 'menu' ? 'default' : 'outline'}
@@ -358,8 +355,15 @@ export function AdminPanel({ user, onBack, onUpdateUser, onAddNotification }: Ad
                 <Alert className="border-error bg-error-soft glass-metal">
                   <AlertTriangle className="h-4 w-4" />
                   <AlertDescription className="text-foreground">
-                    <span className="text-gradient-primary">{coreStats.criticalAlerts}개의 긴급 알림</span>이 있습니다. 
-                    <Button variant="link" className="p-0 h-auto ml-2 text-error btn-hover-glow" onClick={() => setActiveView('security')}>
+                    <span className="text-gradient-primary">
+                      {coreStats.criticalAlerts}개의 긴급 알림
+                    </span>
+                    이 있습니다.
+                    <Button
+                      variant="link"
+                      className="p-0 h-auto ml-2 text-error btn-hover-glow"
+                      onClick={() => setActiveView('security')}
+                    >
                       지금 확인하기 →
                     </Button>
                   </AlertDescription>
@@ -369,8 +373,9 @@ export function AdminPanel({ user, onBack, onUpdateUser, onAddNotification }: Ad
               {/* 💼 카테고리별 빠른 작업 메뉴 */}
               {Object.entries(actionsByCategory).map(([category, actions]) => {
                 const CategoryIcon = categoryIcons[category as keyof typeof categoryIcons];
-                const categoryBgClass = categoryBgClasses[category as keyof typeof categoryBgClasses];
-                
+                const categoryBgClass =
+                  categoryBgClasses[category as keyof typeof categoryBgClasses];
+
                 return (
                   <motion.div
                     key={category}
@@ -379,18 +384,20 @@ export function AdminPanel({ user, onBack, onUpdateUser, onAddNotification }: Ad
                     transition={{ delay: 0.1 }}
                   >
                     <div className="flex items-center gap-3 mb-4">
-                      <div className={`w-8 h-8 ${categoryBgClass} rounded-lg flex items-center justify-center metal-shine`}>
+                      <div
+                        className={`w-8 h-8 ${categoryBgClass} rounded-lg flex items-center justify-center metal-shine`}
+                      >
                         <CategoryIcon className="w-5 h-5 text-white" />
                       </div>
                       <h2 className="text-lg text-foreground">
                         {categoryNames[category as keyof typeof categoryNames]}
                       </h2>
                     </div>
-                    
+
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                       {actions.map((action) => {
                         const ActionIcon = action.icon;
-                        
+
                         return (
                           <motion.div
                             key={action.id}
@@ -403,7 +410,9 @@ export function AdminPanel({ user, onBack, onUpdateUser, onAddNotification }: Ad
                             >
                               <CardContent className="p-4">
                                 <div className="flex items-start gap-3">
-                                  <div className={`w-12 h-12 ${action.bgClass} rounded-xl flex items-center justify-center metal-shine`}>
+                                  <div
+                                    className={`w-12 h-12 ${action.bgClass} rounded-xl flex items-center justify-center metal-shine`}
+                                  >
                                     <ActionIcon className="w-6 h-6 text-white" />
                                   </div>
                                   <div className="flex-1 min-w-0">
@@ -443,7 +452,7 @@ export function AdminPanel({ user, onBack, onUpdateUser, onAddNotification }: Ad
                   <Activity className="w-5 h-5 text-success" />
                   📊 시스템 현황
                 </h2>
-                
+
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <Card className="glass-metal">
                     <CardContent className="p-4 text-center">
@@ -453,30 +462,26 @@ export function AdminPanel({ user, onBack, onUpdateUser, onAddNotification }: Ad
                       <div className="text-sm text-muted-foreground">활성 사용자</div>
                     </CardContent>
                   </Card>
-                  
+
                   <Card className="glass-metal">
                     <CardContent className="p-4 text-center">
                       <div className="text-2xl text-gradient-gold mb-1">
-                        ${(coreStats.totalRevenue/1000000).toFixed(1)}M
+                        ${(coreStats.totalRevenue / 1000000).toFixed(1)}M
                       </div>
                       <div className="text-sm text-muted-foreground">총 수익</div>
                     </CardContent>
                   </Card>
-                  
+
                   <Card className="glass-metal">
                     <CardContent className="p-4 text-center">
-                      <div className="text-2xl text-primary mb-1">
-                        {coreStats.pendingActions}
-                      </div>
+                      <div className="text-2xl text-primary mb-1">{coreStats.pendingActions}</div>
                       <div className="text-sm text-muted-foreground">대기 작업</div>
                     </CardContent>
                   </Card>
-                  
+
                   <Card className="glass-metal">
                     <CardContent className="p-4 text-center">
-                      <div className="text-2xl text-success mb-1">
-                        99.9%
-                      </div>
+                      <div className="text-2xl text-success mb-1">99.9%</div>
                       <div className="text-sm text-muted-foreground">서버 가동률</div>
                     </CardContent>
                   </Card>
@@ -495,7 +500,7 @@ export function AdminPanel({ user, onBack, onUpdateUser, onAddNotification }: Ad
               className="space-y-6"
             >
               <h2 className="text-xl text-gradient-primary">📊 핵심 대시보드</h2>
-              
+
               {/* 기본 통계만 표시 */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <Card className="glass-metal">
@@ -505,7 +510,9 @@ export function AdminPanel({ user, onBack, onUpdateUser, onAddNotification }: Ad
                         <Users className="w-6 h-6 text-primary" />
                       </div>
                       <div>
-                        <div className="text-2xl text-foreground">{coreStats.totalUsers.toLocaleString()}</div>
+                        <div className="text-2xl text-foreground">
+                          {coreStats.totalUsers.toLocaleString()}
+                        </div>
                         <div className="text-sm text-muted-foreground">총 사용자</div>
                       </div>
                     </div>
@@ -519,7 +526,9 @@ export function AdminPanel({ user, onBack, onUpdateUser, onAddNotification }: Ad
                         <Activity className="w-6 h-6 text-success" />
                       </div>
                       <div>
-                        <div className="text-2xl text-foreground">{coreStats.activeUsers.toLocaleString()}</div>
+                        <div className="text-2xl text-foreground">
+                          {coreStats.activeUsers.toLocaleString()}
+                        </div>
                         <div className="text-sm text-muted-foreground">활성 사용자</div>
                       </div>
                     </div>
@@ -533,7 +542,9 @@ export function AdminPanel({ user, onBack, onUpdateUser, onAddNotification }: Ad
                         <DollarSign className="w-6 h-6 text-gold" />
                       </div>
                       <div>
-                        <div className="text-2xl text-foreground">${(coreStats.totalRevenue / 1000).toFixed(0)}K</div>
+                        <div className="text-2xl text-foreground">
+                          ${(coreStats.totalRevenue / 1000).toFixed(0)}K
+                        </div>
                         <div className="text-sm text-muted-foreground">총 수익</div>
                       </div>
                     </div>
@@ -585,9 +596,7 @@ export function AdminPanel({ user, onBack, onUpdateUser, onAddNotification }: Ad
                   {activeView === 'security' && '🛡️ 보안 관리'}
                   {activeView === 'system' && '⚙️ 시스템 관리'}
                 </h2>
-                <p className="text-muted-foreground mb-6">
-                  해당 기능은 현재 개발 중입니다.
-                </p>
+                <p className="text-muted-foreground mb-6">해당 기능은 현재 개발 중입니다.</p>
                 <Button
                   onClick={() => setActiveView('menu')}
                   className="bg-gradient-game btn-hover-lift"

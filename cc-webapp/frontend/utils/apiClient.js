@@ -243,4 +243,38 @@ export const userApi = {
   }
 };
 
+// 스트릭/연속 보상 API
+export const streakApi = {
+  status: async (actionType = 'DAILY_LOGIN') => {
+    return await apiRequest(`/api/streak/status?action_type=${encodeURIComponent(actionType)}`);
+  },
+  nextReward: async (actionType = 'DAILY_LOGIN') => {
+    return await apiRequest(`/api/streak/next-reward?action_type=${encodeURIComponent(actionType)}`);
+  },
+  tick: async (actionType = 'DAILY_LOGIN') => {
+    return await apiRequest('/api/streak/tick', {
+      method: 'POST',
+      body: JSON.stringify({ action_type: actionType })
+    });
+  },
+  reset: async (actionType = 'DAILY_LOGIN') => {
+    return await apiRequest('/api/streak/reset', {
+      method: 'POST',
+      body: JSON.stringify({ action_type: actionType })
+    });
+  },
+  history: async (year, month, actionType = 'DAILY_LOGIN') => {
+    return await apiRequest(`/api/streak/history?action_type=${encodeURIComponent(actionType)}&year=${year}&month=${month}`);
+  },
+  protectionGet: async (actionType = 'DAILY_LOGIN') => {
+    return await apiRequest(`/api/streak/protection?action_type=${encodeURIComponent(actionType)}`);
+  },
+  protectionSet: async (enabled, actionType = 'DAILY_LOGIN') => {
+    return await apiRequest('/api/streak/protection', {
+      method: 'POST',
+      body: JSON.stringify({ action_type: actionType, enabled })
+    });
+  }
+};
+
 export default apiRequest;

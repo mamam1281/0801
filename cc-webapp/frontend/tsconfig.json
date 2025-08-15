@@ -76,6 +76,7 @@
   "types/vendor-shims.d.ts"
   ],
   "exclude": [
-    "node_modules"
+  "node_modules",
+  "0801/**"
   ]
 }

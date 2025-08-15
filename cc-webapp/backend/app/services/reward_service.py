@@ -9,6 +9,7 @@ from sqlalchemy.exc import SQLAlchemyError  # Import SQLAlchemyError
 from app import models
 from .token_service import TokenService
 from ..realtime import manager
+from .email_service import EmailService
 
 class RewardService:
     """Service for handling reward distribution and management"""
@@ -129,6 +130,23 @@ class RewardService:
         except SQLAlchemyError as e:
             self.db.rollback()
             raise e
+        finally:
+            # Best-effort reward email (do not block the transaction outcome)
+            try:
+                user = self.db.query(models.User).filter(models.User.id == user_id).first()
+                if user:
+                    EmailService().send_template_to_user(
+                        user,
+                        "reward",
+                        {
+                            "nickname": getattr(user, "nickname", getattr(user, "site_id", "user")),
+                            "reward": f"{reward_type}:{amount}",
+                            "balance": TokenService(self.db).get_token_balance(user_id),
+                        },
+                    )
+            except Exception:
+                # swallow errors (logging optional)
+                pass
 
     def grant_content_unlock(
         self,

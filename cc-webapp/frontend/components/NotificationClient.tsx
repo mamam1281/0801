@@ -27,9 +27,17 @@ export default function NotificationClient({ userId }: Props) {
           try {
             const msg = JSON.parse(event.data);
       setMessages((prev: EventMsg[]) => [msg, ...prev].slice(0, 50));
+      // 전역 이벤트 디스패치(토스트/리액션 등에서 청취)
+      try {
+        window.dispatchEvent(new CustomEvent('app:notification', { detail: msg }));
+      } catch {}
           } catch {
             // plain text
-      setMessages((prev: EventMsg[]) => [{ type: "text", payload: event.data }, ...prev].slice(0, 50));
+      const payload = { type: "text", payload: event.data } as EventMsg;
+      setMessages((prev: EventMsg[]) => [payload, ...prev].slice(0, 50));
+      try {
+        window.dispatchEvent(new CustomEvent('app:notification', { detail: payload }));
+      } catch {}
           }
         };
         ws.onclose = () => {

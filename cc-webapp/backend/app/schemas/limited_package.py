@@ -21,21 +21,25 @@ class LimitedPackageOut(BaseModel):
 
 
 class LimitedBuyRequest(BaseModel):
-    user_id: int
-    code: str = Field(..., description="Limited package code")
+    package_id: str = Field(..., description="Limited package id/code")
     quantity: int = Field(1, ge=1, le=10)
     currency: str = Field("USD")
     card_token: Optional[str] = None
     promo_code: Optional[str] = Field(None, description="Optional promotion code for discount")
+    # Optional idempotency key to protect from duplicate charges/retries
+    idempotency_key: Optional[str] = Field(None, description="Client-provided idempotency key (unique per purchase attempt)")
 
 
 class LimitedBuyReceipt(BaseModel):
     success: bool
     message: str
-    user_id: int
-    code: str
-    quantity: int
-    total_price_cents: int
-    gems_granted: int
-    new_gem_balance: int
+    user_id: int | None = None
+    code: Optional[str] = None
+    quantity: Optional[int] = None
+    total_price_cents: Optional[int] = None
+    gems_granted: Optional[int] = None
+    new_gem_balance: Optional[int] = None
     charge_id: Optional[str] = None
+    receipt_code: Optional[str] = None
+    # Optional standardized reason code for failures/UI handling (e.g., OUT_OF_STOCK, USER_LIMIT, WINDOW_CLOSED)
+    reason_code: Optional[str] = Field(None, description="Standardized reason code for failure states")

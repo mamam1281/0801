@@ -142,6 +142,127 @@ class RedisManager:
         except Exception as e:
             logger.error(f"Failed to update streak counter: {str(e)}")
             return 0
+
+    def get_streak_counter(self, user_id: str, action_type: str) -> int:
+        """현재 스트릭 카운트 조회 (없으면 0)"""
+        try:
+            key = f"user:{user_id}:streak:{action_type}"
+            if self.is_connected():
+                val = self.redis_client.get(key)
+                return int(val) if val is not None else 0
+            else:
+                return int(self._fallback_cache.get(key, 0))
+        except Exception:
+            return 0
+
+    def get_streak_ttl(self, user_id: str, action_type: str) -> Optional[int]:
+        """스트릭 남은 TTL(초). 연결 안되면 대략적 추정 불가로 None"""
+        try:
+            key = f"user:{user_id}:streak:{action_type}"
+            if self.is_connected():
+                ttl = self.redis_client.ttl(key)
+                return int(ttl) if ttl and ttl > 0 else None
+            return None
+        except Exception:
+            return None
+
+    # -------------------------------
+    # Attendance (출석) 기록/조회
+    # -------------------------------
+    def record_attendance_day(self, user_id: str, action_type: str, day_iso: str) -> bool:
+        """
+        특정 일자 출석 기록
+
+        Args:
+            user_id: 사용자 ID
+            action_type: 액션 타입 (예: DAILY_LOGIN)
+            day_iso: 'YYYY-MM-DD' 형식의 날짜 문자열
+
+        Note:
+            월 단위 키에 SADD로 보관. 키 만료는 120일로 설정.
+        """
+        try:
+            month_key = day_iso[:7].replace('-', '')  # YYYYMM
+            key = f"user:{user_id}:attendance:{action_type}:{month_key}"
+            if self.is_connected():
+                # SADD 로 날짜 문자열 저장
+                self.redis_client.sadd(key, day_iso)
+                # 120일 만료 (보수적으로 길게)
+                self.redis_client.expire(key, 60 * 60 * 24 * 120)
+                return True
+            else:
+                # Fallback set in memory
+                s = self._fallback_cache.get(key)
+                if not isinstance(s, set):
+                    s = set()
+                s.add(day_iso)
+                self._fallback_cache[key] = s
+                return True
+        except Exception as e:
+            logger.error(f"Failed to record attendance: {str(e)}")
+            return False
+
+    def get_attendance_month(self, user_id: str, action_type: str, year: int, month: int) -> List[str]:
+        """
+        해당 연/월의 출석 날짜 목록 반환 (YYYY-MM-DD 문자열 리스트)
+        """
+        try:
+            month_key = f"{year:04d}{month:02d}"
+            key = f"user:{user_id}:attendance:{action_type}:{month_key}"
+            if self.is_connected():
+                members = self.redis_client.smembers(key)
+                # redis-py returns set[bytes|str]; decode if bytes
+                result = []
+                for m in members or []:
+                    if isinstance(m, bytes):
+                        result.append(m.decode('utf-8'))
+                    else:
+                        result.append(str(m))
+                return sorted(result)
+            else:
+                s = self._fallback_cache.get(key, set())
+                return sorted(list(s)) if isinstance(s, set) else []
+        except Exception as e:
+            logger.error(f"Failed to get attendance month: {str(e)}")
+            return []
+
+    # -------------------------------
+    # Streak Protection 토글 저장
+    # -------------------------------
+    def get_streak_protection(self, user_id: str, action_type: str) -> bool:
+        """스트릭 보호 토글 상태 조회 (True/False)"""
+        try:
+            key = f"user:{user_id}:streak_protection:{action_type}"
+            if self.is_connected():
+                val = self.redis_client.get(key)
+                if val is None:
+                    return False
+                if isinstance(val, bytes):
+                    val = val.decode('utf-8')
+                return val == '1' or str(val).lower() == 'true'
+            else:
+                val = self._fallback_cache.get(key, '0')
+                if isinstance(val, bool):
+                    return val
+                return str(val) == '1'
+        except Exception as e:
+            logger.error(f"Failed to get streak protection: {str(e)}")
+            return False
+
+    def set_streak_protection(self, user_id: str, action_type: str, enabled: bool) -> bool:
+        """스트릭 보호 토글 상태 설정"""
+        try:
+            key = f"user:{user_id}:streak_protection:{action_type}"
+            val = '1' if enabled else '0'
+            if self.is_connected():
+                self.redis_client.set(key, val)
+                return True
+            else:
+                self._fallback_cache[key] = enabled
+                return True
+        except Exception as e:
+            logger.error(f"Failed to set streak protection: {str(e)}")
+            return False
     
     def manage_session_data(self, session_id: str, data: Optional[Dict[str, Any]] = None, 
                            delete: bool = False) -> Optional[Dict[str, Any]]:
@@ -299,7 +420,28 @@ def update_streak_counter(user_id: str, action_type: str, increment: bool = True
     """스트릭 카운터 업데이트 (편의 함수)"""
     return get_redis_manager().update_streak_counter(user_id, action_type, increment)
 
+def get_streak_counter(user_id: str, action_type: str) -> int:
+    """스트릭 카운터 조회 (편의 함수)"""
+    return get_redis_manager().get_streak_counter(user_id, action_type)
+
+def get_streak_ttl(user_id: str, action_type: str) -> Optional[int]:
+    """스트릭 TTL 조회 (편의 함수)"""
+    return get_redis_manager().get_streak_ttl(user_id, action_type)
+
 def manage_session_data(session_id: str, data: Optional[Dict[str, Any]] = None, 
                        delete: bool = False) -> Optional[Dict[str, Any]]:
     """세션 데이터 관리 (편의 함수)"""
     return get_redis_manager().manage_session_data(session_id, data, delete)
+
+# Attendance / Protection 편의 함수
+def record_attendance_day(user_id: str, action_type: str, day_iso: str) -> bool:
+    return get_redis_manager().record_attendance_day(user_id, action_type, day_iso)
+
+def get_attendance_month(user_id: str, action_type: str, year: int, month: int) -> List[str]:
+    return get_redis_manager().get_attendance_month(user_id, action_type, year, month)
+
+def get_streak_protection(user_id: str, action_type: str) -> bool:
+    return get_redis_manager().get_streak_protection(user_id, action_type)
+
+def set_streak_protection(user_id: str, action_type: str, enabled: bool) -> bool:
+    return get_redis_manager().set_streak_protection(user_id, action_type, enabled)

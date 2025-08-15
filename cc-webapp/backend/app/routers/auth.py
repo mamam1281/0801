@@ -13,6 +13,7 @@ from ..database import get_db
 from ..schemas.auth import UserCreate, UserLogin, AdminLogin, UserResponse, Token
 from ..schemas.token import RefreshTokenRequest
 from ..services.auth_service import AuthService, security
+from ..services.email_service import EmailService
 from ..auth.token_manager import TokenManager
 from ..models.auth_models import User
 
@@ -35,6 +36,129 @@ def _build_user_response(user: User) -> UserResponse:
     )
 
 
+@router.get("/debug/token")
+async def debug_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """DEV: Return basic info about the provided bearer token (no verification)."""
+    token = credentials.credentials
+    return {"length": len(token), "prefix": token[:16], "suffix": token[-16:]}
+
+
+@router.get("/debug/decode")
+async def debug_decode(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """DEV: Decode JWT header/payload without signature verification for debugging."""
+    import base64, json
+    token = credentials.credentials
+    parts = token.split('.')
+    if len(parts) != 3:
+        return {"error": "invalid token format", "parts": len(parts)}
+    def _b64d(s: str) -> str:
+        return base64.b64decode(s + "=" * ((4 - len(s) % 4) % 4)).decode("utf-8", errors="replace")
+    try:
+        header = json.loads(_b64d(parts[0]))
+    except Exception:
+        header = {"raw": _b64d(parts[0])}
+    try:
+        payload = json.loads(_b64d(parts[1]))
+    except Exception:
+        payload = {"raw": _b64d(parts[1])}
+    return {"header": header, "payload": payload}
+
+
+@router.get("/debug/sig")
+async def debug_signature(credentials: HTTPAuthorizationCredentials = Depends(security), token: str | None = None):
+    """DEV: Verify HS256 signature manually using current SECRET_KEY."""
+    import base64, hmac, hashlib
+    from ..services import auth_service
+    token = token or credentials.credentials
+    parts = token.split('.')
+    if len(parts) != 3:
+        return {"error": "invalid token format", "parts": len(parts)}
+    signing_input = (parts[0] + '.' + parts[1]).encode('utf-8')
+    key = getattr(auth_service, 'SECRET_KEY', '')
+    key_bytes = key.encode('utf-8') if isinstance(key, str) else key
+    digest = hmac.new(key_bytes, signing_input, hashlib.sha256).digest()
+    sig_b64 = base64.urlsafe_b64encode(digest).rstrip(b'=')
+    provided_sig = parts[2].encode('utf-8')
+    match = hmac.compare_digest(sig_b64, provided_sig)
+    return {
+        "sig_valid": bool(match),
+        "calc_sig_prefix": sig_b64[:10].decode('utf-8'),
+        "provided_sig_prefix": parts[2][:10],
+        "key_len": len(key) if isinstance(key, str) else 0,
+    }
+
+
+@router.get("/debug/make")
+async def debug_make_token(db: Session = Depends(get_db)):
+    """DEV: Create a token for the first user and return it along with secret length."""
+    from ..services import auth_service
+    user = db.query(User).first()
+    if not user:
+        return {"error": "no users"}
+    tok = AuthService.create_access_token({"sub": user.site_id, "user_id": user.id, "is_admin": user.is_admin})
+    return {"token": tok, "secret_len": len(getattr(auth_service, 'SECRET_KEY', '') or '')}
+
+
+@router.get("/debug/sig-guess")
+async def debug_signature_guess(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """DEV: Try signature verification with multiple candidate secrets to find a match."""
+    import base64, hmac, hashlib, os
+    from ..services import auth_service
+    token = credentials.credentials
+    parts = token.split('.')
+    if len(parts) != 3:
+        return {"error": "invalid token format", "parts": len(parts)}
+    signing_input = (parts[0] + '.' + parts[1]).encode('utf-8')
+    candidates = []
+    cur = getattr(auth_service, 'SECRET_KEY', '')
+    if isinstance(cur, str):
+        candidates.append(("current", cur))
+    env = os.getenv("JWT_SECRET_KEY")
+    if env:
+        candidates.append(("env", env))
+    defaults = [
+        ("default1", "your-secret-key-here"),
+        ("default2", "secret_key_for_development_only"),
+        ("default3", "changeme"),
+    ]
+    candidates.extend(defaults)
+    tried = []
+    for name, key in candidates:
+        key_bytes = key.encode('utf-8') if isinstance(key, str) else key
+        digest = hmac.new(key_bytes, signing_input, hashlib.sha256).digest()
+        sig_b64 = base64.urlsafe_b64encode(digest).rstrip(b'=')
+        ok = hmac.compare_digest(sig_b64, parts[2].encode('utf-8'))
+        tried.append({"name": name, "match": bool(ok), "key_len": len(key) if isinstance(key, str) else 0})
+        if ok:
+            return {"match": name, "tried": tried}
+    return {"match": None, "tried": tried}
+
+
+@router.get("/debug/verify")
+async def debug_verify(credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)):
+    """DEV: Attempt full verify_token and return result or error details."""
+    try:
+        td = AuthService.verify_token(credentials.credentials, db=db)
+        return {"ok": True, "site_id": td.site_id, "user_id": td.user_id, "is_admin": td.is_admin}
+    except Exception as e:
+        # expose masked secret key info for debugging
+        from ..services import auth_service
+        sk = getattr(auth_service, 'SECRET_KEY', '')
+        masked = (sk[:4] + '***' + sk[-4:]) if isinstance(sk, str) and len(sk) >= 8 else 'short-or-missing'
+        etype = type(e).__name__
+        msg = str(e)
+        # Try to surface HTTPException detail
+        detail = getattr(e, 'detail', None)
+        return {
+            "ok": False,
+            "error_type": etype,
+            "error": msg,
+            "detail": detail,
+            "secret_len": len(sk) if isinstance(sk, str) else 0,
+            "secret_masked": masked,
+        }
+
+
 @router.post("/signup", response_model=Token)
 async def signup(data: UserCreate, request: Request, db: Session = Depends(get_db)):
     try:
@@ -42,6 +166,7 @@ async def signup(data: UserCreate, request: Request, db: Session = Depends(get_d
         access_token = AuthService.create_access_token(
             {"sub": user.site_id, "user_id": user.id, "is_admin": user.is_admin}
         )
+        # Create session (non-fatal)
         try:
             AuthService.create_session(db, user, access_token, request)
         except Exception:
@@ -54,6 +179,15 @@ async def signup(data: UserCreate, request: Request, db: Session = Depends(get_d
         except Exception:
             logger.exception("refresh_token create/save failed (signup) - continuing without refresh_token")
             refresh_token = None
+        # Best-effort welcome email (dev address)
+        try:
+            EmailService().send_template_to_user(
+                user,
+                "welcome",
+                {"nickname": getattr(user, "nickname", user.site_id), "bonus": getattr(user, "cyber_token_balance", 0)},
+            )
+        except Exception:
+            logger.exception("welcome email send failed (non-fatal)")
         return Token(access_token=access_token, token_type="bearer", user=_build_user_response(user), refresh_token=refresh_token)
     except HTTPException:
         raise

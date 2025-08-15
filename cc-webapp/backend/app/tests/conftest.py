@@ -15,12 +15,19 @@ except Exception as e:
 
 @pytest.fixture(scope="session", autouse=True)
 def _ensure_schema():
-	# Recreate schema for test session to ensure latest columns exist
-	Base.metadata.drop_all(bind=engine)
-	Base.metadata.create_all(bind=engine)
+	"""Ensure schema is up to date via Alembic; fallback to metadata create_all.
+
+	We avoid Base.metadata.drop_all due to FK dependencies across modules.
+	"""
+	try:
+		from alembic.config import Config
+		from alembic import command
+		cfg = Config("alembic.ini")
+		command.upgrade(cfg, "head")
+	except Exception:
+		# Fallback: ensure at least ORM-known tables exist
+		Base.metadata.create_all(bind=engine)
 	yield
-	# Optional teardown: keep data for debugging; drop if needed
-	# Base.metadata.drop_all(bind=engine)
 
 
 @pytest.fixture(scope="session")

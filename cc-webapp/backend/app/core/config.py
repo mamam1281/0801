@@ -19,11 +19,18 @@ class Settings(BaseSettings):
     REDIS_HOST: str = os.getenv("REDIS_HOST", "cc_redis")
     REDIS_PORT: int = int(os.getenv("REDIS_PORT", "6379"))
     REDIS_DB: int = int(os.getenv("REDIS_DB", "0"))
+    REDIS_PASSWORD: str = os.getenv("REDIS_PASSWORD", "redis_password")
+    # Redis TTL tunables (seconds)
+    IDEMPOTENCY_TTL_SECONDS: int = int(os.getenv("IDEMPOTENCY_TTL_SECONDS", str(60 * 10)))  # default 10 minutes
+    LIMITED_HOLD_TTL_SECONDS: int = int(os.getenv("LIMITED_HOLD_TTL_SECONDS", "120"))  # default 120s
 
     # JWT Settings
     SECRET_KEY: str = os.getenv("SECRET_KEY", "secret_key_for_development_only")
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24 hours
+
+    # Payments / Webhook
+    PAYMENT_WEBHOOK_SECRET: str = os.getenv("PAYMENT_WEBHOOK_SECRET", "dev-webhook-secret")
 
     # App Settings
     DEBUG: bool = os.getenv("DEBUG", "0") == "1"
@@ -38,6 +45,7 @@ class Settings(BaseSettings):
     KAFKA_ACTIONS_TOPIC: str = "cc_user_actions"
     KAFKA_REWARDS_TOPIC: str = "cc_rewards"
     KAFKA_PURCHASES_TOPIC: str = "buy_package"  # topic used by limited buy analytics
+    KAFKA_DLQ_TOPIC: str = "cc_olap_dlq"
     # Optional comma-separated list of topics used by debug endpoints; may be empty
     KAFKA_TOPICS: str = ""
 
@@ -49,6 +57,22 @@ class Settings(BaseSettings):
     CLICKHOUSE_PASSWORD: str = ""
     OLAP_BATCH_SIZE: int = 500
     OLAP_FLUSH_SECONDS: int = 2
+
+    # Web Push (VAPID) — optional
+    VAPID_PUBLIC_KEY: str = os.getenv("VAPID_PUBLIC_KEY", "")
+    VAPID_PRIVATE_KEY: str = os.getenv("VAPID_PRIVATE_KEY", "")
+
+    # Web Push (VAPID)
+    VAPID_PUBLIC_KEY: str = os.getenv("VAPID_PUBLIC_KEY", "")
+    VAPID_PRIVATE_KEY: str = os.getenv("VAPID_PRIVATE_KEY", "")
+
+    # Email (SMTP) Settings
+    SMTP_HOST: str = os.getenv("SMTP_HOST", "mailpit")
+    SMTP_PORT: int = int(os.getenv("SMTP_PORT", "1025"))
+    SMTP_USER: str = os.getenv("SMTP_USER", "")
+    SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "")
+    SMTP_FROM: str = os.getenv("SMTP_FROM", "noreply@casino-club.local")
+    SMTP_FROM_NAME: str = os.getenv("SMTP_FROM_NAME", "Casino Club")
 
     # Game Settings
     DAILY_SLOT_SPINS: int = 30

@@ -13,6 +13,7 @@ from app import models
 from datetime import datetime, timedelta
 from sqlalchemy import func
 import json
+from app.olap.clickhouse_client import ClickHouseClient
 
 router = APIRouter(prefix="/api/analytics", tags=["Analytics"])
 
@@ -102,3 +103,17 @@ def get_game_statistics(
         "games": games_data,
         "total_games": len(games_data)
     }
+
+@router.get("/funnels/buy")
+def get_buy_funnel(
+    days: int = Query(7, ge=1, le=60),
+    current_user: models.User = Depends(get_current_admin)
+):
+    """Return simple buy funnel slices from ClickHouse over the last N days."""
+    ch = ClickHouseClient()
+    try:
+        data = ch.get_buy_funnel(days=days)
+    except Exception as e:
+        # Surface a friendly error; logs already contain CH detail
+        raise HTTPException(status_code=502, detail=f"ClickHouse query failed: {e}")
+    return {"days": days, "stages": data}

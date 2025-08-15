@@ -294,12 +294,14 @@ def compute_rfm_and_update_segments(db: Session):
     This function is called by the APScheduler job.
     """
     try:
-        # 실제 구현시 RFMService 사용
-        # rfm_service = RFMService(db=db)
-        # rfm_service.update_all_user_segments()
-        
-        # 임시로 로그만 출력
-        logger.info("RFM segment update job executed (placeholder)")
+        # 실제 구현: RFMService를 호출하여 모든 사용자 세그먼트 갱신
+        from app.services.rfm_service import RFMService
+        start_ts = datetime.utcnow()
+        logger.info("Starting RFM segment update job…")
+        svc = RFMService(db=db)
+        svc.update_all_user_segments()
+        dur_ms = int((datetime.utcnow() - start_ts).total_seconds() * 1000)
+        logger.info("RFM segment update job finished in %d ms", dur_ms)
     except Exception as e:
         logger.error(f"An error occurred during the RFM update job: {e}", exc_info=True)
         pass

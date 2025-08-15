@@ -6,6 +6,185 @@
     "version": "1.0.0"
   },
   "paths": {
+    "/api/auth/debug/token": {
+      "get": {
+        "tags": [
+          "Authentication",
+          "Authentication"
+        ],
+        "summary": "Debug Token",
+        "description": "DEV: Return basic info about the provided bearer token (no verification).",
+        "operationId": "debug_token_api_auth_debug_token_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/auth/debug/decode": {
+      "get": {
+        "tags": [
+          "Authentication",
+          "Authentication"
+        ],
+        "summary": "Debug Decode",
+        "description": "DEV: Decode JWT header/payload without signature verification for debugging.",
+        "operationId": "debug_decode_api_auth_debug_decode_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/auth/debug/sig": {
+      "get": {
+        "tags": [
+          "Authentication",
+          "Authentication"
+        ],
+        "summary": "Debug Signature",
+        "description": "DEV: Verify HS256 signature manually using current SECRET_KEY.",
+        "operationId": "debug_signature_api_auth_debug_sig_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "token",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/debug/make": {
+      "get": {
+        "tags": [
+          "Authentication",
+          "Authentication"
+        ],
+        "summary": "Debug Make Token",
+        "description": "DEV: Create a token for the first user and return it along with secret length.",
+        "operationId": "debug_make_token_api_auth_debug_make_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/debug/sig-guess": {
+      "get": {
+        "tags": [
+          "Authentication",
+          "Authentication"
+        ],
+        "summary": "Debug Signature Guess",
+        "description": "DEV: Try signature verification with multiple candidate secrets to find a match.",
+        "operationId": "debug_signature_guess_api_auth_debug_sig_guess_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/auth/debug/verify": {
+      "get": {
+        "tags": [
+          "Authentication",
+          "Authentication"
+        ],
+        "summary": "Debug Verify",
+        "description": "DEV: Attempt full verify_token and return result or error details.",
+        "operationId": "debug_verify_api_auth_debug_verify_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/auth/signup": {
       "post": {
         "tags": [
@@ -539,6 +718,50 @@
         }
       }
     },
+    "/api/admin/email/trigger": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Admin Email Trigger",
+        "operationId": "admin_email_trigger_api_admin_email_trigger_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminEmailTriggerRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/admin/users": {
       "get": {
         "tags": [
@@ -663,6 +886,60 @@
           }
         }
       },
+      "put": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Admin Update User",
+        "description": "Update core user admin fields (admin only).\n\nThis endpoint exists to satisfy tests expecting PUT /api/admin/users/{id}\nto control is_admin/is_active/user_rank with proper permission checks.",
+        "operationId": "admin_update_user_api_admin_users__user_id__put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "User Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminUserUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
       "delete": {
         "tags": [
           "Admin"
@@ -685,6 +962,46 @@
             }
           }
         ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/users/elevate": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Dev Elevate User",
+        "description": "Dev-only: elevate a user by site_id to admin without auth.\n\nThis is used only in tests to enable admin flows.",
+        "operationId": "dev_elevate_user_api_admin_users_elevate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ElevateRequest"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -1301,7 +1618,7 @@
           "Admin"
         ],
         "summary": "Add User Tokens",
-        "description": "Add tokens to a user account (admin only)",
+        "description": "Add tokens to a user account (admin only).\n- 호환성: JSON 본문({amount, reason}) 또는 쿼리 파라미터 amount 모두 지원",
         "operationId": "add_user_tokens_api_admin_users__user_id__tokens_add_post",
         "security": [
           {
@@ -1321,13 +1638,37 @@
           {
             "name": "amount",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
-              "type": "integer",
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
               "title": "Amount"
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/AdminAddTokensRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -1525,6 +1866,240 @@
             }
           }
         }
+      }
+    },
+    "/api/admin/transactions": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Admin List Transactions",
+        "operationId": "admin_list_transactions_api_admin_transactions_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/transactions/{receipt}/force-settle": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Admin Force Settle",
+        "operationId": "admin_force_settle_api_admin_transactions__receipt__force_settle_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "receipt",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Receipt"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ForceSettleRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/limited-packages/upsert": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Admin Limited Upsert",
+        "operationId": "admin_limited_upsert_api_admin_limited_packages_upsert_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LimitedUpsertRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/admin/limited-packages/{package_id}/disable": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Admin Limited Disable",
+        "operationId": "admin_limited_disable_api_admin_limited_packages__package_id__disable_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "package_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Package Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/promo-codes/upsert": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Admin Promo Upsert",
+        "operationId": "admin_promo_upsert_api_admin_promo_codes_upsert_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PromoCodeUpsertRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/admin/limited/period": {
@@ -1983,7 +2558,7 @@
         "tags": [
           "Rewards",
           "Rewards",
-          "rewards"
+          "Rewards"
         ],
         "summary": "Distribute Reward To User",
         "description": "Distributes a specific reward to a user.\nThis is the central endpoint for granting rewards from games or events.",
@@ -2048,14 +2623,14 @@
         }
       }
     },
-    "/api/shop/limited/catalog": {
+    "/api/shop/limited-packages": {
       "get": {
         "tags": [
           "Shop",
           "Shop"
         ],
         "summary": "List active limited packages",
-        "operationId": "list_limited_catalog_api_shop_limited_catalog_get",
+        "operationId": "list_limited_packages_api_shop_limited_packages_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -2066,7 +2641,7 @@
                     "$ref": "#/components/schemas/LimitedPackageOut"
                   },
                   "type": "array",
-                  "title": "Response List Limited Catalog Api Shop Limited Catalog Get"
+                  "title": "Response List Limited Packages Api Shop Limited Packages Get"
                 }
               }
             }
@@ -2123,8 +2698,8 @@
           "Shop",
           "Shop"
         ],
-        "summary": "Buy premium gems (real money)",
-        "operationId": "buy_gems_api_shop_buy_post",
+        "summary": "Buy gems or items",
+        "operationId": "buy_api_shop_buy_post",
         "requestBody": {
           "content": {
             "application/json": {
@@ -2156,17 +2731,115 @@
               }
             }
           }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/shop/transactions": {
+      "get": {
+        "tags": [
+          "Shop",
+          "Shop"
+        ],
+        "summary": "List My Transactions",
+        "operationId": "list_my_transactions_api_shop_transactions_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 20,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
         }
       }
     },
-    "/api/shop/limited/buy": {
+    "/api/shop/transactions/{receipt}/settle": {
+      "post": {
+        "tags": [
+          "Shop",
+          "Shop"
+        ],
+        "summary": "Settle My Transaction",
+        "operationId": "settle_my_transaction_api_shop_transactions__receipt__settle_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "receipt",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Receipt"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/shop/buy-limited": {
       "post": {
         "tags": [
           "Shop",
           "Shop"
         ],
         "summary": "Buy limited-time package (real money)",
-        "operationId": "buy_limited_api_shop_limited_buy_post",
+        "operationId": "buy_limited_api_shop_buy_limited_post",
         "requestBody": {
           "content": {
             "application/json": {
@@ -2198,7 +2871,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/missions/": {
@@ -3042,15 +3720,14 @@
         }
       }
     },
-    "/ws/notify/{user_id}": {
-      "post": {
+    "/sse/notifications/{user_id}": {
+      "get": {
         "tags": [
-          "Real-time Notifications",
-          "websockets",
-          "websockets"
+          "sse"
         ],
-        "summary": "Push Notification",
-        "operationId": "push_notification_ws_notify__user_id__post",
+        "summary": "Sse Notifications",
+        "description": "SSE notifications stream for a user with topic filter and backfill support.",
+        "operationId": "sse_notifications_sse_notifications__user_id__get",
         "parameters": [
           {
             "name": "user_id",
@@ -3062,12 +3739,19 @@
             }
           },
           {
-            "name": "message",
+            "name": "topics",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
-              "type": "string",
-              "title": "Message"
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Topics"
             }
           }
         ],
@@ -3093,23 +3777,103 @@
         }
       }
     },
-    "/ws/sse/notifications": {
-      "get": {
+    "/api/notifications/{user_id}/send": {
+      "post": {
         "tags": [
-          "Real-time Notifications",
-          "websockets"
+          "Real-time Notifications"
         ],
-        "summary": "Sse Notifications",
-        "description": "Simple SSE stream; filters messages by user_id in payload when present.",
-        "operationId": "sse_notifications_ws_sse_notifications_get",
+        "summary": "Send Notification",
+        "operationId": "send_notification_api_notifications__user_id__send_post",
         "parameters": [
           {
             "name": "user_id",
-            "in": "query",
+            "in": "path",
             "required": true,
             "schema": {
               "type": "integer",
               "title": "User Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendNotificationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/notifications/{user_id}/backfill": {
+      "get": {
+        "tags": [
+          "Real-time Notifications"
+        ],
+        "summary": "Get Backfill",
+        "operationId": "get_backfill_api_notifications__user_id__backfill_get",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "User Id"
+            }
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Since"
+            }
+          },
+          {
+            "name": "topics",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Topics"
             }
           }
         ],
@@ -3119,6 +3883,943 @@
             "content": {
               "application/json": {
                 "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/notification/list": {
+      "get": {
+        "tags": [
+          "Notification Center"
+        ],
+        "summary": "List Notifications",
+        "operationId": "list_notifications_api_notification_list_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "only_unread",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Only Unread"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "notification_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Notification Type"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/notification/{notification_id}/read": {
+      "post": {
+        "tags": [
+          "Notification Center"
+        ],
+        "summary": "Mark Read",
+        "operationId": "mark_read_api_notification__notification_id__read_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "notification_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Notification Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MarkRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/notification/read-all": {
+      "post": {
+        "tags": [
+          "Notification Center"
+        ],
+        "summary": "Mark All Read",
+        "operationId": "mark_all_read_api_notification_read_all_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/notification/unread-count": {
+      "get": {
+        "tags": [
+          "Notification Center"
+        ],
+        "summary": "Unread Count",
+        "operationId": "unread_count_api_notification_unread_count_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/notification/settings": {
+      "get": {
+        "tags": [
+          "Notification Center"
+        ],
+        "summary": "Get Settings",
+        "operationId": "get_settings_api_notification_settings_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationSettings"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Notification Center"
+        ],
+        "summary": "Put Settings",
+        "operationId": "put_settings_api_notification_settings_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NotificationSettings"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationSettings"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/notification/push/subscribe": {
+      "post": {
+        "tags": [
+          "Notification Center"
+        ],
+        "summary": "Push Subscribe",
+        "operationId": "push_subscribe_api_notification_push_subscribe_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PushSubscription"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/notification/push/unsubscribe": {
+      "post": {
+        "tags": [
+          "Notification Center"
+        ],
+        "summary": "Push Unsubscribe",
+        "operationId": "push_unsubscribe_api_notification_push_unsubscribe_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PushSubscription"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/notification/push/test": {
+      "post": {
+        "tags": [
+          "Notification Center"
+        ],
+        "summary": "Push Test",
+        "operationId": "push_test_api_notification_push_test_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/notification/push/vapid-public": {
+      "get": {
+        "tags": [
+          "Notification Center"
+        ],
+        "summary": "Get Vapid Public Key",
+        "operationId": "get_vapid_public_key_api_notification_push_vapid_public_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/notification/push/send": {
+      "post": {
+        "tags": [
+          "Notification Center"
+        ],
+        "summary": "Push Send",
+        "operationId": "push_send_api_notification_push_send_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PushSendRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/email/send": {
+      "post": {
+        "tags": [
+          "Email"
+        ],
+        "summary": "Send Email",
+        "operationId": "send_email_api_email_send_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendEmailRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/email/send-bulk": {
+      "post": {
+        "tags": [
+          "Email"
+        ],
+        "summary": "Send Bulk Email",
+        "operationId": "send_bulk_email_api_email_send_bulk_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkEmailRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/email/test": {
+      "get": {
+        "tags": [
+          "Email"
+        ],
+        "summary": "Test Email",
+        "operationId": "test_email_api_email_test_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/email/send-template": {
+      "post": {
+        "tags": [
+          "Email"
+        ],
+        "summary": "Send Template Email",
+        "operationId": "send_template_email_api_email_send_template_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TemplateEmailRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/streak/status": {
+      "get": {
+        "tags": [
+          "Streaks"
+        ],
+        "summary": "Status",
+        "operationId": "status_api_streak_status_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "action_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "SLOT_SPIN",
+              "title": "Action Type"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StreakStatus"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/streak/tick": {
+      "post": {
+        "tags": [
+          "Streaks"
+        ],
+        "summary": "Tick",
+        "operationId": "tick_api_streak_tick_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TickRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StreakStatus"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/streak/reset": {
+      "post": {
+        "tags": [
+          "Streaks"
+        ],
+        "summary": "Reset",
+        "operationId": "reset_api_streak_reset_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/streak/next-reward": {
+      "get": {
+        "tags": [
+          "Streaks"
+        ],
+        "summary": "Next Reward",
+        "operationId": "next_reward_api_streak_next_reward_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "action_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "SLOT_SPIN",
+              "title": "Action Type"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/streak/history": {
+      "get": {
+        "tags": [
+          "Streaks"
+        ],
+        "summary": "History",
+        "operationId": "history_api_streak_history_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "action_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "SLOT_SPIN",
+              "title": "Action Type"
+            }
+          },
+          {
+            "name": "year",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 2100,
+              "minimum": 1970,
+              "title": "Year"
+            }
+          },
+          {
+            "name": "month",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 12,
+              "minimum": 1,
+              "title": "Month"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttendanceHistory"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/streak/protection": {
+      "get": {
+        "tags": [
+          "Streaks"
+        ],
+        "summary": "Protection Status",
+        "operationId": "protection_status_api_streak_protection_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "action_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "SLOT_SPIN",
+              "title": "Action Type"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProtectionStatus"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Streaks"
+        ],
+        "summary": "Set Protection",
+        "operationId": "set_protection_api_streak_protection_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProtectionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProtectionStatus"
+                }
               }
             }
           },
@@ -3260,7 +4961,6 @@
     "/api/games/gacha/config": {
       "get": {
         "tags": [
-          "Game Collection",
           "Games"
         ],
         "summary": "Get Gacha Config",
@@ -3285,7 +4985,6 @@
     "/api/games/gacha/stats": {
       "get": {
         "tags": [
-          "Game Collection",
           "Games"
         ],
         "summary": "Get Gacha Stats",
@@ -3310,7 +5009,6 @@
     "/api/games/": {
       "get": {
         "tags": [
-          "Game Collection",
           "Games"
         ],
         "summary": "Get Games List",
@@ -3336,7 +5034,6 @@
     "/api/games/slot/spin": {
       "post": {
         "tags": [
-          "Game Collection",
           "Games"
         ],
         "summary": "Spin Slot",
@@ -3384,7 +5081,6 @@
     "/api/games/rps/play": {
       "post": {
         "tags": [
-          "Game Collection",
           "Games"
         ],
         "summary": "Play Rps",
@@ -3432,7 +5128,6 @@
     "/api/games/gacha/pull": {
       "post": {
         "tags": [
-          "Game Collection",
           "Games"
         ],
         "summary": "Pull Gacha",
@@ -3480,7 +5175,6 @@
     "/api/games/crash/bet": {
       "post": {
         "tags": [
-          "Game Collection",
           "Games"
         ],
         "summary": "Place Crash Bet",
@@ -3528,7 +5222,6 @@
     "/api/games/stats/{user_id}": {
       "get": {
         "tags": [
-          "Game Collection",
           "Games"
         ],
         "summary": "Get Game Stats",
@@ -3572,7 +5265,6 @@
     "/api/games/profile/{user_id}/stats": {
       "get": {
         "tags": [
-          "Game Collection",
           "Games"
         ],
         "summary": "Get Profile Game Stats",
@@ -3616,7 +5308,6 @@
     "/api/games/leaderboard": {
       "get": {
         "tags": [
-          "Game Collection",
           "Games"
         ],
         "summary": "Get Game Leaderboard",
@@ -3681,7 +5372,6 @@
     "/api/games/achievements/{user_id}": {
       "get": {
         "tags": [
-          "Game Collection",
           "Games"
         ],
         "summary": "Get User Achievements",
@@ -3729,7 +5419,6 @@
     "/api/games/session/start": {
       "post": {
         "tags": [
-          "Game Collection",
           "Games"
         ],
         "summary": "Start Game Session",
@@ -3778,7 +5467,6 @@
     "/api/games/session/end": {
       "post": {
         "tags": [
-          "Game Collection",
           "Games"
         ],
         "summary": "End Game Session",
@@ -4076,8 +5764,7 @@
     "/api/analytics/dashboard/summary": {
       "get": {
         "tags": [
-          "Analytics",
-          "analytics"
+          "Analytics"
         ],
         "summary": "Get Dashboard Summary",
         "description": "Get basic dashboard summary with key metrics",
@@ -4102,8 +5789,7 @@
     "/api/analytics/users/activity": {
       "get": {
         "tags": [
-          "Analytics",
-          "analytics"
+          "Analytics"
         ],
         "summary": "Get User Activity",
         "description": "Get user activity analytics for the specified period",
@@ -4152,8 +5838,7 @@
     "/api/analytics/games/stats": {
       "get": {
         "tags": [
-          "Analytics",
-          "analytics"
+          "Analytics"
         ],
         "summary": "Get Game Statistics",
         "description": "Get game performance statistics",
@@ -4375,15 +6060,14 @@
         ]
       }
     },
-    "/tracking/site-visit": {
+    "/api/tracking/site-visit": {
       "post": {
         "tags": [
-          "Tracking",
-          "tracking"
+          "Tracking"
         ],
         "summary": "Log Site Visit Endpoint",
         "description": "Logs a visit to an external corporate site or other tracked action.",
-        "operationId": "log_site_visit_endpoint_tracking_site_visit_post",
+        "operationId": "log_site_visit_endpoint_api_tracking_site_visit_post",
         "requestBody": {
           "content": {
             "application/json": {
@@ -4418,16 +6102,13 @@
         }
       }
     },
-    "/api/unlock/unlock": {
+    "/api/unlock": {
       "get": {
         "tags": [
-          "Unlock",
-          "Unlock",
-          "unlock",
-          "content"
+          "Unlock"
         ],
         "summary": "Attempt Content Unlock",
-        "operationId": "attempt_content_unlock_api_unlock_unlock_get",
+        "operationId": "attempt_content_unlock_api_unlock_get",
         "parameters": [
           {
             "name": "user_id",
@@ -5312,6 +6993,41 @@
         ],
         "title": "ActionLoggedResponse"
       },
+      "AdminAddTokensRequest": {
+        "properties": {
+          "amount": {
+            "type": "integer",
+            "title": "Amount"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "amount"
+        ],
+        "title": "AdminAddTokensRequest"
+      },
       "AdminCatalogItemIn": {
         "properties": {
           "id": {
@@ -5466,6 +7182,64 @@
         ],
         "title": "AdminDiscountPatch"
       },
+      "AdminEmailTriggerRequest": {
+        "properties": {
+          "template": {
+            "type": "string",
+            "title": "Template"
+          },
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Id"
+          },
+          "site_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Site Id"
+          },
+          "segment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Segment"
+          },
+          "context": {
+            "anyOf": [
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "template"
+        ],
+        "title": "AdminEmailTriggerRequest",
+        "description": "관리자 전용 템플릿 이메일 발송 트리거\n\n- 대상 단일 계정: user_id 또는 site_id 지정\n- 대상 세그먼트: segment 지정 (UserSegment.rfm_group 라벨)\n- template: email_templates.py에 정의된 키 (welcome|reward|event 등)\n- context: 템플릿 렌더링에 사용될 추가 값 (부족하면 서버에서 기본값 보충)"
+      },
       "AdminLogResponse": {
         "properties": {
           "id": {
@@ -5577,6 +7351,46 @@
         "title": "AdminStatsResponse",
         "description": "Admin statistics response"
       },
+      "AdminUserUpdateRequest": {
+        "properties": {
+          "is_admin": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Admin"
+          },
+          "is_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Active"
+          },
+          "user_rank": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Rank"
+          }
+        },
+        "type": "object",
+        "title": "AdminUserUpdateRequest",
+        "description": "Generic admin user update request.\n\nAllows toggling is_admin, is_active and updating user_rank in one call."
+      },
       "AnswerRequest": {
         "properties": {
           "answers": {
@@ -5592,6 +7406,37 @@
           "answers"
         ],
         "title": "AnswerRequest"
+      },
+      "AttendanceHistory": {
+        "properties": {
+          "action_type": {
+            "type": "string",
+            "title": "Action Type"
+          },
+          "year": {
+            "type": "integer",
+            "title": "Year"
+          },
+          "month": {
+            "type": "integer",
+            "title": "Month"
+          },
+          "days": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Days"
+          }
+        },
+        "type": "object",
+        "required": [
+          "action_type",
+          "year",
+          "month",
+          "days"
+        ],
+        "title": "AttendanceHistory"
       },
       "Body_refresh_api_auth_refresh_post": {
         "properties": {
@@ -5626,6 +7471,44 @@
         ],
         "title": "BulkActions"
       },
+      "BulkEmailRequest": {
+        "properties": {
+          "recipients": {
+            "items": {
+              "type": "string",
+              "format": "email"
+            },
+            "type": "array",
+            "title": "Recipients"
+          },
+          "subject": {
+            "type": "string",
+            "title": "Subject"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "html": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Html"
+          }
+        },
+        "type": "object",
+        "required": [
+          "recipients",
+          "subject",
+          "text"
+        ],
+        "title": "BulkEmailRequest"
+      },
       "BuyReceipt": {
         "properties": {
           "success": {
@@ -5641,30 +7524,36 @@
             "title": "User Id"
           },
           "product_id": {
-            "type": "integer",
-            "title": "Product Id"
-          },
-          "sku": {
             "type": "string",
-            "title": "Sku"
+            "title": "Product Id"
           },
           "quantity": {
             "type": "integer",
             "title": "Quantity"
           },
-          "total_price_cents": {
-            "type": "integer",
-            "title": "Total Price Cents"
+          "granted_gems": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Granted Gems"
           },
-          "gems_granted": {
-            "type": "integer",
-            "title": "Gems Granted"
+          "new_balance": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "New Balance"
           },
-          "new_gem_balance": {
-            "type": "integer",
-            "title": "New Gem Balance"
-          },
-          "charge_id": {
+          "receipt_code": {
             "anyOf": [
               {
                 "type": "string"
@@ -5673,7 +7562,29 @@
                 "type": "null"
               }
             ],
-            "title": "Charge Id"
+            "title": "Receipt Code"
+          },
+          "item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Item Id"
+          },
+          "item_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Item Name"
           }
         },
         "type": "object",
@@ -5682,11 +7593,7 @@
           "message",
           "user_id",
           "product_id",
-          "sku",
-          "quantity",
-          "total_price_cents",
-          "gems_granted",
-          "new_gem_balance"
+          "quantity"
         ],
         "title": "BuyReceipt"
       },
@@ -5697,9 +7604,15 @@
             "title": "User Id"
           },
           "product_id": {
-            "type": "integer",
+            "type": "string",
             "title": "Product Id",
-            "description": "Catalog product id"
+            "description": "Catalog product id or item code"
+          },
+          "amount": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Amount",
+            "description": "Amount in cents or tokens depending on kind"
           },
           "quantity": {
             "type": "integer",
@@ -5707,6 +7620,38 @@
             "minimum": 1.0,
             "title": "Quantity",
             "default": 1
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "gems",
+              "item"
+            ],
+            "title": "Kind",
+            "default": "gems"
+          },
+          "payment_method": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payment Method",
+            "description": "card|tokens etc"
+          },
+          "item_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Item Name"
           },
           "currency": {
             "type": "string",
@@ -5728,7 +7673,8 @@
         "type": "object",
         "required": [
           "user_id",
-          "product_id"
+          "product_id",
+          "amount"
         ],
         "title": "BuyRequest"
       },
@@ -5956,6 +7902,19 @@
         ],
         "title": "CrashBetResponse",
         "description": "크래시 게임 베팅 응답 모델"
+      },
+      "ElevateRequest": {
+        "properties": {
+          "site_id": {
+            "type": "string",
+            "title": "Site Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "site_id"
+        ],
+        "title": "ElevateRequest"
       },
       "EmotionFeedbackRequest": {
         "properties": {
@@ -6290,6 +8249,18 @@
           "message"
         ],
         "title": "FeedbackResponse"
+      },
+      "ForceSettleRequest": {
+        "properties": {
+          "outcome": {
+            "type": "string",
+            "pattern": "^(success|failed)$",
+            "title": "Outcome",
+            "default": "success"
+          }
+        },
+        "type": "object",
+        "title": "ForceSettleRequest"
       },
       "GachaConfigUpdate": {
         "properties": {
@@ -6809,27 +8780,69 @@
             "title": "Message"
           },
           "user_id": {
-            "type": "integer",
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "User Id"
           },
           "code": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Code"
           },
           "quantity": {
-            "type": "integer",
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Quantity"
           },
           "total_price_cents": {
-            "type": "integer",
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Total Price Cents"
           },
           "gems_granted": {
-            "type": "integer",
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Gems Granted"
           },
           "new_gem_balance": {
-            "type": "integer",
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "New Gem Balance"
           },
           "charge_id": {
@@ -6842,31 +8855,32 @@
               }
             ],
             "title": "Charge Id"
+          },
+          "receipt_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receipt Code"
           }
         },
         "type": "object",
         "required": [
           "success",
-          "message",
-          "user_id",
-          "code",
-          "quantity",
-          "total_price_cents",
-          "gems_granted",
-          "new_gem_balance"
+          "message"
         ],
         "title": "LimitedBuyReceipt"
       },
       "LimitedBuyRequest": {
         "properties": {
-          "user_id": {
-            "type": "integer",
-            "title": "User Id"
-          },
-          "code": {
+          "package_id": {
             "type": "string",
-            "title": "Code",
-            "description": "Limited package code"
+            "title": "Package Id",
+            "description": "Limited package id/code"
           },
           "quantity": {
             "type": "integer",
@@ -6906,8 +8920,7 @@
         },
         "type": "object",
         "required": [
-          "user_id",
-          "code"
+          "package_id"
         ],
         "title": "LimitedBuyRequest"
       },
@@ -7108,6 +9121,139 @@
           "active"
         ],
         "title": "LimitedToggleRequest"
+      },
+      "LimitedUpsertRequest": {
+        "properties": {
+          "package_id": {
+            "type": "string",
+            "title": "Package Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "price": {
+            "type": "integer",
+            "title": "Price"
+          },
+          "starts_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Starts At"
+          },
+          "ends_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ends At"
+          },
+          "stock_total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stock Total"
+          },
+          "stock_remaining": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stock Remaining"
+          },
+          "per_user_limit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Per User Limit"
+          },
+          "emergency_disabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Emergency Disabled"
+          },
+          "contents": {
+            "anyOf": [
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contents"
+          },
+          "is_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Active"
+          }
+        },
+        "type": "object",
+        "required": [
+          "package_id",
+          "name",
+          "price"
+        ],
+        "title": "LimitedUpsertRequest"
+      },
+      "MarkRequest": {
+        "properties": {
+          "read": {
+            "type": "boolean",
+            "title": "Read",
+            "default": true
+          }
+        },
+        "type": "object",
+        "title": "MarkRequest"
       },
       "MissionResponse": {
         "properties": {
@@ -7313,6 +9459,135 @@
         ],
         "title": "ModelPredictionResponse"
       },
+      "NotificationItem": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "notification_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notification Type",
+            "default": "info"
+          },
+          "is_read": {
+            "type": "boolean",
+            "title": "Is Read"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "read_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Read At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "message",
+          "is_read"
+        ],
+        "title": "NotificationItem"
+      },
+      "NotificationListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/NotificationItem"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "unread": {
+            "type": "integer",
+            "title": "Unread"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "unread"
+        ],
+        "title": "NotificationListResponse"
+      },
+      "NotificationSettings": {
+        "properties": {
+          "toastEnabled": {
+            "type": "boolean",
+            "title": "Toastenabled",
+            "default": true
+          },
+          "types": {
+            "type": "object",
+            "title": "Types",
+            "default": {
+              "reward": true,
+              "event": true,
+              "system": true,
+              "shop": true
+            }
+          },
+          "sound": {
+            "type": "boolean",
+            "title": "Sound",
+            "default": false
+          },
+          "dnd": {
+            "type": "object",
+            "title": "Dnd",
+            "default": {
+              "enabled": false,
+              "start": "22:00",
+              "end": "07:00"
+            }
+          }
+        },
+        "type": "object",
+        "title": "NotificationSettings"
+      },
       "PaginatedRewardsResponse": {
         "properties": {
           "rewards": {
@@ -7507,6 +9782,127 @@
         "title": "ProfileGameStats",
         "description": "프로필 게임 통계 응답"
       },
+      "PromoCodeUpsertRequest": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "package_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Package Id"
+          },
+          "discount_type": {
+            "type": "string",
+            "title": "Discount Type",
+            "default": "flat"
+          },
+          "value": {
+            "type": "integer",
+            "title": "Value",
+            "default": 0
+          },
+          "starts_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Starts At"
+          },
+          "ends_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ends At"
+          },
+          "is_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Active",
+            "default": true
+          },
+          "max_uses": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Uses"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code"
+        ],
+        "title": "PromoCodeUpsertRequest"
+      },
+      "ProtectionRequest": {
+        "properties": {
+          "action_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Action Type"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          }
+        },
+        "type": "object",
+        "required": [
+          "enabled"
+        ],
+        "title": "ProtectionRequest"
+      },
+      "ProtectionStatus": {
+        "properties": {
+          "action_type": {
+            "type": "string",
+            "title": "Action Type"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          }
+        },
+        "type": "object",
+        "required": [
+          "action_type",
+          "enabled"
+        ],
+        "title": "ProtectionStatus"
+      },
       "PublicUserResponse": {
         "properties": {
           "id": {
@@ -7574,6 +9970,72 @@
         ],
         "title": "PublicUserResponse",
         "description": "타인 보기용 제한 정보 스키마"
+      },
+      "PushSendRequest": {
+        "properties": {
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title",
+            "default": "알림"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "default": ""
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type",
+            "default": "info"
+          }
+        },
+        "type": "object",
+        "title": "PushSendRequest"
+      },
+      "PushSubscription": {
+        "properties": {
+          "endpoint": {
+            "type": "string",
+            "title": "Endpoint"
+          },
+          "p256dh": {
+            "type": "string",
+            "title": "P256Dh"
+          },
+          "auth": {
+            "type": "string",
+            "title": "Auth"
+          }
+        },
+        "type": "object",
+        "required": [
+          "endpoint",
+          "p256dh",
+          "auth"
+        ],
+        "title": "PushSubscription"
       },
       "RPSPlayRequest": {
         "properties": {
@@ -7795,6 +10257,23 @@
         "title": "RefreshTokenRequest",
         "description": "리프레시 토큰 요청"
       },
+      "ResetRequest": {
+        "properties": {
+          "action_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Action Type"
+          }
+        },
+        "type": "object",
+        "title": "ResetRequest"
+      },
       "RewardDistributionRequest": {
         "properties": {
           "user_id": {
@@ -7901,6 +10380,69 @@
           "activity_level"
         ],
         "title": "SegmentStatsResponse"
+      },
+      "SendEmailRequest": {
+        "properties": {
+          "to": {
+            "type": "string",
+            "format": "email",
+            "title": "To"
+          },
+          "subject": {
+            "type": "string",
+            "title": "Subject"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "html": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Html"
+          }
+        },
+        "type": "object",
+        "required": [
+          "to",
+          "subject",
+          "text"
+        ],
+        "title": "SendEmailRequest"
+      },
+      "SendNotificationRequest": {
+        "properties": {
+          "message": {
+            "title": "Message"
+          },
+          "topic": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Topic"
+          },
+          "priority": {
+            "type": "integer",
+            "title": "Priority",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "title": "SendNotificationRequest"
       },
       "ShopPurchaseRequest": {
         "properties": {
@@ -8118,6 +10660,87 @@
         ],
         "title": "SlotSpinResponse",
         "description": "슬롯 머신 스핀 응답 모델"
+      },
+      "StreakStatus": {
+        "properties": {
+          "action_type": {
+            "type": "string",
+            "title": "Action Type"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "ttl_seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ttl Seconds"
+          },
+          "next_reward": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Reward"
+          }
+        },
+        "type": "object",
+        "required": [
+          "action_type",
+          "count"
+        ],
+        "title": "StreakStatus"
+      },
+      "TemplateEmailRequest": {
+        "properties": {
+          "to": {
+            "type": "string",
+            "format": "email",
+            "title": "To"
+          },
+          "template": {
+            "type": "string",
+            "title": "Template"
+          },
+          "context": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "to",
+          "template",
+          "context"
+        ],
+        "title": "TemplateEmailRequest"
+      },
+      "TickRequest": {
+        "properties": {
+          "action_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Action Type"
+          }
+        },
+        "type": "object",
+        "title": "TickRequest"
       },
       "Token": {
         "properties": {

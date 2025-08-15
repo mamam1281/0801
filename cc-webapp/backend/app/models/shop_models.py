@@ -2,7 +2,7 @@ from datetime import datetime
 from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, JSON
 from sqlalchemy.orm import relationship
 
-from .auth_models import Base
+from ..database import Base
 
 
 class ShopProduct(Base):
@@ -89,3 +89,29 @@ class ShopPromoCode(Base):
     used_count = Column(Integer, nullable=False, default=0)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow)
+
+
+class ShopPromoUsage(Base):
+    __tablename__ = "shop_promo_usage"
+
+    id = Column(Integer, primary_key=True)
+    promo_code = Column(String(64), index=True, nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    package_code = Column(String(100), index=True, nullable=True)
+    quantity = Column(Integer, nullable=False, default=1)
+    used_at = Column(DateTime, default=datetime.utcnow)
+    # Avoid SQLAlchemy reserved attribute name 'metadata'
+    details = Column(JSON)
+
+
+class AdminAuditLog(Base):
+    __tablename__ = "admin_audit_logs"
+
+    id = Column(Integer, primary_key=True)
+    actor_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    action = Column(String(100), nullable=False)  # e.g., CREATE_PROMO, DISABLE_PACKAGE
+    target_type = Column(String(100), nullable=True)  # e.g., promo, package, user
+    target_id = Column(String(200), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    # Avoid SQLAlchemy reserved attribute name 'metadata'
+    details = Column(JSON)

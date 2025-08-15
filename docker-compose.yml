@@ -14,6 +14,7 @@ services:
       REDIS_PORT: 6379
       REDIS_PASSWORD: redis_password
       JWT_SECRET_KEY: secret_key_for_development_only
+      PAYMENT_WEBHOOK_SECRET: dev-webhook-secret
       KAFKA_ENABLED: ${KAFKA_ENABLED:-0}
       KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-kafka:9092}
       CLICKHOUSE_ENABLED: ${CLICKHOUSE_ENABLED:-0}
@@ -142,7 +143,7 @@ services:
       CLICKHOUSE_USER: ${CLICKHOUSE_USER:-default}
       CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-}
     volumes:
-      - ./data/clickhouse:/var/lib/clickhouse
+      - clickhouse_data:/var/lib/clickhouse
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:8123/ping"]
       interval: 10s
@@ -176,6 +177,19 @@ services:
     networks:
       - ccnet
 
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: cc_mailpit
+    ports:
+      - "8025:8025"  # Web UI/API
+      - "1025:1025"  # SMTP
+    restart: unless-stopped
+    networks:
+      - ccnet
+
 networks:
   ccnet:
     driver: bridge
+
+volumes:
+  clickhouse_data:

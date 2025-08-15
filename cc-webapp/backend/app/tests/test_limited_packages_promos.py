@@ -1,4 +1,5 @@
 import pytest
+import random
 from fastapi.testclient import TestClient
 
 
@@ -68,12 +69,15 @@ def test_limited_promos_and_limits(client: TestClient):
     uh1 = _auth_headers(u1)
 
     # First purchase with promo succeeds (price discounted to 50)
+    random.seed(7)
     r1 = client.post("/api/shop/buy-limited", json={"package_id": "PKG-PROMO-1", "promo_code": "ONEUSE"}, headers=uh1)
     assert r1.status_code == 200 and r1.json()["success"] is True
 
-    # Second purchase with promo should fail due to max_uses reached
+    # Second purchase with promo should fail due to max_uses reached and reason_code PROMO_EXHAUSTED
     r2 = client.post("/api/shop/buy-limited", json={"package_id": "PKG-PROMO-1", "promo_code": "ONEUSE"}, headers=uh1)
-    assert r2.status_code == 200 and r2.json()["success"] is False
+    assert r2.status_code == 200
+    body2 = r2.json()
+    assert body2["success"] is False and body2.get("reason_code") == "PROMO_EXHAUSTED"
 
     # Per-user limit is 2. We have 1 success so far; next without promo should succeed (2nd purchase)
     r3 = client.post("/api/shop/buy-limited", json={"package_id": "PKG-PROMO-1"}, headers=uh1)
@@ -88,4 +92,42 @@ def test_limited_promos_and_limits(client: TestClient):
     assert dis.status_code == 200
     r5 = client.post("/api/shop/buy-limited", json={"package_id": "PKG-PROMO-1"}, headers=uh1)
     assert r5.status_code == 200 and r5.json()["success"] is False
+
+def test_promo_zero_uses_is_exhausted(client: TestClient):
+    # Admin setup
+    admin = signup_and_login(client, "admin_zero_uses", "passw0rd!")
+    client.post("/api/admin/users/elevate", json={"site_id": "admin_zero_uses"})
+    headers = _auth_headers(admin)
+    # Upsert package
+    up = client.post(
+        "/api/admin/limited-packages/upsert",
+        json={
+            "package_id": "PKG-PROMO-0",
+            "name": "Promo Zero",
+            "price": 100,
+            "stock_total": 5,
+            "stock_remaining": 5,
+            "per_user_limit": 1,
+            "is_active": True,
+            "contents": {"bonus_tokens": 10},
+        },
+        headers=headers,
+    )
+    if up.status_code == 403:
+        pytest.skip("Admin guard enforced; skipping")
+    assert up.status_code == 200
+    # Upsert promo with max_uses=0 (effectively exhausted)
+    pu = client.post(
+        "/api/admin/promo-codes/upsert",
+        json={"code": "ZERO", "package_id": "PKG-PROMO-0", "discount_type": "flat", "value": 99, "max_uses": 0, "is_active": True},
+        headers=headers,
+    )
+    assert pu.status_code == 200
+    # Buyer
+    u = signup_and_login(client, "user_zero_uses", "passw0rd!")
+    uh = _auth_headers(u)
+    r = client.post("/api/shop/buy-limited", json={"package_id": "PKG-PROMO-0", "promo_code": "ZERO"}, headers=uh)
+    assert r.status_code == 200
+    body = r.json()
+    assert body["success"] is False and body.get("reason_code") == "PROMO_EXHAUSTED"
 

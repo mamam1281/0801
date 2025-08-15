@@ -3,6 +3,8 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 from app.database import Base, engine, SessionLocal
+from sqlalchemy import text
+from app.tests._testdb import reset_db
 from app.models import User
 from app.utils.redis import init_redis_manager, get_redis_manager
 from app.services.payment_gateway import PaymentResult
@@ -92,8 +94,7 @@ class _FakeRedis:
 
 def setup_module(module):
     # fresh schema
-    Base.metadata.drop_all(bind=engine)
-    Base.metadata.create_all(bind=engine)
+    reset_db(engine)
 
     # init fake redis so limited package service uses counters/stock
     init_redis_manager(_FakeRedis())

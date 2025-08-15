@@ -3,6 +3,8 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 from app.database import Base, engine, SessionLocal
+from sqlalchemy import text
+from app.tests._testdb import reset_db
 from app.models import User
 
 user_id = None
@@ -13,8 +15,7 @@ client = TestClient(app)
 
 def setup_module(module):
     # fresh schema
-    Base.metadata.drop_all(bind=engine)
-    Base.metadata.create_all(bind=engine)
+    reset_db(engine)
     # create a user
     db = SessionLocal()
     try:

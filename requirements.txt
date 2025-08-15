@@ -43,6 +43,9 @@ python-dotenv==1.0.0
 pydantic-settings==2.1.0
 email-validator==2.1.0
 
+# Web Push
+pywebpush==1.14.0
+
 # 개발 도구
 pytest==7.4.3
 pytest-asyncio

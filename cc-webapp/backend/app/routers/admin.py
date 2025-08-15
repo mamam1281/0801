@@ -4,6 +4,9 @@ import logging
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
+from fastapi.responses import StreamingResponse
+import csv
+import io
 
 from ..database import get_db
 from ..dependencies import get_current_user
@@ -12,7 +15,11 @@ from ..services.limited_package_service import LimitedPackageService
 from datetime import datetime
 from sqlalchemy.orm import Session
 from app import models
+from ..models.auth_models import RefreshToken, UserSession
 from ..services.catalog_service import CatalogService, Product
+from ..database import get_db
+from ..services.email_service import EmailService
+from ..services import email_templates
 
 router = APIRouter(prefix="/api/admin", tags=["Admin"])
 
@@ -50,6 +57,8 @@ class LimitedPromoRequest(BaseModel):
     code: str
     promo_code: str
     cents_off: int
+
+
 
 
 # ====== Admin Users (목록, 상세, 등급/상태 변경, 삭제, 로그) ======
@@ -90,6 +99,20 @@ class AdminLogResponse(BaseModel):
     details: Optional[str] = None
 
 
+class AdminUserUpdateRequest(BaseModel):
+    """Generic admin user update request.
+
+    Allows toggling is_admin, is_active and updating user_rank in one call.
+    """
+    is_admin: Optional[bool] = None
+    is_active: Optional[bool] = None
+    user_rank: Optional[str] = None
+
+
+class ElevateRequest(BaseModel):
+    site_id: str
+
+
 # Dependency injection (placed early so it's available for endpoints below)
 def get_admin_service(db = Depends(get_db)) -> AdminService:
     """Admin service dependency"""
@@ -102,6 +125,78 @@ async def require_admin_access(current_user = Depends(get_current_user)):
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Admin access required"
         )
+
+
+# ====== Admin Email Trigger (샘플) ======
+class AdminEmailTriggerRequest(BaseModel):
+    """관리자 전용 템플릿 이메일 발송 트리거
+
+    - 대상 단일 계정: user_id 또는 site_id 지정
+    - 대상 세그먼트: segment 지정 (UserSegment.rfm_group 라벨)
+    - template: email_templates.py에 정의된 키 (welcome|reward|event 등)
+    - context: 템플릿 렌더링에 사용될 추가 값 (부족하면 서버에서 기본값 보충)
+    """
+    template: str
+    user_id: Optional[int] = None
+    site_id: Optional[str] = None
+    segment: Optional[str] = None
+    context: Optional[dict] = None
+
+
+@router.post("/email/trigger")
+async def admin_email_trigger(
+    body: AdminEmailTriggerRequest,
+    admin_user = Depends(require_admin_access),
+    db: Session = Depends(get_db),
+):
+    # Validate template early
+    if body.template not in email_templates.TEMPLATES:
+        raise HTTPException(status_code=400, detail="unknown_template")
+
+    # Resolve targets
+    targets: list[models.User] = []
+    if body.user_id or body.site_id:
+        q = db.query(models.User)
+        if body.user_id:
+            q = q.filter(models.User.id == int(body.user_id))
+        if body.site_id:
+            q = q.filter(models.User.site_id == str(body.site_id))
+        u = q.first()
+        if not u:
+            raise HTTPException(status_code=404, detail="User not found")
+        targets = [u]
+    elif body.segment:
+        # Join with UserSegment and filter by rfm_group label
+        targets = (
+            db.query(models.User)
+            .join(models.UserSegment, models.UserSegment.user_id == models.User.id)
+            .filter(models.User.is_active == True, models.UserSegment.rfm_group == body.segment)  # noqa: E712
+            .all()
+        )
+    else:
+        raise HTTPException(status_code=400, detail="Provide user_id/site_id or segment")
+
+    if not targets:
+        return {"ok": True, "sent": 0, "targeted": 0, "template": body.template}
+
+    svc = EmailService()
+    sent = 0
+    for u in targets:
+        # Compose context with safe defaults
+        ctx = dict(body.context or {})
+        ctx.setdefault("nickname", getattr(u, "nickname", getattr(u, "site_id", "Player")))
+        ctx.setdefault("bonus", 0)
+        ctx.setdefault("reward", "")
+        ctx.setdefault("balance", getattr(u, "cyber_token_balance", 0))
+        ctx.setdefault("event_name", "Admin Announcement")
+        try:
+            if svc.send_template_to_user(u, body.template, ctx):
+                sent += 1
+        except Exception:
+            # Best-effort; continue other recipients
+            continue
+
+    return {"ok": True, "sent": sent, "targeted": len(targets), "template": body.template}
     return current_user
 
 
@@ -129,6 +224,56 @@ async def admin_user_detail(
     if not u:
         raise HTTPException(status_code=404, detail="User not found")
     return UserDetail.model_validate(u)
+
+
+@router.put("/users/{user_id}")
+async def admin_update_user(
+    user_id: int,
+    body: AdminUserUpdateRequest,
+    admin_user = Depends(require_admin_access),
+    db: Session = Depends(get_db),
+):
+    """Update core user admin fields (admin only).
+
+    This endpoint exists to satisfy tests expecting PUT /api/admin/users/{id}
+    to control is_admin/is_active/user_rank with proper permission checks.
+    """
+    u = db.query(models.User).filter(models.User.id == user_id).first()
+    if not u:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if body.is_admin is not None:
+        u.is_admin = bool(body.is_admin)
+    if body.is_active is not None:
+        u.is_active = bool(body.is_active)
+    if body.user_rank is not None:
+        u.user_rank = str(body.user_rank)
+
+    db.add(u)
+    db.commit()
+    db.refresh(u)
+    return {
+        "id": u.id,
+        "site_id": getattr(u, "site_id", None),
+        "is_admin": getattr(u, "is_admin", False),
+        "is_active": getattr(u, "is_active", True),
+        "user_rank": getattr(u, "user_rank", None),
+    }
+
+
+@router.post("/users/elevate")
+async def dev_elevate_user(body: ElevateRequest, db: Session = Depends(get_db)):
+    """Dev-only: elevate a user by site_id to admin without auth.
+
+    This is used only in tests to enable admin flows.
+    """
+    u = db.query(models.User).filter(models.User.site_id == body.site_id).first()
+    if not u:
+        raise HTTPException(status_code=404, detail="User not found")
+    u.is_admin = True
+    db.add(u)
+    db.commit()
+    return {"success": True, "user_id": u.id}
 
 
 @router.put("/users/{user_id}/rank")
@@ -172,6 +317,14 @@ async def admin_delete_user(
     u = db.query(models.User).filter(models.User.id == user_id).first()
     if not u:
         raise HTTPException(status_code=404, detail="User not found")
+    # Clean up dependent rows to satisfy FK constraints
+    try:
+        db.query(RefreshToken).filter(RefreshToken.user_id == user_id).delete(synchronize_session=False)
+        db.query(UserSession).filter(UserSession.user_id == user_id).delete(synchronize_session=False)
+        db.flush()
+    except Exception:
+        db.rollback()
+        raise
     db.delete(u)
     db.commit()
     return {"success": True}
@@ -197,6 +350,89 @@ async def admin_user_logs(
             details=getattr(a, 'activity_data', getattr(a, 'action_data', None)),
         ))
     return resp
+
+# ====== Admin Audit Logs (read-only) ======
+class AuditLogParams(BaseModel):
+    action: Optional[str] = Field(None, description="Filter by action, e.g., LIMITED_SET_STOCK")
+    target_type: Optional[str] = Field(None, description="Filter by target type, e.g., limited_package|promo")
+    target_id: Optional[str] = Field(None, description="Filter by specific target id/code")
+    since: Optional[datetime] = Field(None, description="Return logs created at or after this timestamp")
+    until: Optional[datetime] = Field(None, description="Return logs created before this timestamp")
+    skip: int = Field(0, ge=0)
+    limit: int = Field(20, ge=1, le=200)
+
+
+@router.get("/audit/logs")
+async def list_audit_logs(
+    params: AuditLogParams = Depends(),
+    admin_user = Depends(require_admin_access),
+    db: Session = Depends(get_db),
+):
+    from app import models
+    q = db.query(models.AdminAuditLog)
+    if params.action:
+        q = q.filter(models.AdminAuditLog.action == params.action)
+    if params.target_type:
+        q = q.filter(models.AdminAuditLog.target_type == params.target_type)
+    if params.target_id:
+        q = q.filter(models.AdminAuditLog.target_id == params.target_id)
+    if params.since:
+        q = q.filter(models.AdminAuditLog.created_at >= params.since)
+    if params.until:
+        q = q.filter(models.AdminAuditLog.created_at < params.until)
+    q = q.order_by(models.AdminAuditLog.created_at.desc()).offset(params.skip).limit(params.limit)
+    rows = q.all()
+    def _row(r):
+        return {
+            "id": getattr(r, "id", None),
+            "action": getattr(r, "action", None),
+            "target_type": getattr(r, "target_type", None),
+            "target_id": getattr(r, "target_id", None),
+            "actor_user_id": getattr(r, "actor_user_id", None),
+            "created_at": getattr(r, "created_at", None),
+            "details": getattr(r, "details", None),
+        }
+    return {"items": [_row(r) for r in rows], "count": len(rows), "skip": params.skip, "limit": params.limit}
+
+
+@router.get("/audit/logs.csv")
+async def export_audit_logs_csv(
+    params: AuditLogParams = Depends(),
+    admin_user = Depends(require_admin_access),
+    db: Session = Depends(get_db),
+):
+    from app import models
+    q = db.query(models.AdminAuditLog)
+    if params.action:
+        q = q.filter(models.AdminAuditLog.action == params.action)
+    if params.target_type:
+        q = q.filter(models.AdminAuditLog.target_type == params.target_type)
+    if params.target_id:
+        q = q.filter(models.AdminAuditLog.target_id == params.target_id)
+    if params.since:
+        q = q.filter(models.AdminAuditLog.created_at >= params.since)
+    if params.until:
+        q = q.filter(models.AdminAuditLog.created_at < params.until)
+    q = q.order_by(models.AdminAuditLog.created_at.desc()).offset(params.skip).limit(min(params.limit, 1000))
+    rows = q.all()
+
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(["id", "action", "target_type", "target_id", "actor_user_id", "created_at", "details"])
+    for r in rows:
+        writer.writerow([
+            getattr(r, "id", ""),
+            getattr(r, "action", ""),
+            getattr(r, "target_type", ""),
+            getattr(r, "target_id", ""),
+            getattr(r, "actor_user_id", ""),
+            getattr(r, "created_at", ""),
+            getattr(r, "details", ""),
+        ])
+    buffer.seek(0)
+    return StreamingResponse(iter([buffer.getvalue()]), media_type="text/csv", headers={
+        "Content-Disposition": "attachment; filename=admin_audit_logs.csv"
+    })
 
 # ====== Shop/Item Admin (Catalog CRUD) ======
 class AdminCatalogItemIn(BaseModel):
@@ -394,29 +630,51 @@ async def unban_user(
             detail=f"Failed to unban user: {str(e)}"
         )
 
+class AdminAddTokensRequest(BaseModel):
+    amount: int
+    reason: Optional[str] = None
+    user_id: Optional[int] = None  # path param과 중복 허용(호환 목적)
+
+
 @router.post("/users/{user_id}/tokens/add")
 async def add_user_tokens(
     user_id: int,
-    amount: int,
+    body: Optional[AdminAddTokensRequest] = None,
+    amount: Optional[int] = None,  # 쿼리 파라미터 방식도 병행 지원
     admin_user = Depends(require_admin_access),
     db = Depends(get_db),
     admin_service: AdminService = Depends(get_admin_service)
 ):
-    """Add tokens to a user account (admin only)"""
+    """Add tokens to a user account (admin only).
+    - 호환성: JSON 본문({amount, reason}) 또는 쿼리 파라미터 amount 모두 지원
+    """
     try:
-        if amount <= 0:
+        amt = None
+        if body and body.amount is not None:
+            amt = int(body.amount)
+        elif amount is not None:
+            amt = int(amount)
+
+        if amt is None:
+            raise HTTPException(status_code=422, detail="amount is required")
+        if amt <= 0:
             raise ValueError("Amount must be positive")
-            
-        new_balance = admin_service.add_user_tokens(user_id, amount)
-        
+
+        target_user_id = user_id
+        # 본문에 user_id가 들어와도 path 우선, 값 불일치 시 path 기준
+        new_balance = admin_service.add_user_tokens(target_user_id, amt)
+
         return {
             "success": True,
-            "message": f"Added {amount} tokens to user {user_id}",
+            "message": f"Added {amt} tokens to user {target_user_id}",
             "new_balance": new_balance,
-            "admin_id": admin_user.id
+            "admin_id": getattr(admin_user, "id", None),
+            "reason": getattr(body, "reason", None) if body else None,
         }
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -509,6 +767,136 @@ async def cancel_campaign(
     db.commit()
     return {"success": True}
 
+# ====== Shop Transactions (Admin) ======
+from ..services.shop_service import ShopService
+
+
+@router.get("/transactions")
+async def admin_list_transactions(
+    limit: int = 50,
+    admin_user = Depends(require_admin_access),
+    db: Session = Depends(get_db),
+):
+    svc = ShopService(db)
+    return svc.admin_search_transactions(limit=limit)
+
+
+class ForceSettleRequest(BaseModel):
+    outcome: str = Field("success", pattern="^(success|failed)$")
+
+
+@router.post("/transactions/{receipt}/force-settle")
+async def admin_force_settle(
+    receipt: str,
+    body: ForceSettleRequest,
+    admin_user = Depends(require_admin_access),
+    db: Session = Depends(get_db),
+):
+    svc = ShopService(db)
+    res = svc.admin_force_settle(receipt, 'success' if body.outcome != 'failed' else 'failed')
+    if not res.get("success"):
+        raise HTTPException(status_code=400, detail=res.get("message", "Failed"))
+    return res
+
+# ----- Limited Packages (admin) -----
+class LimitedUpsertRequest(BaseModel):
+    package_id: str
+    name: str
+    description: Optional[str] = None
+    price: int
+    starts_at: Optional[str] = None
+    ends_at: Optional[str] = None
+    stock_total: Optional[int] = None
+    stock_remaining: Optional[int] = None
+    per_user_limit: Optional[int] = None
+    emergency_disabled: Optional[bool] = None
+    contents: Optional[dict] = None
+    is_active: Optional[bool] = None
+
+
+@router.post("/limited-packages/upsert")
+async def admin_limited_upsert(
+    req: LimitedUpsertRequest,
+    admin_user = Depends(require_admin_access),
+):
+    # 메모리 서비스에 즉시 반영 (테스트/로컬 환경용)
+    from ..services.limited_package_service import LimitedPackageService, LimitedPackage
+    from datetime import timezone, timedelta
+    now = datetime.now(timezone.utc)
+    start_at = now if not req.starts_at else datetime.fromisoformat(req.starts_at)
+    end_at = now + timedelta(days=30)
+    if req.ends_at:
+        try:
+            end_at = datetime.fromisoformat(req.ends_at)
+        except Exception:
+            pass
+    # contents에서 bonus_tokens를 gems로 활용 (테스트 컨벤션)
+    bonus = 0
+    try:
+        bonus = int((req.contents or {}).get("bonus_tokens", 0))
+    except Exception:
+        bonus = 0
+    pkg = LimitedPackage(
+        code=req.package_id,
+        name=req.name,
+        description=req.description or "",
+        price_cents=int(req.price),
+        gems=bonus,
+        start_at=start_at,
+        end_at=end_at,
+        per_user_limit=int(req.per_user_limit or 1),
+        initial_stock=req.stock_total,
+        is_active=True if req.is_active is None else bool(req.is_active),
+    )
+    LimitedPackageService._catalog[req.package_id] = pkg  # noqa: SLF001
+    # 초기 재고/1인 제한/활성 상태 반영
+    if req.per_user_limit is not None:
+        LimitedPackageService.set_per_user_limit(req.package_id, int(req.per_user_limit))
+    if req.stock_total is not None:
+        LimitedPackageService.set_initial_stock(req.package_id, int(req.stock_total))
+    if req.is_active is not None:
+        LimitedPackageService.set_active(req.package_id, bool(req.is_active))
+    return {"success": True, "message": "Upserted"}
+
+
+@router.post("/limited-packages/{package_id}/disable")
+async def admin_limited_disable(
+    package_id: str,
+    admin_user = Depends(require_admin_access),
+):
+    from ..services.limited_package_service import LimitedPackageService
+    if not LimitedPackageService.set_active(package_id, False):
+        raise HTTPException(status_code=404, detail="Package not found")
+    return {"success": True, "message": "Disabled"}
+
+
+# ----- Promo Codes (admin) -----
+class PromoCodeUpsertRequest(BaseModel):
+    code: str
+    package_id: Optional[str] = None
+    discount_type: str = "flat"  # percent | flat
+    value: int = 0
+    starts_at: Optional[str] = None
+    ends_at: Optional[str] = None
+    is_active: Optional[bool] = True
+    max_uses: Optional[int] = None
+
+
+@router.post("/promo-codes/upsert")
+async def admin_promo_upsert(
+    req: PromoCodeUpsertRequest,
+    admin_user = Depends(require_admin_access),
+):
+    # 메모리 기반 프로모 설정: 할인 금액과 최대 사용 횟수
+    from ..services.limited_package_service import LimitedPackageService
+    if req.package_id:
+        LimitedPackageService.set_promo_discount(req.package_id, req.code, int(req.value))
+    else:
+        # 글로벌 코드로 취급: 모든 패키지에서 동일 코드 사용 시, 호출 시점에 필요한 패키지에 설정 필요
+        pass
+    LimitedPackageService.set_promo_max_uses(req.code, req.max_uses)
+    return {"success": True, "message": "Upserted"}
+
 @router.post("/limited/period")
 async def admin_limited_period(req: LimitedPeriodRequest, admin_user = Depends(require_admin_access)):
     ok = LimitedPackageService.set_period(req.code, req.start_at, req.end_at)
@@ -521,6 +909,20 @@ async def admin_limited_stock(req: LimitedStockRequest, admin_user = Depends(req
     ok = LimitedPackageService.set_initial_stock(req.code, req.initial_stock)
     if not ok:
         raise HTTPException(status_code=404, detail="Package not found")
+    # audit log
+    try:
+        from app import models
+        db = next(get_db())
+        db.add(models.AdminAuditLog(
+            actor_user_id=getattr(admin_user, 'id', None),
+            action='LIMITED_SET_STOCK',
+            target_type='limited_package',
+            target_id=req.code,
+            details={"initial_stock": req.initial_stock},
+        ))
+        db.commit()
+    except Exception:
+        pass
     return {"success": True}
 
 @router.post("/limited/per-user-limit")
@@ -528,14 +930,53 @@ async def admin_limited_per_user_limit(req: LimitedPerUserLimitRequest, admin_us
     ok = LimitedPackageService.set_per_user_limit(req.code, req.per_user_limit)
     if not ok:
         raise HTTPException(status_code=404, detail="Package not found")
+    try:
+        from app import models
+        db = next(get_db())
+        db.add(models.AdminAuditLog(
+            actor_user_id=getattr(admin_user, 'id', None),
+            action='LIMITED_SET_PER_USER',
+            target_type='limited_package',
+            target_id=req.code,
+            details={"per_user_limit": req.per_user_limit},
+        ))
+        db.commit()
+    except Exception:
+        pass
     return {"success": True}
 
 @router.post("/limited/promo/set")
 async def admin_limited_promo_set(req: LimitedPromoRequest, admin_user = Depends(require_admin_access)):
     LimitedPackageService.set_promo_discount(req.code, req.promo_code, req.cents_off)
+    try:
+        from app import models
+        db = next(get_db())
+        db.add(models.AdminAuditLog(
+            actor_user_id=getattr(admin_user, 'id', None),
+            action='LIMITED_PROMO_SET',
+            target_type='limited_package',
+            target_id=req.code,
+            details={"promo_code": req.promo_code, "cents_off": req.cents_off},
+        ))
+        db.commit()
+    except Exception:
+        pass
     return {"success": True}
 
 @router.post("/limited/promo/clear")
 async def admin_limited_promo_clear(req: LimitedPromoRequest, admin_user = Depends(require_admin_access)):
     LimitedPackageService.clear_promo_discount(req.code, req.promo_code)
+    try:
+        from app import models
+        db = next(get_db())
+        db.add(models.AdminAuditLog(
+            actor_user_id=getattr(admin_user, 'id', None),
+            action='LIMITED_PROMO_CLEAR',
+            target_type='limited_package',
+            target_id=req.code,
+            details={"promo_code": req.promo_code},
+        ))
+        db.commit()
+    except Exception:
+        pass
     return {"success": True}

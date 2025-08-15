@@ -1,7 +1,8 @@
 'use client';
 
 import React from 'react';
+import { ToastProvider } from '@/components/NotificationToast';
 
 export function Providers({ children }: { children: React.ReactNode }) {
-  return <>{children}</>;
+  return <ToastProvider>{children}</ToastProvider>;
 }

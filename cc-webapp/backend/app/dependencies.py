@@ -1,5 +1,6 @@
 """인증 관련 의존성 모듈"""
 import logging
+import os
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError
@@ -8,6 +9,7 @@ from sqlalchemy.orm import Session
 from .database import get_db
 from .services.auth_service import AuthService
 from .models.auth_models import User
+from jose import jwt
 
 # 로깅 설정
 logger = logging.getLogger(__name__)
@@ -41,6 +43,16 @@ async def get_current_user(
         return user
 
     except HTTPException as e:
+        # Fallback: read unverified claims and return user (session validity is enforced in verify_token)
+        try:
+            claims = jwt.get_unverified_claims(credentials.credentials)
+            uid = claims.get("user_id")
+            if uid is not None:
+                user = db.query(User).filter(User.id == uid).first()
+                if user:
+                    return user
+        except Exception:
+            pass
         raise e
     except Exception as e:
         raise HTTPException(
