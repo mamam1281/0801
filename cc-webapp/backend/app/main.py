@@ -66,6 +66,7 @@ from app.routers import notification_center
 from app.routers import email as email_router
 from app.kafka_client import start_consumer, stop_consumer, get_last_messages, is_consumer_ready
 from app.routers import streak
+from app.routers import abtest
 
 # AI recommendation system router separate import (removed duplicate)
 
@@ -273,6 +274,7 @@ app.include_router(tracking.router)
 
 # Phase 10: Unlock System (no prefix - routers have their own)
 app.include_router(unlock.router)
+app.include_router(abtest.router, tags=["ABTest"])
 
 # 이벤트/미션 라우터 추가
 app.include_router(events.router)  # 태그 오버라이드 제거 - 이미 events.py에서 "Events & Missions" 태그를 지정함
