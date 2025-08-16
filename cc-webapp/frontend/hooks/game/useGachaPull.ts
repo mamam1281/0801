@@ -13,7 +13,8 @@ export function useGachaPull(authToken: string | null) {
   const pull = useCallback(async (count: 1 | 10 = 1) => {
     setLoading(true); setError(null);
     try {
-      const res = await call<GachaPullResponse>('/pull', { method: 'POST', authToken, body: { count } });
+        // TS 5.x 환경에서 useCallback 제네릭 전달 경고(2347) 회피: 내부 any 추론 → as 단언 사용
+        const res = await call('/pull', { method: 'POST', authToken, body: { count } }) as GachaPullResponse;
       setLastResult(res);
     } catch (e: any) { setError(e.message); }
     finally { setLoading(false); }
