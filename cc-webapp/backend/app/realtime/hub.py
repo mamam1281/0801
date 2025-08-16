@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import time
+import os
 from typing import Dict, Set, Any
 
 class RealtimeHub:
@@ -20,6 +21,14 @@ class RealtimeHub:
         # 최근 이벤트 메모리 (간단 sliding window)
         self._recent_events: list[dict[str, Any]] = []
         self._max_recent = 200
+        # 퍼유저 스로틀: user_id -> 마지막 전송 epoch(float)
+        self._last_emit: Dict[int, float] = {}
+        # 최소 인터벌 초 (환경변수 REALTIME_USER_MIN_INTERVAL_MS, 기본 300ms)
+        try:
+            ms = float(os.getenv("REALTIME_USER_MIN_INTERVAL_MS", "300"))
+        except ValueError:
+            ms = 300.0
+        self._min_interval = ms / 1000.0
 
     async def register_user(self, user_id: int, ws: Any) -> None:
         async with self._lock:
@@ -62,9 +71,24 @@ class RealtimeHub:
         targets: Set[Any] = set()
         async with self._lock:
             uid = event.get("user_id")
+            # 스로틀 적용(모니터 채널 제외) - user_id가 있고 type이 balance_update/reward_grant/game_session/game_event 등 빈번 이벤트인 경우
+            throttled = False
             if uid in self._user_channels:
-                targets |= self._user_channels[uid]
+                if uid is not None and self._min_interval > 0:
+                    now = time.time()
+                    last = self._last_emit.get(uid, 0.0)
+                    # 이벤트 타입 화이트리스트(스로틀 적용 대상)
+                    evt_type = event.get("type")
+                    if evt_type in {"reward_grant", "balance_update", "game_session", "game_event"}:
+                        if (now - last) < self._min_interval:
+                            throttled = True
+                        else:
+                            self._last_emit[uid] = now
+                if not throttled:
+                    targets |= self._user_channels[uid]
             targets |= self._monitor
+        if not targets:
+            return
         coros = []
         for ws in list(targets):
             try:

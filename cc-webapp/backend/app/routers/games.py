@@ -1,6 +1,6 @@
 """Game Collection API Endpoints (Updated & Unified)"""
 import logging
-from fastapi import APIRouter, Depends, HTTPException, Response, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, HTTPException, Response, WebSocket, WebSocketDisconnect, Query
 from sqlalchemy.orm import Session
 import random
 import json
@@ -14,6 +14,7 @@ from ..models.game_models import Game, UserAction, GameSession as GameSessionMod
 from ..services.simple_user_service import SimpleUserService
 from ..services.game_service import GameService
 from ..services.history_service import log_game_history
+from ..services.achievement_service import AchievementService
 from pydantic import BaseModel, ConfigDict
 
 def _lazy_broadcast_game_session_event():
@@ -59,6 +60,51 @@ class GameHistoryListResponse(BaseModel):
     items: List[GameHistoryItem]
     limit: int
     offset: int
+
+
+class AchievementProgressItem(BaseModel):
+    code: str
+    title: str
+    description: Optional[str]
+    icon: Optional[str]
+    badge_color: Optional[str]
+    reward_coins: int
+    reward_gems: int
+    progress: int
+    threshold: Optional[int]
+    unlocked: bool
+
+class AchievementProgressResponse(BaseModel):
+    items: List[AchievementProgressItem]
+
+
+@router.get("/achievements", response_model=AchievementProgressResponse)
+def list_achievements(db: Session = Depends(get_db)):
+    svc = AchievementService(db)
+    # 공개 목록: progress 제외하고 unlocked 항상 False 로 표시 (보안 단순화)
+    data = []
+    for a in svc.list_active():
+        cond = a.condition if isinstance(a.condition, dict) else {}
+        data.append(AchievementProgressItem(
+            code=a.code,
+            title=a.title,
+            description=a.description,
+            icon=a.icon,
+            badge_color=a.badge_color,
+            reward_coins=a.reward_coins,
+            reward_gems=a.reward_gems,
+            progress=0,
+            threshold=cond.get("threshold"),
+            unlocked=False,
+        ))
+    return {"items": data}
+
+
+@router.get("/achievements/my", response_model=AchievementProgressResponse)
+def my_achievements(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    svc = AchievementService(db)
+    items = [AchievementProgressItem(**row) for row in svc.user_progress(current_user.id)]
+    return {"items": items}
 
 # ----------------------------- GameHistory 기반 통계 스키마 -----------------------------
 class GameTypeStats(BaseModel):
@@ -114,6 +160,20 @@ class GameSessionEndResponse(BaseModel):
     game_type: str
     # 추가: result_data 요약 노출 (선택)
     result_data: Optional[Dict[str, Any]] = None
+
+# ----------------------------- Stats Models -----------------------------
+class GameBasicStatsItem(BaseModel):
+    game_type: str
+    total_hands: int
+    wins: int
+    win_rate: float
+    total_bet: int
+    total_win: int
+    net: int
+    roi: float
+
+class GameBasicStatsResponse(BaseModel):
+    items: List[GameBasicStatsItem]
 
 # ----------------------------- Realtime WebSocket Endpoints -----------------------------
 @router.websocket("/ws")
@@ -208,6 +268,23 @@ async def monitor_game_ws(websocket: WebSocket, token: Optional[str] = None):
             pass
         await websocket.close()
         db.close()
+
+# ----------------------------- Stats Endpoint -----------------------------
+@router.get("/stats/basic", response_model=GameBasicStatsResponse)
+def get_basic_stats(
+    game_type: Optional[str] = Query(None),
+    user_scope: Optional[bool] = Query(True, description="True=자신의 통계, False=전체(관리자 필요)"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    from ..services.stats_service import GameStatsService  # lazy import
+    if user_scope:
+        items = GameStatsService(db).basic_stats(user_id=current_user.id, game_type=game_type)
+    else:
+        if not getattr(current_user, "is_admin", False):
+            raise HTTPException(status_code=403, detail="admin required")
+        items = GameStatsService(db).basic_stats(game_type=game_type)
+    return {"items": items}
 
 @router.post("/session/start", response_model=GameSessionStartResponse)
 async def start_game_session(

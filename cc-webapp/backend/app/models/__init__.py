@@ -91,6 +91,7 @@ from .event_models import (
 # History / Social 모델 추가
 from .history_models import GameHistory
 from .social_models import FollowRelation
+from .achievement_models import Achievement, UserAchievement
 
 # 모든 모델 클래스들을 리스트로 정의
 __all__ = [
@@ -187,6 +188,9 @@ __all__ = [
 
     # Social
     "FollowRelation",
+    # Achievements
+    "Achievement",
+    "UserAchievement",
 ]
 
 # Content 모델들 추가

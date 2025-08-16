@@ -17,7 +17,19 @@ export default function NotificationClient({ userId }: Props) {
     let stopped = false;
     const connect = () => {
       try {
-        const ws = new WebSocket(`${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}/ws/notifications/${userId}`);
+        const origin = (() => {
+          // If a NEXT_PUBLIC_API_URL is set and points to another host, derive WS base from it.
+          try {
+            const api = (window as any).ENV_API_BASE || process.env.NEXT_PUBLIC_API_URL;
+            if (api) {
+              const u = new URL(api);
+              return `${u.hostname}${u.port ? ':'+u.port : ''}`;
+            }
+          } catch { /* ignore */ }
+          return window.location.host;
+        })();
+        const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
+        const ws = new WebSocket(`${proto}://${origin}/ws/notifications/${userId}`);
         wsRef.current = ws;
         ws.onopen = () => {
           retryRef.current = 0;

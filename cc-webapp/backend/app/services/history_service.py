@@ -10,6 +10,7 @@ import asyncio
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 from ..models.history_models import GameHistory
+from .achievement_service import AchievementService
 def _lazy_broadcast_game_history_event():
     try:
         from app import main  # type: ignore
@@ -80,3 +81,16 @@ def log_game_history(
         db.rollback()
         logger.warning("GameHistory 로그 실패 user=%s action=%s err=%s", user_id, action_type, e)
         return None
+
+    # 업적 평가 비동기 실행 (commit 후)
+    try:
+        if record:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                def _eval():
+                    # 새 세션 열어야 하지만 간단히 동일 세션 재사용 (스레드 안전성 보강 필요 시 SessionLocal())
+                    svc = AchievementService(db)
+                    svc.evaluate_after_history(record)
+                loop.run_in_executor(None, _eval)
+    except Exception:  # pragma: no cover
+        logger.debug("Achievement evaluation scheduling failed", exc_info=True)

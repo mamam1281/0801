@@ -1,7 +1,42 @@
 import { apiLogTry, apiLogSuccess, apiLogFail } from './apiLogger';
 import { getTokens, getAccessToken, setTokens, clearTokens } from './tokenStorage';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+// Raw base URL from env (can include /api). We normalize to avoid // or /api/api duplication.
+const _RAW_API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
+function normalizeBase(url) {
+  if (!url) return '';
+  // trim whitespace
+  let u = url.trim();
+  // remove trailing slashes
+  u = u.replace(/\/+$/,'');
+  // collapse accidental repeated /api segments (e.g., http://host/api/api -> http://host/api)
+  u = u.replace(/(\/api)+(\/)?$/i, '/api');
+  return u;
+}
+
+let API_BASE_URL = normalizeBase(_RAW_API_BASE);
+
+// Developer guard: if code later concatenates endpoint starting with /api and base already ends with /api, that's fine.
+// But if an endpoint ALSO includes /api at its start and base does NOT end with /api, it's still fine.
+// The problematic case was base containing /api AND endpoints also containing /api leading to double segment after earlier naive concatenation.
+// We detect at runtime and warn once if duplicate would occur.
+let _warnedDuplicate = false;
+function joinUrl(base, endpoint){
+  if (endpoint.startsWith('http://') || endpoint.startsWith('https://')) return endpoint; // absolute override
+  // Ensure endpoint starts with /
+  const ep = endpoint.startsWith('/') ? endpoint : ('/' + endpoint);
+  // If base already ends with /api and endpoint starts with /api/, avoid duplicating.
+  if (/\/api$/i.test(base) && /^\/api\//i.test(ep)) {
+    if (!_warnedDuplicate) {
+      // eslint-disable-next-line no-console
+      console.warn('[apiClient] Detected base URL ending with /api and endpoint beginning with /api – preventing duplication. Endpoint:', ep);
+      _warnedDuplicate = true;
+    }
+    return base + ep.replace(/^\/api/, '');
+  }
+  return base + ep;
+}
 
 /**
  * API 클라이언트
@@ -30,7 +65,7 @@ const apiRequest = async (endpoint, options = {}) => {
   console.log(`API 요청 토큰 확인 - ${endpoint}:`, authHeaders);
 
   try {
-    const url = `${API_BASE_URL}${endpoint}`;
+  const url = joinUrl(API_BASE_URL, endpoint);
     console.log(`API 요청 URL: ${url}`);
     const response = await fetch(url, {
       ...options,

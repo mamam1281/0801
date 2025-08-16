@@ -119,11 +119,11 @@ class RewardService:
             self.db.commit()
             self.db.refresh(user_reward)
 
-            # Async notification (best-effort)
-            # 브로드캐스트 (best-effort)
+            # 브로드캐스트 (best-effort, 스로틀 적용 대상)
             if _realtime_hub is not None:
                 try:
                     loop = asyncio.get_running_loop()
+                    # reward_grant 이벤트
                     loop.create_task(
                         _realtime_hub.broadcast(
                             {
@@ -132,6 +132,20 @@ class RewardService:
                                 "reward_type": reward.reward_type,
                                 "amount": amount,
                                 "source": source_description,
+                            }
+                        )
+                    )
+                    # balance_update 이벤트 (현재 토큰/코인 잔액 포함)
+                    try:
+                        balance = self.token_service.get_token_balance(user_id)
+                    except Exception:
+                        balance = None
+                    loop.create_task(
+                        _realtime_hub.broadcast(
+                            {
+                                "type": "balance_update",
+                                "user_id": user_id,
+                                "balance": balance,
                             }
                         )
                     )
