@@ -1,6 +1,6 @@
 """Game Collection API Endpoints (Updated & Unified)"""
 import logging
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Response, WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session
 import random
 import json
@@ -114,6 +114,100 @@ class GameSessionEndResponse(BaseModel):
     game_type: str
     # 추가: result_data 요약 노출 (선택)
     result_data: Optional[Dict[str, Any]] = None
+
+# ----------------------------- Realtime WebSocket Endpoints -----------------------------
+@router.websocket("/ws")
+async def user_game_ws(
+    websocket: WebSocket,
+    token: Optional[str] = None,
+):
+    """사용자 개인 게임 이벤트 피드
+
+    쿼리파라미터 token 또는 헤더 Authorization Bearer 지원 (FastAPI WebSocket은 Depends 간편사용 제한 -> 수동 검증)
+    """
+    from ..services.auth_service import AuthService  # type: ignore
+    from ..models.auth_models import User  # type: ignore
+    from ..database import SessionLocal  # type: ignore
+    from ..realtime import hub
+    await websocket.accept()
+    db = SessionLocal()
+    user = None
+    try:
+        if token is None:
+            # header에서 추출
+            auth = websocket.headers.get("authorization") or websocket.headers.get("Authorization")
+            if auth and auth.lower().startswith("bearer "):
+                token = auth.split()[1]
+        if not token:
+            await websocket.close(code=4401)
+            return
+        token_data = AuthService.verify_token(token, db=db)
+        user = db.query(User).filter(User.id == token_data.user_id).first()
+        if not user:
+            await websocket.close(code=4403)
+            return
+        await hub.register_user(user.id, websocket)
+        # 간단한 hello
+        await websocket.send_json({"type": "ws_ack", "user_id": user.id})
+        while True:
+            try:
+                _ = await websocket.receive_text()
+                # ping ignore / client -> no-op
+            except WebSocketDisconnect:
+                break
+            except Exception:
+                break
+    finally:
+        if user:
+            try:
+                await hub.unregister_user(user.id, websocket)
+            except Exception:
+                pass
+        await websocket.close()
+        db.close()
+
+@router.websocket("/ws/monitor")
+async def monitor_game_ws(websocket: WebSocket, token: Optional[str] = None):
+    """관리자/모니터 WebSocket (전체 사용자 이벤트 구독 + 스냅샷 1회)
+    간단 권한 체크: is_admin True 필요
+    """
+    from ..services.auth_service import AuthService  # type: ignore
+    from ..models.auth_models import User  # type: ignore
+    from ..database import SessionLocal  # type: ignore
+    from ..realtime import hub
+    await websocket.accept()
+    db = SessionLocal()
+    user = None
+    try:
+        if token is None:
+            auth = websocket.headers.get("authorization") or websocket.headers.get("Authorization")
+            if auth and auth.lower().startswith("bearer "):
+                token = auth.split()[1]
+        if not token:
+            await websocket.close(code=4401)
+            return
+        token_data = AuthService.verify_token(token, db=db)
+        user = db.query(User).filter(User.id == token_data.user_id).first()
+        if not user or not getattr(user, "is_admin", False):
+            await websocket.close(code=4403)
+            return
+        await hub.register_monitor(websocket)
+        snapshot = await hub.snapshot_for_monitor()
+        await websocket.send_json(snapshot)
+        while True:
+            try:
+                _ = await websocket.receive_text()
+            except WebSocketDisconnect:
+                break
+            except Exception:
+                break
+    finally:
+        try:
+            await hub.unregister_monitor(websocket)
+        except Exception:
+            pass
+        await websocket.close()
+        db.close()
 
 @router.post("/session/start", response_model=GameSessionStartResponse)
 async def start_game_session(
@@ -429,6 +523,22 @@ async def spin_slot(
         )
     except Exception as e:
         logger.warning(f"slot spin history log failed: {e}")
+    # 실시간 브로드캐스트 (실패 허용)
+    try:
+        from ..realtime import hub
+        await hub.broadcast({
+            "type": "game_event",
+            "subtype": "slot_spin",
+            "user_id": current_user.id,
+            "game_type": "slot",
+            "bet": bet_amount,
+            "win": win_amount,
+            "reels": reels,
+            "jackpot": action_data["is_jackpot"],
+            "streak": streak_count,
+        })
+    except Exception:
+        pass
     return {
         'success': True,
         'reels': reels_matrix,
@@ -441,6 +551,8 @@ async def spin_slot(
         'balance': new_balance,
         'special_animation': 'near_miss' if win_amount == 0 and (reels[0] == reels[1] or reels[1] == reels[2]) else None
     }
+    # (도달 불가) 위 return 위에 브로드캐스트 삽입 완료
+
 
 # 가위바위보 엔드포인트
 @router.post("/rps/play", response_model=RPSPlayResponse)
@@ -522,6 +634,22 @@ async def play_rps(
         )
     except Exception as e:
         logger.warning(f"rps play history log failed: {e}")
+    # 실시간 브로드캐스트 (실패 허용)
+    try:
+        from ..realtime import hub
+        await hub.broadcast({
+            "type": "game_event",
+            "subtype": "rps_play",
+            "user_id": current_user.id,
+            "game_type": "rps",
+            "bet": bet_amount,
+            "win": win_amount,
+            "result": result,
+            "user_choice": user_choice,
+            "ai_choice": ai_choice,
+        })
+    except Exception:
+        pass
     return {
         'success': True,
         'player_choice': user_choice,
@@ -594,6 +722,21 @@ async def pull_gacha(
     # special_animation: mirror animation_type for non-normal states for easier FE handling
     special_anim = last_animation if (last_animation in {"near_miss", "epic", "legendary", "pity"}) else None
 
+    # 실시간 브로드캐스트 (실패 허용)
+    try:
+        from ..realtime import hub
+        await hub.broadcast({
+            "type": "game_event",
+            "subtype": "gacha_pull",
+            "user_id": current_user.id,
+            "game_type": "gacha",
+            "pull_count": pull_count,
+            "rare": rare_count,
+            "ultra_rare": ultra_rare_count,
+            "anim": special_anim,
+        })
+    except Exception:
+        pass
     return {
         "success": True,
         "items": items,
@@ -719,6 +862,21 @@ async def place_crash_bet(
         )
     except Exception as e:
         logger.warning(f"crash bet history log failed: {e}")
+    # 실시간 브로드캐스트 (실패 허용)
+    try:
+        from ..realtime import hub
+        await hub.broadcast({
+            "type": "game_event",
+            "subtype": "crash_bet",
+            "user_id": current_user.id,
+            "game_type": "crash",
+            "bet": bet_amount,
+            "auto_cashout": auto_cashout_multiplier,
+            "actual_multiplier": multiplier,
+            "win": win_amount,
+        })
+    except Exception:
+        pass
     return {
         'success': True,
         'game_id': game_id,
