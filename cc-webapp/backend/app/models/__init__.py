@@ -88,6 +88,10 @@ from .event_models import (
     UserMission
 )
 
+# History / Social 모델 추가
+from .history_models import GameHistory
+from .social_models import FollowRelation
+
 # 모든 모델 클래스들을 리스트로 정의
 __all__ = [
     # Base
@@ -177,6 +181,12 @@ __all__ = [
     "Event",
     "EventParticipation", 
     "UserMission",
+
+    # History
+    "GameHistory",
+
+    # Social
+    "FollowRelation",
 ]
 
 # Content 모델들 추가

@@ -3069,8 +3069,8 @@
           "Shop",
           "Shop"
         ],
-        "summary": "Payment Webhook",
-        "description": "Verify HMAC signature and accept payment provider webhook.\nExpected header: X-Signature: sha256=<hex>\nSecret: settings.PAYMENT_WEBHOOK_SECRET",
+        "summary": "Payment Webhook (Replay & 멱등 보호)",
+        "description": "결제 프로바이더 웹훅 수신.\n보안 계층:\n  1) HMAC 서명 검증 (X-Signature)\n  2) 재생(Replay) 방어: X-Timestamp + X-Nonce (서로 결합한 키 Redis SETNX, 시간왜곡 허용 ±300s)\n  3) 이벤트 멱등: X-Event-Id 헤더 또는 payload.event_id 기준 Redis SETNX (중복시 duplicate 응답)\n\n기대 헤더:\n  - X-Signature: sha256=<hex>\n  - X-Timestamp: unix epoch seconds\n  - X-Nonce: 임의 UUID/난수 문자열\n  - (선택) X-Event-Id: 공급자 이벤트 고유 ID",
         "operationId": "payment_webhook_api_shop_webhook_payment_post",
         "responses": {
           "200": {
@@ -5945,6 +5945,394 @@
         }
       }
     },
+    "/api/games/history": {
+      "get": {
+        "tags": [
+          "Games"
+        ],
+        "summary": "Get Game History",
+        "description": "현재 사용자 GameHistory 조회\n\n필터:\n  - game_type, action_type (정확 일치)\n  - since (ISO8601 문자열) 이후\n페이지네이션:\n  - limit / offset\n정렬: 최신(created_at desc)",
+        "operationId": "get_game_history_api_games_history_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "game_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Game Type"
+            }
+          },
+          {
+            "name": "action_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Action Type"
+            }
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Since"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GameHistoryListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/games/{game_type}/stats": {
+      "get": {
+        "tags": [
+          "Games"
+        ],
+        "summary": "Get Game Type Stats",
+        "operationId": "get_game_type_stats_api_games__game_type__stats_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "game_type",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Game Type"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GameTypeStats"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/games/profile/stats": {
+      "get": {
+        "tags": [
+          "Games"
+        ],
+        "summary": "Get Profile Stats",
+        "operationId": "get_profile_stats_api_games_profile_stats_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileAggregateStats"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/games/follow/{target_user_id}": {
+      "post": {
+        "tags": [
+          "Games"
+        ],
+        "summary": "Follow User",
+        "operationId": "follow_user_api_games_follow__target_user_id__post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "target_user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Target User Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FollowActionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Games"
+        ],
+        "summary": "Unfollow User",
+        "operationId": "unfollow_user_api_games_follow__target_user_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "target_user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Target User Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FollowActionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/games/follow/list": {
+      "get": {
+        "tags": [
+          "Games"
+        ],
+        "summary": "List Following",
+        "operationId": "list_following_api_games_follow_list_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FollowListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/games/follow/followers": {
+      "get": {
+        "tags": [
+          "Games"
+        ],
+        "summary": "List Followers",
+        "operationId": "list_followers_api_games_follow_followers_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FollowListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/invite/generate": {
       "post": {
         "tags": [
@@ -6613,6 +7001,115 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/UnlockResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/abtest/assign": {
+      "post": {
+        "tags": [
+          "ABTest",
+          "abtest"
+        ],
+        "summary": "Assign Variant",
+        "operationId": "assign_variant_api_abtest_assign_post",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "description": "User ID",
+              "title": "User Id"
+            },
+            "description": "User ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignmentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssignmentResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/abtest/variant": {
+      "get": {
+        "tags": [
+          "ABTest",
+          "abtest"
+        ],
+        "summary": "Get Variant",
+        "operationId": "get_variant_api_abtest_variant_get",
+        "parameters": [
+          {
+            "name": "test_name",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Test Name"
+            }
+          },
+          {
+            "name": "user_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "description": "User ID",
+              "title": "User Id"
+            },
+            "description": "User ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssignmentResponse"
                 }
               }
             }
@@ -7891,6 +8388,53 @@
         ],
         "title": "AnswerRequest"
       },
+      "AssignmentRequest": {
+        "properties": {
+          "test_name": {
+            "type": "string",
+            "title": "Test Name"
+          },
+          "variants": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Variants",
+            "default": [
+              "A",
+              "B"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "test_name"
+        ],
+        "title": "AssignmentRequest"
+      },
+      "AssignmentResponse": {
+        "properties": {
+          "user_id": {
+            "type": "integer",
+            "title": "User Id"
+          },
+          "test_name": {
+            "type": "string",
+            "title": "Test Name"
+          },
+          "variant": {
+            "type": "string",
+            "title": "Variant"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id",
+          "test_name",
+          "variant"
+        ],
+        "title": "AssignmentResponse"
+      },
       "AttendanceHistory": {
         "properties": {
           "action_type": {
@@ -8757,6 +9301,84 @@
         ],
         "title": "FeedbackResponse"
       },
+      "FollowActionResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "following": {
+            "type": "boolean",
+            "title": "Following"
+          },
+          "target_user_id": {
+            "type": "integer",
+            "title": "Target User Id"
+          },
+          "follower_count": {
+            "type": "integer",
+            "title": "Follower Count"
+          },
+          "following_count": {
+            "type": "integer",
+            "title": "Following Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success",
+          "following",
+          "target_user_id",
+          "follower_count",
+          "following_count"
+        ],
+        "title": "FollowActionResponse"
+      },
+      "FollowListItem": {
+        "properties": {
+          "user_id": {
+            "type": "integer",
+            "title": "User Id"
+          },
+          "nickname": {
+            "type": "string",
+            "title": "Nickname"
+          },
+          "followed_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Followed At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id",
+          "nickname",
+          "followed_at"
+        ],
+        "title": "FollowListItem"
+      },
+      "FollowListResponse": {
+        "properties": {
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/FollowListItem"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total",
+          "items"
+        ],
+        "title": "FollowListResponse"
+      },
       "ForceSettleRequest": {
         "properties": {
           "outcome": {
@@ -8963,6 +9585,92 @@
           "ultra_rare_item_count": 1
         }
       },
+      "GameHistoryItem": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "user_id": {
+            "type": "integer",
+            "title": "User Id"
+          },
+          "game_type": {
+            "type": "string",
+            "title": "Game Type"
+          },
+          "action_type": {
+            "type": "string",
+            "title": "Action Type"
+          },
+          "delta_coin": {
+            "type": "integer",
+            "title": "Delta Coin"
+          },
+          "delta_gem": {
+            "type": "integer",
+            "title": "Delta Gem"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "result_meta": {
+            "anyOf": [
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result Meta"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "user_id",
+          "game_type",
+          "action_type",
+          "delta_coin",
+          "delta_gem",
+          "created_at"
+        ],
+        "title": "GameHistoryItem"
+      },
+      "GameHistoryListResponse": {
+        "properties": {
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/GameHistoryItem"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total",
+          "items",
+          "limit",
+          "offset"
+        ],
+        "title": "GameHistoryListResponse"
+      },
       "GameLeaderboard": {
         "properties": {
           "game_type": {
@@ -9143,6 +9851,57 @@
         "title": "GameStats",
         "description": "사용자 게임 통계 모델"
       },
+      "GameTypeStats": {
+        "properties": {
+          "game_type": {
+            "type": "string",
+            "title": "Game Type"
+          },
+          "play_count": {
+            "type": "integer",
+            "title": "Play Count"
+          },
+          "net_coin": {
+            "type": "integer",
+            "title": "Net Coin"
+          },
+          "net_gem": {
+            "type": "integer",
+            "title": "Net Gem"
+          },
+          "wins": {
+            "type": "integer",
+            "title": "Wins"
+          },
+          "losses": {
+            "type": "integer",
+            "title": "Losses"
+          },
+          "last_played_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Played At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "game_type",
+          "play_count",
+          "net_coin",
+          "net_gem",
+          "wins",
+          "losses",
+          "last_played_at"
+        ],
+        "title": "GameTypeStats"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -9170,6 +9929,18 @@
           "version": {
             "type": "string",
             "title": "Version"
+          },
+          "redis_connected": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Redis Connected",
+            "description": "Redis 연결 성공 여부 (lifespan 초기화 시 설정). 테스트 및 관측 목적."
           }
         },
         "type": "object",
@@ -10374,6 +11145,72 @@
           "payload"
         ],
         "title": "ProduceRequest"
+      },
+      "ProfileAggregateStats": {
+        "properties": {
+          "user_id": {
+            "type": "integer",
+            "title": "User Id"
+          },
+          "total_play_count": {
+            "type": "integer",
+            "title": "Total Play Count"
+          },
+          "total_net_coin": {
+            "type": "integer",
+            "title": "Total Net Coin"
+          },
+          "total_net_gem": {
+            "type": "integer",
+            "title": "Total Net Gem"
+          },
+          "distinct_game_types": {
+            "type": "integer",
+            "title": "Distinct Game Types"
+          },
+          "favorite_game_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Favorite Game Type"
+          },
+          "recent_game_types": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Recent Game Types"
+          },
+          "last_played_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Played At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id",
+          "total_play_count",
+          "total_net_coin",
+          "total_net_gem",
+          "distinct_game_types",
+          "favorite_game_type",
+          "recent_game_types",
+          "last_played_at"
+        ],
+        "title": "ProfileAggregateStats"
       },
       "ProfileGameStats": {
         "properties": {

@@ -10,9 +10,9 @@ Core FastAPI application with essential routers and middleware
 import os
 import logging
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List, Dict, Any
 
-from fastapi import FastAPI, HTTPException, Depends, status
+from fastapi import FastAPI, HTTPException, Depends, status, WebSocket, WebSocketDisconnect
 from contextlib import asynccontextmanager
 import asyncio
 from fastapi.middleware.cors import CORSMiddleware
@@ -384,4 +384,54 @@ if __name__ == "__main__":
 # 테스트 라우터는 제거되었습니다 - main_fixed.py에서 이 부분이 제거됨
 # from app.auth.test_endpoints import router as test_router
 # app.include_router(test_router)
+
+# ======================= WebSocket: /ws/games =======================
+class GamesConnectionManager:
+    def __init__(self) -> None:
+        self.active: List[WebSocket] = []
+
+    async def connect(self, websocket: WebSocket) -> None:
+        await websocket.accept()
+        self.active.append(websocket)
+
+    def disconnect(self, websocket: WebSocket) -> None:
+        if websocket in self.active:
+            self.active.remove(websocket)
+
+    async def broadcast(self, message: Dict[str, Any]) -> None:
+        dead: List[WebSocket] = []
+        for ws in list(self.active):
+            try:
+                await ws.send_json(message)
+            except Exception:
+                dead.append(ws)
+        for ws in dead:
+            self.disconnect(ws)
+
+games_ws_manager = GamesConnectionManager()
+
+async def broadcast_game_history_event(event: Dict[str, Any]) -> None:
+    """GameHistory 로깅 후 호출되는 브로드캐스트 헬퍼 (실패 허용)."""
+    try:
+        if games_ws_manager.active:
+            await games_ws_manager.broadcast({"type": "game_history", **event})
+    except Exception as e:
+        logging.getLogger(__name__).warning(f"WS broadcast failed: {e}")
+
+@app.websocket("/ws/games")
+async def games_websocket_endpoint(websocket: WebSocket):
+    await games_ws_manager.connect(websocket)
+    try:
+        while True:
+            data = await websocket.receive_json()
+            msg_type = data.get("type")
+            if msg_type == "ping":
+                await websocket.send_json({"type": "pong", "ts": datetime.utcnow().isoformat()})
+            else:
+                await websocket.send_json({"type": "echo", "payload": data})
+    except WebSocketDisconnect:
+        games_ws_manager.disconnect(websocket)
+    except Exception as e:
+        logging.getLogger(__name__).warning(f"WS error: {e}")
+        games_ws_manager.disconnect(websocket)
 

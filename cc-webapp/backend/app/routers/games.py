@@ -13,6 +13,7 @@ from ..models.auth_models import User
 from ..models.game_models import Game, UserAction
 from ..services.simple_user_service import SimpleUserService
 from ..services.game_service import GameService
+from ..services.history_service import log_game_history
 from ..schemas.game_schemas import (
     GameListResponse, GameDetailResponse,
     GameSessionStart, GameSessionEnd,
@@ -29,6 +30,65 @@ from ..core.config import settings
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/games", tags=["Games"])
+
+# ----------------------------- GameHistory 조회 스키마 (간단 내장) -----------------------------
+from pydantic import BaseModel
+
+class GameHistoryItem(BaseModel):
+    id: int
+    user_id: int
+    game_type: str
+    action_type: str
+    delta_coin: int
+    delta_gem: int
+    created_at: datetime
+    result_meta: Optional[Dict[str, Any]] = None
+
+    class Config:
+        orm_mode = True
+
+class GameHistoryListResponse(BaseModel):
+    total: int
+    items: List[GameHistoryItem]
+    limit: int
+    offset: int
+
+# ----------------------------- GameHistory 기반 통계 스키마 -----------------------------
+class GameTypeStats(BaseModel):
+    game_type: str
+    play_count: int
+    net_coin: int
+    net_gem: int
+    wins: int
+    losses: int
+    last_played_at: Optional[datetime]
+
+class ProfileAggregateStats(BaseModel):
+    user_id: int
+    total_play_count: int
+    total_net_coin: int
+    total_net_gem: int
+    distinct_game_types: int
+    favorite_game_type: Optional[str]
+    recent_game_types: List[str]
+    last_played_at: Optional[datetime]
+
+# ----------------------------- Follow API 스키마 -----------------------------
+class FollowActionResponse(BaseModel):
+    success: bool
+    following: bool
+    target_user_id: int
+    follower_count: int
+    following_count: int
+
+class FollowListItem(BaseModel):
+    user_id: int
+    nickname: str
+    followed_at: datetime
+
+class FollowListResponse(BaseModel):
+    total: int
+    items: List[FollowListItem]
 # 가챠 확률 공개/구성 조회
 @router.get("/gacha/config")
 async def get_gacha_config(
@@ -155,6 +215,19 @@ async def spin_slot(
     reels_matrix = [reels]
     # Derive an effective multiplier for reference (0 on lose)
     eff_multiplier = 0.0 if bet_amount <= 0 else round(win_amount / float(bet_amount), 2)
+    # GameHistory 로그 (return 이전)
+    try:
+        delta = -bet_amount + win_amount
+        log_game_history(
+            db,
+            user_id=current_user.id,
+            game_type="slot",
+            action_type="WIN" if win_amount > 0 else "BET",
+            delta_coin=delta,
+            result_meta={"reels": reels, "bet": bet_amount, "win": win_amount, "jackpot": action_data["is_jackpot"], "streak": streak_count}
+        )
+    except Exception as e:
+        logger.warning(f"slot spin history log failed: {e}")
     return {
         'success': True,
         'reels': reels_matrix,
@@ -235,6 +308,19 @@ async def play_rps(
         'lose': 'You lose!',
         'draw': 'It\'s a draw.'
     }
+    # GameHistory 로그 (return 이전)
+    try:
+        delta = -bet_amount + win_amount
+        log_game_history(
+            db,
+            user_id=current_user.id,
+            game_type="rps",
+            action_type="WIN" if result == 'win' else ("DRAW" if result == 'draw' else "BET"),
+            delta_coin=delta,
+            result_meta={"bet": bet_amount, "user_choice": user_choice, "ai_choice": ai_choice, "result": result}
+        )
+    except Exception as e:
+        logger.warning(f"rps play history log failed: {e}")
     return {
         'success': True,
         'player_choice': user_choice,
@@ -419,6 +505,19 @@ async def place_crash_bet(
         logger.warning(f"Crash persistence skipped: {_e}")
     
     potential_win = int(bet_amount * (auto_cashout_multiplier or multiplier))
+    # GameHistory 로그 (return 이전)
+    try:
+        delta = -bet_amount + win_amount
+        log_game_history(
+            db,
+            user_id=current_user.id,
+            game_type="crash",
+            action_type="WIN" if win_amount > 0 else "BET",
+            delta_coin=delta,
+            result_meta={"bet": bet_amount, "auto_cashout": auto_cashout_multiplier, "actual_multiplier": multiplier, "win": win_amount}
+        )
+    except Exception as e:
+        logger.warning(f"crash bet history log failed: {e}")
     return {
         'success': True,
         'game_id': game_id,
@@ -588,3 +687,202 @@ def calculate_user_streak(user_id: int, db: Session) -> int:
         else:
             break
     return streak
+
+# --------------------------- GameHistory 조회 엔드포인트 ---------------------------
+@router.get("/history", response_model=GameHistoryListResponse)
+def get_game_history(
+    game_type: Optional[str] = None,
+    action_type: Optional[str] = None,
+    since: Optional[str] = None,
+    limit: int = 50,
+    offset: int = 0,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """현재 사용자 GameHistory 조회
+
+    필터:
+      - game_type, action_type (정확 일치)
+      - since (ISO8601 문자열) 이후
+    페이지네이션:
+      - limit / offset
+    정렬: 최신(created_at desc)
+    """
+    from ..models.history_models import GameHistory
+    q = db.query(GameHistory).filter(GameHistory.user_id == current_user.id)
+    if game_type:
+        q = q.filter(GameHistory.game_type == game_type)
+    if action_type:
+        q = q.filter(GameHistory.action_type == action_type)
+    if since:
+        try:
+            dt = datetime.fromisoformat(since.replace('Z',''))
+            q = q.filter(GameHistory.created_at >= dt)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="since 형식이 잘못되었습니다(ISO8601)")
+    total = q.count()
+    items = q.order_by(GameHistory.created_at.desc()).limit(min(limit, 200)).offset(offset).all()
+    return GameHistoryListResponse(
+        total=total,
+        items=items,
+        limit=min(limit,200),
+        offset=offset
+    )
+
+# ----------------------------- /api/games/{game_type}/stats (GameHistory) -----------------------------
+@router.get("/{game_type}/stats", response_model=GameTypeStats)
+def get_game_type_stats(
+    game_type: str,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    from ..models.history_models import GameHistory
+    q = db.query(GameHistory).filter(
+        GameHistory.user_id == current_user.id,
+        GameHistory.game_type == game_type
+    )
+    play_count = q.count()
+    agg = db.query(
+        db.func.coalesce(db.func.sum(GameHistory.delta_coin), 0),
+        db.func.coalesce(db.func.sum(GameHistory.delta_gem), 0),
+        db.func.coalesce(db.func.sum(db.case((GameHistory.action_type == 'WIN', 1), else_=0)), 0),
+        db.func.coalesce(db.func.sum(db.case((GameHistory.action_type.in_(['BET','LOSE']), 1), else_=0)), 0),
+        db.func.max(GameHistory.created_at)
+    ).filter(
+        GameHistory.user_id == current_user.id,
+        GameHistory.game_type == game_type
+    ).one()
+    net_coin, net_gem, wins, losses, last_played = agg
+    return GameTypeStats(
+        game_type=game_type,
+        play_count=play_count,
+        net_coin=net_coin,
+        net_gem=net_gem,
+        wins=wins,
+        losses=losses,
+        last_played_at=last_played
+    )
+
+# ----------------------------- /api/profile/stats (GameHistory) -----------------------------
+@router.get("/profile/stats", response_model=ProfileAggregateStats)
+def get_profile_stats(
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    from ..models.history_models import GameHistory
+    base_q = db.query(GameHistory).filter(GameHistory.user_id == current_user.id)
+    total_play = base_q.count()
+    sums = db.query(
+        db.func.coalesce(db.func.sum(GameHistory.delta_coin), 0),
+        db.func.coalesce(db.func.sum(GameHistory.delta_gem), 0),
+        db.func.max(GameHistory.created_at)
+    ).filter(GameHistory.user_id == current_user.id).one()
+    net_coin, net_gem, last_played = sums
+    # 즐겨찾기 게임: play count 상위 1개
+    fav_row = db.query(
+        GameHistory.game_type,
+        db.func.count(GameHistory.id).label('cnt')
+    ).filter(GameHistory.user_id == current_user.id).group_by(GameHistory.game_type).order_by(db.text('cnt DESC')).first()
+    favorite = fav_row[0] if fav_row else None
+    distinct_game_types = db.query(db.func.count(db.func.distinct(GameHistory.game_type))).filter(GameHistory.user_id == current_user.id).scalar() or 0
+    recent_game_types_rows = db.query(GameHistory.game_type).filter(GameHistory.user_id == current_user.id).order_by(GameHistory.created_at.desc()).limit(5).all()
+    recent_game_types = []
+    seen = set()
+    for (gt,) in recent_game_types_rows:
+        if gt not in seen:
+            seen.add(gt)
+            recent_game_types.append(gt)
+        if len(recent_game_types) >= 5:
+            break
+    return ProfileAggregateStats(
+        user_id=current_user.id,
+        total_play_count=total_play,
+        total_net_coin=net_coin,
+        total_net_gem=net_gem,
+        distinct_game_types=distinct_game_types,
+        favorite_game_type=favorite,
+        recent_game_types=recent_game_types,
+        last_played_at=last_played
+    )
+
+# ----------------------------- Follow API 구현 -----------------------------
+@router.post("/follow/{target_user_id}", response_model=FollowActionResponse)
+def follow_user(
+    target_user_id: int,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    from ..models.social_models import FollowRelation
+    if target_user_id == current_user.id:
+        raise HTTPException(status_code=400, detail="자기 자신은 팔로우할 수 없습니다")
+    # 대상 유저 존재 확인
+    target = db.query(models.User).filter(models.User.id == target_user_id).first()
+    if not target:
+        raise HTTPException(status_code=404, detail="대상 유저를 찾을 수 없습니다")
+    existing = db.query(FollowRelation).filter(
+        FollowRelation.user_id == current_user.id,
+        FollowRelation.target_user_id == target_user_id
+    ).first()
+    if existing:
+        # 이미 팔로우 상태 → idempotent 응답
+        follower_count = db.query(FollowRelation).filter(FollowRelation.target_user_id == target_user_id).count()
+        following_count = db.query(FollowRelation).filter(FollowRelation.user_id == current_user.id).count()
+        return FollowActionResponse(success=True, following=True, target_user_id=target_user_id, follower_count=follower_count, following_count=following_count)
+    rel = FollowRelation(user_id=current_user.id, target_user_id=target_user_id)
+    db.add(rel)
+    db.commit()
+    follower_count = db.query(FollowRelation).filter(FollowRelation.target_user_id == target_user_id).count()
+    following_count = db.query(FollowRelation).filter(FollowRelation.user_id == current_user.id).count()
+    return FollowActionResponse(success=True, following=True, target_user_id=target_user_id, follower_count=follower_count, following_count=following_count)
+
+@router.delete("/follow/{target_user_id}", response_model=FollowActionResponse)
+def unfollow_user(
+    target_user_id: int,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    from ..models.social_models import FollowRelation
+    rel = db.query(FollowRelation).filter(
+        FollowRelation.user_id == current_user.id,
+        FollowRelation.target_user_id == target_user_id
+    ).first()
+    if rel:
+        db.delete(rel)
+        db.commit()
+    follower_count = db.query(FollowRelation).filter(FollowRelation.target_user_id == target_user_id).count()
+    following_count = db.query(FollowRelation).filter(FollowRelation.user_id == current_user.id).count()
+    return FollowActionResponse(success=True, following=False, target_user_id=target_user_id, follower_count=follower_count, following_count=following_count)
+
+@router.get("/follow/list", response_model=FollowListResponse)
+def list_following(
+    limit: int = 50,
+    offset: int = 0,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    from ..models.social_models import FollowRelation
+    q = db.query(FollowRelation, models.User).join(models.User, FollowRelation.target_user_id == models.User.id).filter(FollowRelation.user_id == current_user.id)
+    total = q.count()
+    rows = q.order_by(FollowRelation.created_at.desc()).limit(min(limit,200)).offset(offset).all()
+    items = [
+        FollowListItem(user_id=user.id, nickname=user.nickname, followed_at=rel.created_at)
+        for rel, user in rows
+    ]
+    return FollowListResponse(total=total, items=items, limit=min(limit,200), offset=offset)
+
+@router.get("/follow/followers", response_model=FollowListResponse)
+def list_followers(
+    limit: int = 50,
+    offset: int = 0,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    from ..models.social_models import FollowRelation
+    q = db.query(FollowRelation, models.User).join(models.User, FollowRelation.user_id == models.User.id).filter(FollowRelation.target_user_id == current_user.id)
+    total = q.count()
+    rows = q.order_by(FollowRelation.created_at.desc()).limit(min(limit,200)).offset(offset).all()
+    items = [
+        FollowListItem(user_id=user.id, nickname=user.nickname, followed_at=rel.created_at)
+        for rel, user in rows
+    ]
+    return FollowListResponse(total=total, items=items, limit=min(limit,200), offset=offset)
