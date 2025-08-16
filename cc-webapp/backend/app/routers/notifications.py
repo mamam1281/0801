@@ -5,7 +5,48 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Request
 from fastapi.responses import StreamingResponse, JSONResponse
 from pydantic import BaseModel
 
-from ..realtime import manager
+"""Notifications router
+
+기존 manager.enqueue / register_sse 구조를 단순화된 hub 브로드캐스트로 점진 전환.
+필요 메서드 미존재 시 No-op Fallback 구성.
+"""
+try:  # pragma: no cover
+    from ..realtime import hub as _hub  # type: ignore
+except Exception:  # pragma: no cover
+    _hub = None
+
+class _LegacyCompatManager:
+    """이전 manager API를 참조하는 기존 코드 호환을 위한 최소 wrapper.
+    SSE/WS 개별 큐 없이 hub.broadcast 로 대체 (MVP 용)
+    """
+    async def connect_ws(self, websocket, user_id: int, topics=None):  # noqa: D401
+        await websocket.accept()
+
+    def disconnect(self, user_id: int, websocket):  # noqa: D401
+        try:
+            # nothing
+            pass
+        except Exception:
+            pass
+
+    async def update_ws_topics(self, user_id: int, websocket, topics):
+        return None
+
+    async def touch_ws(self, user_id: int, websocket):
+        return None
+
+    def get_backfill(self, user_id: int, last_event_id):
+        return []
+
+    async def register_sse(self, user_id: int):
+        import asyncio
+        q: asyncio.Queue = asyncio.Queue()
+        return q
+
+    async def unregister_sse(self, user_id: int, q):
+        return None
+
+manager = _LegacyCompatManager()
 
 # WebSocket router
 router = APIRouter(prefix="/ws", tags=["websockets"])

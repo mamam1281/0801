@@ -398,69 +398,9 @@ if __name__ == "__main__":
 # from app.auth.test_endpoints import router as test_router
 # app.include_router(test_router)
 
-# ======================= WebSocket: /ws/games =======================
-class GamesConnectionManager:
-    def __init__(self) -> None:
-        self.active: List[WebSocket] = []
+"""Legacy /ws/games endpoint and manager removed in favor of unified /api/games/ws & /api/games/ws/monitor.
 
-    async def connect(self, websocket: WebSocket) -> None:
-        await websocket.accept()
-        self.active.append(websocket)
-
-    def disconnect(self, websocket: WebSocket) -> None:
-        if websocket in self.active:
-            self.active.remove(websocket)
-
-    async def broadcast(self, message: Dict[str, Any]) -> None:
-        dead: List[WebSocket] = []
-        for ws in list(self.active):
-            try:
-                await ws.send_json(message)
-            except Exception:
-                dead.append(ws)
-        for ws in dead:
-            self.disconnect(ws)
-
-games_ws_manager = GamesConnectionManager()
-
-async def broadcast_game_history_event(event: Dict[str, Any]) -> None:
-    """GameHistory 로깅 후 호출되는 브로드캐스트 헬퍼 (실패 허용)."""
-    try:
-        if games_ws_manager.active:
-            await games_ws_manager.broadcast({"type": "game_history", **event})
-    except Exception as e:
-        logging.getLogger(__name__).warning(f"WS broadcast failed: {e}")
-
-async def broadcast_game_session_event(event: Dict[str, Any]) -> None:
-    """GameSession 시작/종료 브로드캐스트 (실패 허용)."""
-    try:
-        if games_ws_manager.active:
-            await games_ws_manager.broadcast({"type": "game_session", **event})
-    except Exception as e:  # pragma: no cover
-        logging.getLogger(__name__).warning(f"WS session broadcast failed: {e}")
-
-async def broadcast_token_update_event(event: Dict[str, Any]) -> None:
-    """토큰 잔액 변경 브로드캐스트 (실패 허용)."""
-    try:
-        if games_ws_manager.active:
-            await games_ws_manager.broadcast({"type": "token_update", **event})
-    except Exception as e:  # pragma: no cover
-        logging.getLogger(__name__).warning(f"WS token broadcast failed: {e}")
-
-@app.websocket("/ws/games")
-async def games_websocket_endpoint(websocket: WebSocket):
-    await games_ws_manager.connect(websocket)
-    try:
-        while True:
-            data = await websocket.receive_json()
-            msg_type = data.get("type")
-            if msg_type == "ping":
-                await websocket.send_json({"type": "pong", "ts": datetime.utcnow().isoformat()})
-            else:
-                await websocket.send_json({"type": "echo", "payload": data})
-    except WebSocketDisconnect:
-        games_ws_manager.disconnect(websocket)
-    except Exception as e:
-        logging.getLogger(__name__).warning(f"WS error: {e}")
-        games_ws_manager.disconnect(websocket)
+If any external client still references /ws/games, consider adding a lightweight forwarding
+endpoint that simply instructs clients to migrate. Intentionally omitted to reduce surface.
+"""
 

@@ -8,7 +8,11 @@ from sqlalchemy.exc import SQLAlchemyError  # Import SQLAlchemyError
 
 from app import models
 from .token_service import TokenService
-from ..realtime import manager
+# realtime hub (단순 브로드캐스트만 사용)
+try:  # pragma: no cover - optional during tests
+    from ..realtime import hub as _realtime_hub  # type: ignore
+except Exception:  # pragma: no cover
+    _realtime_hub = None
 from .email_service import EmailService
 
 class RewardService:
@@ -116,26 +120,23 @@ class RewardService:
             self.db.refresh(user_reward)
 
             # Async notification (best-effort)
-            try:
-                loop = asyncio.get_running_loop()
-                loop.create_task(
-                    manager.enqueue(
-                        user_id,
-                        {
-                            "type": "REWARD_RECEIVED",
-                            "payload": {
+            # 브로드캐스트 (best-effort)
+            if _realtime_hub is not None:
+                try:
+                    loop = asyncio.get_running_loop()
+                    loop.create_task(
+                        _realtime_hub.broadcast(
+                            {
+                                "type": "reward_grant",
+                                "user_id": user_id,
                                 "reward_type": reward.reward_type,
                                 "amount": amount,
                                 "source": source_description,
-                                "meta": metadata or {},
-                            },
-                        },
-                        priority=3,
-                        topic="rewards",
+                            }
+                        )
                     )
-                )
-            except RuntimeError:
-                pass
+                except RuntimeError:
+                    pass
 
             return {
                 "reward_id": reward.id,

@@ -1,5 +1,5 @@
 "SQLAlchemy engine and session configuration."
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import declarative_base, sessionmaker
 import os
 import time
@@ -95,6 +95,19 @@ def _create_engine_with_retry(url: str):
 
 # Create engine with robust behavior
 engine = _create_engine_with_retry(DATABASE_URL)
+
+# ---------------------------------------------------------------------------
+# SQLite compatibility: emulate NOW() for models using server_default=func.now()
+# ---------------------------------------------------------------------------
+if DATABASE_URL.startswith("sqlite"):
+    @event.listens_for(engine, "connect")
+    def _register_sqlite_now(dbapi_connection, connection_record):  # type: ignore
+        try:
+            # Register only if not already present
+            dbapi_connection.create_function("now", 0, lambda: __import__("datetime").datetime.utcnow().isoformat())
+        except Exception:
+            # Silent: function might already exist or driver doesn't support create_function
+            pass
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
