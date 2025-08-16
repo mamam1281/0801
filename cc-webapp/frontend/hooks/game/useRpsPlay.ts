@@ -13,7 +13,7 @@ export function useRpsPlay(authToken: string | null) {
   const play = useCallback(async (hand: RpsHand) => {
     setLoading(true); setError(null);
     try {
-        const res = await call('/play', { method: 'POST', authToken, body: { hand } }) as RpsPlayResponse;
+        const res = await call<RpsPlayResponse>('/play', { method: 'POST', authToken, body: { hand } });
       setLast(res);
     } catch (e: any) { setError(e.message); }
     finally { setLoading(false); }

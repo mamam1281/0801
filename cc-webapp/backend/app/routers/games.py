@@ -7,13 +7,13 @@ import json
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
 
-from app.database import get_db  # type: ignore
-from app.dependencies import get_current_user  # type: ignore
-from app.models.auth_models import User  # type: ignore
-from app.models.game_models import Game, UserAction, GameSession as GameSessionModel  # type: ignore
-from app.services.simple_user_service import SimpleUserService  # type: ignore
-from app.services.game_service import GameService  # type: ignore
-from app.services.history_service import log_game_history  # type: ignore
+from ..database import get_db
+from ..dependencies import get_current_user
+from ..models.auth_models import User
+from ..models.game_models import Game, UserAction, GameSession as GameSessionModel
+from ..services.simple_user_service import SimpleUserService
+from ..services.game_service import GameService
+from ..services.history_service import log_game_history
 from pydantic import BaseModel, ConfigDict
 
 def _lazy_broadcast_game_session_event():
@@ -24,7 +24,7 @@ def _lazy_broadcast_game_session_event():
         async def _noop(_):
             return None
         return _noop
-from app.schemas.game_schemas import (
+from ..schemas.game_schemas import (
     GameListResponse, GameDetailResponse,
     GameSessionStart, GameSessionEnd,
     SlotSpinRequest, SlotSpinResponse,
@@ -35,8 +35,8 @@ from app.schemas.game_schemas import (
 )
 from app import models
 from sqlalchemy import text
-from app.utils.redis import update_streak_counter  # type: ignore
-from app.core.config import settings  # type: ignore
+from ..utils.redis import update_streak_counter
+from ..core.config import settings
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/games", tags=["Games"])

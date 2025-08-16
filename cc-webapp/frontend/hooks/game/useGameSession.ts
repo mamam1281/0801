@@ -16,7 +16,7 @@ export function useGameSession(authToken: string | null) {
   const start = useCallback(async () => {
     setLoading(true); setError(null);
     try {
-        const s = await call('/session/start', { method: 'POST', authToken }) as GameSession;
+        const s = await call<GameSession>('/session/start', { method: 'POST', authToken });
       setSession(s);
     } catch (e: any) { setError(e.message); }
     finally { setLoading(false); }
