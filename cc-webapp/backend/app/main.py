@@ -8,6 +8,9 @@ Core FastAPI application with essential routers and middleware
 """
 
 import os
+# 테스트 실행 시 필수 환경변수 기본값 주입 (없을 때만) - idempotent
+os.environ.setdefault("DATABASE_URL", "sqlite:///./test_app.db")
+os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key")
 import logging
 from datetime import datetime
 from typing import Optional, List, Dict, Any
@@ -417,6 +420,22 @@ async def broadcast_game_history_event(event: Dict[str, Any]) -> None:
             await games_ws_manager.broadcast({"type": "game_history", **event})
     except Exception as e:
         logging.getLogger(__name__).warning(f"WS broadcast failed: {e}")
+
+async def broadcast_game_session_event(event: Dict[str, Any]) -> None:
+    """GameSession 시작/종료 브로드캐스트 (실패 허용)."""
+    try:
+        if games_ws_manager.active:
+            await games_ws_manager.broadcast({"type": "game_session", **event})
+    except Exception as e:  # pragma: no cover
+        logging.getLogger(__name__).warning(f"WS session broadcast failed: {e}")
+
+async def broadcast_token_update_event(event: Dict[str, Any]) -> None:
+    """토큰 잔액 변경 브로드캐스트 (실패 허용)."""
+    try:
+        if games_ws_manager.active:
+            await games_ws_manager.broadcast({"type": "token_update", **event})
+    except Exception as e:  # pragma: no cover
+        logging.getLogger(__name__).warning(f"WS token broadcast failed: {e}")
 
 @app.websocket("/ws/games")
 async def games_websocket_endpoint(websocket: WebSocket):

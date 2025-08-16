@@ -10,7 +10,14 @@ import asyncio
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 from ..models.history_models import GameHistory
-from ..main import broadcast_game_history_event  # 순환 import 가능성: 실행 시점에 함수 정의 이후 import 되도록 (FastAPI startup 이후 사용)
+def _lazy_broadcast_game_history_event():
+    try:
+        from app import main  # type: ignore
+        return getattr(main, "broadcast_game_history_event", None)
+    except Exception:  # pragma: no cover
+        async def _noop(_):
+            return None
+        return _noop
 import logging
 
 logger = logging.getLogger(__name__)
@@ -64,6 +71,7 @@ def log_game_history(
             # 이벤트 루프 존재 시 create_task, 아니면 무시
             loop = asyncio.get_event_loop()
             if loop.is_running():
+                broadcast_game_history_event = _lazy_broadcast_game_history_event()
                 loop.create_task(broadcast_game_history_event(payload))
         except Exception as be:  # pragma: no cover
             logger.debug("Broadcast schedule failed: %s", be)

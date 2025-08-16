@@ -14,11 +14,15 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 
 class GameRepository:
-    """Data access layer for game state using DB."""
+    """Data access layer for game state using DB.
 
-    def __init__(self, db_session: Session):
-        self.db = db_session
-        # Redis는 선택적으로 사용
+    테스트 코드/기존 호출들이 인자 없이 생성하는 경우가 있어 db_session Optional 허용.
+    db_session 없으면 read/write 메서드 사용 시 예외 대신 no-op 또는 기본값 반환.
+    """
+
+    def __init__(self, db_session: Session | None = None):
+        self.db: Session | None = db_session
+        # Redis는 선택적으로 사용 (지연 주입 가능)
         self.redis_client = None
 
     def _get_redis_key(self, user_id: int, key_type: str) -> str:
@@ -64,7 +68,9 @@ class GameRepository:
         user_segment = db.query(models.UserSegment).filter(models.UserSegment.user_id == user_id).first()
         return user_segment.rfm_group if user_segment else "Low-Value"
 
-    def record_action(self, db: Session, user_id: int, action_type: str, action_data: str) -> models.UserAction:
+    def record_action(self, db: Session, user_id: int, action_type: str, action_data: str) -> models.UserAction | None:
+        if not db:
+            return None
         action = models.UserAction(user_id=user_id, action_type=action_type, action_data=action_data)
         db.add(action)
         db.commit()

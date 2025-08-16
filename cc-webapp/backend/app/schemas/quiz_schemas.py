@@ -4,7 +4,7 @@
 퀴즈 시스템 Pydantic 스키마 정의
 """
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 from enum import Enum
@@ -31,18 +31,14 @@ class QuizCategoryResponse(BaseModel):
     icon: Optional[str] = None
     category_type: str = "general"
     is_active: bool = True
-    
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class QuizAnswerResponse(BaseModel):
     id: int
     text: str
     order: int = 0
-    
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class QuizQuestionResponse(BaseModel):
@@ -53,9 +49,7 @@ class QuizQuestionResponse(BaseModel):
     points: int = 10
     explanation: Optional[str] = None
     answers: List[QuizAnswerResponse] = []
-    
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class QuizResponse(BaseModel):
@@ -70,9 +64,7 @@ class QuizResponse(BaseModel):
     is_active: bool = True
     category: Optional[QuizCategoryResponse] = None
     questions: List[QuizQuestionResponse] = []
-    
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class QuizAttemptCreate(BaseModel):
@@ -102,9 +94,7 @@ class QuizAttemptResponse(BaseModel):
     personality_traits: Optional[Dict[str, Any]] = None
     status: str = "in_progress"
     feedback: Optional[Dict[str, Any]] = None
-    
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class QuizLeaderboardResponse(BaseModel):
@@ -115,9 +105,7 @@ class QuizLeaderboardResponse(BaseModel):
     total_attempts: int = 0
     completion_rate: float = 0.0
     rank_position: Optional[int] = None
-    
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class QuizStatsResponse(BaseModel):
@@ -130,3 +118,4 @@ class QuizStatsResponse(BaseModel):
     recent_performance: List[Dict[str, Any]] = []
     risk_profile_history: List[Dict[str, Any]] = []
     achievements: List[Dict[str, Any]] = []
+    model_config = ConfigDict(from_attributes=True)

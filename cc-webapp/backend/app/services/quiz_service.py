@@ -282,7 +282,7 @@ class QuizService:
             quiz_id=quiz_id,
             final_score=total_score,
             risk_profile_result=risk_profile,
-            answers_json=answers
+            answers_json=answers  # SQLAlchemy JSON/Text 컬럼 assume
         )
         self.db.add(attempt)
 
@@ -291,10 +291,9 @@ class QuizService:
         if user_segment:
             user_segment.risk_profile = risk_profile
         else:
-            # If no segment exists, create one
             user_segment = models.UserSegment(user_id=user_id, risk_profile=risk_profile, rfm_group="New")
             self.db.add(user_segment)
-
+        self.db.flush()  # flush 후 attempt id 확보 및 segment 갱신 즉시 반영
         self.db.commit()
         self.db.refresh(attempt)
 

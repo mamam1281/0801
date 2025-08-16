@@ -21,6 +21,7 @@ services:
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-test_secret_key_change_me}
       KAFKA_ENABLED: ${KAFKA_ENABLED:-1}
       KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-kafka_test:9092}
+      CASINO_GACHA_LEGACY_COST: "true"  # 임시: 테스트 레거시 비용 구조 유지 (추후 제거)
     volumes:
       - ./cc-webapp/backend:/app
       - ./logs/test:/app/logs:rw

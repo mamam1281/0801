@@ -69,9 +69,7 @@ class ChatRoomResponse(BaseModel):
     ai_assistant_enabled: bool = True
     created_at: datetime
     participant_count: Optional[int] = 0
-    
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ChatParticipantResponse(BaseModel):
@@ -84,9 +82,7 @@ class ChatParticipantResponse(BaseModel):
     joined_at: datetime
     last_seen: Optional[datetime] = None
     message_count: int = 0
-    
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ChatMessageCreate(BaseModel):
@@ -117,9 +113,7 @@ class ChatMessageResponse(BaseModel):
     created_at: datetime
     edited_at: Optional[datetime] = None
     sender_nickname: Optional[str] = None
-    
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class MessageReactionCreate(BaseModel):
@@ -134,9 +128,7 @@ class MessageReactionResponse(BaseModel):
     reaction_type: str
     reaction_value: str
     created_at: datetime
-    
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class AIAssistantCreate(BaseModel):
@@ -172,9 +164,7 @@ class AIAssistantResponse(BaseModel):
     can_provide_rewards: bool = False
     is_active: bool = True
     created_at: datetime
-    
-    # Pydantic v2 config: read from ORM and allow model_* field names
-    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
+    model_config = ConfigDict(from_attributes=True)
 
 
 class AIConversationCreate(BaseModel):
@@ -197,9 +187,7 @@ class AIConversationResponse(BaseModel):
     started_at: datetime
     ended_at: Optional[datetime] = None
     last_activity: datetime
-    
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class AIMessageCreate(BaseModel):
@@ -225,10 +213,7 @@ class AIMessageResponse(BaseModel):
     user_feedback: Optional[str] = None
     follow_up_needed: bool = False
     created_at: datetime
-    
-    class Config:
-        from_attributes = True
-        protected_namespaces = ()
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
 
 
 class EmotionProfileUpdate(BaseModel):
@@ -250,9 +235,7 @@ class EmotionProfileResponse(BaseModel):
     sensitivity_level: float = 0.5
     last_updated: datetime
     created_at: datetime
-    
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ChatModerationAction(BaseModel):
@@ -274,6 +257,4 @@ class ChatModerationResponse(BaseModel):
     action_taken: Optional[Dict[str, Any]] = None
     expires_at: Optional[datetime] = None
     created_at: datetime
-    
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

@@ -61,8 +61,8 @@ class TestGachaService:
         """Test single gacha pull."""
         # Arrange
         count = 1
-        self.token_service.deduct_tokens.return_value = 50
-        self.token_service.get_token_balance.return_value = 950
+        self.token_service.deduct_tokens.return_value = 5000
+        self.token_service.get_token_balance.return_value = 95000
         self.repo.get_gacha_count.return_value = 0
         self.repo.get_gacha_history.return_value = []
         
@@ -70,19 +70,19 @@ class TestGachaService:
         result = self.service.pull(self.user_id, count, self.db)
         
         # Assert
-        self.token_service.deduct_tokens.assert_called_once_with(self.user_id, 50)
+        self.token_service.deduct_tokens.assert_called_once_with(self.user_id, 5000)
         self.repo.record_action.assert_called_once()
         assert isinstance(result, GachaPullResult)
         assert len(result.results) == 1
-        assert result.tokens_change == -50
-        assert result.balance == 950
+        assert result.tokens_change == -5000
+        assert result.balance == 95000
 
     def test_ten_pull(self):
         """Test ten-pull gacha (with discount)."""
         # Arrange
         count = 10
-        self.token_service.deduct_tokens.return_value = 450  # Discounted from 500
-        self.token_service.get_token_balance.return_value = 550
+        self.token_service.deduct_tokens.return_value = 50000
+        self.token_service.get_token_balance.return_value = 500000
         self.repo.get_gacha_count.return_value = 0
         self.repo.get_gacha_history.return_value = []
         
@@ -90,12 +90,12 @@ class TestGachaService:
         result = self.service.pull(self.user_id, count, self.db)
         
         # Assert
-        self.token_service.deduct_tokens.assert_called_once_with(self.user_id, 450)
+        self.token_service.deduct_tokens.assert_called_once_with(self.user_id, 50000)
         self.repo.record_action.assert_called_once()
         assert isinstance(result, GachaPullResult)
         assert len(result.results) == 10
-        assert result.tokens_change == -450
-        assert result.balance == 550
+        assert result.tokens_change == -50000
+        assert result.balance == 500000
 
     def test_insufficient_tokens(self):
         """Test gacha pull with insufficient tokens."""
@@ -111,8 +111,8 @@ class TestGachaService:
         """Test pity system guarantees an Epic after 90 pulls."""
         # Arrange
         count = 1
-        self.token_service.deduct_tokens.return_value = 50
-        self.token_service.get_token_balance.return_value = 950
+        self.token_service.deduct_tokens.return_value = 5000
+        self.token_service.get_token_balance.return_value = 95000
         self.repo.get_gacha_history.return_value = []
         
         # Set current count to 89 (next pull triggers pity)
@@ -133,8 +133,8 @@ class TestGachaService:
         """Test that previous pulls affect future probabilities."""
         # Arrange
         count = 1
-        self.token_service.deduct_tokens.return_value = 50
-        self.token_service.get_token_balance.return_value = 950
+        self.token_service.deduct_tokens.return_value = 5000
+        self.token_service.get_token_balance.return_value = 95000
         self.repo.get_gacha_count.return_value = 10
         
         # User recently got a Legendary
@@ -153,8 +153,8 @@ class TestGachaService:
         """Test that pull history is tracked correctly."""
         # Arrange
         count = 1
-        self.token_service.deduct_tokens.return_value = 50
-        self.token_service.get_token_balance.return_value = 950
+        self.token_service.deduct_tokens.return_value = 5000
+        self.token_service.get_token_balance.return_value = 95000
         self.repo.get_gacha_count.return_value = 10
         original_history = ["Epic", "Common", "Rare", "Common"]
         self.repo.get_gacha_history.return_value = original_history.copy()
@@ -178,8 +178,8 @@ class TestGachaService:
         """Test reward pool limits item availability."""
         # Arrange
         count = 1
-        self.token_service.deduct_tokens.return_value = 50
-        self.token_service.get_token_balance.return_value = 950
+        self.token_service.deduct_tokens.return_value = 5000
+        self.token_service.get_token_balance.return_value = 95000
         self.repo.get_gacha_count.return_value = 10
         self.repo.get_gacha_history.return_value = []
         

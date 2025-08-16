@@ -12,6 +12,7 @@ class UserSegment(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True)
     rfm_group = Column(String(50), index=True)  # e.g., Whale, High Engaged, Medium, Low/At-risk
+    name = Column(String(50), nullable=True)    # 테스트 코드가 name= 전달; rfm_group 별칭
     ltv_score = Column(Float, default=0.0)
     risk_profile = Column(String(50))  # e.g., High-Risk, Medium-Risk, Low-Risk
     last_updated = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

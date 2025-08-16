@@ -36,8 +36,8 @@ def test_gacha_pull_success(mock_db_session, mock_game_repo, mock_token_service,
     # Arrange
     mock_db_session.query.return_value.filter.return_value.first.return_value = standard_user
     mock_game_repo.count_daily_actions.return_value = 1  # Below the limit of 3
-    mock_token_service.deduct_tokens.return_value = 50000
-    mock_token_service.get_token_balance.return_value = 100000 - 50000
+    mock_token_service.deduct_tokens.return_value = 5000
+    mock_token_service.get_token_balance.return_value = 100000 - 5000
 
     gacha_service = GachaService(repository=mock_game_repo, token_service=mock_token_service, db=mock_db_session)
 
@@ -45,8 +45,8 @@ def test_gacha_pull_success(mock_db_session, mock_game_repo, mock_token_service,
     result = gacha_service.pull(user_id=standard_user.id, db=mock_db_session)
 
     # Assert
-    assert result.tokens_change == -50000
-    mock_token_service.deduct_tokens.assert_called_once_with(standard_user.id, 50000)
+    assert result.tokens_change == -5000
+    mock_token_service.deduct_tokens.assert_called_once_with(standard_user.id, 5000)
     mock_game_repo.record_action.assert_called_once()
     assert "GACHA_PULL" in mock_game_repo.record_action.call_args[0]
 

@@ -8,15 +8,27 @@ from ..database import Base
 
 
 class Game(Base):
-    """게임 모델"""
+    """게임 모델
+
+    테스트 코드 및 서비스 레이어(roulette/slot 등)가 다음 형태의 생성자를 사용:
+        Game(user_id=..., game_type=..., bet_amount=..., payout=..., result=...)
+    과거 스키마는 name(unique, not null)을 강제했으나 실제 사용 시 name 미지정으로
+    에러가 발생했으므로 name 을 nullable 로 완화하고 기본적으로 game_type 기반
+    메타 데이터만 저장하도록 조정.
+    """
     __tablename__ = "games"
 
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(100), nullable=False, unique=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    name = Column(String(100), nullable=True, unique=True)  # 선택적; NULL 허용
     description = Column(Text)
-    game_type = Column(String(50), nullable=False)
+    game_type = Column(String(50), nullable=False, index=True)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+    # 집계/호환 필드
+    bet_amount = Column(Integer, default=0)
+    payout = Column(Integer, default=0)
+    result = Column(String(100))  # 최근 결과(예: prize id, win/lose 등)
 
 
 class UserAction(Base):
@@ -50,17 +62,21 @@ class UserReward(Base):
 
 
 class GameSession(Base):
-    """게임 세션 모델"""
+    """게임 세션 모델 (리팩터: 내부 int PK + 외부 UUID)"""
     __tablename__ = "game_sessions"
 
-    id = Column(String, primary_key=True)
-    user_id = Column(Integer, ForeignKey("users.id"))
-    game_type = Column(String, nullable=False)
-    bet_amount = Column(Integer, nullable=False)
-    win_amount = Column(Integer, default=0)
-    start_time = Column(DateTime, default=datetime.utcnow)
-    end_time = Column(DateTime)
-    status = Column(String, default="active")
+    id = Column(Integer, primary_key=True, index=True)
+    external_session_id = Column(String(36), unique=True, nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    game_type = Column(String(50), nullable=False, index=True)
+    initial_bet = Column(Integer, nullable=False, default=0)
+    total_win = Column(Integer, nullable=False, default=0)
+    total_bet = Column(Integer, nullable=False, default=0)
+    total_rounds = Column(Integer, nullable=False, default=0)
+    start_time = Column(DateTime, default=datetime.utcnow, nullable=False)
+    end_time = Column(DateTime, nullable=True)
+    status = Column(String(20), default="active", nullable=False, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     result_data = Column(JSON)
     
     user = relationship("User", back_populates="game_sessions")

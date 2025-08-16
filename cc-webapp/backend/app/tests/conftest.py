@@ -1,9 +1,15 @@
-import pytest
+import os, sys, pytest
 from fastapi.testclient import TestClient
 
+# Add backend root to sys.path if missing (when pytest launched from repo root)
+_here = os.path.dirname(__file__)
+_backend_root = os.path.abspath(os.path.join(_here, "..", ".."))
+if _backend_root not in sys.path:
+	sys.path.insert(0, _backend_root)
+
 # Ensure DB tables exist for tests
-from app.database import Base, engine
-import app.models  # noqa: F401 - register all models on Base
+from app.database import Base, engine  # noqa: E402
+import app.models  # noqa: F401, E402 - register all models on Base
 
 
 try:
@@ -19,11 +25,28 @@ def _ensure_schema():
 
 	We avoid Base.metadata.drop_all due to FK dependencies across modules.
 	"""
+	# SQLite 파일에서 이전 버전 테이블 잔존 시 정리
+	try:
+		from sqlalchemy import inspect
+		ins = inspect(engine)
+		if ins.has_table("game_sessions"):
+			cols = [c["name"] for c in ins.get_columns("game_sessions")]
+			if "external_session_id" not in cols:
+				# 오래된 스키마 -> 파일 DB 제거 후 재생성
+				engine.dispose()
+				import os
+				if engine.url.database and os.path.exists(engine.url.database):
+					os.remove(engine.url.database)
+	except Exception:
+		pass
+
 	try:
 		from alembic.config import Config
 		from alembic import command
 		cfg = Config("alembic.ini")
 		command.upgrade(cfg, "head")
+		# 일부 신규 모델이 아직 마이그레이션에 반영되지 않았다면 보강 (idempotent)
+		Base.metadata.create_all(bind=engine)
 	except Exception:
 		# Fallback: ensure at least ORM-known tables exist
 		Base.metadata.create_all(bind=engine)

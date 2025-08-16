@@ -10,10 +10,20 @@ from datetime import datetime, timedelta
 from ..database import get_db
 from ..dependencies import get_current_user
 from ..models.auth_models import User
-from ..models.game_models import Game, UserAction
+from ..models.game_models import Game, UserAction, GameSession as GameSessionModel
 from ..services.simple_user_service import SimpleUserService
 from ..services.game_service import GameService
 from ..services.history_service import log_game_history
+from pydantic import BaseModel, ConfigDict
+
+def _lazy_broadcast_game_session_event():
+    try:
+        from app import main  # type: ignore
+        return getattr(main, "broadcast_game_session_event", None)
+    except Exception:  # pragma: no cover
+        async def _noop(_):
+            return None
+        return _noop
 from ..schemas.game_schemas import (
     GameListResponse, GameDetailResponse,
     GameSessionStart, GameSessionEnd,
@@ -32,7 +42,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/games", tags=["Games"])
 
 # ----------------------------- GameHistory 조회 스키마 (간단 내장) -----------------------------
-from pydantic import BaseModel
 
 class GameHistoryItem(BaseModel):
     id: int
@@ -43,9 +52,7 @@ class GameHistoryItem(BaseModel):
     delta_gem: int
     created_at: datetime
     result_meta: Optional[Dict[str, Any]] = None
-
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 class GameHistoryListResponse(BaseModel):
     total: int
@@ -89,6 +96,200 @@ class FollowListItem(BaseModel):
 class FollowListResponse(BaseModel):
     total: int
     items: List[FollowListItem]
+
+# ----------------------------- Game Session API -----------------------------
+class GameSessionStartResponse(BaseModel):
+    session_id: str
+    status: str
+    started_at: datetime
+    game_type: str
+    bet_amount: int
+
+class GameSessionEndResponse(BaseModel):
+    session_id: str
+    status: str
+    duration: Optional[int]
+    total_bet: int
+    total_win: int
+    game_type: str
+    # 추가: result_data 요약 노출 (선택)
+    result_data: Optional[Dict[str, Any]] = None
+
+@router.post("/session/start", response_model=GameSessionStartResponse)
+async def start_game_session(
+    payload: GameSessionStart,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    # 활성 세션 존재 확인
+    active = db.query(GameSessionModel).filter(
+        GameSessionModel.user_id == current_user.id,
+        GameSessionModel.status == "active",
+        GameSessionModel.game_type == payload.game_type
+    ).first()
+    if active:
+        raise HTTPException(status_code=409, detail="Active session already exists")
+
+    import uuid
+    ext_id = str(uuid.uuid4())
+    now = datetime.utcnow()
+    session_row = GameSessionModel(
+        external_session_id=ext_id,
+        user_id=current_user.id,
+        game_type=payload.game_type,
+        initial_bet=payload.bet_amount or 0,
+        total_bet=payload.bet_amount or 0,
+        total_rounds=0,
+        status="active",
+        start_time=now,
+    )
+    db.add(session_row)
+    db.flush()  # id 확보
+    # GameHistory 기록
+    log_game_history(
+        db,
+        user_id=current_user.id,
+        game_type=payload.game_type,
+        action_type="SESSION_START",
+        session_id=session_row.id,
+        result_meta={"external_session_id": ext_id, "bet_amount": payload.bet_amount or 0}
+    )
+    db.refresh(session_row)
+    # 브로드캐스트
+    try:
+        broadcast_game_session_event = _lazy_broadcast_game_session_event()
+        await broadcast_game_session_event({
+            "event": "start",
+            "session_id": session_row.id,
+            "external_session_id": ext_id,
+            "user_id": current_user.id,
+            "game_type": payload.game_type,
+            "bet_amount": payload.bet_amount or 0,
+            "ts": now.isoformat()
+        })
+    except Exception:
+        pass
+    return {
+        "session_id": ext_id,
+        "status": "active",
+        "started_at": now,
+        "game_type": payload.game_type,
+        "bet_amount": payload.bet_amount or 0,
+    }
+
+@router.post("/session/end", response_model=GameSessionEndResponse)
+async def end_game_session(
+    payload: GameSessionEnd,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    # external_session_id 매핑
+    session_row = db.query(GameSessionModel).filter(
+        GameSessionModel.external_session_id == payload.session_id,
+        GameSessionModel.user_id == current_user.id
+    ).first()
+    if not session_row:
+        raise HTTPException(status_code=404, detail="Session not found")
+    if session_row.status != "active":
+        raise HTTPException(status_code=409, detail="Session already ended")
+
+    now = datetime.utcnow()
+    session_row.end_time = now
+    session_row.status = "ended"
+    session_row.total_rounds = payload.rounds_played
+    session_row.total_bet = payload.total_bet
+    session_row.total_win = payload.total_win
+    # result_data 요약 구성 및 저장 (세션 KPI)
+    summary = {
+        "duration": payload.duration,
+        "rounds": payload.rounds_played,
+        "total_bet": payload.total_bet,
+        "total_win": payload.total_win,
+        "net": (payload.total_win - payload.total_bet),
+        "roi": ((payload.total_win - payload.total_bet) / payload.total_bet) if payload.total_bet else 0,
+        "game_result": payload.game_result or {},
+    }
+    try:
+        session_row.result_data = summary
+    except Exception:
+        # JSON 직렬화 실패 시 텍스트 fallback
+        try:
+            import json as _json
+            session_row.result_data = _json.dumps(summary, default=str)  # type: ignore
+        except Exception:
+            session_row.result_data = None  # 최종 포기
+    db.add(session_row)
+    db.flush()
+
+    log_game_history(
+        db,
+        user_id=current_user.id,
+        game_type=session_row.game_type,
+        action_type="SESSION_END",
+        session_id=session_row.id,
+        result_meta={
+            "external_session_id": payload.session_id,
+            "duration": payload.duration,
+            "rounds": payload.rounds_played,
+            "total_bet": payload.total_bet,
+            "total_win": payload.total_win,
+            "result": payload.game_result or {}
+        }
+    )
+
+    try:
+        broadcast_game_session_event = _lazy_broadcast_game_session_event()
+        await broadcast_game_session_event({
+            "event": "end",
+            "session_id": session_row.id,
+            "external_session_id": payload.session_id,
+            "user_id": current_user.id,
+            "duration": payload.duration,
+            "total_bet": payload.total_bet,
+            "total_win": payload.total_win,
+            "game_type": session_row.game_type,
+            "ts": now.isoformat(),
+            "result_data": summary,
+        })
+    except Exception:
+        pass
+
+    duration = payload.duration
+    return {
+        "session_id": payload.session_id,
+        "status": "ended",
+        "duration": duration,
+        "total_bet": payload.total_bet,
+        "total_win": payload.total_win,
+        "game_type": session_row.game_type,
+        "result_data": summary,
+    }
+
+@router.get("/session/active", response_model=GameSession)
+async def get_active_session(
+    game_type: Optional[str] = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    q = db.query(GameSessionModel).filter(
+        GameSessionModel.user_id == current_user.id,
+        GameSessionModel.status == "active"
+    )
+    if game_type:
+        q = q.filter(GameSessionModel.game_type == game_type)
+    row = q.order_by(GameSessionModel.start_time.desc()).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="No active session")
+    return GameSession(
+        session_id=row.external_session_id,
+        user_id=row.user_id,
+        game_type=row.game_type,
+        start_time=row.start_time,
+        duration=None,
+        current_bet=row.initial_bet,
+        current_round=row.total_rounds,
+        status=row.status
+    )
 # 가챠 확률 공개/구성 조회
 @router.get("/gacha/config")
 async def get_gacha_config(
@@ -639,36 +840,7 @@ def get_user_achievements(user_id: int, db: Session = Depends(get_db)):
     )
     return [sample]
 
-@router.post("/session/start", response_model=GameSession)
-def start_game_session(game_type: str, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    """게임 세션 시작"""
-    session = GameSession(
-        session_id=str(uuid4()),
-        user_id=current_user.id,
-        game_type=game_type,
-        start_time=datetime.utcnow(),
-        status="active"
-    )
-    action = models.UserAction(
-        user_id=current_user.id,
-        action_type="SESSION_START",
-        action_data=json.dumps({"game_type": game_type, "session_id": session.session_id})
-    )
-    db.add(action)
-    db.commit()
-    return session
-
-@router.post("/session/end")
-def end_game_session(session_id: str, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    """게임 세션 종료"""
-    action = models.UserAction(
-        user_id=current_user.id,
-        action_type="SESSION_END",
-        action_data=json.dumps({"session_id": session_id, "ended_at": datetime.utcnow().isoformat()})
-    )
-    db.add(action)
-    db.commit()
-    return {"message": "Session ended"}
+# (legacy /session/start, /session/end 엔드포인트 제거됨 - 영속 버전 상단 구현 사용)
 
 # Helper
 from uuid import uuid4

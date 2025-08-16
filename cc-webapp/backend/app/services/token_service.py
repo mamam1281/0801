@@ -2,12 +2,25 @@
 
 import logging
 from typing import Optional
+import asyncio
 
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.repositories.game_repository import GameRepository
 from app.models import User
+def _lazy_broadcast_token_update_event():
+    """Return broadcast_token_update_event lazily to avoid circular import.
+
+    If not available (e.g. during early import), return a no-op coroutine.
+    """
+    try:
+        from app import main  # type: ignore
+        return getattr(main, "broadcast_token_update_event", None)
+    except Exception:  # pragma: no cover
+        async def _noop(_):
+            return None
+        return _noop
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +66,19 @@ class TokenService:
             setattr(user, 'cyber_token_balance', new_balance)
             self.db.commit()
             self.db.refresh(user)
-            
+            # 브로드캐스트
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    broadcast_token_update_event = _lazy_broadcast_token_update_event()
+                    loop.create_task(broadcast_token_update_event({
+                        "user_id": user_id,
+                        "balance": new_balance,
+                        "delta": amount,
+                        "source": "add_tokens"
+                    }))
+            except Exception:
+                pass
             logger.info(f"Added {amount} tokens to user {user_id}, new balance: {new_balance}")
             return new_balance
             
@@ -92,7 +117,18 @@ class TokenService:
             setattr(user, 'cyber_token_balance', new_balance)
             self.db.commit()
             self.db.refresh(user)
-            
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    broadcast_token_update_event = _lazy_broadcast_token_update_event()
+                    loop.create_task(broadcast_token_update_event({
+                        "user_id": user_id,
+                        "balance": new_balance,
+                        "delta": -amount,
+                        "source": "deduct_tokens"
+                    }))
+            except Exception:
+                pass
             logger.info(f"Deducted {amount} tokens from user {user_id}, new balance: {new_balance}")
             return new_balance
             
