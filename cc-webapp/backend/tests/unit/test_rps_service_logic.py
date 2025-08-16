@@ -72,3 +72,21 @@ def test_rps_play_daily_limit(rps_service, mock_db_session, standard_user):
     # Act & Assert
     with pytest.raises(ValueError, match="Daily RPS play limit (3) exceeded."):
         rps_service.play(user_id=1, user_choice='rock', bet_amount=5000, db=mock_db_session)
+
+
+@pytest.mark.parametrize("forced,result_field_checker", [
+    ("win", lambda r, bet: (r.result == "win" and r.tokens_change == bet)),
+    ("draw", lambda r, bet: (r.result == "draw" and r.tokens_change == 0)),
+    ("lose", lambda r, bet: (r.result == "lose" and r.tokens_change == -bet)),
+])
+def test_rps_deterministic_modes(rps_service, mock_db_session, mock_token_service, standard_user, forced, result_field_checker, monkeypatch):
+    """CASINO_RPS_DETERMINISTIC=win/draw/lose 강제 결과 모드 검증."""
+    monkeypatch.setenv("CASINO_RPS_DETERMINISTIC", forced)
+    mock_db_session.query.return_value.filter.return_value.first.return_value = standard_user
+    rps_service.repo.count_daily_actions.return_value = 0
+    bet_amount = 5000
+
+    result = rps_service.play(user_id=1, user_choice='rock', bet_amount=bet_amount, db=mock_db_session)
+
+    assert result_field_checker(result, bet_amount)
+    mock_token_service.deduct_tokens.assert_called_with(1, bet_amount)

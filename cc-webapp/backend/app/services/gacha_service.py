@@ -254,23 +254,27 @@ class GachaService:
                 
                 rarity = actual_rarity
             else:
-                results.append(rarity)
-                
-                # 특별 애니메이션 타입 설정
-                if rarity == "Legendary":
+                # 보상 풀 제한을 rarity 확정 전에 적용해야 Legendary 재고 0 시 리스트에 잘못 포함되지 않음
+                final_rarity = rarity
+                if self.reward_pool:
+                    available = self.reward_pool.get(final_rarity, 0)
+                    if available <= 0:
+                        # 재고 소진 → Common 강등
+                        final_rarity = "Common"
+                    else:
+                        self.reward_pool[final_rarity] = available - 1
+
+                results.append(final_rarity)
+
+                # 특별 애니메이션 타입 설정 (강등 적용 후 기준)
+                if final_rarity == "Legendary":
                     animation_type = "legendary"
-                elif rarity == "Epic":
+                elif final_rarity == "Epic":
                     animation_type = "epic"
-            
-            # 보상 풀 관리
-            if self.reward_pool:
-                available = self.reward_pool.get(rarity, 0)
-                if available <= 0:
-                    rarity = "Common"
-                else:
-                    self.reward_pool[rarity] = available - 1
-            
-            # 히스토리 업데이트 (실제 획득 아이템 기록)
+
+                rarity = final_rarity
+
+            # 히스토리 업데이트 (실제 획득 아이템 기록 - near miss 변형 제거 후)
             actual_rarity = rarity.replace("_near_miss_epic", "").replace("_near_miss_legendary", "").replace("_near_miss", "")
             history.insert(0, actual_rarity)
             history = history[:10]

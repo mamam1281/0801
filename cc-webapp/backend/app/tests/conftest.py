@@ -25,7 +25,16 @@ def _ensure_schema():
 
 	We avoid Base.metadata.drop_all due to FK dependencies across modules.
 	"""
-	# SQLite 파일에서 이전 버전 테이블 잔존 시 정리
+	# 항상 초기화 (drift 지속 발생하므로 test DB 파일 제거)
+	try:
+		from sqlalchemy import inspect as _insp
+		engine.dispose()
+		if engine.url.database and os.path.exists(engine.url.database):
+			os.remove(engine.url.database)
+	except Exception:
+		pass
+
+	# SQLite 파일에서 이전 버전 테이블 잔존 시 정리 (보조 안전장치)
 	try:
 		from sqlalchemy import inspect
 		ins = inspect(engine)
@@ -45,6 +54,22 @@ def _ensure_schema():
 		from alembic import command
 		cfg = Config("alembic.ini")
 		command.upgrade(cfg, "head")
+		# 스키마 drift 감지: user_actions.action_data 누락 시 전체 DB 재생성 (SQLite 한정)
+		try:
+			from sqlalchemy import inspect
+			ins2 = inspect(engine)
+			if ins2.has_table("user_actions"):
+				cols = {c["name"] for c in ins2.get_columns("user_actions")}
+				if "action_data" not in cols:
+					# SQLite 에서 누락된 컬럼 추가 (drift 수선) - 데이터 무시 가능 (테스트 DB)
+					from sqlalchemy import text
+					with engine.begin() as conn:
+						try:
+							conn.execute(text("ALTER TABLE user_actions ADD COLUMN action_data TEXT"))
+						except Exception:
+							pass
+		except Exception:
+			pass
 		# 일부 신규 모델이 아직 마이그레이션에 반영되지 않았다면 보강 (idempotent)
 		Base.metadata.create_all(bind=engine)
 	except Exception:
