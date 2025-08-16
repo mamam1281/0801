@@ -9,7 +9,7 @@ import string
 import hashlib
 import secrets
 from app.models.auth_models import InviteCode
-from app.core.error_handlers import UserServiceException
+from app.core.exceptions import UserServiceException
 
 class InviteService:
     """초대코드 서비스"""

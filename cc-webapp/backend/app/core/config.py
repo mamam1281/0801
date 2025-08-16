@@ -90,6 +90,10 @@ class Settings(BaseSettings):
     ADULT_CONTENT_ENABLED: bool = False
     VIP_CONTENT_ENABLED: bool = False
 
+    # Observability / APM
+    SENTRY_DSN: str | None = os.getenv("SENTRY_DSN")
+    SENTRY_TRACES_SAMPLE_RATE: float = float(os.getenv("SENTRY_TRACES_SAMPLE_RATE", "0.0"))  # 0.0 (off) ~ 1.0
+
     # Slot configuration (symbol weights as JSON-like string env or default mapping)
     SLOT_SYMBOL_WEIGHTS: dict = {
         "🍒": 30,

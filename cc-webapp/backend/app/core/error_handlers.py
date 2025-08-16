@@ -3,55 +3,64 @@ from typing import Dict, Any
 from fastapi import Request, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
-from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.status import HTTP_500_INTERNAL_SERVER_ERROR, HTTP_422_UNPROCESSABLE_ENTITY
+from app.core.exceptions import (
+    BaseDomainError,
+    ValidationError,
+)
+from app.core.logging import request_id_ctx
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("errors")
 
-def log_error(exc: Exception, context: Dict[str, Any] = None):
-    logger.error(f'Error: {str(exc)}', extra=context or {})
+STANDARD_CONTENT_TYPE = "application/json"
 
-def get_logger(name: str):
-    return logging.getLogger(name)
+def _error_payload(code: str, message: str, *, request_id: str, details: Any = None):
+    return {"error": {"code": code, "message": message, "details": details, "request_id": request_id}}
 
-class CasinoClubException(Exception):
-    def __init__(self, message: str, error_code: str = 'GENERAL_ERROR', status_code: int = 500):
-        self.message = message
-        self.error_code = error_code
-        self.status_code = status_code
-        super().__init__(self.message)
-
-class UserServiceException(CasinoClubException):
-    def __init__(self, message: str, error_code: str = 'USER_ERROR'):
-        super().__init__(message, error_code, 400)
-
-class InviteCodeException(CasinoClubException):
-    def __init__(self, message: str, error_code: str = 'INVITE_CODE_ERROR'):
-        super().__init__(message, error_code, 400)
-
-class AuthenticationException(CasinoClubException):
-    def __init__(self, message: str = 'Authentication failed', error_code: str = 'AUTH_ERROR'):
-        super().__init__(message, error_code, 401)
-
-class AuthorizationException(CasinoClubException):
-    def __init__(self, message: str = 'Authorization failed', error_code: str = 'AUTHORIZATION_ERROR'):
-        super().__init__(message, error_code, 403)
-
-class ErrorHandlingMiddleware(BaseHTTPMiddleware):
-    def __init__(self, app):
-        super().__init__(app)
-
-    async def dispatch(self, request: Request, call_next):
-        try:
-            response = await call_next(request)
-            return response
-        except Exception as e:
-            return JSONResponse(
-                status_code=HTTP_500_INTERNAL_SERVER_ERROR,
-                content={'detail': 'Internal server error', 'error_code': 'INTERNAL_ERROR'}
-            )
 
 def add_exception_handlers(app):
-    pass
+    """Register global exception handlers on the FastAPI app."""
 
-error_handling_middleware = ErrorHandlingMiddleware
+    @app.exception_handler(BaseDomainError)
+    async def domain_error_handler(request: Request, exc: BaseDomainError):  # type: ignore
+        rid = request_id_ctx.get()
+        logger.warning(f"DomainError {exc.code}: {exc.message}", extra={"request_id": rid, "path": request.url.path})
+        return JSONResponse(
+            status_code=exc.status_code,
+            content=_error_payload(exc.code, exc.message, request_id=rid, details=exc.details),
+            media_type=STANDARD_CONTENT_TYPE,
+        )
+
+    @app.exception_handler(RequestValidationError)
+    async def validation_exception_handler(request: Request, exc: RequestValidationError):  # type: ignore
+        rid = request_id_ctx.get()
+        logger.info("Request validation failed", extra={"request_id": rid, "errors": exc.errors()})
+        vexc = ValidationError(details=exc.errors())
+        return JSONResponse(
+            status_code=vexc.status_code,
+            content=_error_payload(vexc.code, vexc.message, request_id=rid, details=vexc.details),
+            media_type=STANDARD_CONTENT_TYPE,
+        )
+
+    @app.exception_handler(HTTPException)
+    async def http_exception_handler(request: Request, exc: HTTPException):  # type: ignore
+        rid = request_id_ctx.get()
+        code = f"HTTP_{exc.status_code}"
+        logger.info("HTTPException", extra={"request_id": rid, "status": exc.status_code, "detail": exc.detail})
+        return JSONResponse(
+            status_code=exc.status_code,
+            content=_error_payload(code, str(exc.detail), request_id=rid),
+            media_type=STANDARD_CONTENT_TYPE,
+        )
+
+    @app.exception_handler(Exception)
+    async def unhandled_exception_handler(request: Request, exc: Exception):  # type: ignore
+        rid = request_id_ctx.get()
+        logger.exception("Unhandled exception", extra={"request_id": rid})
+        return JSONResponse(
+            status_code=HTTP_500_INTERNAL_SERVER_ERROR,
+            content=_error_payload("INTERNAL_ERROR", "Internal server error", request_id=rid),
+            media_type=STANDARD_CONTENT_TYPE,
+        )
+
+__all__ = ["add_exception_handlers"]

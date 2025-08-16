@@ -10,6 +10,7 @@ between Starlette's TestClient and the installed HTTP client libraries in runtim
 import json
 import os
 import sys
+from datetime import datetime
 
 # Ensure 'app' package import works when run from different CWDs
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -27,10 +28,16 @@ def main() -> None:
     except Exception:
         pass
     schema = app.openapi()
-    out_path = os.path.join(BACKEND_ROOT, "current_openapi.json")  # Writes under backend dir
-    with open(out_path, "w", encoding="utf-8") as f:
+    # Always update canonical file
+    canonical_path = os.path.join(BACKEND_ROOT, "current_openapi.json")
+    with open(canonical_path, "w", encoding="utf-8") as f:
         json.dump(schema, f, ensure_ascii=False, indent=2)
-    print(f"✅ Exported OpenAPI to {out_path}")
+    # Timestamped snapshot for change tracking
+    ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    snapshot_path = os.path.join(BACKEND_ROOT, f"openapi_{ts}.json")
+    with open(snapshot_path, "w", encoding="utf-8") as f:
+        json.dump(schema, f, ensure_ascii=False, indent=2)
+    print(f"✅ Exported OpenAPI: canonical={canonical_path}, snapshot={snapshot_path}")
 
 
 if __name__ == "__main__":

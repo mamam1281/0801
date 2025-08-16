@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from .database import get_db
 from .services.auth_service import AuthService
 from .models.auth_models import User
+from .core.logging import user_id_ctx  # contextvar for structured logging
 from jose import jwt
 
 # 로깅 설정
@@ -33,13 +34,12 @@ async def get_current_user(
         token = credentials.credentials
         token_data = AuthService.verify_token(token, db=db)
         user = db.query(User).filter(User.id == token_data.user_id).first()
-        
         if not user:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="User not found"
-            )
-            
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        try:
+            user_id_ctx.set(str(user.id))
+        except Exception:
+            pass
         return user
 
     except HTTPException as e:
@@ -50,6 +50,10 @@ async def get_current_user(
             if uid is not None:
                 user = db.query(User).filter(User.id == uid).first()
                 if user:
+                    try:
+                        user_id_ctx.set(str(user.id))
+                    except Exception:
+                        pass
                     return user
         except Exception:
             pass

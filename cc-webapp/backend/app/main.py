@@ -25,7 +25,9 @@ from pydantic import BaseModel, Field
 # Core imports
 from app.database import get_db
 from app.utils.redis import init_redis_manager, get_redis_manager
-from app.core.logging import setup_logging
+from app.core.logging import setup_logging, LoggingContextMiddleware
+from app.core.config import settings
+from app.core.error_handlers import add_exception_handlers
 from app.middleware.simple_logging import SimpleLoggingMiddleware
 # from app.core.exceptions import add_exception_handlers  # Disabled - empty file
 # from app.middleware.error_handling import error_handling_middleware  # Disabled
@@ -96,6 +98,17 @@ try:  # 선택적 Sentry APM/에러 추적
     import sentry_sdk
 except Exception:
     sentry_sdk = None  # 환경 미설정 시 무시
+
+if sentry_sdk and settings.SENTRY_DSN:
+    try:
+        sentry_sdk.init(
+            dsn=settings.SENTRY_DSN,
+            traces_sample_rate=settings.SENTRY_TRACES_SAMPLE_RATE,
+            enable_tracing=settings.SENTRY_TRACES_SAMPLE_RATE > 0,
+        )
+        print("🛰️  Sentry initialized (dsn set)")
+    except Exception as e:
+        print(f"⚠️ Sentry init failed: {e}")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -199,15 +212,12 @@ origins = (
     if _env_origins else _default_origins
 )
 
-# Error handlers (disabled - files empty)
-# add_exception_handlers(app)
+add_exception_handlers(app)
 
 # 간단한 API 로깅 미들웨어 추가
 app.add_middleware(SimpleLoggingMiddleware)
 
-# Middleware registration (disabled - files missing)
-# app.add_middleware(error_handling_middleware)
-# app.add_middleware(LoggingContextMiddleware)
+app.add_middleware(LoggingContextMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
