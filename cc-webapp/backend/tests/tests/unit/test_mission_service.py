@@ -1,4 +1,6 @@
 import pytest
+pytest.skip("Duplicate mission service test (tests/tests) – skipped", allow_module_level=True)
+
 from unittest.mock import MagicMock, patch
 from sqlalchemy.orm import Session
 from datetime import datetime

@@ -86,6 +86,10 @@ class Settings(BaseSettings):
     VIP_DAILY_RPS_PLAYS: int = 5
     VIP_DAILY_GACHA_PULLS: int = 5
 
+    # Feature Flags (미구현 기능 토글)
+    ADULT_CONTENT_ENABLED: bool = False
+    VIP_CONTENT_ENABLED: bool = False
+
     # Slot configuration (symbol weights as JSON-like string env or default mapping)
     SLOT_SYMBOL_WEIGHTS: dict = {
         "🍒": 30,

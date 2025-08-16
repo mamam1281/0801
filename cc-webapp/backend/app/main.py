@@ -17,10 +17,11 @@ from contextlib import asynccontextmanager
 import asyncio
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 # Core imports
 from app.database import get_db
+from app.utils.redis import init_redis_manager, get_redis_manager
 from app.core.logging import setup_logging
 from app.middleware.simple_logging import SimpleLoggingMiddleware
 # from app.core.exceptions import add_exception_handlers  # Disabled - empty file
@@ -102,6 +103,25 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"⚠️ Logging setup failed: {e}")
     start_scheduler()
+    # Redis 초기화 (실패 허용)
+    try:
+        if not getattr(app.state, "redis_initialized", False):
+            redis_host = os.getenv("REDIS_HOST", "localhost")
+            redis_port = int(os.getenv("REDIS_PORT", "6379"))
+            redis_password = os.getenv("REDIS_PASSWORD", None)
+            import redis  # type: ignore
+            client = redis.Redis(host=redis_host, port=redis_port, password=redis_password, decode_responses=False)
+            # ping으로 연결검증, 실패 시 fallback (메모리 모드)
+            try:
+                client.ping()
+                init_redis_manager(client)
+                app.state.redis_manager = get_redis_manager()
+                app.state.redis_initialized = True
+                print("🔌 Redis connected & manager initialized")
+            except Exception as re:
+                print(f"⚠️ Redis connection failed, using in-memory fallback: {re}")
+    except Exception as e:
+        print(f"⚠️ Redis init wrapper error: {e}")
     # Start Kafka consumer (optional)
     try:
         await start_consumer()
@@ -144,6 +164,10 @@ class HealthResponse(BaseModel):
     status: str
     timestamp: datetime
     version: str
+    redis_connected: Optional[bool] = Field(
+        default=None,
+        description="Redis 연결 성공 여부 (lifespan 초기화 시 설정). 테스트 및 관측 목적."
+    )
 
 class LoginRequest(BaseModel):
     user_id: str
@@ -274,10 +298,13 @@ async def root():
 @app.get("/health", response_model=HealthResponse, tags=["Health"])
 async def health_check():
     """Health check endpoint"""
+    # lifespan에서 app.state.redis_initialized / redis_error 설정됨
+    redis_connected = getattr(app.state, "redis_initialized", False)
     return HealthResponse(
         status="healthy",
         timestamp=datetime.now(),
-        version="1.0.0"
+        version="1.0.0",
+        redis_connected=redis_connected
     )
 
 @app.get("/api/kafka/_debug/last", tags=["Kafka"])

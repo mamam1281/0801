@@ -2,7 +2,7 @@
 from datetime import datetime
 from typing import Optional
 from sqlalchemy import Column, Integer, String, DateTime, Boolean, Text, ForeignKey
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, synonym
 from ..database import Base
 
 class User(Base):
@@ -20,6 +20,9 @@ class User(Base):
     is_admin = Column(Boolean, default=False)  # 관리자 여부
     # DB의 컬럼명은 'vip_tier' 이므로 name='vip_tier'로 매핑 (기존 'rank' 예약어 사용 회피)
     user_rank = Column(String(50), default="STANDARD", name="vip_tier")
+    # Backwards compatibility alias: many tests/services still reference 'rank'
+    # Provide synonym so constructor User(rank="VIP") works and attribute access is preserved.
+    rank = synonym('user_rank')
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     last_login = Column(DateTime, nullable=True)

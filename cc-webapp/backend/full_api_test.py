@@ -11,7 +11,20 @@ import requests
 import json
 import time
 from typing import Optional, Dict, Any
-from colorama import init, Fore, Style
+
+# colorama는 개발 편의용이며 테스트 환경에서 누락될 수 있으므로 안전 가드
+try:
+    from colorama import init, Fore, Style  # type: ignore
+    init()
+except Exception:  # pragma: no cover - optional dependency
+    class _Dummy:
+        RESET_ALL = ""
+    class _F:
+        RED = GREEN = YELLOW = CYAN = MAGENTA = ""
+    Fore = _F()  # type: ignore
+    Style = _Dummy()  # type: ignore
+    def init():
+        return None
 
 # Colorama 초기화
 init()
@@ -268,6 +281,8 @@ class APITester:
             else:
                 print(f"{Fore.RED}🔧 많은 문제가 발견되었습니다. 수정이 필요합니다.{Style.RESET_ALL}")
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     tester = APITester()
     tester.run_all_tests()
+
+# pytest 수집 방지 힌트: 본 파일은 독립 실행 스크립트이며 테스트 프레임워크에서 무시되어야 함

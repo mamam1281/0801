@@ -168,7 +168,12 @@ def list_limited_catalog_compat():
     return packages
 
 
-@router.post("/limited/buy", response_model=LimitedBuyReceipt, summary="[Compat] Buy limited-time package (no auth)")
+@router.post(
+    "/limited/buy",
+    response_model=LimitedBuyReceipt,
+    summary="[Compat] Buy limited-time package (no auth)",
+    operation_id="compat_buy_limited_package",
+)
 def buy_limited_compat(req: LimitedBuyCompatRequest, db = Depends(get_db)):
     user_id = int(req.user_id)
     rman = get_redis_manager()
@@ -645,7 +650,12 @@ def list_limited_catalog(db = Depends(get_db)):
     return list_limited_packages(db)
 
 
-@router.post("/limited/buy", response_model=LimitedBuyReceipt, summary="Buy limited-time package (compat)")
+@router.post(
+    "/limited/buy",
+    response_model=LimitedBuyReceipt,
+    summary="Buy limited-time package (compat)",
+    operation_id="compat_buy_limited_package_legacy",
+)
 def buy_limited_compat(req: LegacyLimitedBuyRequest, db = Depends(get_db)):
     # Map to new endpoint using explicit user context
     # Authenticate as provided user_id for test compatibility
@@ -675,7 +685,12 @@ def buy_limited_compat(req: LegacyLimitedBuyRequest, db = Depends(get_db)):
     return res
 
 
-@router.post("/buy-limited", response_model=LimitedBuyReceipt, summary="Buy limited-time package (real money)")
+@router.post(
+    "/buy-limited",
+    response_model=LimitedBuyReceipt,
+    summary="Buy limited-time package (real money)",
+    operation_id="buy_limited_package",
+)
 def buy_limited(req: LimitedBuyRequest, db = Depends(get_db), current_user = Depends(get_current_user)):
     user_id = getattr(current_user, "id", None)
     if not user_id:
@@ -694,21 +709,23 @@ def buy_limited(req: LimitedBuyRequest, db = Depends(get_db), current_user = Dep
     if hasattr(pkg.start_at, 'tzinfo') and pkg.start_at.tzinfo is not None:
         now = datetime.now(pkg.start_at.tzinfo)
     if not (pkg.is_active and pkg.start_at <= now <= pkg.end_at):
-        return LimitedBuyReceipt(success=False, message="Package not available", user_id=user_id, code=pkg.code, reason_code="WINDOW_CLOSED")
+        cur_user = db.query(models.User).filter(models.User.id == user_id).first()
+        return LimitedBuyReceipt(success=False, message="Package not available", user_id=user_id, code=pkg.code, reason_code="WINDOW_CLOSED", new_gem_balance=getattr(cur_user, 'cyber_token_balance', 0) if cur_user else None)
 
     user = db.query(models.User).filter(models.User.id == user_id).first()
     if not user:
-        return LimitedBuyReceipt(success=False, message="User not found", user_id=user_id, reason_code="UNAUTHORIZED")
+        return LimitedBuyReceipt(success=False, message="User not found", user_id=user_id, reason_code="UNAUTHORIZED", new_gem_balance=None)
 
     # Fast path: if idempotency key already seen, acknowledge
     if idem and rman.redis_client:
         if rman.redis_client.exists(_idem_key(user_id, req.package_id, idem)):
-            return LimitedBuyReceipt(success=True, message="중복 요청 처리됨", user_id=user_id, code=req.package_id)
+            cur_user = db.query(models.User).filter(models.User.id == user_id).first()
+            return LimitedBuyReceipt(success=True, message="중복 요청 처리됨", user_id=user_id, code=req.package_id, new_gem_balance=getattr(cur_user, 'cyber_token_balance', 0) if cur_user else None)
 
     # per-user limit
     already = LimitedPackageService.get_user_purchased(pkg.code, user_id)
     if pkg.per_user_limit and already + req.quantity > pkg.per_user_limit:
-        return LimitedBuyReceipt(success=False, message="Per-user limit exceeded", user_id=user_id, code=pkg.code, reason_code="USER_LIMIT")
+        return LimitedBuyReceipt(success=False, message="Per-user limit exceeded", user_id=user_id, code=pkg.code, reason_code="USER_LIMIT", new_gem_balance=getattr(user, 'cyber_token_balance', 0))
 
     # Sweep expired holds to return any timed-out reservations back to stock (best-effort)
     try:
@@ -719,7 +736,7 @@ def buy_limited(req: LimitedBuyRequest, db = Depends(get_db), current_user = Dep
     # stock reservation
     hold_id: Optional[str] = None
     if not LimitedPackageService.try_reserve(pkg.code, req.quantity):
-        return LimitedBuyReceipt(success=False, message="Out of stock", user_id=user_id, code=pkg.code, reason_code="OUT_OF_STOCK")
+        return LimitedBuyReceipt(success=False, message="Out of stock", user_id=user_id, code=pkg.code, reason_code="OUT_OF_STOCK", new_gem_balance=getattr(user, 'cyber_token_balance', 0))
 
     # add a short hold so that if payment fails or client drops, stock returns after TTL
     try:

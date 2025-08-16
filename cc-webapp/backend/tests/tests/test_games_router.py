@@ -1,4 +1,7 @@
-"""Tests for games.py router."""
+import pytest
+pytest.skip("Duplicate games router test (tests/tests) – skipped", allow_module_level=True)
+
+"""(SKIPPED DUPLICATE) Tests for games.py router."""
 
 import pytest
 from fastapi.testclient import TestClient

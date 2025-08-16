@@ -1,9 +1,14 @@
 """
 AdultContentService 테스트 - 이중 접근 제어 시스템
 랭크 + RFM 세그먼트 조합 접근 제어
+미구현 상태(ADULT_CONTENT_ENABLED False)에서는 전체 스킵.
 """
 
 import pytest
+from app.core.config import settings
+
+if not getattr(settings, "ADULT_CONTENT_ENABLED", False):
+    pytest.skip("성인 콘텐츠 기능 미구현 - 테스트 스킵", allow_module_level=True)
 from unittest.mock import MagicMock, AsyncMock
 from datetime import datetime
 

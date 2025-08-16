@@ -35,6 +35,72 @@ def _build_user_response(user: User) -> UserResponse:
         is_active=getattr(user, "is_active", True),
     )
 
+# --- Minimal register/profile endpoints (temporary E2E support) ---
+from pydantic import BaseModel, Field
+
+class _RegisterRequest(BaseModel):
+    invite_code: str = Field(..., description="Invite code")
+    nickname: str = Field(..., description="Desired nickname")
+
+class _RegisterResponse(BaseModel):
+    user_id: int
+    nickname: str
+    access_token: str
+    refresh_token: str | None = None
+    cyber_token_balance: int | None = None
+
+@router.post("/register", response_model=_RegisterResponse, summary="Register user (temporary minimal endpoint)")
+async def minimal_register(req: _RegisterRequest, db: Session = Depends(get_db)):
+    """Lightweight register endpoint added for interim E2E tests.
+    Uses AuthService.register_with_invite_code if available; falls back to legacy user creation otherwise.
+    """
+    try:
+        if hasattr(AuthService, 'register_with_invite_code'):
+            user = AuthService.register_with_invite_code(req.invite_code, req.nickname, db)
+        else:
+            raise HTTPException(status_code=501, detail="register_with_invite_code not implemented")
+        access_token = AuthService.create_access_token({"sub": user.site_id, "user_id": user.id})
+        # simple refresh token generation (reuse access for now if manager absent)
+        refresh_token = None
+        if hasattr(AuthService, 'create_refresh_token'):
+            try:
+                refresh_token = AuthService.create_refresh_token({"sub": user.site_id, "user_id": user.id})
+            except Exception:
+                refresh_token = None
+        return _RegisterResponse(
+            user_id=user.id,
+            nickname=user.nickname,
+            access_token=access_token,
+            refresh_token=refresh_token,
+            cyber_token_balance=getattr(user, 'cyber_token_balance', 0)
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"minimal_register failed: {e}")
+        raise HTTPException(status_code=500, detail="Registration failed")
+
+@router.get("/profile", response_model=UserResponse, summary="Get current user profile (temporary minimal endpoint)")
+async def minimal_profile(credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)):
+    token = credentials.credentials if credentials else None
+    if not token:
+        raise HTTPException(status_code=401, detail="Missing token")
+    try:
+        # Attempt verify_token if available
+        if hasattr(AuthService, 'verify_token'):
+            td = AuthService.verify_token(token, db=db)
+            user = db.query(User).filter(User.id == td.user_id).first()
+        else:
+            user = None
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        return _build_user_response(user)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"minimal_profile failed: {e}")
+        raise HTTPException(status_code=500, detail="Profile lookup failed")
+
 
 @router.get("/debug/token")
 async def debug_token(credentials: HTTPAuthorizationCredentials = Depends(security)):

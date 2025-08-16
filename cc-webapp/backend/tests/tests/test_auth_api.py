@@ -1,13 +1,8 @@
-"""
-Casino-Club F2P - 인증 시스템 테스트 스크립트
-=============================================================================
-개선된 인증 시스템의 모든 API 엔드포인트를 테스트합니다:
-- 회원가입
-- 로그인
-- 토큰 갱신
-- 로그아웃
-- 사용자 프로필 조회
-- 세션 목록 조회
+import pytest
+pytest.skip("Duplicate legacy auth API script (tests/tests) – skipped", allow_module_level=True)
+
+"""(SKIPPED DUPLICATE)
+원본: 절차형 requests 스크립트. 상위 tests/test_auth_api.py와 중복.
 """
 
 import requests
