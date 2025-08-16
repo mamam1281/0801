@@ -48,10 +48,17 @@ class ShopTransaction(Base):
     status = Column(String(20), nullable=False, default="success")  # pending|success|failed|refunded
     receipt_code = Column(String(64), unique=True, index=True)
     failure_reason = Column(String(500))
+    # 무결성 검증용 해시 (user_id|product_id|amount|quantity|charge_id|receipt_code 등 조합 sha256)
+    integrity_hash = Column(String(64), nullable=True, index=True)
+    # 환불/보정 대비 원본 트랜잭션 참조 (self-reference)
+    original_tx_id = Column(Integer, ForeignKey("shop_transactions.id"), nullable=True)
+    # 클라이언트 제공 검증용 영수증 서명(HMAC) - integrity_hash와 별개 (회전 가능 secret 기반)
+    receipt_signature = Column(String(128), nullable=True, index=True)
     # Avoid SQLAlchemy reserved attribute name 'metadata' on declarative models
     extra = Column(JSON)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow)
+    # NOTE: status 값 확장 예정(success|failed|voided|reversed 등) - DB 레벨 제약 없음(문서 참조)
 
 
 class ShopLimitedPackage(Base):

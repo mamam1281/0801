@@ -2,6 +2,11 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from typing import Optional, Literal, List
 from datetime import datetime
+import time
+import json
+import logging
+import uuid
+import hmac, hashlib
 
 from .. import models
 from ..database import get_db
@@ -66,6 +71,26 @@ from ..utils.redis import get_redis_manager
 from ..core.config import settings
 from ..utils.utils import WebhookUtils
 from fastapi import Request
+
+logger = logging.getLogger(__name__)
+
+# --- Metrics (best-effort; 실패시 무시) ---
+try:
+    from prometheus_client import Counter
+    PURCHASE_COUNTER = Counter(
+        "purchase_attempt_total",
+        "구매 시도/성공/실패 카운터",
+        ["flow", "result", "reason"],
+    )
+except Exception:  # pragma: no cover - 라이브러리 미존재시 무시
+    PURCHASE_COUNTER = None
+
+def _metric_inc(flow: str, result: str, reason: str | None = None):  # helper
+    if PURCHASE_COUNTER:
+        try:
+            PURCHASE_COUNTER.labels(flow=flow, result=result, reason=reason or "").inc()
+        except Exception:
+            pass
 
 def get_shop_service(db = Depends(get_db)) -> ShopService:
     """Dependency provider for ShopService."""
@@ -199,6 +224,43 @@ def buy_limited_compat(req: LimitedBuyCompatRequest, db = Depends(get_db)):
     if not user:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
+    # --- Fraud 차단 선제 룰 (시도 직전 윈도 검사) ---
+    rclient = getattr(rman, 'redis_client', None)
+    FRAUD_WINDOW = 300  # 5분
+    FRAUD_MAX_COUNT = 20
+    FRAUD_MAX_CARD_UNIQUE = 3
+    if rclient:
+        try:
+            now_ts = int(time.time())
+            zkey = f"user:buy:ts:{user_id}"
+            rclient.zremrangebyscore(zkey, 0, now_ts - FRAUD_WINDOW)
+            count = rclient.zcount(zkey, now_ts - FRAUD_WINDOW, now_ts)
+            skey = f"user:buy:cards:{user_id}"
+            card_uniques = rclient.scard(skey) if rclient.exists(skey) else 0
+            if count >= FRAUD_MAX_COUNT or card_uniques >= FRAUD_MAX_CARD_UNIQUE:
+                _metric_inc("limited", "fail", "FRAUD_BLOCK")
+                try:
+                    db.add(models.ShopTransaction(
+                        user_id=user_id,
+                        product_id=pkg.code if pkg else req.code,
+                        kind="gems",
+                        quantity=req.quantity,
+                        unit_price=0,
+                        amount=0,
+                        payment_method="card" if req.card_token else "unknown",
+                        status="failed",
+                        failure_reason="fraud_velocity_threshold",
+                        extra={"limited": True, "reason": "FRAUD_BLOCK", "count_5m": int(count), "cards_5m": int(card_uniques)},
+                    ))
+                    db.commit()
+                except Exception:
+                    pass
+                raise HTTPException(status_code=429, detail="Fraud velocity threshold")
+        except HTTPException:
+            raise
+        except Exception:
+            pass
+
     # Fast path idempotency
     if idem and rman.redis_client:
         try:
@@ -246,6 +308,24 @@ def buy_limited_compat(req: LimitedBuyCompatRequest, db = Depends(get_db)):
     from ..services.payment_gateway import authorize_with_retry, capture_with_retry
     auth = authorize_with_retry(gateway, total_price_cents, req.currency, card_token=req.card_token)
     if not auth.success:
+        # 실패 트랜잭션 기록
+        try:
+            db.add(models.ShopTransaction(
+                user_id=user_id,
+                product_id=pkg.code,
+                kind="gems",
+                quantity=req.quantity,
+                unit_price=unit_price,
+                amount=total_price_cents,
+                payment_method="card" if req.card_token else "unknown",
+                status="failed",
+                failure_reason=f"authorize:{auth.message}",
+                extra={"limited": True, "stage": "authorize"},
+            ))
+            db.commit()
+        except Exception:
+            try: db.rollback()
+            except Exception: pass
         try:
             if hold_id:
                 LimitedPackageService.remove_hold(pkg.code, hold_id)
@@ -265,6 +345,23 @@ def buy_limited_compat(req: LimitedBuyCompatRequest, db = Depends(get_db)):
         )
     cap = capture_with_retry(gateway, auth.charge_id or "")
     if not cap.success:
+        try:
+            db.add(models.ShopTransaction(
+                user_id=user_id,
+                product_id=pkg.code,
+                kind="gems",
+                quantity=req.quantity,
+                unit_price=unit_price,
+                amount=total_price_cents,
+                payment_method="card" if req.card_token else "unknown",
+                status="failed",
+                failure_reason=f"capture:{cap.message}",
+                extra={"limited": True, "stage": "capture", "charge_id": auth.charge_id},
+            ))
+            db.commit()
+        except Exception:
+            try: db.rollback()
+            except Exception: pass
         try:
             if hold_id:
                 LimitedPackageService.remove_hold(pkg.code, hold_id)
@@ -328,6 +425,10 @@ def buy_limited_compat(req: LimitedBuyCompatRequest, db = Depends(get_db)):
     # synthetic receipt + cleanup hold
     import uuid
     receipt_code = uuid.uuid4().hex[:12]
+    # receipt_signature 생성 (회전 가능한 secret 사용: PAYMENT_WEBHOOK_SECRET 재사용 또는 전용 키 추후 분리)
+    secret = settings.PAYMENT_WEBHOOK_SECRET.encode()
+    sig_payload = f"{user_id}|{pkg.code}|{req.quantity}|{total_price_cents}|{cap.charge_id}|{int(time.time())}".encode()
+    receipt_signature = hmac.new(secret, sig_payload, hashlib.sha256).hexdigest()
     try:
         if hold_id:
             LimitedPackageService.remove_hold(pkg.code, hold_id)
@@ -381,24 +482,87 @@ class LegacyLimitedBuyRequest(BaseModel):
     promo_code: Optional[str] = None
     idempotency_key: Optional[str] = Field(None, description="Client-provided idempotency key (unique per purchase attempt)")
 
-@router.post("/webhook/payment", summary="Payment Webhook")
+@router.post("/webhook/payment", summary="Payment Webhook (Replay & 멱등 보호)")
 async def payment_webhook(request: Request):
-    """Verify HMAC signature and accept payment provider webhook.
-    Expected header: X-Signature: sha256=<hex>
-    Secret: settings.PAYMENT_WEBHOOK_SECRET
+    """결제 프로바이더 웹훅 수신.
+    보안 계층:
+      1) HMAC 서명 검증 (X-Signature)
+      2) 재생(Replay) 방어: X-Timestamp + X-Nonce (서로 결합한 키 Redis SETNX, 시간왜곡 허용 ±300s)
+      3) 이벤트 멱등: X-Event-Id 헤더 또는 payload.event_id 기준 Redis SETNX (중복시 duplicate 응답)
+
+    기대 헤더:
+      - X-Signature: sha256=<hex>
+      - X-Timestamp: unix epoch seconds
+      - X-Nonce: 임의 UUID/난수 문자열
+      - (선택) X-Event-Id: 공급자 이벤트 고유 ID
     """
     raw_body = await request.body()
-    provided = request.headers.get("X-Signature", "")
+    headers = request.headers
+    provided_sig = headers.get("X-Signature", "")
+    ts_header = headers.get("X-Timestamp")
+    nonce = headers.get("X-Nonce")
+    event_id_hdr = headers.get("X-Event-Id")
+
+    # 1. 서명 검증
     try:
-        # Compute signature over raw payload
-        expected = WebhookUtils.generate_webhook_signature(raw_body.decode("utf-8"), settings.PAYMENT_WEBHOOK_SECRET)
+        expected_sig = WebhookUtils.generate_webhook_signature(raw_body.decode("utf-8"), settings.PAYMENT_WEBHOOK_SECRET)
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid payload")
     import hmac
-    if not (provided and hmac.compare_digest(provided, expected)):
+    if not (provided_sig and hmac.compare_digest(provided_sig, expected_sig)):
         raise HTTPException(status_code=401, detail="Invalid signature")
-    # For now, just ack; in future, map to receipt and settle
-    return {"ok": True}
+
+    # 2. Timestamp / Nonce 필수
+    if not ts_header or not nonce:
+        raise HTTPException(status_code=400, detail="Missing timestamp/nonce")
+    try:
+        ts_val = int(ts_header)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid timestamp")
+    now = int(time.time())
+    ALLOWED_SKEW = 300  # 5분
+    if abs(now - ts_val) > ALLOWED_SKEW:
+        raise HTTPException(status_code=400, detail="Stale timestamp")
+
+    # 3. Redis 기반 Replay 방어 (ts+nonce 조합)
+    rman = get_redis_manager()
+    replay_key = f"webhook:pay:replay:{ts_val}:{nonce}"
+    REPLAY_TTL = 600  # 10분
+    client = getattr(rman, 'redis_client', None)
+    if client:
+        try:
+            if not client.set(replay_key, "1", nx=True, ex=REPLAY_TTL):
+                # 이미 처리된 (replay)
+                raise HTTPException(status_code=409, detail="Replay detected")
+        except HTTPException:
+            raise
+        except Exception as e:  # Redis 장애시 degrade
+            logger.warning(f"Replay key set 실패(degrade): {e}")
+
+    # 4. Payload 파싱 (event_id 추출)
+    event_id = event_id_hdr
+    payload_json = None
+    if not event_id:
+        try:
+            payload_json = json.loads(raw_body.decode("utf-8"))
+            event_id = payload_json.get("event_id") if isinstance(payload_json, dict) else None
+        except Exception:
+            # event_id 없이도 서명/재생 방어 되었다면 계속 진행
+            payload_json = None
+
+    # 5. 이벤트 멱등 처리
+    duplicate = False
+    if event_id and client:
+        idemp_key = f"webhook:pay:event:{event_id}"
+        IDEMP_TTL = 60 * 60 * 24  # 24h
+        try:
+            if not client.set(idemp_key, "1", nx=True, ex=IDEMP_TTL):
+                duplicate = True
+        except Exception as e:
+            logger.warning(f"Webhook event idempotency set 실패(degrade): {e}")
+
+    # TODO: 실제 비즈니스 처리 (예: 결제 상태 업데이트, 보상 지급 등)
+    return {"ok": True, "duplicate": duplicate}
 
 @router.post("/purchase", response_model=ShopPurchaseResponse, summary="Purchase Item", description="Purchase shop item using user's gold tokens")
 def purchase_shop_item(
@@ -701,8 +865,40 @@ def buy_limited(req: LimitedBuyRequest, db = Depends(get_db), current_user = Dep
     IDEM_TTL = 60 * 10
     def _idem_key(uid: int, code: str, key: str) -> str:
         return f"shop:limited:idemp:{uid}:{code}:{key}"
+    def _idem_lock_key(uid: int, code: str, key: str) -> str:
+        return f"shop:limited:idemp_lock:{uid}:{code}:{key}"
+
+    _metric_inc("limited", "start", None)
+
+    # Rate limiting (10초 5회)
+    if rman.redis_client:
+        try:
+            rl_key = f"rl:buy-limited:{user_id}"
+            cnt = rman.redis_client.incr(rl_key)
+            if cnt == 1:
+                rman.redis_client.expire(rl_key, 10)
+            if cnt > 5:
+                _metric_inc("limited", "fail", "RATE_LIMIT")
+                return LimitedBuyReceipt(success=False, message="Rate limit exceeded", user_id=user_id, code=req.package_id, reason_code="RATE_LIMIT")
+        except Exception:
+            pass
+
+    # Idempotency pre-lock: 동시 중복 처리 방지
+    if idem and rman.redis_client:
+        try:
+            if rman.redis_client.exists(_idem_key(user_id, req.package_id, idem)):
+                # 이미 성공 처리됨
+                cur_user = db.query(models.User).filter(models.User.id == user_id).first()
+                return LimitedBuyReceipt(success=True, message="중복 요청 처리됨", user_id=user_id, code=req.package_id, new_gem_balance=getattr(cur_user, 'cyber_token_balance', 0) if cur_user else None)
+            # pre-lock 획득 시도
+            if not rman.redis_client.set(_idem_lock_key(user_id, req.package_id, idem), "1", nx=True, ex=60):
+                _metric_inc("limited", "fail", "PROCESSING")
+                return LimitedBuyReceipt(success=False, message="Processing duplicate", user_id=user_id, code=req.package_id, reason_code="PROCESSING")
+        except Exception:
+            pass
     pkg = LimitedPackageService.get(req.package_id)
     if not pkg:
+        _metric_inc("limited", "fail", "NOT_FOUND")
         return LimitedBuyReceipt(success=False, message="Package not found", user_id=user_id, reason_code="NOT_FOUND")
     now = datetime.utcnow()
     # normalize to naive for comparison if needed
@@ -710,21 +906,27 @@ def buy_limited(req: LimitedBuyRequest, db = Depends(get_db), current_user = Dep
         now = datetime.now(pkg.start_at.tzinfo)
     if not (pkg.is_active and pkg.start_at <= now <= pkg.end_at):
         cur_user = db.query(models.User).filter(models.User.id == user_id).first()
-        return LimitedBuyReceipt(success=False, message="Package not available", user_id=user_id, code=pkg.code, reason_code="WINDOW_CLOSED", new_gem_balance=getattr(cur_user, 'cyber_token_balance', 0) if cur_user else None)
+    _metric_inc("limited", "fail", "WINDOW_CLOSED")
+    return LimitedBuyReceipt(success=False, message="Package not available", user_id=user_id, code=pkg.code, reason_code="WINDOW_CLOSED", new_gem_balance=getattr(cur_user, 'cyber_token_balance', 0) if cur_user else None)
 
     user = db.query(models.User).filter(models.User.id == user_id).first()
     if not user:
-        return LimitedBuyReceipt(success=False, message="User not found", user_id=user_id, reason_code="UNAUTHORIZED", new_gem_balance=None)
+        _metric_inc("limited", "fail", "UNAUTHORIZED")
+        return LimitedBuyReceipt(
+            success=False,
+            message="User not found",
+            user_id=user_id,
+            reason_code="UNAUTHORIZED",
+            new_gem_balance=None,
+        )
 
     # Fast path: if idempotency key already seen, acknowledge
-    if idem and rman.redis_client:
-        if rman.redis_client.exists(_idem_key(user_id, req.package_id, idem)):
-            cur_user = db.query(models.User).filter(models.User.id == user_id).first()
-            return LimitedBuyReceipt(success=True, message="중복 요청 처리됨", user_id=user_id, code=req.package_id, new_gem_balance=getattr(cur_user, 'cyber_token_balance', 0) if cur_user else None)
+    # Fast path (이미 pre-lock 전 성공 케이스 확인은 위에서 처리) - 유지 목적 주석
 
     # per-user limit
     already = LimitedPackageService.get_user_purchased(pkg.code, user_id)
     if pkg.per_user_limit and already + req.quantity > pkg.per_user_limit:
+        _metric_inc("limited", "fail", "USER_LIMIT")
         return LimitedBuyReceipt(success=False, message="Per-user limit exceeded", user_id=user_id, code=pkg.code, reason_code="USER_LIMIT", new_gem_balance=getattr(user, 'cyber_token_balance', 0))
 
     # Sweep expired holds to return any timed-out reservations back to stock (best-effort)
@@ -736,6 +938,7 @@ def buy_limited(req: LimitedBuyRequest, db = Depends(get_db), current_user = Dep
     # stock reservation
     hold_id: Optional[str] = None
     if not LimitedPackageService.try_reserve(pkg.code, req.quantity):
+        _metric_inc("limited", "fail", "OUT_OF_STOCK")
         return LimitedBuyReceipt(success=False, message="Out of stock", user_id=user_id, code=pkg.code, reason_code="OUT_OF_STOCK", new_gem_balance=getattr(user, 'cyber_token_balance', 0))
 
     # add a short hold so that if payment fails or client drops, stock returns after TTL
@@ -755,6 +958,7 @@ def buy_limited(req: LimitedBuyRequest, db = Depends(get_db), current_user = Dep
                     LimitedPackageService.remove_hold(pkg.code, hold_id)
             finally:
                 LimitedPackageService.release_reservation(pkg.code, req.quantity)
+            _metric_inc("limited", "fail", "PROMO_EXHAUSTED")
             return LimitedBuyReceipt(
                 success=False,
                 message="Promo code usage limit reached",
@@ -779,6 +983,7 @@ def buy_limited(req: LimitedBuyRequest, db = Depends(get_db), current_user = Dep
                 LimitedPackageService.remove_hold(pkg.code, hold_id)
         finally:
             LimitedPackageService.release_reservation(pkg.code, req.quantity)
+        _metric_inc("limited", "fail", "PAYMENT_AUTH")
         return LimitedBuyReceipt(
             success=False,
             message=f"Payment failed: {auth.message}",
@@ -799,6 +1004,7 @@ def buy_limited(req: LimitedBuyRequest, db = Depends(get_db), current_user = Dep
                 LimitedPackageService.remove_hold(pkg.code, hold_id)
         finally:
             LimitedPackageService.release_reservation(pkg.code, req.quantity)
+        _metric_inc("limited", "fail", "PAYMENT_CAPTURE")
         return LimitedBuyReceipt(
             success=False,
             message=f"Capture failed: {cap.message}",
@@ -839,6 +1045,37 @@ def buy_limited(req: LimitedBuyRequest, db = Depends(get_db), current_user = Dep
     if req.promo_code:
         LimitedPackageService.record_promo_use(req.promo_code)
 
+    # Generate receipt early for persistence
+    receipt_code = uuid.uuid4().hex[:12]
+
+    # 트랜잭션 영속화 (limited purchase)
+    try:
+        # integrity hash 계산
+        import hashlib
+        raw = f"{user_id}|{pkg.code}|{req.quantity}|{unit_price}|{total_price_cents}|{cap.charge_id}|{receipt_code}".encode()
+        integrity_hash = hashlib.sha256(raw).hexdigest()
+        db.add(models.ShopTransaction(
+            user_id=user_id,
+            product_id=pkg.code,
+            kind="gems",
+            quantity=req.quantity,
+            unit_price=unit_price,
+            amount=total_price_cents,
+            payment_method="card" if req.card_token else "unknown",
+            status="success",
+            receipt_code=receipt_code,
+            integrity_hash=integrity_hash,
+            receipt_signature=receipt_signature,
+            extra={
+                "limited": True,
+                "promo_code": req.promo_code,
+                "charge_id": cap.charge_id,
+            },
+        ))
+    except Exception:
+        # 영속화 실패는 치명적이지 않으나 감사 추적 공백 -> 메트릭/로그 필요 (간단히 패스)
+        _metric_inc("limited", "fail", "TX_PERSIST")
+
     db.commit()
 
     # Emit Kafka event for analytics (best-effort)
@@ -857,8 +1094,6 @@ def buy_limited(req: LimitedBuyRequest, db = Depends(get_db), current_user = Dep
         pass
 
     # include a synthetic receipt code for client-side tracking
-    import uuid
-    receipt_code = uuid.uuid4().hex[:12]
     resp = LimitedBuyReceipt(
         success=True,
         message="Purchase completed",
@@ -880,7 +1115,29 @@ def buy_limited(req: LimitedBuyRequest, db = Depends(get_db), current_user = Dep
     # Mark idempotency after success
     if idem and rman.redis_client:
         try:
+            # pre-lock 키 제거 후 성공 키 기록
+            try:
+                rman.redis_client.delete(_idem_lock_key(user_id, pkg.code, idem))
+            except Exception:
+                pass
             rman.redis_client.setex(_idem_key(user_id, pkg.code, idem), IDEM_TTL, receipt_code)
         except Exception:
             pass
+
+    # Fraud velocity 1차 룰 (사후 기록) - 임계 초과 시에도 성공 후 별도 처리 가능
+    if rman.redis_client:
+        try:
+            zkey = f"user:buy:ts:{user_id}"
+            now_ts = int(time.time())
+            rman.redis_client.zadd(zkey, {str(now_ts): now_ts})
+            rman.redis_client.zremrangebyscore(zkey, 0, now_ts - 300)
+            rman.redis_client.expire(zkey, 600)
+            if req.card_token:
+                skey = f"user:buy:cards:{user_id}"
+                rman.redis_client.sadd(skey, req.card_token)
+                rman.redis_client.expire(skey, 600)
+        except Exception:
+            pass
+
+    _metric_inc("limited", "success", None)
     return resp

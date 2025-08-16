@@ -31,7 +31,7 @@ services:
 
   zookeeper:
     container_name: cc_zookeeper_local
-    ports: []  # remove host binding for 2181
+  # 로컬 개발에서는 호스트 포트 바인딩 생략 (기본 내부 포트만 사용)
 
   olap_worker:
     environment:

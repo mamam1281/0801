@@ -83,15 +83,15 @@ except Exception:
     scheduler = _DummyScheduler()
 
 # Optional monitoring
-try:
+try:  # 선택적 Prometheus 계측
     from prometheus_fastapi_instrumentator import Instrumentator
 except ImportError:
-    Instrumentator = None
+    Instrumentator = None  # 미설치 시 계측 비활성
 
-try:
+try:  # 선택적 Sentry APM/에러 추적
     import sentry_sdk
 except Exception:
-    sentry_sdk = None
+    sentry_sdk = None  # 환경 미설정 시 무시
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
