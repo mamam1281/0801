@@ -668,6 +668,17 @@ def buy(
 
     shop_svc = ShopService(db)
 
+    # Back-compat: if amount not provided, try to fetch from catalog
+    if req.amount is None:
+        try:
+            prod = CatalogService.get_product(req.product_id)
+            if prod is not None:
+                # catalog price stored in cents/units depending on service
+                req.amount = int(getattr(prod, 'price_cents', getattr(prod, 'price', 0)))
+        except Exception:
+            # leave as None; later code should handle or raise explicit error
+            pass
+
     # Idempotency protection for item/gems purchases (best-effort via Redis)
     idem = (req.idempotency_key or '').strip() or None
     rman = get_redis_manager()
