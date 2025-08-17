@@ -1,45 +1,5 @@
 services:
-  backend:
-    container_name: cc_backend_local
-    environment:
-      KAFKA_ENABLED: "1"
-      KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
-      CLICKHOUSE_ENABLED: "1"
-      CLICKHOUSE_URL: "http://clickhouse:8123"
-      CLICKHOUSE_DATABASE: "cc_olap"
-      CLICKHOUSE_USER: "default"
-    ports:
-      - "8001:8000"
-
-  frontend:
-    container_name: cc_frontend_local
-    environment:
-      NEXT_PUBLIC_API_URL: "${NEXT_PUBLIC_API_URL:-http://localhost:8001}"
-    ports:
-      - "3001:3000"
-
-  postgres:
-    container_name: cc_postgres_local
-    ports:
-      - "5433:5432"
-
-  redis:
-    container_name: cc_redis_local
-
-  kafka:
-    container_name: cc_kafka_local
-
-  zookeeper:
-    container_name: cc_zookeeper_local
-  # 로컬 개발에서는 호스트 포트 바인딩 생략 (기본 내부 포트만 사용)
-
-  olap_worker:
-    environment:
-      KAFKA_ENABLED: "1"
-      KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
-      CLICKHOUSE_ENABLED: "1"
-      CLICKHOUSE_URL: "http://clickhouse:8123"
-      CLICKHOUSE_DATABASE: "cc_olap"
-      CLICKHOUSE_USER: "default"
-    labels:
-      - "override=true"
+  services:
+    frontend:
+      environment:
+        NODE_OPTIONS: "--max-old-space-size=2048"

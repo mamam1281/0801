@@ -1009,8 +1009,12 @@ def buy(
         )
     else:
         # success immediately
-        total_gems = int(req.amount)
+        # If catalog product known, use its gems * quantity; otherwise fall back to amount-as-gems
         try:
+            if prod is not None:
+                total_gems = int(getattr(prod, 'gems', 0)) * req.quantity
+            else:
+                total_gems = int(req.amount)
             from app.services.currency_service import CurrencyService
             new_balance = CurrencyService(db).add(req_user_id, total_gems, 'gem')
         except Exception:
