@@ -64,6 +64,10 @@ class UserResponse(BaseModel):
     is_admin: bool
     created_at: datetime
     last_login: Optional[datetime] = None
+    # Currency balances (legacy + new dual currency fields)
+    cyber_token_balance: int = 0
+    regular_coin_balance: int = 0
+    premium_gem_balance: int = 0
     
     model_config = ConfigDict(from_attributes=True)
 

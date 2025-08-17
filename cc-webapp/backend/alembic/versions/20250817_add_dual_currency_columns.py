@@ -1,3 +1,54 @@
+"""add dual currency columns to users table
+
+Revision ID: 20250817_add_dual_currency
+Revises: 20250816_add_receipt_signature
+Create Date: 2025-08-17
+
+Adds regular_coin_balance and premium_gem_balance columns if missing.
+"""
+from typing import Sequence, Union
+from alembic import op
+import sqlalchemy as sa
+
+revision: str = '20250817_add_dual_currency'
+down_revision: Union[str, None] = '20250816_add_receipt_signature'
+branch_labels: Union[str, Sequence[str], None] = None
+depends_on: Union[str, Sequence[str], None] = None
+
+
+def upgrade() -> None:
+    bind = op.get_bind()
+    insp = sa.inspect(bind)
+
+    def has_col(table: str, col: str) -> bool:
+        try:
+            return any(c['name'] == col for c in insp.get_columns(table))
+        except Exception:
+            return False
+
+    with op.batch_alter_table('users') as batch_op:
+        if not has_col('users', 'regular_coin_balance'):
+            batch_op.add_column(sa.Column('regular_coin_balance', sa.Integer(), nullable=False, server_default='0'))
+        if not has_col('users', 'premium_gem_balance'):
+            batch_op.add_column(sa.Column('premium_gem_balance', sa.Integer(), nullable=False, server_default='0'))
+
+    # Drop server defaults to match ORM after backfill
+    try:
+        if has_col('users', 'regular_coin_balance'):
+            op.execute("ALTER TABLE users ALTER COLUMN regular_coin_balance DROP DEFAULT")
+    except Exception:
+        pass
+    try:
+        if has_col('users', 'premium_gem_balance'):
+            op.execute("ALTER TABLE users ALTER COLUMN premium_gem_balance DROP DEFAULT")
+    except Exception:
+        pass
+
+
+def downgrade() -> None:
+    with op.batch_alter_table('users') as batch_op:
+        batch_op.drop_column('premium_gem_balance')
+        batch_op.drop_column('regular_coin_balance')
 """add dual currency columns to users
 
 Revision ID: 20250817_add_dual_currency_columns

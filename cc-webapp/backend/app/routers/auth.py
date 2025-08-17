@@ -29,11 +29,13 @@ def _build_user_response(user: User) -> UserResponse:
         site_id=user.site_id,
         nickname=user.nickname,
         phone_number=getattr(user, "phone_number", None),
-        cyber_token_balance=getattr(user, "cyber_token_balance", 0),
         created_at=user.created_at,
         last_login=user.last_login or user.created_at,
         is_admin=getattr(user, "is_admin", False),
         is_active=getattr(user, "is_active", True),
+    cyber_token_balance=getattr(user, "cyber_token_balance", 0),
+    regular_coin_balance=getattr(user, "regular_coin_balance", 0),
+    premium_gem_balance=getattr(user, "premium_gem_balance", 0),
     )
 
 """NOTE: 2025-08 Consolidation
@@ -263,9 +265,10 @@ async def signup(data: UserCreate, request: Request, db: Session = Depends(get_d
         return Token(access_token=access_token, token_type="bearer", user=_build_user_response(user), refresh_token=refresh_token)
     except HTTPException:
         raise
-    except Exception:
+    except Exception as e:
+        # TEMP DEBUG: surface exception message inline to diagnose test failure
         logger.exception("Signup error")
-        raise HTTPException(status_code=500, detail="Registration processing error occurred")
+        raise HTTPException(status_code=500, detail=f"Registration processing error occurred: {type(e).__name__}: {e}")
 
 
 @router.post("/login", response_model=Token)

@@ -725,6 +725,25 @@ def buy(
                 pass
         return resp
 
+    # If idempotency key provided, attempt to reuse existing transaction (DB first, then Redis)
+    reused_receipt = None
+    if idem:
+        try:
+            # Search existing tx by product + recent window (simple heuristic)
+            existing = (
+                db.query(models.ShopTransaction)
+                .filter(
+                    models.ShopTransaction.user_id == req_user_id,
+                    models.ShopTransaction.product_id == req.product_id,
+                    models.ShopTransaction.idempotency_key == idem,
+                )
+                .order_by(models.ShopTransaction.id.desc())
+                .first()
+            ) if shop_svc._table_exists('shop_transactions') else None
+            if existing:
+                reused_receipt = existing.receipt_code
+        except Exception:
+            pass
     # Gems purchase via external gateway (can be pending)
     gateway = PaymentGatewayService()
     # Create pending transaction record
@@ -740,9 +759,11 @@ def buy(
         amount=int(req.amount),
         payment_method=req.payment_method or 'card',
         status='pending',
-        receipt_code=receipt_code,
+        receipt_code=reused_receipt or receipt_code,
         extra={"currency": req.currency},
     )
+    if reused_receipt:
+        receipt_code = reused_receipt
     # Also append a lightweight action log for environments without transactions table
     try:
         db.add(models.UserAction(
@@ -798,14 +819,14 @@ def buy(
     else:
         # success immediately
         total_gems = int(req.amount)
-        # 듀얼 통화 구조 적용: TokenService -> CurrencyService (gem balance)
         try:
             from app.services.currency_service import CurrencyService
             new_balance = CurrencyService(db).add(req_user_id, total_gems, 'gem')
         except Exception:
-            # 실패 시 롤백 및 기존 balance 반환 (grant 미적용)
-            try: db.rollback()
-            except Exception: pass
+            try:
+                db.rollback()
+            except Exception:
+                pass
             return BuyReceipt(
                 success=False,
                 message="보석 지급 실패",
@@ -821,6 +842,12 @@ def buy(
         if db_tx:
             db_tx.status = 'success'
             try:
+                # store idempotency key if not already (for reuse)
+                if idem and not getattr(db_tx, 'idempotency_key', None):
+                    try:
+                        db_tx.idempotency_key = idem
+                    except Exception:
+                        pass
                 db.commit()
             except Exception:
                 db.rollback()
@@ -834,7 +861,6 @@ def buy(
             new_balance=new_balance,
             receipt_code=receipt_code,
         )
-        # Mark idempotency after successful grant
         if idem and rman.redis_client:
             try:
                 rman.redis_client.setex(_idem_key(req_user_id, req.product_id, idem), IDEM_TTL, receipt_code)

@@ -191,6 +191,14 @@ __all__ = [
     # Achievements
     "Achievement",
     "UserAchievement",
+    # Shop (added 2025-08-17 for idempotent purchase tests)
+    "ShopProduct",
+    "ShopDiscount",
+    "ShopTransaction",
+    "ShopLimitedPackage",
+    "ShopPromoCode",
+    "ShopPromoUsage",
+    "AdminAuditLog",
 ]
 
 # Content 모델들 추가
@@ -215,3 +223,14 @@ from .analytics_models import (
 
 # Emotion 모델들 추가
 from .emotion_models import SupportedEmotion
+
+# Shop / Commerce models (ensure available for services & routers)
+from .shop_models import (
+    ShopProduct,
+    ShopDiscount,
+    ShopTransaction,
+    ShopLimitedPackage,
+    ShopPromoCode,
+    ShopPromoUsage,
+    AdminAuditLog,
+)
