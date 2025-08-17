@@ -1,17 +1,4 @@
-// Basic Jest config suitable for Next.js 15 with TS/JS tests
-const nextJest = require('next/jest')({ dir: './' });
-
-const createJestConfig = nextJest({
-  dir: './',
-});
-
-const customJestConfig = {
-  testEnvironment: 'jsdom',
-  setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
-  testMatch: ['**/__tests__/**/*.[jt]s?(x)'],
-  moduleNameMapper: {
-    '^@/(.*)$': '<rootDir>/$1',
-  },
-};
-
-module.exports = createJestConfig(customJestConfig);
+// Delegated to TypeScript config to avoid duplicate auto-detection conflict.
+// Keep this shim so tools expecting .js config still work.
+// If you remove this file, ensure IDE/Jest runner is pointed at jest.config.ts.
+module.exports = require('./jest.config.ts').default;
