@@ -1088,14 +1088,38 @@ class AuthService:
 
 
 # ===== 전역 인스턴스 및 헬퍼 함수 =====
-auth_service = AuthService()
+# Avoid constructing AuthService at import time because it requires a DB session.
+# Use lazy initialization: create the instance when a DB session is available.
+_auth_service_instance = None
+
+def init_auth_service(db: Session):
+    """Initialize the global auth service with a DB session.
+
+    This should be called during application startup where a DB/session is
+    available. Tests or fixtures can call this with a test DB session to
+    ensure imports don't trigger DB-dependent initializers.
+    """
+    global _auth_service_instance
+    if _auth_service_instance is None:
+        _auth_service_instance = AuthService(db)
+    return _auth_service_instance
+
+def get_auth_service_or_init(db: Session):
+    """Return the global auth service, initializing it with the provided DB if needed."""
+    global _auth_service_instance
+    if _auth_service_instance is None:
+        return init_auth_service(db)
+    return _auth_service_instance
+
 
 def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: Session = Depends(get_db)
 ):
     """현재 사용자 정보 가져오기 (의존성 주입용)"""
-    return auth_service.get_current_user_dependency(credentials, db)
+    auth = get_auth_service_or_init(db)
+    return auth.get_current_user_dependency(credentials, db)
+
 
 def get_current_user_optional(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
@@ -1104,8 +1128,9 @@ def get_current_user_optional(
     """현재 사용자 정보 가져오기 (선택적, 토큰 없어도 None 반환)"""
     if not credentials:
         return None
-    
+
     try:
-        return auth_service.get_current_user(credentials.credentials, db)
+        auth = get_auth_service_or_init(db)
+        return auth.get_current_user(credentials.credentials, db)
     except HTTPException:
         return None
