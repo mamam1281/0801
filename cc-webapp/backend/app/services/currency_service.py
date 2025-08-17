@@ -1,7 +1,8 @@
-"""이원화 통화(Coins/Gems) 관리 서비스
+"""단일 통화(cyber_token_balance) 관리 서비스
 
-SELECT FOR UPDATE 기반 원자적 잔액 변경 제공.
-기존 cyber_token_balance 는 향후 deprecated 예정이며 premium_gem_balance 로 이동.
+요구 변경: 이원화(regular_coin_balance / premium_gem_balance) 보류 → 단일 잔액 유지.
+외부 호출에서 coin/gem 구분 인자 들어오더라도 모두 동일 잔액(cyber_token_balance)을 참조.
+향후 이원화 재도입 시 이 파일을 dual-currency 브랜치로 교체 가능하도록 최소 표면적 유지.
 """
 from __future__ import annotations
 from typing import Optional, Literal
@@ -13,7 +14,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-CurrencyType = Literal['coin','gem']
+CurrencyType = Literal['coin','gem','token']  # coin/gem synonym → 단일 token
 
 class InsufficientBalanceError(Exception):
     def __init__(self, currency: str, required: int, current: int):
@@ -37,22 +38,21 @@ class CurrencyService:
             return None
 
     def _apply_delta(self, user: User, currency: CurrencyType, delta: int) -> int:
-        if currency == 'coin':
-            current = getattr(user, 'regular_coin_balance', 0) or 0
-            new_val = current + delta
-            if new_val < 0:
-                raise InsufficientBalanceError('coin', -delta, current)
-            user.regular_coin_balance = new_val
-            return new_val
-        else:
-            # gem
-            # 우선 premium_gem_balance 우선, legacy cyber_token_balance 동기화 선택적(여기선 독립)
-            current = getattr(user, 'premium_gem_balance', 0) or 0
-            new_val = current + delta
-            if new_val < 0:
-                raise InsufficientBalanceError('gem', -delta, current)
-            user.premium_gem_balance = new_val
-            return new_val
+        # 모든 currency 라벨은 cyber_token_balance 하나로 합산
+        label = 'token'
+        current = getattr(user, 'cyber_token_balance', 0) or 0
+        new_val = current + delta
+        if new_val < 0:
+            raise InsufficientBalanceError(label, -delta, current)
+        user.cyber_token_balance = new_val
+        # 동시 존재할 수 있는 실험적 컬럼이 남아있다면 동기화(읽기 혼선 감소)
+        if hasattr(user, 'regular_coin_balance'):
+            try: user.regular_coin_balance = new_val
+            except Exception: pass
+        if hasattr(user, 'premium_gem_balance'):
+            try: user.premium_gem_balance = new_val
+            except Exception: pass
+        return new_val
 
     def add(self, user_id: int, amount: int, currency: CurrencyType) -> int:
         if amount < 0:
@@ -74,25 +74,28 @@ class CurrencyService:
         self.db.commit()
         return new_val
 
-    def transfer_legacy_tokens_to_gems(self, user_id: int) -> int:
-        """옵션: 기존 cyber_token_balance 를 premium_gem_balance 로 1:1 이전(1회성 마이그레이션 시 사용)."""
+    def transfer_legacy_tokens_to_gems(self, user_id: int) -> int:  # 유지: 하위호환 (현재 단일 모드에서는 noop)
         user = self._get_user_for_update(user_id)
         if not user:
             raise ValueError('user not found')
-        legacy = getattr(user, 'cyber_token_balance', 0) or 0
-        if legacy <= 0:
-            return user.premium_gem_balance or 0
-        user.premium_gem_balance = (user.premium_gem_balance or 0) + legacy
-        user.cyber_token_balance = 0  # zero out legacy
+        # 단일 통화 모드에서는 premium_gem_balance 사용 안 함. 동기화만 수행.
+        val = getattr(user, 'cyber_token_balance', 0) or 0
+        if hasattr(user, 'premium_gem_balance'):
+            try: user.premium_gem_balance = val
+            except Exception: pass
+        if hasattr(user, 'regular_coin_balance'):
+            try: user.regular_coin_balance = val
+            except Exception: pass
         self.db.commit()
-        return user.premium_gem_balance or 0
+        return val
 
     def get_balances(self, user_id: int) -> dict:
         user = self.db.get(User, user_id)
         if not user:
             raise ValueError('user not found')
+        unified = getattr(user, 'cyber_token_balance', 0) or 0
         return {
-            'coin': getattr(user, 'regular_coin_balance', 0) or 0,
-            'gem': getattr(user, 'premium_gem_balance', 0) or 0,
-            'legacy_token': getattr(user, 'cyber_token_balance', 0) or 0,
+            'token': unified,
+            'coin': unified,  # alias
+            'gem': unified,   # alias
         }

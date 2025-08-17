@@ -377,34 +377,10 @@ class AuthService:
             db.add(db_user)
             db.commit()
             db.refresh(db_user)
-        except Exception as e:
+        except Exception:
+            # 이 시점에서 dual currency 컬럼 자동 추가 로직은 보류(단일 통화 정책 확정) → 즉시 오류 전파
             db.rollback()
-            import logging as _log
-            _log.exception("create_user DB error")
-            # Dynamic schema repair for missing dual currency columns (test/local SQLite only)
-            msg = str(e).lower()
-            if 'no column named regular_coin_balance' in msg or 'no such column: users.regular_coin_balance' in msg:
-                try:
-                    from sqlalchemy import text
-                    conn = db.connection()
-                    # Add columns if absent
-                    for ddl in [
-                        "ALTER TABLE users ADD COLUMN regular_coin_balance INTEGER NOT NULL DEFAULT 0",
-                        "ALTER TABLE users ADD COLUMN premium_gem_balance INTEGER NOT NULL DEFAULT 0"
-                    ]:
-                        try:
-                            conn.execute(text(ddl))
-                        except Exception:
-                            pass
-                    # Retry insert with updated schema
-                    db.add(db_user)
-                    db.commit()
-                    db.refresh(db_user)
-                except Exception:
-                    db.rollback()
-                    raise
-            else:
-                raise
+            raise
         return db_user
     
     @staticmethod

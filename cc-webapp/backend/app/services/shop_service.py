@@ -171,7 +171,7 @@ class ShopService:
         }
 
     # ----- transactions/receipts -----
-    def record_transaction(self, user_id: int, product_id: str, kind: str, quantity: int, unit_price: int, amount: int, payment_method: str | None, status: str, receipt_code: str, extra: Dict[str, Any] | None = None, failure_reason: Optional[str] = None) -> None:
+    def record_transaction(self, user_id: int, product_id: str, kind: str, quantity: int, unit_price: int, amount: int, payment_method: str | None, status: str, receipt_code: str, extra: Dict[str, Any] | None = None, failure_reason: Optional[str] = None, idempotency_key: Optional[str] = None, *, raise_on_conflict: bool = False) -> None:
         if not self._table_exists('shop_transactions'):
             return
         try:
@@ -186,12 +186,15 @@ class ShopService:
                 status=status,
                 receipt_code=receipt_code,
                 failure_reason=failure_reason,
+                idempotency_key=idempotency_key,
                 extra=extra or None,
             )
             self.db.add(tx)
             self.db.commit()
-        except Exception:
+        except Exception as e:  # pragma: no cover - conflict path exercised in race test
             self.db.rollback()
+            if raise_on_conflict:
+                raise e
 
     def list_transactions(self, user_id: int, limit: int = 20) -> List[Dict[str, Any]]:
         if self._table_exists('shop_transactions'):

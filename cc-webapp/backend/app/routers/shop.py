@@ -725,45 +725,63 @@ def buy(
                 pass
         return resp
 
-    # If idempotency key provided, attempt to reuse existing transaction (DB first, then Redis)
+    # If idempotency key provided, attempt to reuse existing transaction
     reused_receipt = None
+    existing_tx = None
     if idem:
         try:
-            # Search existing tx by product + recent window (simple heuristic)
-            existing = (
+            existing_tx = (
                 db.query(models.ShopTransaction)
                 .filter(
                     models.ShopTransaction.user_id == req_user_id,
                     models.ShopTransaction.product_id == req.product_id,
                     models.ShopTransaction.idempotency_key == idem,
                 )
-                .order_by(models.ShopTransaction.id.desc())
+                .order_by(models.ShopTransaction.id.asc())
                 .first()
             ) if shop_svc._table_exists('shop_transactions') else None
-            if existing:
-                reused_receipt = existing.receipt_code
+            if existing_tx:
+                reused_receipt = existing_tx.receipt_code
+                # Fast return if already success or failed (deterministic reuse)
+                if existing_tx.status in ("success", "failed"):
+                    return BuyReceipt(
+                        success=(existing_tx.status == 'success'),
+                        message="구매 완료" if existing_tx.status == 'success' else "결제 실패 재사용",
+                        user_id=req_user_id,
+                        product_id=req.product_id,
+                        quantity=existing_tx.quantity or req.quantity,
+                        granted_gems=existing_tx.amount if existing_tx.status == 'success' else None,
+                        new_balance=getattr(user, "cyber_token_balance", 0),
+                        receipt_code=reused_receipt,
+                        reason_code=None if existing_tx.status == 'success' else 'PAYMENT_DECLINED',
+                    )
         except Exception:
-            pass
+            existing_tx = None
     # Gems purchase via external gateway (can be pending)
     gateway = PaymentGatewayService()
     # Create pending transaction record
     from datetime import datetime as _dt
     import uuid
     receipt_code = uuid.uuid4().hex[:12]
-    shop_svc.record_transaction(
-        user_id=req_user_id,
-        product_id=req.product_id,
-        kind='gems',
-        quantity=req.quantity,
-        unit_price=int(req.amount),
-        amount=int(req.amount),
-        payment_method=req.payment_method or 'card',
-        status='pending',
-        receipt_code=reused_receipt or receipt_code,
-        extra={"currency": req.currency},
-    )
-    if reused_receipt:
-        receipt_code = reused_receipt
+    if existing_tx and existing_tx.status == 'pending':
+        # Update existing pending tx (no new row)
+        receipt_code = existing_tx.receipt_code
+    else:
+        shop_svc.record_transaction(
+            user_id=req_user_id,
+            product_id=req.product_id,
+            kind='gems',
+            quantity=req.quantity,
+            unit_price=int(req.amount),
+            amount=int(req.amount),
+            payment_method=req.payment_method or 'card',
+            status='pending',
+            receipt_code=reused_receipt or receipt_code,
+            extra={"currency": req.currency},
+            idempotency_key=idem,
+        )
+        if reused_receipt:
+            receipt_code = reused_receipt
     # Also append a lightweight action log for environments without transactions table
     try:
         db.add(models.UserAction(
@@ -778,9 +796,12 @@ def buy(
     status = pres.get("status")
     if status == "failed":
         # Update to failed
-        db_tx = shop_svc.get_tx_by_receipt_for_user(req_user_id, receipt_code)
+        db_tx = existing_tx or shop_svc.get_tx_by_receipt_for_user(req_user_id, receipt_code)
         if db_tx:
             db_tx.status = 'failed'
+            if idem and not getattr(db_tx, 'idempotency_key', None):
+                try: db_tx.idempotency_key = idem
+                except Exception: pass
             try:
                 db.commit()
             except Exception:
@@ -838,35 +859,36 @@ def buy(
                 reason_code="GRANT_FAILED",
             )
         # mark success
-        db_tx = shop_svc.get_tx_by_receipt_for_user(req_user_id, receipt_code)
-        if db_tx:
-            db_tx.status = 'success'
-            try:
-                # store idempotency key if not already (for reuse)
-                if idem and not getattr(db_tx, 'idempotency_key', None):
-                    try:
-                        db_tx.idempotency_key = idem
-                    except Exception:
-                        pass
-                db.commit()
-            except Exception:
-                db.rollback()
-        resp = BuyReceipt(
-            success=True,
-            message="구매 완료",
-            user_id=req_user_id,
-            product_id=req.product_id,
-            quantity=req.quantity,
-            granted_gems=total_gems,
-            new_balance=new_balance,
-            receipt_code=receipt_code,
-        )
-        if idem and rman.redis_client:
-            try:
-                rman.redis_client.setex(_idem_key(req_user_id, req.product_id, idem), IDEM_TTL, receipt_code)
-            except Exception:
-                pass
-        return resp
+    db_tx = existing_tx or shop_svc.get_tx_by_receipt_for_user(req_user_id, receipt_code)
+    if db_tx:
+        db_tx.status = 'success'
+        try:
+            # store idempotency key if not already (for reuse)
+            if idem and not getattr(db_tx, 'idempotency_key', None):
+                try:
+                    db_tx.idempotency_key = idem
+                except Exception:
+                    pass
+            db.commit()
+        except Exception:
+            db.rollback()
+
+    resp = BuyReceipt(
+        success=True,
+        message="구매 완료",
+        user_id=req_user_id,
+        product_id=req.product_id,
+        quantity=req.quantity,
+        granted_gems=total_gems,
+        new_balance=new_balance,
+        receipt_code=receipt_code,
+    )
+    if idem and rman.redis_client:
+        try:
+            rman.redis_client.setex(_idem_key(req_user_id, req.product_id, idem), IDEM_TTL, receipt_code)
+        except Exception:
+            pass
+    return resp
 
 
 @router.get("/transactions")

@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, JSON
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, JSON, UniqueConstraint
 from sqlalchemy.orm import relationship
 
 from ..database import Base
@@ -36,6 +36,10 @@ class ShopDiscount(Base):
 
 class ShopTransaction(Base):
     __tablename__ = "shop_transactions"
+    __table_args__ = (
+        # 하나의 사용자-상품-멱등키 조합은 단일 트랜잭션으로 고정
+        UniqueConstraint('user_id', 'product_id', 'idempotency_key', name='uq_shop_tx_user_product_idem'),
+    )
 
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
