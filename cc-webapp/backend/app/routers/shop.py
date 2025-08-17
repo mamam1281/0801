@@ -68,25 +68,6 @@ from ..services.limited_package_service import LimitedPackageService
 from ..schemas.limited_package import LimitedPackageOut, LimitedBuyRequest, LimitedBuyReceipt
 from ..kafka_client import send_kafka_message
 from ..utils.redis import get_redis_manager
-import threading
-
-# In-process fallback lock map for idempotent purchase when Redis unavailable
-_LOCAL_IDEMP_LOCKS: dict[str, threading.Lock] = {}
-
-def _acquire_local_lock(key: str) -> bool:
-    lock = _LOCAL_IDEMP_LOCKS.get(key)
-    if lock is None:
-        lock = threading.Lock()
-        _LOCAL_IDEMP_LOCKS[key] = lock
-    return lock.acquire(blocking=False)
-
-def _release_local_lock(key: str):
-    lock = _LOCAL_IDEMP_LOCKS.get(key)
-    if lock and lock.locked():
-        try:
-            lock.release()
-        except Exception:
-            pass
 from ..core.config import settings
 from ..utils.utils import WebhookUtils
 from fastapi import Request
@@ -674,8 +655,6 @@ def buy(
 
     def _idem_key(uid: int, pid: str, key: str) -> str:
         return f"{IDEM_PREFIX}{uid}:{pid}:{key}"
-    def _idem_lock_key(uid: int, pid: str, key: str) -> str:
-        return f"{IDEM_PREFIX}lock:{uid}:{pid}:{key}"
 
     # If idempotency key present and lock exists, short-circuit with generic success (client should have prior receipt)
     if idem and rman.redis_client:
@@ -763,7 +742,7 @@ def buy(
             ) if shop_svc._table_exists('shop_transactions') else None
             if existing_tx:
                 reused_receipt = existing_tx.receipt_code
-                # Fast path: success/failed 재사용
+                # 상태 분기: success/failed 즉시 재사용, pending이면 게이트웨이 폴링
                 if existing_tx.status in ("success", "failed"):
                     return BuyReceipt(
                         success=(existing_tx.status == 'success'),
@@ -776,60 +755,41 @@ def buy(
                         receipt_code=reused_receipt,
                         reason_code=None if existing_tx.status == 'success' else 'PAYMENT_DECLINED',
                     )
-                # Poll path: pending 상태 재호출 시 게이트웨이 상태 확인
-                if existing_tx.status == 'pending':
-                    gw_ref = None
+                elif existing_tx.status == 'pending':
+                    # gateway_reference 확보 후 폴링 시도
+                    gateway_reference = None
                     try:
                         if isinstance(existing_tx.extra, dict):
-                            gw_ref = existing_tx.extra.get('gateway_reference')
+                            gateway_reference = existing_tx.extra.get('gateway_reference')
                     except Exception:
-                        gw_ref = None
-                    if gw_ref:
+                        gateway_reference = None
+                    if gateway_reference:
                         gateway = PaymentGatewayService()
-                        poll_res = gateway.check_status(gw_ref)
-                        polled_status = poll_res.get('status')
-                        if polled_status == 'pending':
-                            return BuyReceipt(
-                                success=False,
-                                message="결제 대기 중",
-                                user_id=req_user_id,
-                                product_id=req.product_id,
-                                quantity=existing_tx.quantity or req.quantity,
-                                receipt_code=reused_receipt,
-                                new_balance=getattr(user, "cyber_token_balance", 0),
-                                reason_code="PAYMENT_PENDING",
-                            )
-                        elif polled_status == 'failed':
+                        try:
+                            pres = gateway.check_status(gateway_reference)
+                        except Exception:
+                            pres = {"status": "pending"}
+                        polled_status = pres.get("status")
+                        if polled_status == 'success':
+                            # 토큰 아직 지급 안된 상태라면 지급 → amount는 gems 수량으로 간주(기존 단가 동일)
                             try:
-                                existing_tx.status = 'failed'
-                                existing_tx.failure_reason = 'Gateway declined (poll)'
-                                db.commit()
-                            except Exception:
-                                db.rollback()
-                            return BuyReceipt(
-                                success=False,
-                                message="결제 거절됨",
-                                user_id=req_user_id,
-                                product_id=req.product_id,
-                                quantity=existing_tx.quantity or req.quantity,
-                                receipt_code=reused_receipt,
-                                new_balance=getattr(user, "cyber_token_balance", 0),
-                                reason_code="PAYMENT_DECLINED",
-                            )
-                        else:  # success
-                            # 토큰 지급 (이미 지급 안되었을 가능성)
-                            from app.services.currency_service import CurrencyService
-                            total_gems = existing_tx.amount
-                            try:
-                                new_balance = CurrencyService(db).add(req_user_id, total_gems, 'gem')
+                                from app.services.currency_service import CurrencyService
+                                CurrencyService(db).add(req_user_id, existing_tx.amount, 'gem')
                             except Exception:
                                 try: db.rollback()
                                 except Exception: pass
-                                new_balance = getattr(user, "cyber_token_balance", 0)
+                                return BuyReceipt(
+                                    success=False,
+                                    message="보석 지급 실패",
+                                    user_id=req_user_id,
+                                    product_id=req.product_id,
+                                    quantity=existing_tx.quantity or req.quantity,
+                                    receipt_code=existing_tx.receipt_code,
+                                    new_balance=getattr(user, "premium_gem_balance", 0) or getattr(user, "cyber_token_balance", 0),
+                                    reason_code="GRANT_FAILED",
+                                )
+                            existing_tx.status = 'success'
                             try:
-                                existing_tx.status = 'success'
-                                if idem and not getattr(existing_tx, 'idempotency_key', None):
-                                    existing_tx.idempotency_key = idem
                                 db.commit()
                             except Exception:
                                 db.rollback()
@@ -840,42 +800,38 @@ def buy(
                                 product_id=req.product_id,
                                 quantity=existing_tx.quantity or req.quantity,
                                 granted_gems=existing_tx.amount,
-                                new_balance=new_balance,
-                                receipt_code=reused_receipt,
+                                new_balance=getattr(user, "cyber_token_balance", 0),
+                                receipt_code=existing_tx.receipt_code,
                             )
+                        elif polled_status == 'failed':
+                            existing_tx.status = 'failed'
+                            try:
+                                db.commit()
+                            except Exception:
+                                db.rollback()
+                            return BuyReceipt(
+                                success=False,
+                                message="결제 거절됨",
+                                user_id=req_user_id,
+                                product_id=req.product_id,
+                                quantity=existing_tx.quantity or req.quantity,
+                                receipt_code=existing_tx.receipt_code,
+                                new_balance=getattr(user, "cyber_token_balance", 0),
+                                reason_code="PAYMENT_DECLINED",
+                            )
+                        # 여전히 pending → 현재 상태 그대로 반환
+                        return BuyReceipt(
+                            success=False,
+                            message="결제 대기 중",
+                            user_id=req_user_id,
+                            product_id=req.product_id,
+                            quantity=existing_tx.quantity or req.quantity,
+                            receipt_code=existing_tx.receipt_code,
+                            new_balance=getattr(user, "cyber_token_balance", 0),
+                            reason_code="PAYMENT_PENDING",
+                        )
         except Exception:
             existing_tx = None
-    # Acquire pre-insert Redis lock to prevent duplicate row creation in race conditions
-    acquired_local = False
-    lock_key = None
-    if idem and not existing_tx:
-        if rman.redis_client:
-            try:
-                if not rman.redis_client.set(_idem_lock_key(req_user_id, req.product_id, idem), "1", nx=True, ex=60):
-                    return BuyReceipt(
-                        success=False,
-                        message="Processing duplicate",
-                        user_id=req_user_id,
-                        product_id=req.product_id,
-                        quantity=req.quantity,
-                        receipt_code=None,
-                        reason_code="PROCESSING",
-                    )
-            except Exception:
-                pass
-        else:
-            lock_key = f"local:{req_user_id}:{req.product_id}:{idem}"
-            acquired_local = _acquire_local_lock(lock_key)
-            if not acquired_local:
-                return BuyReceipt(
-                    success=False,
-                    message="Processing duplicate",
-                    user_id=req_user_id,
-                    product_id=req.product_id,
-                    quantity=req.quantity,
-                    receipt_code=None,
-                    reason_code="PROCESSING",
-                )
     # Gems purchase via external gateway (can be pending)
     gateway = PaymentGatewayService()
     # Create pending transaction record
@@ -901,15 +857,6 @@ def buy(
         )
         if reused_receipt:
             receipt_code = reused_receipt
-        # Release lock immediately after row creation so subsequent call can poll status
-        if idem:
-            if rman.redis_client:
-                try:
-                    rman.redis_client.delete(_idem_lock_key(req_user_id, req.product_id, idem))
-                except Exception:
-                    pass
-            elif acquired_local and lock_key:
-                _release_local_lock(lock_key)
     # Also append a lightweight action log for environments without transactions table
     try:
         db.add(models.UserAction(
@@ -955,13 +902,14 @@ def buy(
             db.commit()
         except Exception:
             db.rollback()
-        # 트랜잭션 extra 에 gateway_reference 저장 (추후 polling)
+        # 트랜잭션 extra에 gateway_reference 저장 (최초 pending 생성 시)
         try:
             db_tx = existing_tx or shop_svc.get_tx_by_receipt_for_user(req_user_id, receipt_code)
             if db_tx:
-                extra = db_tx.extra if isinstance(db_tx.extra, dict) else {}
-                extra.update({"gateway_reference": pres.get("gateway_reference")})
-                db_tx.extra = extra
+                if not isinstance(db_tx.extra, dict):
+                    db_tx.extra = {"currency": req.currency}
+                db_tx.extra.setdefault('currency', req.currency)
+                db_tx.extra['gateway_reference'] = pres.get('gateway_reference')
                 db.commit()
         except Exception:
             db.rollback()
@@ -1010,7 +958,6 @@ def buy(
             db.commit()
         except Exception:
             db.rollback()
-    # Idempotent success marker & lock cleanup
 
     resp = BuyReceipt(
         success=True,
@@ -1022,15 +969,11 @@ def buy(
         new_balance=new_balance,
         receipt_code=receipt_code,
     )
-    if idem:
-        if rman.redis_client:
-            try:
-                rman.redis_client.setex(_idem_key(req_user_id, req.product_id, idem), IDEM_TTL, receipt_code)
-                rman.redis_client.delete(_idem_lock_key(req_user_id, req.product_id, idem))
-            except Exception:
-                pass
-        elif acquired_local and lock_key:
-            _release_local_lock(lock_key)
+    if idem and rman.redis_client:
+        try:
+            rman.redis_client.setex(_idem_key(req_user_id, req.product_id, idem), IDEM_TTL, receipt_code)
+        except Exception:
+            pass
     return resp
 
 

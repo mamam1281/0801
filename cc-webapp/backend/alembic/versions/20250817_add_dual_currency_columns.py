@@ -1,72 +1,64 @@
-"""Add dual currency columns to users
+"""add dual currency columns to users table
 
-Revision ID: 20250817_add_dual_currency_columns
-Revises: 20250816_add_ab_test_participants
+Revision ID: 20250817_add_dual_currency
+Revises: 20250816_add_receipt_signature
 Create Date: 2025-08-17
 
-Adds regular_coin_balance and premium_gem_balance columns with default 0 if missing.
-Removes server_default after backfill to align with ORM (nullable=False without default).
-Consolidated from previously duplicated/partial revision content.
+Adds regular_coin_balance and premium_gem_balance columns if missing.
 """
-
-from __future__ import annotations
-
 from typing import Sequence, Union
 from alembic import op
 import sqlalchemy as sa
 
-revision: str = '20250817_add_dual_currency_columns'
-down_revision: Union[str, None] = '20250816_add_ab_test_participants'
+revision: str = '20250817_add_dual_currency'
+down_revision: Union[str, None] = '20250816_add_receipt_signature'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
-
-
-def _has_column(insp, table: str, col: str) -> bool:
-    try:
-        return any(c['name'] == col for c in insp.get_columns(table))
-    except Exception:
-        return False
 
 
 def upgrade() -> None:
     bind = op.get_bind()
     insp = sa.inspect(bind)
-    table = 'users'
 
-    # Add columns with temporary server_default=0 for backfill safety
-    if _has_column(insp, table, 'id'):
-        if not _has_column(insp, table, 'regular_coin_balance'):
-            op.add_column(table, sa.Column('regular_coin_balance', sa.Integer(), nullable=False, server_default='0'))
-        if not _has_column(insp, table, 'premium_gem_balance'):
-            op.add_column(table, sa.Column('premium_gem_balance', sa.Integer(), nullable=False, server_default='0'))
+    def has_col(table: str, col: str) -> bool:
+        try:
+            return any(c['name'] == col for c in insp.get_columns(table))
+        except Exception:
+            return False
 
-    # Drop server defaults (PostgreSQL specific) to match ORM definition
+    with op.batch_alter_table('users') as batch_op:
+        if not has_col('users', 'regular_coin_balance'):
+            batch_op.add_column(sa.Column('regular_coin_balance', sa.Integer(), nullable=False, server_default='0'))
+        if not has_col('users', 'premium_gem_balance'):
+            batch_op.add_column(sa.Column('premium_gem_balance', sa.Integer(), nullable=False, server_default='0'))
+
+    # Drop server defaults to match ORM after backfill
     try:
-        if _has_column(insp, table, 'regular_coin_balance'):
+        if has_col('users', 'regular_coin_balance'):
             op.execute("ALTER TABLE users ALTER COLUMN regular_coin_balance DROP DEFAULT")
     except Exception:
         pass
     try:
-        if _has_column(insp, table, 'premium_gem_balance'):
+        if has_col('users', 'premium_gem_balance'):
             op.execute("ALTER TABLE users ALTER COLUMN premium_gem_balance DROP DEFAULT")
     except Exception:
         pass
 
 
 def downgrade() -> None:
-    bind = op.get_bind()
-    insp = sa.inspect(bind)
-    table = 'users'
-    try:
-        if _has_column(insp, table, 'regular_coin_balance'):
-            op.drop_column(table, 'regular_coin_balance')
-    except Exception:
-        pass
-    try:
-        if _has_column(insp, table, 'premium_gem_balance'):
-            op.drop_column(table, 'premium_gem_balance')
-    except Exception:
-        pass
+    with op.batch_alter_table('users') as batch_op:
+        batch_op.drop_column('premium_gem_balance')
+        batch_op.drop_column('regular_coin_balance')
+"""add dual currency columns to users
+
+Revision ID: 20250817_add_dual_currency_columns
+Revises: 20250816_add_ab_test_participants
+Create Date: 2025-08-17
+
+Adds regular_coin_balance and premium_gem_balance columns with default 0.
+Keeps existing cyber_token_balance for backward compatibility (to be deprecated).
+"""
+from __future__ import annotations
 from typing import Sequence, Union
 from alembic import op
 import sqlalchemy as sa
