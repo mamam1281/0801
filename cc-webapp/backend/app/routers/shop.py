@@ -62,8 +62,11 @@ class BuyReceipt(BaseModel):
     product_id: str
     quantity: int
     # Gems purchase fields
-    granted_gems: Optional[int] = None
-    new_balance: Optional[int] = None
+    # legacy field names used by tests/clients
+    gems_granted: Optional[int] = None
+    new_gem_balance: Optional[int] = None
+    charge_id: Optional[str] = None
+    # additional fields
     receipt_code: Optional[str] = None
     # Item purchase fields
     item_id: Optional[str] = None
@@ -669,9 +672,9 @@ def buy(
     shop_svc = ShopService(db)
 
     # Back-compat: if amount not provided, try to fetch from catalog
+    prod = None
     if req.amount is None:
         try:
-            prod = None
             # CatalogService keys are integers for legacy numeric product ids
             try:
                 pid_int = int(req.product_id)
@@ -690,7 +693,18 @@ def buy(
                 req.amount = int(getattr(prod, 'price_cents', getattr(prod, 'price', 0)))
         except Exception:
             # leave as None; later code handles missing amount
-            pass
+            prod = None
+
+    # Enforce product-level restrictions (e.g., VIP-only) early
+    try:
+        if prod is not None and getattr(prod, 'min_rank', None):
+            user_rank = getattr(user, 'rank', None) or getattr(user, 'role', None)
+            if user_rank != getattr(prod, 'min_rank'):
+                raise HTTPException(status_code=403, detail="VIP required")
+    except HTTPException:
+        raise
+    except Exception:
+        pass
 
     # Idempotency protection for item/gems purchases (best-effort via Redis)
     idem = (req.idempotency_key or '').strip() or None
@@ -712,6 +726,9 @@ def buy(
                 user_id=req_user_id,
                 product_id=req.product_id,
                 quantity=req.quantity,
+                    gems_granted=0,
+                new_gem_balance=getattr(user, "cyber_token_balance", 0),
+                charge_id=None,
                 receipt_code=None,
             )
 
@@ -790,17 +807,33 @@ def buy(
                 reused_receipt = existing_tx.receipt_code
                 # 상태 분기: success/failed 즉시 재사용, pending이면 게이트웨이 폴링
                 if existing_tx.status in ("success", "failed"):
-                    return BuyReceipt(
-                        success=(existing_tx.status == 'success'),
-                        message="구매 완료" if existing_tx.status == 'success' else "결제 실패 재사용",
-                        user_id=req_user_id,
-                        product_id=req.product_id,
-                        quantity=existing_tx.quantity or req.quantity,
-                        granted_gems=existing_tx.amount if existing_tx.status == 'success' else None,
-                        new_balance=getattr(user, "cyber_token_balance", 0),
-                        receipt_code=reused_receipt,
-                        reason_code=None if existing_tx.status == 'success' else 'PAYMENT_DECLINED',
-                    )
+                        # Derive gems for legacy stored transactions: if catalog product exists, use its gems * quantity
+                        try:
+                            tx_prod = None
+                            try:
+                                tx_pid_int = int(existing_tx.product_id)
+                            except Exception:
+                                tx_pid_int = None
+                            if tx_pid_int is not None:
+                                tx_prod = CatalogService.get_product(tx_pid_int)
+                            if tx_prod is not None:
+                                tx_gems = int(getattr(tx_prod, 'gems', 0)) * (existing_tx.quantity or req.quantity)
+                            else:
+                                tx_gems = int(existing_tx.amount) if existing_tx.amount is not None else 0
+                        except Exception:
+                            tx_gems = int(existing_tx.amount) if existing_tx.amount is not None else 0
+                        return BuyReceipt(
+                            success=(existing_tx.status == 'success'),
+                            message="구매 완료" if existing_tx.status == 'success' else "결제 실패 재사용",
+                            user_id=req_user_id,
+                            product_id=req.product_id,
+                            quantity=existing_tx.quantity or req.quantity,
+                            gems_granted=tx_gems if existing_tx.status == 'success' else 0,
+                            new_gem_balance=getattr(user, "cyber_token_balance", 0),
+                            charge_id=getattr(existing_tx, 'charge_id', None) if hasattr(existing_tx, 'charge_id') else None,
+                            receipt_code=reused_receipt,
+                            reason_code=None if existing_tx.status == 'success' else 'PAYMENT_DECLINED',
+                        )
                 elif existing_tx.status == 'pending':
                     # gateway_reference 확보 후 폴링 시도
                     gateway_reference = None
@@ -845,8 +878,9 @@ def buy(
                                 user_id=req_user_id,
                                 product_id=req.product_id,
                                 quantity=existing_tx.quantity or req.quantity,
-                                granted_gems=existing_tx.amount,
-                                new_balance=getattr(user, "cyber_token_balance", 0),
+                                gems_granted=existing_tx.amount,
+                                new_gem_balance=getattr(user, "cyber_token_balance", 0),
+                                charge_id=getattr(existing_tx, 'charge_id', None) if hasattr(existing_tx, 'charge_id') else None,
                                 receipt_code=existing_tx.receipt_code,
                             )
                         elif polled_status == 'failed':
@@ -861,8 +895,9 @@ def buy(
                                 user_id=req_user_id,
                                 product_id=req.product_id,
                                 quantity=existing_tx.quantity or req.quantity,
+                                gems_granted=0,
                                 receipt_code=existing_tx.receipt_code,
-                                new_balance=getattr(user, "cyber_token_balance", 0),
+                                new_gem_balance=getattr(user, "cyber_token_balance", 0),
                                 reason_code="PAYMENT_DECLINED",
                             )
                         # 여전히 pending → 현재 상태 그대로 반환
@@ -872,8 +907,9 @@ def buy(
                             user_id=req_user_id,
                             product_id=req.product_id,
                             quantity=existing_tx.quantity or req.quantity,
+                            gems_granted=0,
                             receipt_code=existing_tx.receipt_code,
-                            new_balance=getattr(user, "cyber_token_balance", 0),
+                            new_gem_balance=getattr(user, "cyber_token_balance", 0),
                             reason_code="PAYMENT_PENDING",
                         )
         except Exception:
@@ -933,8 +969,9 @@ def buy(
             user_id=req_user_id,
             product_id=req.product_id,
             quantity=req.quantity,
+            gems_granted=0,
             receipt_code=receipt_code,
-            new_balance=getattr(user, "cyber_token_balance", 0),
+            new_gem_balance=getattr(user, "cyber_token_balance", 0),
             reason_code="PAYMENT_DECLINED",
         )
     elif status == "pending":
@@ -965,8 +1002,9 @@ def buy(
             user_id=req_user_id,
             product_id=req.product_id,
             quantity=req.quantity,
+            gems_granted=0,
             receipt_code=receipt_code,
-            new_balance=getattr(user, "cyber_token_balance", 0),
+            new_gem_balance=getattr(user, "cyber_token_balance", 0),
             reason_code="PAYMENT_PENDING",
         )
     else:
@@ -1011,9 +1049,10 @@ def buy(
         user_id=req_user_id,
         product_id=req.product_id,
         quantity=req.quantity,
-        granted_gems=total_gems,
-        new_balance=new_balance,
-        receipt_code=receipt_code,
+    gems_granted=total_gems,
+    new_gem_balance=new_balance,
+    charge_id=pres.get("gateway_reference") if isinstance(pres, dict) else None,
+    receipt_code=receipt_code,
     )
     if idem and rman.redis_client:
         try:

@@ -10,6 +10,7 @@ import io
 
 from ..database import get_db
 from ..dependencies import get_current_user
+from ..core.config import settings
 from ..services.admin_service import AdminService
 from ..services.limited_package_service import LimitedPackageService
 from datetime import datetime
@@ -267,6 +268,9 @@ async def dev_elevate_user(body: ElevateRequest, db: Session = Depends(get_db)):
 
     This is used only in tests to enable admin flows.
     """
+    # Safety: disallow in non-development environments
+    if settings.ENVIRONMENT != "development":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="dev-only endpoint")
     u = db.query(models.User).filter(models.User.site_id == body.site_id).first()
     if not u:
         raise HTTPException(status_code=404, detail="User not found")
