@@ -742,7 +742,7 @@ def buy(
             ) if shop_svc._table_exists('shop_transactions') else None
             if existing_tx:
                 reused_receipt = existing_tx.receipt_code
-                # Fast return if already success or failed (deterministic reuse)
+                # Fast path: success/failed 재사용
                 if existing_tx.status in ("success", "failed"):
                     return BuyReceipt(
                         success=(existing_tx.status == 'success'),
@@ -755,6 +755,73 @@ def buy(
                         receipt_code=reused_receipt,
                         reason_code=None if existing_tx.status == 'success' else 'PAYMENT_DECLINED',
                     )
+                # Poll path: pending 상태 재호출 시 게이트웨이 상태 확인
+                if existing_tx.status == 'pending':
+                    gw_ref = None
+                    try:
+                        if isinstance(existing_tx.extra, dict):
+                            gw_ref = existing_tx.extra.get('gateway_reference')
+                    except Exception:
+                        gw_ref = None
+                    if gw_ref:
+                        gateway = PaymentGatewayService()
+                        poll_res = gateway.check_status(gw_ref)
+                        polled_status = poll_res.get('status')
+                        if polled_status == 'pending':
+                            return BuyReceipt(
+                                success=False,
+                                message="결제 대기 중",
+                                user_id=req_user_id,
+                                product_id=req.product_id,
+                                quantity=existing_tx.quantity or req.quantity,
+                                receipt_code=reused_receipt,
+                                new_balance=getattr(user, "cyber_token_balance", 0),
+                                reason_code="PAYMENT_PENDING",
+                            )
+                        elif polled_status == 'failed':
+                            try:
+                                existing_tx.status = 'failed'
+                                existing_tx.failure_reason = 'Gateway declined (poll)'
+                                db.commit()
+                            except Exception:
+                                db.rollback()
+                            return BuyReceipt(
+                                success=False,
+                                message="결제 거절됨",
+                                user_id=req_user_id,
+                                product_id=req.product_id,
+                                quantity=existing_tx.quantity or req.quantity,
+                                receipt_code=reused_receipt,
+                                new_balance=getattr(user, "cyber_token_balance", 0),
+                                reason_code="PAYMENT_DECLINED",
+                            )
+                        else:  # success
+                            # 토큰 지급 (이미 지급 안되었을 가능성)
+                            from app.services.currency_service import CurrencyService
+                            total_gems = existing_tx.amount
+                            try:
+                                new_balance = CurrencyService(db).add(req_user_id, total_gems, 'gem')
+                            except Exception:
+                                try: db.rollback()
+                                except Exception: pass
+                                new_balance = getattr(user, "cyber_token_balance", 0)
+                            try:
+                                existing_tx.status = 'success'
+                                if idem and not getattr(existing_tx, 'idempotency_key', None):
+                                    existing_tx.idempotency_key = idem
+                                db.commit()
+                            except Exception:
+                                db.rollback()
+                            return BuyReceipt(
+                                success=True,
+                                message="구매 완료",
+                                user_id=req_user_id,
+                                product_id=req.product_id,
+                                quantity=existing_tx.quantity or req.quantity,
+                                granted_gems=existing_tx.amount,
+                                new_balance=new_balance,
+                                receipt_code=reused_receipt,
+                            )
         except Exception:
             existing_tx = None
     # Gems purchase via external gateway (can be pending)
@@ -825,6 +892,16 @@ def buy(
                 action_data=f'{{"product_id":"{req.product_id}","kind":"gems","quantity":{req.quantity},"amount":{int(req.amount)},"payment_method":"{req.payment_method or "card"}","status":"pending","receipt_code":"{receipt_code}","gateway_reference":"{pres.get("gateway_reference")}"}}'
             ))
             db.commit()
+        except Exception:
+            db.rollback()
+        # 트랜잭션 extra 에 gateway_reference 저장 (추후 polling)
+        try:
+            db_tx = existing_tx or shop_svc.get_tx_by_receipt_for_user(req_user_id, receipt_code)
+            if db_tx:
+                extra = db_tx.extra if isinstance(db_tx.extra, dict) else {}
+                extra.update({"gateway_reference": pres.get("gateway_reference")})
+                db_tx.extra = extra
+                db.commit()
         except Exception:
             db.rollback()
         return BuyReceipt(
