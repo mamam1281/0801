@@ -33,4 +33,5 @@ __all__ = [
     "ai_router",
     "chat",
     "events",
+    "notification",
 ]

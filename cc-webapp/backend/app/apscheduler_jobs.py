@@ -44,6 +44,15 @@ def cleanup_stale_pending_transactions(max_age_minutes: int = None):
         cutoff = datetime.utcnow() - timedelta(minutes=max_age_minutes)
         # 테이블 존재 여부 방어
         try:
+            # Defensive: ensure the ShopTransaction model/table and expected columns exist.
+            # This avoids ProgrammingError when migrations are out-of-sync.
+            # We do a lightweight existence check using SQLAlchemy's inspection via table name.
+            from sqlalchemy import inspect
+            inspector = inspect(db.bind)
+            if 'shop_transactions' not in inspector.get_table_names():
+                print(f"[{datetime.utcnow()}] APScheduler: cleanup skipped - table 'shop_transactions' not present.")
+                return 0
+
             # 조건에 맞는 row 수만 먼저 count -> 과도한 업데이트 방지
             stale_q = (
                 db.query(models.ShopTransaction)
@@ -64,9 +73,13 @@ def cleanup_stale_pending_transactions(max_age_minutes: int = None):
             print(f"[{datetime.utcnow()}] APScheduler: Auto-voided {updated} stale pending transactions (> {max_age_minutes}m).")
             return updated
         except Exception as e:
-            db.rollback()
-            print(f"[{datetime.utcnow()}] APScheduler: cleanup_stale_pending_transactions error: {e}")
-            logging.exception("cleanup_stale_pending_transactions error")
+            # Catch and log without propagating to let scheduler continue running.
+            try:
+                db.rollback()
+            except Exception:
+                pass
+            print(f"[{datetime.utcnow()}] APScheduler: cleanup_stale_pending_transactions error (guarded): {e}")
+            logging.exception("cleanup_stale_pending_transactions guarded error")
             return 0
     finally:
         if db:

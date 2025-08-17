@@ -1,3 +1,23 @@
+from fastapi import APIRouter, Depends, HTTPException
+from typing import Dict
+from .auth import get_current_user_optional
+
+router = APIRouter(prefix="/api/notification", tags=["Notification Center"])
+
+
+@router.get("/settings")
+def get_notification_settings(current_user = Depends(get_current_user_optional)) -> Dict:
+    """경량 스텁: 유저가 있으면 user:id 키를 참고하는 형태로 응답, 아니면 기본 설정 반환."""
+    # 기본값: 모든 알림 허용
+    default = {
+        "email": True,
+        "push": True,
+        "in_app": True,
+        "daily_summary": False,
+    }
+
+    # If user present, return same defaults for now (placeholder for real Redis-backed settings)
+    return {"user_id": getattr(current_user, "id", None), "settings": default}
 # cc-webapp/backend/app/routers/notification.py
 from fastapi import APIRouter, Depends, HTTPException, Path
 

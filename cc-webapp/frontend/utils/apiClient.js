@@ -95,23 +95,23 @@ const apiRequest = async (endpoint, options = {}) => {
       return null;
     }
 
-    // 401 인증 오류 처리
-    if (response.status === 401) {
+      // 401 인증 오류 처리
+      if (response.status === 401) {
       console.error('인증 오류 발생 (401):', endpoint);
       console.error('현재 토큰 정보:', getTokens() ? '토큰 존재' : '토큰 없음');
-
-      // 리프레시 토큰을 사용해 액세스 토큰 갱신 시도
-      const refreshed = await refreshAccessToken();
-      if (refreshed) {
-        // 토큰 갱신 성공, 원래 요청 재시도
-        console.log('토큰 갱신 성공, 요청 재시도:', endpoint);
-        return apiRequest(endpoint, options);
-      } else {
-        console.error('토큰 갱신 실패, 인증 필요');
-        // 여기서 로그인 페이지로 리디렉션하거나 인증 관련 처리
+        // Prevent infinite retry loops: only attempt refresh once per original call.
+        if (!options._retry_once) {
+          options._retry_once = true;
+          const refreshed = await refreshAccessToken();
+          if (refreshed) {
+            // 토큰 갱신 성공, 원래 요청 재시도
+            console.log('토큰 갱신 성공, 요청 재시도:', endpoint);
+            return apiRequest(endpoint, options);
+          }
+        }
+        console.error('토큰 갱신 실패 또는 이미 재시도함, 인증 필요');
         clearTokens(); // 잘못된 토큰 제거
         throw new Error('인증이 필요합니다. 로그인 후 다시 시도해주세요.');
-      }
     }
 
     // 에러 응답 처리
@@ -123,7 +123,27 @@ const apiRequest = async (endpoint, options = {}) => {
       throw new Error('서버 응답을 처리할 수 없습니다.');
     }
 
+    // Handle common non-OK status codes gracefully for frontend UX
     if (!response.ok) {
+      // 403 처리: 인증이 없는 상태에서 403이 응답되는 경우 토큰이 없는지 확인하고 명시적 에러를 던짐
+      if (response.status === 403) {
+        if (!getAccessToken()) {
+          apiLogFail(`${method} ${endpoint}`, 'Forbidden (no token)');
+          // When no token, return null so callers can use defaults instead of spinning retries
+          return null;
+        }
+        // 토큰은 있지만 403이면 권한 부족
+        const errorMessage = data?.detail || data?.message || '권한이 없습니다.';
+        apiLogFail(`${method} ${endpoint}`, errorMessage);
+        throw new Error(errorMessage);
+      }
+
+      // 404 처리: 리소스 미구현 상태일 수 있으니 null 반환으로 호출측에서 기본 동작 사용 허용
+      if (response.status === 404) {
+        apiLogFail(`${method} ${endpoint}`, 'Not Found (404)');
+        return null;
+      }
+
       const errorMessage = data?.detail || data?.message || '요청 처리 중 오류가 발생했습니다.';
       apiLogFail(`${method} ${endpoint}`, errorMessage);
       throw new Error(errorMessage);
