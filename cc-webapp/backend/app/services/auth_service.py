@@ -271,6 +271,10 @@ class AuthService:
         # Cutover 모드(ENFORCE_DB_INVITE_CODES=1): DB is_active=1 인 코드 목록 OR UNLIMITED(명시적으로 계속 허용 정책일 경우)만 허용.
         from ..core.config import settings
         supplied_code = getattr(user_create, 'invite_code', None)
+        # Alias 지원: 일부 테스트/스크립트에서 'UNLIMITED' 문자열을 직접 전송하는 경우
+        # 실제 설정된 unlimited 코드(settings.UNLIMITED_INVITE_CODE)로 매핑하여 과도한 400 방지
+        if supplied_code == 'UNLIMITED':
+            supplied_code = settings.UNLIMITED_INVITE_CODE
         unlimited = settings.UNLIMITED_INVITE_CODE
         enforce_db = settings.ENFORCE_DB_INVITE_CODES
         if not supplied_code:

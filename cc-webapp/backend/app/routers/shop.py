@@ -68,6 +68,25 @@ from ..services.limited_package_service import LimitedPackageService
 from ..schemas.limited_package import LimitedPackageOut, LimitedBuyRequest, LimitedBuyReceipt
 from ..kafka_client import send_kafka_message
 from ..utils.redis import get_redis_manager
+import threading
+
+# In-process fallback lock map for idempotent purchase when Redis unavailable
+_LOCAL_IDEMP_LOCKS: dict[str, threading.Lock] = {}
+
+def _acquire_local_lock(key: str) -> bool:
+    lock = _LOCAL_IDEMP_LOCKS.get(key)
+    if lock is None:
+        lock = threading.Lock()
+        _LOCAL_IDEMP_LOCKS[key] = lock
+    return lock.acquire(blocking=False)
+
+def _release_local_lock(key: str):
+    lock = _LOCAL_IDEMP_LOCKS.get(key)
+    if lock and lock.locked():
+        try:
+            lock.release()
+        except Exception:
+            pass
 from ..core.config import settings
 from ..utils.utils import WebhookUtils
 from fastapi import Request
@@ -655,6 +674,8 @@ def buy(
 
     def _idem_key(uid: int, pid: str, key: str) -> str:
         return f"{IDEM_PREFIX}{uid}:{pid}:{key}"
+    def _idem_lock_key(uid: int, pid: str, key: str) -> str:
+        return f"{IDEM_PREFIX}lock:{uid}:{pid}:{key}"
 
     # If idempotency key present and lock exists, short-circuit with generic success (client should have prior receipt)
     if idem and rman.redis_client:
@@ -824,6 +845,37 @@ def buy(
                             )
         except Exception:
             existing_tx = None
+    # Acquire pre-insert Redis lock to prevent duplicate row creation in race conditions
+    acquired_local = False
+    lock_key = None
+    if idem and not existing_tx:
+        if rman.redis_client:
+            try:
+                if not rman.redis_client.set(_idem_lock_key(req_user_id, req.product_id, idem), "1", nx=True, ex=60):
+                    return BuyReceipt(
+                        success=False,
+                        message="Processing duplicate",
+                        user_id=req_user_id,
+                        product_id=req.product_id,
+                        quantity=req.quantity,
+                        receipt_code=None,
+                        reason_code="PROCESSING",
+                    )
+            except Exception:
+                pass
+        else:
+            lock_key = f"local:{req_user_id}:{req.product_id}:{idem}"
+            acquired_local = _acquire_local_lock(lock_key)
+            if not acquired_local:
+                return BuyReceipt(
+                    success=False,
+                    message="Processing duplicate",
+                    user_id=req_user_id,
+                    product_id=req.product_id,
+                    quantity=req.quantity,
+                    receipt_code=None,
+                    reason_code="PROCESSING",
+                )
     # Gems purchase via external gateway (can be pending)
     gateway = PaymentGatewayService()
     # Create pending transaction record
@@ -849,6 +901,15 @@ def buy(
         )
         if reused_receipt:
             receipt_code = reused_receipt
+        # Release lock immediately after row creation so subsequent call can poll status
+        if idem:
+            if rman.redis_client:
+                try:
+                    rman.redis_client.delete(_idem_lock_key(req_user_id, req.product_id, idem))
+                except Exception:
+                    pass
+            elif acquired_local and lock_key:
+                _release_local_lock(lock_key)
     # Also append a lightweight action log for environments without transactions table
     try:
         db.add(models.UserAction(
@@ -949,6 +1010,7 @@ def buy(
             db.commit()
         except Exception:
             db.rollback()
+    # Idempotent success marker & lock cleanup
 
     resp = BuyReceipt(
         success=True,
@@ -960,11 +1022,15 @@ def buy(
         new_balance=new_balance,
         receipt_code=receipt_code,
     )
-    if idem and rman.redis_client:
-        try:
-            rman.redis_client.setex(_idem_key(req_user_id, req.product_id, idem), IDEM_TTL, receipt_code)
-        except Exception:
-            pass
+    if idem:
+        if rman.redis_client:
+            try:
+                rman.redis_client.setex(_idem_key(req_user_id, req.product_id, idem), IDEM_TTL, receipt_code)
+                rman.redis_client.delete(_idem_lock_key(req_user_id, req.product_id, idem))
+            except Exception:
+                pass
+        elif acquired_local and lock_key:
+            _release_local_lock(lock_key)
     return resp
 
 

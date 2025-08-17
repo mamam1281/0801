@@ -1,7 +1,7 @@
 """add achievements tables
 
 Revision ID: 20250816_add_achievements_tables
-Revises: 20250816_add_core_indexes
+Revises: a1d3b6b5c9f0
 Create Date: 2025-08-16
 """
 from __future__ import annotations
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 revision: str = '20250816_add_achievements_tables'
 
-down_revision: Union[str, None] = '20250816_add_core_indexes'
+down_revision: Union[str, None] = 'a1d3b6b5c9f0'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
