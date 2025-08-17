@@ -671,12 +671,25 @@ def buy(
     # Back-compat: if amount not provided, try to fetch from catalog
     if req.amount is None:
         try:
-            prod = CatalogService.get_product(req.product_id)
+            prod = None
+            # CatalogService keys are integers for legacy numeric product ids
+            try:
+                pid_int = int(req.product_id)
+            except Exception:
+                pid_int = None
+            if pid_int is not None:
+                prod = CatalogService.get_product(pid_int)
+            else:
+                # try SKU/name match
+                for p in CatalogService.list_products():
+                    if getattr(p, 'sku', '').lower() == str(req.product_id).lower() or p.name == req.product_id:
+                        prod = p
+                        break
             if prod is not None:
-                # catalog price stored in cents/units depending on service
+                # catalog price stored in cents
                 req.amount = int(getattr(prod, 'price_cents', getattr(prod, 'price', 0)))
         except Exception:
-            # leave as None; later code should handle or raise explicit error
+            # leave as None; later code handles missing amount
             pass
 
     # Idempotency protection for item/gems purchases (best-effort via Redis)
