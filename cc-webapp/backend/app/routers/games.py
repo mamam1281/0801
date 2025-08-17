@@ -1,5 +1,6 @@
 """Game Collection API Endpoints (Updated & Unified)"""
 import logging
+import json as _json
 from fastapi import APIRouter, Depends, HTTPException, Response, WebSocket, WebSocketDisconnect, Query
 from sqlalchemy.orm import Session
 import random
@@ -38,9 +39,44 @@ from app import models
 from sqlalchemy import text
 from ..utils.redis import update_streak_counter
 from ..core.config import settings
+try:  # Kafka optional import
+    from app.messaging.kafka import get_kafka_producer  # type: ignore
+except Exception:  # pragma: no cover
+    def get_kafka_producer():  # type: ignore
+        return None
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/games", tags=["Games"])
+
+# ---------------------------------------------------------------------------
+# 표준 사용자 액션 로깅 헬퍼
+# 통일된 envelope: {"v":1, "type":action_type, "ts": iso8601, "data": <payload dict>}
+# data 내부는 각 게임/행동별 스키마 (bet_amount, win_amount 등). 문자열 저장 (Text 컬럼) 최종 직렬화.
+def _log_user_action(db: Session, *, user_id: int, action_type: str, data: Dict[str, Any]) -> None:
+    try:
+        envelope = {
+            "v": 1,
+            "type": action_type,
+            "ts": datetime.utcnow().isoformat() + "Z",
+            "data": data,
+        }
+        ua = UserAction(user_id=user_id, action_type=action_type, action_data=_json.dumps(envelope, ensure_ascii=False))
+        db.add(ua)
+        db.commit()
+        # Kafka publish (best-effort)
+        try:
+            producer = get_kafka_producer()
+            if producer:
+                topic = getattr(settings, "KAFKA_USER_ACTION_TOPIC", "topic_user_actions")
+                producer.produce(topic, _json.dumps(envelope, ensure_ascii=False).encode("utf-8"))  # type: ignore
+        except Exception as ke:  # pragma: no cover
+            logger.debug(f"kafka publish skipped: {ke}")
+    except Exception as e:  # 실패 허용 (게임 진행 차단 X)
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        logger.warning(f"user_action log failed action_type={action_type}: {e}")
 
 # ---------------------------------------------------------------------------
 # 공통 피드백 헬퍼
@@ -607,13 +643,12 @@ async def spin_slot(
         "is_jackpot": reels[0] == '7️⃣' and reels[0] == reels[1] == reels[2]
     }
     
-    user_action = UserAction(
+    _log_user_action(
+        db,
         user_id=current_user.id,
         action_type="SLOT_SPIN",
-        action_data=str({**action_data, "streak": streak_count})
+        data={**action_data, "streak": streak_count}
     )
-    db.add(user_action)
-    db.commit()
     
     message = "Jackpot!" if action_data["is_jackpot"] else ("Win" if win_amount > 0 else "Better luck next time")
     # SlotSpinResponse expects reels as List[List[str]]
@@ -670,6 +705,7 @@ async def spin_slot(
         'balance': new_balance,
         'special_animation': near_miss_anim,
         'feedback': feedback,
+    'net_change': win_amount - bet_amount,
     }
     # (도달 불가) 위 return 위에 브로드캐스트 삽입 완료
 
@@ -727,13 +763,12 @@ async def play_rps(
         "result": result
     }
     
-    user_action = UserAction(
+    _log_user_action(
+        db,
         user_id=current_user.id,
         action_type="RPS_PLAY",
-        action_data=str(action_data)
+        data=action_data
     )
-    db.add(user_action)
-    db.commit()
     
     # Build response matching schema
     message_map = {
@@ -793,8 +828,12 @@ async def pull_gacha(
     """
     pull_count = max(1, int(request.pull_count or 1))
 
-    # 서비스 초기화
+    # 서비스 초기화 및 실행 전 잔액 캡처(net_change 계산용)
     game_service = GameService(db)
+    try:
+        old_balance = SimpleUserService.get_user_tokens(db, current_user.id)
+    except Exception:
+        old_balance = None
 
     # pull_count을 10연 단위와 단일 뽑기로 배치 실행
     batches_of_10 = pull_count // 10
@@ -820,6 +859,9 @@ async def pull_gacha(
 
     # 현재 잔액 조회
     new_balance = SimpleUserService.get_user_tokens(db, current_user.id)
+    net_change = None
+    if old_balance is not None and new_balance is not None:
+        net_change = new_balance - old_balance
 
     # 결과를 응답 스키마에 맞게 매핑
     def _to_item(result_token: str) -> Dict[str, Any]:
@@ -841,6 +883,26 @@ async def pull_gacha(
 
     # special_animation: mirror animation_type for non-normal states for easier FE handling
     special_anim = last_animation if (last_animation in {"near_miss", "epic", "legendary", "pity"}) else None
+
+    # 표준 사용자 액션 로깅 (요약 데이터)
+    try:
+        summary = {
+            "game_type": "gacha",
+            "pull_count": pull_count,
+            "rare_count": rare_count,
+            "ultra_rare_count": ultra_rare_count,
+            "anim": special_anim,
+            "last_animation": last_animation,
+            "items_sample": items[:3],  # 과도한 길이 방지
+        }
+        _log_user_action(
+            db,
+            user_id=current_user.id,
+            action_type="GACHA_PULL",
+            data=summary,
+        )
+    except Exception:
+        pass
 
     # 실시간 브로드캐스트 (실패 허용)
     try:
@@ -883,6 +945,7 @@ async def pull_gacha(
         "message": "Gacha pull completed",
         "currency_balance": {"tokens": new_balance},
         "feedback": feedback,
+    "net_change": net_change,
     }
 
 # 크래시 게임 엔드포인트
@@ -930,13 +993,12 @@ async def place_crash_bet(
         "win_amount": win_amount
     }
     
-    user_action = UserAction(
+    _log_user_action(
+        db,
         user_id=current_user.id,
         action_type="CRASH_BET",
-        action_data=str(action_data)
+        data=action_data
     )
-    db.add(user_action)
-    db.commit()
 
     # Optional crash persistence (best-effort, no hard failure)
     try:

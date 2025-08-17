@@ -380,10 +380,26 @@ def buy_limited_compat(req: LimitedBuyCompatRequest, db = Depends(get_db)):
             reason_code="PAYMENT_FAILED",
         )
 
-    # Grant gems
-    token_service = TokenService(db)
+    # Grant gems (TokenService -> CurrencyService 사용으로 이원화 통화 반영)
+    from app.services.currency_service import CurrencyService
     total_gems = pkg.gems * req.quantity
-    new_balance = token_service.add_tokens(user_id, total_gems)
+    try:
+        new_balance = CurrencyService(db).add(user_id, total_gems, 'gem')
+    except Exception:
+        try: db.rollback()
+        except Exception: pass
+        return LimitedBuyReceipt(
+            success=False,
+            message="보석 지급 실패",
+            user_id=user_id,
+            code=pkg.code,
+            quantity=req.quantity,
+            total_price_cents=total_price_cents,
+            gems_granted=0,
+            new_gem_balance=getattr(user, "premium_gem_balance", 0) or getattr(user, "cyber_token_balance", 0),
+            charge_id=cap.charge_id,
+            reason_code="GRANT_FAILED",
+        )
 
     # Reward + action log
     reward = models.Reward(
@@ -654,7 +670,24 @@ def buy(
             )
 
     if req.kind == "item":
-        # Item purchases consume tokens immediately
+        # 통화 차감 우선 (기존 cyber_token_balance -> premium_gem_balance 또는 coin 구분)
+        from app.services.currency_service import CurrencyService, InsufficientBalanceError
+        cur_svc = CurrencyService(db)
+        currency_mode = 'gem'  # 향후 req.payload 확장으로 선택 가능
+        try:
+            new_bal = cur_svc.deduct(req_user_id, req.amount, 'gem' if currency_mode == 'gem' else 'coin')
+        except InsufficientBalanceError as ie:
+            return BuyReceipt(
+                success=False,
+                message=str(ie),
+                user_id=req_user_id,
+                product_id=req.product_id,
+                quantity=req.quantity,
+                item_id=req.product_id,
+                item_name=req.item_name or req.product_id,
+                new_balance=None,
+            )
+        # Item DB 기록 (기존 ShopService 로직 재사용)
         result = shop_svc.purchase_item(
             user_id=req_user_id,
             item_id=0,
@@ -664,6 +697,7 @@ def buy(
             product_id=req.product_id,
         )
         if not result["success"]:
+            # 실패 시 롤백으로 잔액 보정 고려(현재 단순 실패 반환)
             return BuyReceipt(
                 success=False,
                 message=result["message"],
@@ -672,7 +706,7 @@ def buy(
                 quantity=req.quantity,
                 item_id=req.product_id,
                 item_name=req.item_name or req.product_id,
-                new_balance=result.get("new_balance"),
+                new_balance=new_bal,
             )
         resp = BuyReceipt(
             success=True,
@@ -682,9 +716,8 @@ def buy(
             quantity=req.quantity,
             item_id=result.get("item_id"),
             item_name=result.get("item_name"),
-            new_balance=result.get("new_balance"),
+            new_balance=new_bal,
         )
-        # Mark idempotency for item purchases (no external gateway)
         if idem and rman.redis_client:
             try:
                 rman.redis_client.setex(_idem_key(req_user_id, req.product_id, idem), IDEM_TTL, "1")
@@ -765,7 +798,24 @@ def buy(
     else:
         # success immediately
         total_gems = int(req.amount)
-        new_balance = TokenService(db).add_tokens(req_user_id, total_gems)
+        # 듀얼 통화 구조 적용: TokenService -> CurrencyService (gem balance)
+        try:
+            from app.services.currency_service import CurrencyService
+            new_balance = CurrencyService(db).add(req_user_id, total_gems, 'gem')
+        except Exception:
+            # 실패 시 롤백 및 기존 balance 반환 (grant 미적용)
+            try: db.rollback()
+            except Exception: pass
+            return BuyReceipt(
+                success=False,
+                message="보석 지급 실패",
+                user_id=req_user_id,
+                product_id=req.product_id,
+                quantity=req.quantity,
+                receipt_code=receipt_code,
+                new_balance=getattr(user, "premium_gem_balance", 0) or getattr(user, "cyber_token_balance", 0),
+                reason_code="GRANT_FAILED",
+            )
         # mark success
         db_tx = shop_svc.get_tx_by_receipt_for_user(req_user_id, receipt_code)
         if db_tx:
@@ -1018,9 +1068,25 @@ def buy_limited(req: LimitedBuyRequest, db = Depends(get_db), current_user = Dep
             reason_code="PAYMENT_FAILED",
         )
 
-    token_service = TokenService(db)
+    from app.services.currency_service import CurrencyService
     total_gems = pkg.gems * req.quantity
-    new_balance = token_service.add_tokens(user_id, total_gems)
+    try:
+        new_balance = CurrencyService(db).add(user_id, total_gems, 'gem')
+    except Exception:
+        try: db.rollback()
+        except Exception: pass
+        return LimitedBuyReceipt(
+            success=False,
+            message="보석 지급 실패",
+            user_id=user_id,
+            code=pkg.code,
+            quantity=req.quantity,
+            total_price_cents=total_price_cents,
+            gems_granted=0,
+            new_gem_balance=getattr(user, "premium_gem_balance", 0) or getattr(user, "cyber_token_balance", 0),
+            charge_id=cap.charge_id,
+            reason_code="GRANT_FAILED",
+        )
 
     # Reward ledger row + link
     reward = models.Reward(

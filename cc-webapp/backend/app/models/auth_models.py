@@ -16,6 +16,9 @@ class User(Base):
     password_hash = Column(String(255), nullable=False)  # 비밀번호
     invite_code = Column(String(10), nullable=False)  # 초대코드 (5858)
     cyber_token_balance = Column(Integer, default=200)  # 사이버 토큰 잔액
+    # 신규 이원화 통화 컬럼 (MVP 이후 확장): regular coins / premium gems
+    regular_coin_balance = Column(Integer, default=0, nullable=False)
+    premium_gem_balance = Column(Integer, default=0, nullable=False)
     is_active = Column(Boolean, default=True)
     is_admin = Column(Boolean, default=False)  # 관리자 여부
     # DB의 컬럼명은 'vip_tier' 이므로 name='vip_tier'로 매핑 (기존 'rank' 예약어 사용 회피)

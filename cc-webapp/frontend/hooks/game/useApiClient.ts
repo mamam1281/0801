@@ -1,4 +1,5 @@
 import { useCallback } from 'react';
+import useAuthToken from '../useAuthToken';
 
 interface ApiOptions {
   method?: string;
@@ -34,32 +35,54 @@ function joinUrl(base: string, endpoint: string){
   return base + ep;
 }
 
+// 별도 타입 인터페이스 선언하여 제네릭 호출 시 'Untyped function calls may not accept type arguments' 경고 회피
+export interface ApiCaller {
+  <T = any>(path: string, opts?: ApiOptions): Promise<T>;
+  // non-generic fallback
+  (path: string, opts?: ApiOptions): Promise<any>;
+}
+
 export function useApiClient(baseUrl = '/api') {
+  const { getValidAccessToken } = useAuthToken();
   const envBase = (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_API_URL) ? process.env.NEXT_PUBLIC_API_URL : undefined;
   const normalizedBase = normalizeBase(envBase || baseUrl) || '';
 
-  const call = useCallback(async <T = any>(path: string, opts: ApiOptions = {}): Promise<T> => {
+  const call: ApiCaller = useCallback(async (path: string, opts: ApiOptions = {}): Promise<any> => {
     const { method = 'GET', body, params, headers = {}, authToken } = opts;
     const query = buildQuery(params);
     const url = joinUrl(normalizedBase, path + query);
     const h: Record<string, string> = { 'Content-Type': 'application/json', ...headers };
     if (authToken) h['Authorization'] = `Bearer ${authToken}`;
-    const res = await fetch(url, {
+    let res = await fetch(url, {
       method,
       headers: h,
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });
+    // 401 처리: refresh 후 1회 재시도
+    if (res.status === 401 && !authToken) {
+      try {
+        const refreshed = await getValidAccessToken();
+        if (refreshed) {
+          h['Authorization'] = `Bearer ${refreshed}`;
+          res = await fetch(url, {
+            method,
+            headers: h,
+            body: body !== undefined ? JSON.stringify(body) : undefined,
+          });
+        }
+      } catch { /* ignore */ }
+    }
     if (!res.ok) {
       let detail: any = undefined;
       try { detail = await res.json(); } catch { /* ignore */ }
       throw new Error(detail?.detail || `API Error ${res.status}`);
     }
     try {
-      return (await res.json()) as T;
+      return (await res.json());
     } catch {
-      return undefined as unknown as T;
+      return undefined as unknown as any;
     }
-  }, [normalizedBase]);
+  }, [normalizedBase, getValidAccessToken]);
 
   return { call };
 }

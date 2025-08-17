@@ -200,6 +200,7 @@ class SlotSpinResponse(BaseModel):
     special_animation: Optional[str] = None
     # 표준화된 피드백 블록 (UI 토스트/애니메이션 트리거)
     feedback: Optional[Dict[str, Any]] = None
+    net_change: Optional[int] = Field(default=None, description="순 변화량 (win_amount - bet_amount)")
 
 
 # 가위바위보 게임 스키마
@@ -251,6 +252,7 @@ class GachaPullResponse(BaseModel):
     message: str
     feedback: Optional[Dict[str, Any]] = None
     currency_balance: Dict[str, int]
+    net_change: Optional[int] = Field(default=None, description="토큰 순 변화량 (뽑기 비용 합산 반영)")
     # OpenAPI 예시
     model_config = ConfigDict(json_schema_extra={
         "example": {

@@ -13,7 +13,7 @@ export function useGachaPull(authToken: string | null) {
   const pull = useCallback(async (count: 1 | 10 = 1) => {
     setLoading(true); setError(null);
     try {
-        const res = await call<GachaPullResponse>('/pull', { method: 'POST', authToken, body: { count } });
+      const res = await call('/pull', { method: 'POST', authToken, body: { count } }) as GachaPullResponse;
       setLastResult(res);
     } catch (e: any) { setError(e.message); }
     finally { setLoading(false); }

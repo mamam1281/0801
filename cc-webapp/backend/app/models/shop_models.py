@@ -54,6 +54,8 @@ class ShopTransaction(Base):
     original_tx_id = Column(Integer, ForeignKey("shop_transactions.id"), nullable=True)
     # 클라이언트 제공 검증용 영수증 서명(HMAC) - integrity_hash와 별개 (회전 가능 secret 기반)
     receipt_signature = Column(String(128), nullable=True, index=True)
+    # 멱등성 키 (클라이언트/서버 생성). 동일 키 재요청 시 최초 성공 트랜잭션 재사용.
+    idempotency_key = Column(String(80), nullable=True, index=True)
     # Avoid SQLAlchemy reserved attribute name 'metadata' on declarative models
     extra = Column(JSON)
     created_at = Column(DateTime, default=datetime.utcnow)
