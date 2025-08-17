@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional, Literal, List
 from datetime import datetime
 import time
@@ -31,8 +31,10 @@ class ShopPurchaseResponse(BaseModel):
 
 class BuyRequest(BaseModel):
     user_id: int
+    # Support legacy numeric product_id in tests/clients by coercing ints to str
     product_id: str = Field(..., description="Catalog product id or item code")
-    amount: int = Field(..., ge=0, description="Amount in cents or tokens depending on kind")
+    # Make amount optional for gems purchases where catalog price may be used
+    amount: int | None = Field(None, ge=0, description="Amount in cents or tokens depending on kind")
     quantity: int = Field(1, ge=1, le=99)
     kind: Literal["gems", "item"] = Field("gems")
     payment_method: Optional[str] = Field(None, description="card|tokens etc")
@@ -40,6 +42,16 @@ class BuyRequest(BaseModel):
     currency: str = Field("USD")
     card_token: Optional[str] = None
     idempotency_key: Optional[str] = Field(None, description="Client-provided idempotency key (unique per purchase attempt)")
+
+    @field_validator('product_id', mode='before')
+    def _coerce_product_id(cls, v):
+        # accept integers and convert to string for backward compatibility
+        try:
+            if isinstance(v, (int,)):
+                return str(v)
+        except Exception:
+            pass
+        return v
 
 
 class BuyReceipt(BaseModel):
