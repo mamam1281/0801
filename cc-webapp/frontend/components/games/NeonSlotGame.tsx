@@ -1,20 +1,22 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import useFeedback from '../../hooks/useFeedback';
+import { useApiClient } from '../../hooks/game/useApiClient';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  ArrowLeft, 
-  Coins, 
-  Zap, 
-  Crown, 
-  Star, 
+import {
+  ArrowLeft,
+  Coins,
+  Zap,
+  Crown,
+  Star,
   Diamond,
   Heart,
   RefreshCw,
   Volume2,
   VolumeX,
   Sparkles,
-  Flame
+  Flame,
 } from 'lucide-react';
 import { User } from '../../types';
 import { Button } from '../ui/button';
@@ -40,10 +42,32 @@ type SlotSymbol = {
 const SLOT_SYMBOLS: SlotSymbol[] = [
   { id: 'cherry', icon: Heart, name: '체리', value: 2, rarity: 'common', color: 'text-pink-400' },
   { id: 'lemon', icon: Star, name: '별', value: 3, rarity: 'common', color: 'text-yellow-400' },
-  { id: 'diamond', icon: Diamond, name: '다이아', value: 5, rarity: 'rare', color: 'text-blue-400' },
+  {
+    id: 'diamond',
+    icon: Diamond,
+    name: '다이아',
+    value: 5,
+    rarity: 'rare',
+    color: 'text-blue-400',
+  },
   { id: 'crown', icon: Crown, name: '크라운', value: 10, rarity: 'epic', color: 'text-gold' },
-  { id: 'seven', icon: Sparkles, name: '세븐', value: 25, rarity: 'legendary', color: 'text-primary' },
-  { id: 'wild', icon: Flame, name: '와일드', value: 0, rarity: 'legendary', color: 'text-gradient-primary', isWild: true }
+  {
+    id: 'seven',
+    icon: Sparkles,
+    name: '세븐',
+    value: 25,
+    rarity: 'legendary',
+    color: 'text-primary',
+  },
+  {
+    id: 'wild',
+    icon: Flame,
+    name: '와일드',
+    value: 0,
+    rarity: 'legendary',
+    color: 'text-gradient-primary',
+    isWild: true,
+  },
 ];
 
 interface SpinResult {
@@ -57,8 +81,26 @@ interface SpinResult {
   winningPositions: boolean[];
 }
 
+interface SlotSpinApiResponse {
+  success: boolean;
+  reels: string[][]; // server reels matrix
+  win_amount: number;
+  is_jackpot: boolean;
+  multiplier?: number;
+  balance: number;
+  feedback?: any;
+  special_animation?: string | null;
+  message?: string;
+}
+
 export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: NeonSlotGameProps) {
-  const [reels, setReels] = useState([SLOT_SYMBOLS[0], SLOT_SYMBOLS[1], SLOT_SYMBOLS[2]] as SlotSymbol[]);
+  const { fromApi } = useFeedback();
+  const { call } = useApiClient('/api/games/slot');
+  const [reels, setReels] = useState([
+    SLOT_SYMBOLS[0],
+    SLOT_SYMBOLS[1],
+    SLOT_SYMBOLS[2],
+  ] as SlotSymbol[]);
   const [spinningReels, setSpinningReels] = useState([[], [], []] as SlotSymbol[][]);
   const [isSpinning, setIsSpinning] = useState(false);
   const [reelStopOrder, setReelStopOrder] = useState([] as number[]);
@@ -71,11 +113,13 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
   const [consecutiveWins, setConsecutiveWins] = useState(0);
   const [showWinModal, setShowWinModal] = useState(false);
   const [multiplier, setMultiplier] = useState(1);
-  const [particles, setParticles] = useState([] as Array<{ id: number; x: number; y: number; type: string }>);
+  const [particles, setParticles] = useState(
+    [] as Array<{ id: number; x: number; y: number; type: string }>
+  );
   const [isAutoSpinning, setIsAutoSpinning] = useState(false);
   const [autoSpinCount, setAutoSpinCount] = useState(0);
   const [coinDrops, setCoinDrops] = useState([] as Array<{ id: number; x: number; delay: number }>);
-  
+
   // Jackpot calculation
   useEffect(() => {
     setCurrentJackpot(50000 + user.gameStats.slot.totalSpins * 50);
@@ -86,7 +130,7 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
     if (isAutoSpinning && autoSpinCount > 0 && !isSpinning) {
       const timer = setTimeout(() => {
         handleSpin();
-  setAutoSpinCount((prev: number) => prev - 1);
+        setAutoSpinCount((prev: number) => prev - 1);
       }, 1500);
       return () => clearTimeout(timer);
     } else if (autoSpinCount === 0) {
@@ -231,12 +275,77 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
     setWinningPositions([false, false, false]);
     setCoinDrops([]);
 
-    // Deduct bet amount
+    // Deduct bet amount (locally; authoritative balance will come from server if call succeeds)
     const costAmount = betAmount;
 
-    // Generate spin result
-    const result = generateSpinResult();
-    setSpinningReels(result.reels);
+    let serverResult: SlotSpinApiResponse | null = null;
+    // Attempt authoritative server spin
+    try {
+      const raw = await (call as any)('/spin', {
+        method: 'POST',
+        body: { bet_amount: betAmount },
+        authToken:
+          typeof window !== 'undefined'
+            ? JSON.parse(localStorage.getItem('cc_auth_tokens') || 'null')?.access_token || null
+            : null,
+      });
+      serverResult = raw as SlotSpinApiResponse;
+      if (serverResult?.feedback) {
+        fromApi(serverResult as any);
+      }
+    } catch (_e) {
+      serverResult = null; // fallback to local simulation
+    }
+
+    // Helper to map server unicode symbol to local symbol
+    const mapServerSymbol = (sym: string): SlotSymbol => {
+      if (sym.includes('7')) return SLOT_SYMBOLS.find((s) => s.id === 'seven')!;
+      if (sym.includes('💎')) return SLOT_SYMBOLS.find((s) => s.id === 'diamond')!;
+      if (sym.includes('🍒')) return SLOT_SYMBOLS.find((s) => s.id === 'cherry')!;
+      if (sym.includes('🍋') || sym.includes('🍊') || sym.includes('🍇'))
+        return SLOT_SYMBOLS.find((s) => s.id === 'lemon')!;
+      return SLOT_SYMBOLS[0];
+    };
+
+    let result: SpinResult;
+    if (serverResult && serverResult.success) {
+      const srvRow = serverResult.reels[0] || [];
+      const finalReels = srvRow.slice(0, 3).map(mapServerSymbol);
+      // Build animated spinning reel data
+      const spinning = generateSpinningReels();
+      spinning.forEach((reel, idx) => {
+        if (reel.length) reel[reel.length - 1] = finalReels[idx];
+      });
+      // Determine winning positions heuristically
+      const winningPositions = [false, false, false];
+      if (serverResult.is_jackpot) {
+        winningPositions.fill(true);
+      } else if (serverResult.win_amount > 0) {
+        if (finalReels[0].id === finalReels[1].id) {
+          winningPositions[0] = winningPositions[1] = true;
+        }
+        if (finalReels[1].id === finalReels[2].id) {
+          winningPositions[1] = winningPositions[2] = true;
+        }
+      }
+      result = {
+        reels: spinning,
+        finalReels,
+        winAmount: serverResult.win_amount,
+        isJackpot: serverResult.is_jackpot,
+        isBigWin: serverResult.win_amount >= betAmount * 10,
+        hasWilds: finalReels.some((f) => f.isWild),
+        multiplier:
+          serverResult.multiplier ||
+          (serverResult.win_amount > 0 ? Math.max(1, serverResult.win_amount / betAmount) : 1),
+        winningPositions,
+      };
+      setSpinningReels(result.reels);
+    } else {
+      // Local simulation fallback
+      result = generateSpinResult();
+      setSpinningReels(result.reels);
+    }
 
     // Create staggered reel stop timing (more realistic)
     const stopOrder = [0, 1, 2];
@@ -248,22 +357,22 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
     // Stop reels one by one
     for (let i = 0; i < stopOrder.length; i++) {
       setTimeout(() => {
-    setReels((prev: SlotSymbol[]) => {
+        setReels((prev: SlotSymbol[]) => {
           const newReels = [...prev];
           newReels[stopOrder[i]] = result.finalReels[stopOrder[i]];
           return newReels;
         });
-  setReelStopOrder((prev: number[]) => [...prev, stopOrder[i]]);
+        setReelStopOrder((prev: number[]) => [...prev, stopOrder[i]]);
       }, reelStopTimes[i]);
     }
 
     // Process final result after all reels stop
-    setTimeout(() => {
+    setTimeout(async () => {
       if (result.winAmount > 0) {
         setIsWin(true);
         setWinAmount(result.winAmount);
         setWinningPositions(result.winningPositions);
-  setConsecutiveWins((prev: number) => prev + 1);
+        setConsecutiveWins((prev: number) => prev + 1);
 
         // Enhanced particle effects based on win type
         if (result.isJackpot) {
@@ -276,10 +385,13 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
 
         generateCoinDrops();
 
-        // Update user stats
+        // Update user stats (use server authoritative balance if present)
         const updatedUser = {
           ...user,
-          goldBalance: user.goldBalance - costAmount + result.winAmount,
+          goldBalance:
+            serverResult && serverResult.success
+              ? serverResult.balance
+              : user.goldBalance - costAmount + result.winAmount,
           gameStats: {
             ...user.gameStats,
             slot: {
@@ -300,7 +412,6 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
             winStreak: user.stats.winStreak + 1,
           },
         };
-
         onUpdateUser(updatedUser);
 
         // Only important notifications
@@ -315,7 +426,10 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
 
         const updatedUser = {
           ...user,
-          goldBalance: user.goldBalance - costAmount,
+          goldBalance:
+            serverResult && serverResult.success
+              ? serverResult.balance
+              : user.goldBalance - costAmount,
           gameStats: {
             ...user.gameStats,
             slot: {
@@ -329,8 +443,8 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
             winStreak: 0,
           },
         };
-
         onUpdateUser(updatedUser);
+        // 실패 스핀도 서버 feedback이 push 되었을 수 있음 (serverResult)
       }
 
       setIsSpinning(false);
@@ -342,7 +456,7 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
     <div className="min-h-screen bg-gradient-to-br from-background via-black to-primary-soft relative overflow-hidden">
       {/* Enhanced Particle Effects */}
       <AnimatePresence>
-      {particles.map((particle: { id: number; x: number; y: number; type: string }) => (
+        {particles.map((particle: { id: number; x: number; y: number; type: string }) => (
           <motion.div
             key={particle.id}
             initial={{
@@ -372,7 +486,7 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
 
       {/* Coin Drop Effects */}
       <AnimatePresence>
-  {coinDrops.map((coin: { id: number; x: number; delay: number }) => (
+        {coinDrops.map((coin: { id: number; x: number; delay: number }) => (
           <motion.div
             key={coin.id}
             initial={{
@@ -518,16 +632,18 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
                         }}
                         className="absolute inset-0 flex flex-col justify-center"
                       >
-                        {spinningReels[index]?.slice(0, 3).map((spinSymbol: SlotSymbol, spinIndex: number) => (
-                          <div
-                            key={`spin-${index}-${spinIndex}`}
-                            className="h-full flex items-center justify-center reel-blur"
-                          >
-                            <spinSymbol.icon
-                              className={`text-4xl lg:text-5xl ${spinSymbol.color}`}
-                            />
-                          </div>
-                        )) || []}
+                        {spinningReels[index]
+                          ?.slice(0, 3)
+                          .map((spinSymbol: SlotSymbol, spinIndex: number) => (
+                            <div
+                              key={`spin-${index}-${spinIndex}`}
+                              className="h-full flex items-center justify-center reel-blur"
+                            >
+                              <spinSymbol.icon
+                                className={`text-4xl lg:text-5xl ${spinSymbol.color}`}
+                              />
+                            </div>
+                          )) || []}
                       </motion.div>
                     )}
                   </AnimatePresence>

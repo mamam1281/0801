@@ -198,6 +198,8 @@ class SlotSpinResponse(BaseModel):
     message: str
     balance: int
     special_animation: Optional[str] = None
+    # 표준화된 피드백 블록 (UI 토스트/애니메이션 트리거)
+    feedback: Optional[Dict[str, Any]] = None
 
 
 # 가위바위보 게임 스키마
@@ -247,6 +249,7 @@ class GachaPullResponse(BaseModel):
     animation_type: Optional[str] = Field(default=None, description="애니메이션 타입: normal|epic|legendary|near_miss|pity")
     psychological_message: Optional[str] = Field(default=None, description="즉시 피드백용 메시지")
     message: str
+    feedback: Optional[Dict[str, Any]] = None
     currency_balance: Dict[str, int]
     # OpenAPI 예시
     model_config = ConfigDict(json_schema_extra={

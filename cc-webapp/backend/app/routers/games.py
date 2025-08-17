@@ -42,6 +42,39 @@ from ..core.config import settings
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/games", tags=["Games"])
 
+# ---------------------------------------------------------------------------
+# 공통 피드백 헬퍼
+# code 네이밍 규칙: <domain>.<event>[.<qualifier>]  / severity: info|success|warning|loss
+# animation 은 프론트에서 선택적 매핑 (특수 연출)
+def _build_feedback(
+    *,
+    domain: str,
+    event: str,
+    qualifier: Optional[str] = None,
+    message: str,
+    severity: Optional[str] = None,
+    animation: Optional[str] = None,
+    streak: Optional[int] = None,
+    extra: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    code_parts = [domain, event]
+    if qualifier:
+        code_parts.append(qualifier)
+    code = ".".join(code_parts)
+    sev = severity or ("success" if event in ("win", "jackpot") else ("loss" if event in ("lose", "bet") else "info"))
+    payload: Dict[str, Any] = {
+        "code": code,
+        "severity": sev,
+        "message": message,
+    }
+    if animation:
+        payload["animation"] = animation
+    if streak is not None:
+        payload["streak"] = streak
+    if extra:
+        payload["meta"] = extra
+    return payload
+
 # ----------------------------- GameHistory 조회 스키마 (간단 내장) -----------------------------
 
 class GameHistoryItem(BaseModel):
@@ -616,6 +649,15 @@ async def spin_slot(
         })
     except Exception:
         pass
+    near_miss_anim = 'near_miss' if win_amount == 0 and (reels[0] == reels[1] or reels[1] == reels[2]) else None
+    feedback = _build_feedback(
+        domain="slot",
+        event=("jackpot" if action_data["is_jackpot"] else ("win" if win_amount > 0 else "lose")),
+        message=message,
+        animation=near_miss_anim or ("jackpot" if action_data["is_jackpot"] else None),
+        streak=streak_count,
+        extra={"bet": bet_amount, "win": win_amount, "reels": reels}
+    )
     return {
         'success': True,
         'reels': reels_matrix,
@@ -626,7 +668,8 @@ async def spin_slot(
         'free_spins_awarded': 0,
         'message': message,
         'balance': new_balance,
-        'special_animation': 'near_miss' if win_amount == 0 and (reels[0] == reels[1] or reels[1] == reels[2]) else None
+        'special_animation': near_miss_anim,
+        'feedback': feedback,
     }
     # (도달 불가) 위 return 위에 브로드캐스트 삽입 완료
 
@@ -814,6 +857,19 @@ async def pull_gacha(
         })
     except Exception:
         pass
+    # feedback 구성
+    qualifier = None
+    if last_animation in {"legendary", "epic"}:
+        qualifier = last_animation
+    event = "pity" if last_animation == "pity" else ("near_miss" if last_animation == "near_miss" else ("win" if ultra_rare_count or rare_count else "pull"))
+    feedback = _build_feedback(
+        domain="gacha",
+        event=event,
+        qualifier=qualifier,
+        message=last_message or "다음 뽑기에 더 좋은 결과가 기다리고 있을지도 몰라요!",
+        animation=last_animation if last_animation not in {None, "normal"} else None,
+        extra={"pull_count": pull_count, "rare": rare_count, "ultra_rare": ultra_rare_count}
+    )
     return {
         "success": True,
         "items": items,
@@ -826,6 +882,7 @@ async def pull_gacha(
         "psychological_message": last_message or "다음 뽑기에 더 좋은 결과가 기다리고 있을지도 몰라요!",
         "message": "Gacha pull completed",
         "currency_balance": {"tokens": new_balance},
+        "feedback": feedback,
     }
 
 # 크래시 게임 엔드포인트

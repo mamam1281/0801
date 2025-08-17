@@ -14,6 +14,8 @@ from ..models.auth_models import User, LoginAttempt, UserSession
 from ..models.token_blacklist import TokenBlacklist
 from ..schemas.auth import TokenData, UserCreate, UserLogin, AdminLogin
 
+from ..models.auth_models import InviteCode
+
 # 보안 설정
 SECRET_KEY = os.getenv("JWT_SECRET_KEY", "your-secret-key-here")
 ALGORITHM = "HS256"
@@ -262,12 +264,42 @@ class AuthService:
     @staticmethod
     def create_user(db: Session, user_create: UserCreate) -> User:
         """사용자 생성 - 회원가입 필수 입력사항"""
-        # 초대코드 검증 (5858은 항상 허용하고 재사용 가능)
-        if user_create.invite_code != "5858":
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="유효하지 않은 초대코드입니다"
-            )
+        # --- Invite Code 검증 전략 ---
+        # 기본 정책: UNLIMITED_INVITE_CODE(기본 5858) 는 항상 허용.
+        # Grace 모드: NEW 코드(예: DB 활성 invite_codes.is_active=1) + OLD(UNLIMITED) 모두 허용.
+        # Cutover 모드(ENFORCE_DB_INVITE_CODES=1): DB is_active=1 인 코드 목록 OR UNLIMITED(명시적으로 계속 허용 정책일 경우)만 허용.
+        from ..core.config import settings
+        supplied_code = getattr(user_create, 'invite_code', None)
+        unlimited = settings.UNLIMITED_INVITE_CODE
+        enforce_db = settings.ENFORCE_DB_INVITE_CODES
+        if not supplied_code:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="초대코드가 필요합니다")
+
+        code_ok = False
+        # 1) Unlimited 코드 허용
+        if supplied_code == unlimited:
+            # Cutover(enforce_db) 모드에서는 DB 에 활성 레코드 없으면 OLD 코드 차단
+            if enforce_db:
+                try:
+                    unlimited_row = db.query(InviteCode).filter(InviteCode.code == unlimited, InviteCode.is_active == True).first()
+                    if unlimited_row:
+                        code_ok = True
+                except Exception:
+                    code_ok = False
+            else:
+                code_ok = True
+        else:
+            # 2) DB 활성 코드 검사 (Cutover 또는 Grace 모두 시도)
+            try:
+                invite_row = db.query(InviteCode).filter(InviteCode.code == supplied_code, InviteCode.is_active == True).first()
+                if invite_row:
+                    code_ok = True
+            except Exception:
+                # DB 에러 시 안전 측면에서 차단
+                code_ok = False
+
+        if not code_ok:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="유효하지 않은 초대코드입니다")
         
         # 사이트 아이디 중복 검사
         if db.query(User).filter(User.site_id == user_create.site_id).first():
@@ -305,7 +337,7 @@ class AuthService:
             nickname=user_create.nickname,
             phone_number=getattr(user_create, 'phone_number', None),  # 선택적 필드로 처리
             password_hash=hashed_password,
-            invite_code="5858",  # 항상 5858 초대코드 사용
+            invite_code=supplied_code,
             is_admin=False
         )
         db.add(db_user)
