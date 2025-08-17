@@ -13,6 +13,7 @@ import {
   Percent,
   AlertTriangle,
   Eye,
+  UserPlus,
   Wifi,
   Settings,
   Database,

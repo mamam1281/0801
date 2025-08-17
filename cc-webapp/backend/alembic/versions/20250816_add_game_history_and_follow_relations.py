@@ -22,12 +22,18 @@ def upgrade():
 
     # game_history
     if not dialect.has_table(bind, 'game_history'):  # type: ignore
+        # create session_id as plain Integer if game_sessions table is not yet present
+        if dialect.has_table(bind, 'game_sessions'):
+            session_col = sa.Column('session_id', sa.Integer, sa.ForeignKey('game_sessions.id'), nullable=True)
+        else:
+            session_col = sa.Column('session_id', sa.Integer, nullable=True)
+
         op.create_table(
             'game_history',
             sa.Column('id', sa.Integer, primary_key=True),
             sa.Column('user_id', sa.Integer, sa.ForeignKey('users.id'), nullable=False),
             sa.Column('game_type', sa.String(50), nullable=False),
-            sa.Column('session_id', sa.Integer, sa.ForeignKey('game_sessions.id'), nullable=True),
+            session_col,
             sa.Column('action_type', sa.String(30), nullable=False),
             sa.Column('delta_coin', sa.Integer, nullable=False, server_default='0'),
             sa.Column('delta_gem', sa.Integer, nullable=False, server_default='0'),

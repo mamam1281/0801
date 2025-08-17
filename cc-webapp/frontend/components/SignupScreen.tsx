@@ -124,11 +124,11 @@ export function SignupScreen({
   };
 
   const handleInputChange = (field: keyof SignupFormData) => (
-    e: React.ChangeEvent<HTMLInputElement>
+    e: any
   ) => {
-    setFormData(prev => ({ ...prev, [field]: e.target.value }));
+    setFormData((prev: SignupFormData) => ({ ...prev, [field]: e.target.value }));
     if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: undefined }));
+      setErrors((prev: Partial<SignupFormData>) => ({ ...prev, [field]: undefined }));
     }
   };
 
@@ -139,7 +139,7 @@ export function SignupScreen({
       const hasErrors = step1Fields.some(field => {
         const key = field as keyof SignupFormData;
         if (!formData[key].trim()) {
-          setErrors(prev => ({ ...prev, [key]: '필수 입력 항목입니다.' }));
+          setErrors((prev: Partial<SignupFormData>) => ({ ...prev, [key]: '필수 입력 항목입니다.' }));
           return true;
         }
         return false;

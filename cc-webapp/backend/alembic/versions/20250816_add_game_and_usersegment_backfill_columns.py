@@ -17,19 +17,47 @@ depends_on = None
 def column_exists(table: str, column: str) -> bool:
     bind = op.get_bind()
     inspector = sa.inspect(bind)
+    # guard against missing table: check table list first
+    try:
+        tables = inspector.get_table_names()
+    except Exception:
+        return False
+    if table not in tables:
+        return False
+    # safe to get columns now
     cols = [c['name'] for c in inspector.get_columns(table)]
     return column in cols
 
 def upgrade():
+    bind = op.get_bind()
+
+    def table_exists(table_name: str) -> bool:
+        # Use Postgres to_regclass to reliably determine table existence
+        try:
+            res = bind.execute(sa.text("SELECT to_regclass(:t)"), {"t": table_name}).scalar()
+            return res is not None
+        except Exception:
+            return False
+
     # games.bet_amount
-    if not column_exists('games', 'bet_amount'):
-        op.add_column('games', sa.Column('bet_amount', sa.Integer(), server_default='0', nullable=False))
+    if table_exists('games') and not column_exists('games', 'bet_amount'):
+        try:
+            op.add_column('games', sa.Column('bet_amount', sa.Integer(), server_default='0', nullable=False))
+        except Exception:
+            # If table disappeared between checks, skip safely
+            pass
     # games.payout
-    if not column_exists('games', 'payout'):
-        op.add_column('games', sa.Column('payout', sa.Integer(), server_default='0', nullable=False))
+    if table_exists('games') and not column_exists('games', 'payout'):
+        try:
+            op.add_column('games', sa.Column('payout', sa.Integer(), server_default='0', nullable=False))
+        except Exception:
+            pass
     # user_segments.name
-    if not column_exists('user_segments', 'name'):
-        op.add_column('user_segments', sa.Column('name', sa.String(length=50), nullable=True))
+    if table_exists('user_segments') and not column_exists('user_segments', 'name'):
+        try:
+            op.add_column('user_segments', sa.Column('name', sa.String(length=50), nullable=True))
+        except Exception:
+            pass
 
 
 def downgrade():

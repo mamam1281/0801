@@ -107,4 +107,29 @@ declare module 'lucide-react' {
   export const X: Icon;
   export const XCircle: Icon;
   export const Zap: Icon;
+  // Additional aliases / missing icons used across the codebase
+  export const ExternalLink: Icon;
+  export const Bot: Icon;
+  export const Frown: Icon;
+  export const Angry: Icon;
+  export const Bug: Icon;
+  export const Dice1: Icon;
+  export const Swords: Icon;
+  export const BarChart2: Icon;
+  export const History: Icon;
+  export const Sword: Icon;
+  export const Grid3X3: Icon;
+  export const List: Icon;
+  export const Bell: Icon;
+  export const UserX: Icon;
+  export const UserPlus: Icon;
+  export const TrendingDown: Icon;
+  export const HelpCircle: Icon;
+  export const SearchIcon: Icon;
+  export const ChevronRightIcon: Icon;
+  export const CircleIcon: Icon;
+  export const MinusIcon: Icon;
+  export const XIcon: Icon;
+  export const ChevronLeftIcon: Icon;
+  export const GripVerticalIcon: Icon;
 }

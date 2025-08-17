@@ -37,7 +37,7 @@ def upgrade() -> None:
             sa.Column('name', sa.String(length=200), nullable=False),
             sa.Column('description', sa.String(length=1000), nullable=True),
             sa.Column('price', sa.Integer(), nullable=False),
-            sa.Column('is_active', sa.Boolean(), nullable=False, server_default=sa.text('1')),
+            sa.Column('is_active', sa.Boolean(), nullable=False, server_default=sa.text('true')),
             sa.Column('metadata', sa.JSON(), nullable=True),
             sa.Column('created_at', sa.DateTime(), nullable=True),
             sa.Column('updated_at', sa.DateTime(), nullable=True),
@@ -54,7 +54,7 @@ def upgrade() -> None:
             sa.Column('value', sa.Integer(), nullable=False),
             sa.Column('starts_at', sa.DateTime(), nullable=True),
             sa.Column('ends_at', sa.DateTime(), nullable=True),
-            sa.Column('is_active', sa.Boolean(), nullable=False, server_default=sa.text('1')),
+            sa.Column('is_active', sa.Boolean(), nullable=False, server_default=sa.text('true')),
             sa.Column('created_at', sa.DateTime(), nullable=True),
             sa.Column('updated_at', sa.DateTime(), nullable=True),
         )
