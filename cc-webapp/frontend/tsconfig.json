@@ -1,7 +1,11 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-  "lib": ["dom", "dom.iterable", "es2022"],
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "es2022"
+    ],
     "allowJs": true,
     "skipLibCheck": true,
     "strict": true,
@@ -12,8 +16,11 @@
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
-  "jsx": "react-jsx",
-  "types": ["react", "react-dom"],
+    "jsx": "preserve",
+    "types": [
+      "react",
+      "react-dom"
+    ],
     "incremental": true,
     "plugins": [
       {
@@ -68,12 +75,12 @@
     "**/*.ts",
     "**/*.tsx",
     ".next/types/**/*.ts",
-  "components/ui/alert-dialog.tsx",
-  "types/react-namespace-compat.d.ts",
-  "types/vendor-shims.d.ts"
+    "components/ui/alert-dialog.tsx",
+    "types/react-namespace-compat.d.ts",
+    "types/vendor-shims.d.ts"
   ],
   "exclude": [
-  "node_modules",
-  "0801/**"
+    "node_modules",
+    "0801/**"
   ]
 }

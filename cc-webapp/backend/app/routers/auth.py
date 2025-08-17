@@ -6,6 +6,7 @@ Delegates business logic to services.auth_service.AuthService.
 
 import logging
 from fastapi import APIRouter, Depends, HTTPException, status, Body, Request
+from pydantic import BaseModel, Field
 from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 
@@ -35,8 +36,13 @@ def _build_user_response(user: User) -> UserResponse:
         is_active=getattr(user, "is_active", True),
     )
 
-# --- Minimal register/profile endpoints (temporary E2E support) ---
-from pydantic import BaseModel, Field
+"""NOTE: 2025-08 Consolidation
+중복되던 최소(SignupResponse/AuthTokens) 기반 /signup,/login 엔드포인트 제거.
+현재 유효 엔드포인트:
+    POST /api/auth/signup -> Token (access_token, optional refresh_token, user)
+    POST /api/auth/login  -> Token
+프론트엔드(useAuth)는 Token 스키마만 사용해야 하며 이전 SignupResponse 구조 제거됨.
+"""
 
 class _RegisterRequest(BaseModel):
     invite_code: str = Field(..., description="Invite code")

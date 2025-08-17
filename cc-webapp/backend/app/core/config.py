@@ -28,6 +28,13 @@ class Settings(BaseSettings):
     SECRET_KEY: str = os.getenv("SECRET_KEY", "secret_key_for_development_only")
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24 hours
+    # Default invite code (runtime generated if not provided). For MVP we allow a single shared code.
+    # To override: set ENV DEFAULT_INVITE_CODE. Length 10, upper alnum.
+    DEFAULT_INVITE_CODE: str = os.getenv("DEFAULT_INVITE_CODE", "")
+    # Invite code enforcement: when True, ONLY codes present in DB (or UNLIMITED_INVITE_CODE) are accepted.
+    ENFORCE_DB_INVITE_CODES: bool = os.getenv("ENFORCE_DB_INVITE_CODES", "0") == "1"
+    # A single unlimited code (legacy 5858). If blank, unlimited code disabled.
+    UNLIMITED_INVITE_CODE: str = os.getenv("UNLIMITED_INVITE_CODE", "5858")
 
     # Payments / Webhook
     PAYMENT_WEBHOOK_SECRET: str = os.getenv("PAYMENT_WEBHOOK_SECRET", "dev-webhook-secret")
@@ -109,3 +116,13 @@ class Settings(BaseSettings):
 
 # Create global settings object
 settings = Settings()
+
+# Post-init dynamic generation for DEFAULT_INVITE_CODE if absent
+if not settings.DEFAULT_INVITE_CODE:
+    import secrets, string, logging
+    alphabet = string.ascii_uppercase + string.digits
+    generated = ''.join(secrets.choice(alphabet) for _ in range(10))
+    settings.DEFAULT_INVITE_CODE = generated  # type: ignore[attr-defined]
+    logging.getLogger(__name__).info("[BOOT] Generated DEFAULT_INVITE_CODE (ephemeral): %s", generated)
+    logging.getLogger(__name__).warning(
+        "DEFAULT_INVITE_CODE not supplied via environment. A random code was generated for this process only. Set env DEFAULT_INVITE_CODE to pin it.")
