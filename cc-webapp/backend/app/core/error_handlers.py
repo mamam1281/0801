@@ -47,9 +47,16 @@ def add_exception_handlers(app):
         rid = request_id_ctx.get()
         code = f"HTTP_{exc.status_code}"
         logger.info("HTTPException", extra={"request_id": rid, "status": exc.status_code, "detail": exc.detail})
+        # Preserve existing structured 'error' payload while also providing a top-level
+        # 'detail' field because some tests and clients expect it.
+        payload = _error_payload(code, str(exc.detail), request_id=rid)
+        # Add a convenience top-level 'detail' for compatibility
+        payload_top = {"detail": str(exc.detail)}
+        # Merge: keep both keys
+        merged = {**payload_top, **payload}
         return JSONResponse(
             status_code=exc.status_code,
-            content=_error_payload(code, str(exc.detail), request_id=rid),
+            content=merged,
             media_type=STANDARD_CONTENT_TYPE,
         )
 

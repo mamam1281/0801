@@ -64,6 +64,8 @@ class BuyReceipt(BaseModel):
     # Gems purchase fields
     # legacy field names used by tests/clients
     gems_granted: Optional[int] = None
+    # Backwards-compatible alias for older clients/tests expecting 'granted_gems'
+    granted_gems: Optional[int] = None
     new_gem_balance: Optional[int] = None
     charge_id: Optional[str] = None
     # additional fields
@@ -1054,6 +1056,7 @@ def buy(
         product_id=req.product_id,
         quantity=req.quantity,
     gems_granted=total_gems,
+    granted_gems=total_gems,
     new_gem_balance=new_balance,
     charge_id=pres.get("gateway_reference") if isinstance(pres, dict) else None,
     receipt_code=receipt_code,
@@ -1132,6 +1135,8 @@ def buy_limited(req: LimitedBuyRequest, db = Depends(get_db), current_user = Dep
     user_id = getattr(current_user, "id", None)
     if not user_id:
         raise HTTPException(status_code=401, detail="Unauthorized")
+    # Ensure variables used in multiple branches are defined to avoid UnboundLocalError in edge paths
+    receipt_signature = None
     # Idempotency guard for limited purchases
     rman = get_redis_manager()
     idem = (getattr(req, 'idempotency_key', None) or '').strip() or None
@@ -1179,8 +1184,8 @@ def buy_limited(req: LimitedBuyRequest, db = Depends(get_db), current_user = Dep
         now = datetime.now(pkg.start_at.tzinfo)
     if not (pkg.is_active and pkg.start_at <= now <= pkg.end_at):
         cur_user = db.query(models.User).filter(models.User.id == user_id).first()
-    _metric_inc("limited", "fail", "WINDOW_CLOSED")
-    return LimitedBuyReceipt(success=False, message="Package not available", user_id=user_id, code=pkg.code, reason_code="WINDOW_CLOSED", new_gem_balance=getattr(cur_user, 'cyber_token_balance', 0) if cur_user else None)
+        _metric_inc("limited", "fail", "WINDOW_CLOSED")
+        return LimitedBuyReceipt(success=False, message="Package not available", user_id=user_id, code=pkg.code, reason_code="WINDOW_CLOSED", new_gem_balance=getattr(cur_user, 'cyber_token_balance', 0) if cur_user else None)
 
     user = db.query(models.User).filter(models.User.id == user_id).first()
     if not user:

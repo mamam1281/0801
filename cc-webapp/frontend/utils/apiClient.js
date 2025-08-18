@@ -1,5 +1,7 @@
 import { apiLogTry, apiLogSuccess, apiLogFail } from './apiLogger';
 import { getTokens, getAccessToken, setTokens, clearTokens } from './tokenStorage';
+import * as InteractionTracker from './interactionTracker';
+import UIRecorder from './uiActionRecorder';
 
 // Raw base URL from env (can include /api). We normalize to avoid // or /api/api duplication.
 const _RAW_API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -57,6 +59,13 @@ const apiRequest = async (endpoint, options = {}) => {
 
   // API 요청 로그
   apiLogTry(`${method} ${endpoint}`);
+  // 개발용 추적: 요청(헤더/바디/쿼리)을 기록
+  const traceId = InteractionTracker.recordApiCall({
+    method,
+    endpoint,
+    requestData,
+    auth: !!getAccessToken(),
+  });
 
   const startTime = Date.now();
 
@@ -78,7 +87,7 @@ const apiRequest = async (endpoint, options = {}) => {
 
     const duration = Date.now() - startTime;
 
-    if (response.ok) {
+  if (response.ok) {
       const contentType = response.headers.get('content-type');
       if (contentType && contentType.includes('application/json')) {
         const data = await response.json();
@@ -90,8 +99,11 @@ const apiRequest = async (endpoint, options = {}) => {
           data 
         });
 
+        // 기록에 응답 부착
+        InteractionTracker.recordApiResult(traceId, { status: response.status, data });
         return data;
       }
+      InteractionTracker.recordApiResult(traceId, { status: response.status, data: null });
       return null;
     }
 
@@ -120,17 +132,19 @@ const apiRequest = async (endpoint, options = {}) => {
       data = await response.json();
     } catch (jsonError) {
       apiLogFail(`${method} ${endpoint}`, 'JSON 파싱 오류');
+      InteractionTracker.recordApiResult(traceId, { status: response.status, parseError: true });
       throw new Error('서버 응답을 처리할 수 없습니다.');
     }
 
     // Handle common non-OK status codes gracefully for frontend UX
     if (!response.ok) {
       // 403 처리: 인증이 없는 상태에서 403이 응답되는 경우 토큰이 없는지 확인하고 명시적 에러를 던짐
-      if (response.status === 403) {
+    if (response.status === 403) {
         if (!getAccessToken()) {
           apiLogFail(`${method} ${endpoint}`, 'Forbidden (no token)');
-          // When no token, return null so callers can use defaults instead of spinning retries
-          return null;
+      // When no token, return null so callers can use defaults instead of spinning retries
+      InteractionTracker.recordApiResult(traceId, { status: response.status, reason: 'forbidden_no_token' });
+      return null;
         }
         // 토큰은 있지만 403이면 권한 부족
         const errorMessage = data?.detail || data?.message || '권한이 없습니다.';
@@ -141,6 +155,7 @@ const apiRequest = async (endpoint, options = {}) => {
       // 404 처리: 리소스 미구현 상태일 수 있으니 null 반환으로 호출측에서 기본 동작 사용 허용
       if (response.status === 404) {
         apiLogFail(`${method} ${endpoint}`, 'Not Found (404)');
+        InteractionTracker.recordApiResult(traceId, { status: response.status, reason: 'not_found' });
         return null;
       }
 
@@ -151,7 +166,8 @@ const apiRequest = async (endpoint, options = {}) => {
 
     return data;
   } catch (error) {
-    apiLogFail(`${method} ${endpoint}`, error.message);
+  apiLogFail(`${method} ${endpoint}`, error.message);
+  InteractionTracker.recordApiResult(traceId, { error: error.message });
     throw error;
   }
 };
@@ -333,3 +349,23 @@ export const streakApi = {
 };
 
 export default apiRequest;
+
+// 개발용 유틸 노출: UI 액션 레코더 초기화와 추적 로그 접근
+export function initUiRecorder(opts) {
+  try {
+    UIRecorder.initUiActionRecorder(opts);
+    // eslint-disable-next-line no-console
+    console.log('[apiClient] UIRecorder 초기화됨');
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.warn('[apiClient] UIRecorder 초기화 실패', e);
+  }
+}
+
+export function getApiTraceLogs() {
+  return InteractionTracker.getInteractionLogs();
+}
+
+export function sendApiTraceToBackend() {
+  return InteractionTracker.sendLogsToBackend();
+}

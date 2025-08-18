@@ -34,7 +34,7 @@ import time
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, Tuple
 
-from fastapi import HTTPException, Depends, status
+from fastapi import HTTPException, Depends, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import jwt, JWTError
 from passlib.context import CryptContext
@@ -1074,17 +1074,48 @@ class AuthService:
     @staticmethod
     def get_current_user_dependency(
         credentials: HTTPAuthorizationCredentials = Depends(security),
-        db: Session = Depends(get_db)
+        db: Session = Depends(get_db),
+        request: Request = None
     ):
-        """FastAPI 의존성 주입용 현재 사용자 가져오기"""
-        if not credentials:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="인증 토큰이 필요합니다",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-        
-        return AuthService.get_current_user(credentials.credentials, db)
+        """FastAPI dependency to get current user.
+
+        This updated dependency prefers the Authorization header but will
+        fall back to reading an httpOnly cookie from the incoming Request
+        when the header is not present. This keeps compatibility with
+        existing routes that depend on AuthService.get_current_user_dependency
+        while providing the cookie-based flow.
+        """
+        # If Authorization header present, use it
+        if credentials and credentials.scheme.lower() == 'bearer' and credentials.credentials:
+            return AuthService.get_current_user(credentials.credentials, db)
+
+        # No header -> try cookie fallback if Request is available
+        if request is not None:
+            cookie_token = None
+            for name in ('access_token', 'cc_access_token', 'cc_auth_tokens'):
+                val = request.cookies.get(name)
+                if val:
+                    cookie_token = val
+                    break
+
+            if cookie_token:
+                # try extracting JSON {access_token: ...}
+                try:
+                    import json
+                    maybe = json.loads(cookie_token)
+                    if isinstance(maybe, dict) and 'access_token' in maybe:
+                        cookie_token = maybe['access_token']
+                except Exception:
+                    pass
+
+                return AuthService.get_current_user(cookie_token, db)
+
+        # Fallback: no credentials found
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="인증 토큰이 필요합니다",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
 
 # ===== 전역 인스턴스 및 헬퍼 함수 =====
@@ -1113,12 +1144,63 @@ def get_auth_service_or_init(db: Session):
 
 
 def get_current_user(
+    request: Request,
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: Session = Depends(get_db)
 ):
-    """현재 사용자 정보 가져오기 (의존성 주입용)"""
+    """현재 사용자 정보 가져오기 (의존성 주입용)
+
+    This dependency now supports a safe cookie fallback: if the Authorization
+    bearer header is not present, the function will attempt to read an
+    access token from a configured httpOnly cookie (common in browser
+    environments). The cookie name prioritized is 'access_token', then
+    'cc_access_token'.
+
+    NOTE: Using cookies for authentication requires CSRF protections in the
+    client (SameSite flags, CSRF token) or design where state-changing
+    endpoints require additional verification. This change only performs a
+    token source fallback for verification; it does not change how session
+    state or CSRF is handled elsewhere.
+    """
+    # If Authorization header provided, prefer it
     auth = get_auth_service_or_init(db)
-    return auth.get_current_user_dependency(credentials, db)
+    if credentials and credentials.scheme.lower() == 'bearer' and credentials.credentials:
+        return auth.get_current_user_dependency(credentials, db)
+
+    # Authorization header missing or empty -> try cookie fallback
+    try:
+        # look for common cookie names used by frontend
+        cookie_token = None
+        for name in ('access_token', 'cc_access_token', 'cc_auth_tokens'):
+            val = request.cookies.get(name)
+            if val:
+                cookie_token = val
+                break
+
+        if cookie_token:
+            # If cookie contains JSON with access_token inside (legacy), try to extract
+            try:
+                import json
+                maybe = json.loads(cookie_token)
+                if isinstance(maybe, dict) and 'access_token' in maybe:
+                    cookie_token = maybe['access_token']
+            except Exception:
+                # not JSON, proceed assuming raw token
+                pass
+
+            return auth.get_current_user(cookie_token, db)
+    except HTTPException:
+        raise
+    except Exception as e:
+        # On unexpected errors reading cookies, fall back to raising auth error
+        logger.warning(f"Cookie fallback read failed: {e}")
+
+    # No creds available
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="인증 토큰이 필요합니다",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
 
 
 def get_current_user_optional(

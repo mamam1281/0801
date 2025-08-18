@@ -1,9 +1,48 @@
 // src/pages/_app.js
 import { useEffect } from 'react';
+import { getTokens, clearTokens } from '../../utils/tokenStorage';
 import '../../styles/globals.css';
+
+// (초기화 로직은 아래 MyApp의 useEffect에 통합됩니다.)
+
+// 앱 부팅 시 서버에 토큰 유효성 검증 수행 (재사용 가능한 함수로 추출)
+export async function validateAuthOnBoot({ doReload = true } = {}) {
+  if (typeof window === 'undefined') return;
+
+  try {
+    const tokens = getTokens();
+    const access = tokens?.access_token;
+    if (!access) return;
+
+    const res = await fetch('/api/auth/me', {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${access}`,
+      },
+    });
+
+    if (res.status === 401 || res.status === 403 || res.status === 404) {
+      try {
+        clearTokens();
+        if (doReload) {
+          // eslint-disable-next-line no-restricted-globals
+          location.reload();
+        }
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.warn('[Auth] 토큰 정리 실패', err);
+      }
+    }
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.warn('[Auth] 서버 검증 실패:', e && e.message ? e.message : e);
+  }
+}
 
 function MyApp({ Component, pageProps }) {
   useEffect(() => {
+    // --- 기존 개발 편의 초기화 로직 (MSW, Dev API Logger, UI Recorder) ---
     if (process.env.NEXT_PUBLIC_DEV_MODE === 'true') {
       if (typeof window !== 'undefined') {
         // MSW 활성화 (개발 모드에서만)
@@ -16,8 +55,6 @@ function MyApp({ Component, pageProps }) {
                 console.log('[MSW] 모의 API 서버가 활성화되었습니다.');
               }
             } catch (err) {
-              // If mocks are not present in this runtime (production/container), don't fail.
-              // Keep quiet but log for diagnostics.
               // eslint-disable-next-line no-console
               console.warn('[MSW] 모의 API 로더 실패 (무시):', err && err.message ? err.message : err);
             }
@@ -27,13 +64,12 @@ function MyApp({ Component, pageProps }) {
         }
       }
     }
-    // 개발 편의: Dev API Logger 자동 로드 (로컬에서만, 토글 가능)
+
     try {
       if (process.env.NEXT_PUBLIC_DEV_MODE === 'true' && typeof window !== 'undefined') {
         const shouldLoad = localStorage.getItem('dev_api_logger') === 'on';
         const isLocalHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
         if (shouldLoad && isLocalHost) {
-          // script를 동적으로 주입하여 cc-webapp/devtools/dev_api_logger.js를 로드
           const script = document.createElement('script');
           script.src = '/devtools/dev_api_logger.js';
           script.async = true;
@@ -43,10 +79,39 @@ function MyApp({ Component, pageProps }) {
         }
       }
     } catch (e) {
-      // 안전하게 무시
       // eslint-disable-next-line no-console
       console.warn('[Dev API Logger] 자동 로드 오류:', e && e.message ? e.message : e);
     }
+
+    try {
+      if (process.env.NEXT_PUBLIC_DEV_MODE === 'true' && typeof window !== 'undefined') {
+        const shouldRecordUi = localStorage.getItem('dev_ui_recorder') === 'on';
+        const isLocalHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        if (shouldRecordUi && isLocalHost) {
+          import('../../utils/apiClient').then(mod => {
+            try {
+              if (mod && typeof mod.initUiRecorder === 'function') {
+                mod.initUiRecorder();
+                // eslint-disable-next-line no-console
+                console.log('[Dev] UIRecorder initialized');
+              }
+            } catch (e) {
+              // eslint-disable-next-line no-console
+              console.warn('[Dev] initUiRecorder failed', e);
+            }
+          }).catch(e => {
+            // eslint-disable-next-line no-console
+            console.warn('[Dev] UIRecorder import failed', e);
+          });
+        }
+      }
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.warn('[Dev] UIRecorder activation check failed', e);
+    }
+
+    // --- 서버 검증 호출 ---
+    validateAuthOnBoot();
   }, []);
 
   return <Component {...pageProps} />;

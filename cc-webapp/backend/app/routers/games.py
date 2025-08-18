@@ -36,7 +36,7 @@ from ..schemas.game_schemas import (
     GameStats, ProfileGameStats, Achievement, GameSession, GameLeaderboard
 )
 from app import models
-from sqlalchemy import text
+from sqlalchemy import text, func
 from ..utils.redis import update_streak_counter
 from ..core.config import settings
 try:  # Kafka optional import
@@ -845,14 +845,21 @@ async def pull_gacha(
 
     # 10연 배치 실행
     for _ in range(batches_of_10):
-        res = game_service.gacha_pull(current_user.id, 10)
+        try:
+            res = game_service.gacha_pull(current_user.id, 10)
+        except ValueError as ve:
+            # Convert service-level validation errors to client 400
+            raise HTTPException(status_code=400, detail=str(ve))
         all_results.extend(res.results)
         last_animation = res.animation_type or last_animation
         last_message = res.psychological_message or last_message
 
     # 단일 실행
     for _ in range(singles):
-        res = game_service.gacha_pull(current_user.id, 1)
+        try:
+            res = game_service.gacha_pull(current_user.id, 1)
+        except ValueError as ve:
+            raise HTTPException(status_code=400, detail=str(ve))
         all_results.extend(res.results)
         last_animation = res.animation_type or last_animation
         last_message = res.psychological_message or last_message
@@ -1206,7 +1213,7 @@ def calculate_user_streak(user_id: int, db: Session) -> int:
         check_date = today - timedelta(days=i)
         activity = db.query(models.UserAction).filter(
             models.UserAction.user_id == user_id,
-            db.func.date(models.UserAction.created_at) == check_date
+            func.date(models.UserAction.created_at) == check_date
         ).first()
         if activity:
             streak += 1

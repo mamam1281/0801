@@ -26,6 +26,8 @@ class User(Base):
     # Backwards compatibility alias: many tests/services still reference 'rank'
     # Provide synonym so constructor User(rank="VIP") works and attribute access is preserved.
     rank = synonym('user_rank')
+    # Backwards compatibility: accept 'hashed_password' in constructors/tests
+    hashed_password = synonym('password_hash')
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     last_login = Column(DateTime, nullable=True)

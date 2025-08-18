@@ -6,7 +6,7 @@ import logging
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any
 
-from fastapi import FastAPI, Depends, HTTPException, status, Response
+from fastapi import FastAPI, Depends, HTTPException, status, Response, Request
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, ForeignKey
@@ -168,6 +168,20 @@ class Token(BaseModel):
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/login")
 
+
+def oauth2_optional_token(request: Request) -> str | None:
+    """Extract bearer token from Authorization header if present; do not raise if missing.
+
+    This allows route dependencies to implement cookie fallbacks when headers are not provided.
+    """
+    auth = request.headers.get("Authorization")
+    if not auth:
+        return None
+    parts = auth.split()
+    if len(parts) == 2 and parts[0].lower() == "bearer":
+        return parts[1]
+    return None
+
 def create_access_token(data: dict, expires_delta: timedelta = None):
     """JWT 액세스 토큰 생성"""
     to_encode = data.copy()
@@ -176,9 +190,30 @@ def create_access_token(data: dict, expires_delta: timedelta = None):
     encoded_jwt = jwt.encode(to_encode, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
     return encoded_jwt
 
-def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> User:
-    """현재 인증된 사용자 가져오기"""
-    logger.debug(f"[AUTH] Token received (first 10 chars): {token[:10]}...")
+def get_current_user(token: str = Depends(oauth2_optional_token), db: Session = Depends(get_db), request: Request = None) -> User:
+    """현재 인증된 사용자 가져오기
+
+    Accepts bearer token via Authorization header or falls back to reading
+    an httpOnly cookie (common in browser environments). Cookie names
+    checked: 'access_token', 'cc_access_token', 'cc_auth_tokens'.
+    """
+    # If oauth2_scheme provided a token, prefer it. If not, try optional header first
+    if not token and request is not None:
+        # try common cookie names
+        for name in ('access_token', 'cc_access_token', 'cc_auth_tokens'):
+            val = request.cookies.get(name)
+            if val:
+                token = val
+                # if cookie contains JSON with access_token field, extract it
+                try:
+                    import json
+                    maybe = json.loads(token)
+                    if isinstance(maybe, dict) and 'access_token' in maybe:
+                        token = maybe['access_token']
+                except Exception:
+                    pass
+
+    logger.debug(f"[AUTH] Token received (first 10 chars): { (token[:10] if token else 'None') }...")
     
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,

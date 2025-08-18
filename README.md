@@ -205,6 +205,30 @@ def calculate_rfm_segment(user_actions):
     # ... 추가 세분화 로직
 ```
 
+## CI / 컨테이너화된 Playwright E2E 실행
+
+리포지토리는 Playwright 기반 E2E를 GitHub Actions와 컨테이너로 실행할 수 있는 간단한 워크플로와 실행 이미지를 포함합니다.
+
+- 워크플로: `.github/workflows/playwright-e2e.yml` (push/PR on main)
+- 컨테이너: `ci/playwright/Dockerfile` 와 `ci/playwright/run_e2e.sh`
+
+로컬에서 시도하려면(권장: Docker Desktop이 설치된 경우):
+
+```powershell
+# 스택 시작
+docker compose -f docker-compose.yml -f docker-compose.override.yml up -d --build
+
+# 컨테이너 빌드 및 실행 (리포지토리 루트에서 실행)
+docker build -t cc-playwright-runner -f ci/playwright/Dockerfile .
+docker run --rm --network host -v ${PWD}:/workspace -w /workspace cc-playwright-runner bash ci/playwright/run_e2e.sh
+
+# 종료
+docker compose -f docker-compose.yml -f docker-compose.override.yml down -v --remove-orphans
+```
+
+CI는 워크플로에서 동일한 빌드/실행 과정을 수행합니다. 백엔드가 8000에서 /docs를 노출해야 합니다.
+
+
 ### 3. 실시간 추천 엔진
 ```python
 @app.post("/api/recommend/personalized")
