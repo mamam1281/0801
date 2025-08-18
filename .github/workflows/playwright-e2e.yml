@@ -32,10 +32,11 @@ jobs:
             sleep 2; 
           done
 
-      - name: Run containerized Playwright runner
+      - name: Build and run Playwright runner (run onboarding E2E)
         run: |
           docker build -t cc-playwright-runner -f ci/playwright/Dockerfile .
-          docker run --rm --network host -v ${{ github.workspace }}:/workspace -w /workspace cc-playwright-runner bash ci/playwright/run_e2e.sh
+          # Run onboarding E2E (script will execute onboarding_e2e.py)
+          docker run --rm --network host -v ${{ github.workspace }}:/workspace -w /workspace cc-playwright-runner bash -lc "python e2e/onboarding_e2e.py"
 
       - name: Tear down
         if: always()
