@@ -15,3 +15,6 @@ services:
       CLICKHOUSE_URL: "http://clickhouse:8123"
       CLICKHOUSE_DATABASE: "cc_olap"
       CLICKHOUSE_USER: "default"
+  frontend:
+    environment:
+      NODE_OPTIONS: "--max-old-space-size=4096"

@@ -109,7 +109,7 @@ export function BottomNavigation({ currentScreen, onNavigate, user }: BottomNavi
               <div className="relative">
                 <motion.div
                   animate={isActive && !item.isExternal ? { scale: [1, 1.1, 1] } : {}}
-                  transition={{ duration: 0.3 }}
+                  transition={{ duration: 0.3, type: 'tween', ease: 'easeOut' }}
                   className="relative"
                 >
                   <Icon 
@@ -127,7 +127,7 @@ export function BottomNavigation({ currentScreen, onNavigate, user }: BottomNavi
                 {item.id === 'shop' && (
                   <motion.div
                     animate={{ scale: [1, 1.2, 1] }}
-                    transition={{ duration: 2, repeat: Infinity }}
+                    transition={{ duration: 2, repeat: Infinity, type: 'tween' }}
                     className="absolute -top-2 -right-2 w-4 h-4 bg-gradient-to-r from-error to-warning rounded-full flex items-center justify-center"
                   >
                     <span className="text-white text-xs font-bold">!</span>

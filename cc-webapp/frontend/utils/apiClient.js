@@ -4,7 +4,8 @@ import * as InteractionTracker from './interactionTracker';
 import UIRecorder from './uiActionRecorder';
 
 // Raw base URL from env (can include /api). We normalize to avoid // or /api/api duplication.
-const _RAW_API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+// Use IPv4 loopback by default in local dev to avoid host IPv6/::1 issues (use NEXT_PUBLIC_API_URL to override).
+const _RAW_API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
 
 function normalizeBase(url) {
   if (!url) return '';

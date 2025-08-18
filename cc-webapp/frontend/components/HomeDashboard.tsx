@@ -237,6 +237,7 @@ export function HomeDashboard({
               repeat: Infinity,
               delay: i * 0.3,
               ease: 'easeInOut',
+              type: 'tween',
             }}
             className="absolute w-1 h-1 bg-primary rounded-full"
           />
@@ -723,7 +724,7 @@ export function HomeDashboard({
                           rotate: [0, -10, 10, -10, 0],
                           scale: 1.1,
                         }}
-                        transition={{ duration: 0.5 }}
+                        transition={{ duration: 0.5, type: 'tween' }}
                         className="w-12 h-12 bg-gradient-to-r from-error to-warning rounded-lg flex items-center justify-center"
                       >
                         <Gift className="w-6 h-6 text-white" />
@@ -748,6 +749,7 @@ export function HomeDashboard({
                         transition={{
                           duration: 1.5,
                           repeat: Infinity,
+                          type: 'tween',
                         }}
                         className="text-error text-sm font-medium"
                       >
@@ -881,7 +883,7 @@ export function HomeDashboard({
             >
               <motion.div
                 animate={{ scale: [1, 1.2, 1] }}
-                transition={{ duration: 0.6, repeat: 3 }}
+                transition={{ duration: 0.6, repeat: 3, type: 'tween' }}
                 className="text-6xl mb-4"
               >
                 ⭐

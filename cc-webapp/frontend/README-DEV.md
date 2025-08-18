@@ -30,8 +30,8 @@ npm run start
 - Quick manual ping (PowerShell):
 
 ```powershell
-Invoke-WebRequest -Uri http://localhost:8000/api/health -UseBasicParsing
-Invoke-WebRequest -Uri http://localhost:3000/api/smoke-refresh -UseBasicParsing
+Invoke-WebRequest -Uri http://127.0.0.1:8000/api/health -UseBasicParsing
+Invoke-WebRequest -Uri http://127.0.0.1:3000/api/smoke-refresh -UseBasicParsing
 ```
 
 - Or run the provided smoke script (requires Node 18+ or optional node-fetch installed):

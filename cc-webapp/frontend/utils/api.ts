@@ -3,7 +3,8 @@
  * 백엔드와의 통신을 처리하는 함수들
  */
 
-const API_BASE_URL = 'http://localhost:8000'; // 백엔드 API 주소 (필요에 따라 수정)
+// 개발 기본값: IPv4 루프백을 사용하여 호스트의 IPv6 문제 회피
+const API_BASE_URL = 'http://127.0.0.1:8000'; // 백엔드 API 주소 (필요에 따라 수정)
 
 // 개발 모드 여부 확인
 const IS_DEV = process.env.NODE_ENV === 'development';

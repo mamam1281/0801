@@ -68,7 +68,7 @@ function MyApp({ Component, pageProps }) {
     try {
       if (process.env.NEXT_PUBLIC_DEV_MODE === 'true' && typeof window !== 'undefined') {
         const shouldLoad = localStorage.getItem('dev_api_logger') === 'on';
-        const isLocalHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  const isLocalHost = window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost';
         if (shouldLoad && isLocalHost) {
           const script = document.createElement('script');
           script.src = '/devtools/dev_api_logger.js';
@@ -86,7 +86,7 @@ function MyApp({ Component, pageProps }) {
     try {
       if (process.env.NEXT_PUBLIC_DEV_MODE === 'true' && typeof window !== 'undefined') {
         const shouldRecordUi = localStorage.getItem('dev_ui_recorder') === 'on';
-        const isLocalHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  const isLocalHost = window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost';
         if (shouldRecordUi && isLocalHost) {
           import('../../utils/apiClient').then(mod => {
             try {

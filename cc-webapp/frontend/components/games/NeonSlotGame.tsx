@@ -664,12 +664,21 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
                             }
                           : {}
                     }
-                    transition={{
-                      duration: winningPositions[index] ? 0.6 : 0.5,
-                      repeat: winningPositions[index] ? 3 : 0,
-                      type: 'spring',
-                      stiffness: 300,
-                    }}
+                    transition={
+                      (reelStopOrder.includes(index) || winningPositions[index])
+                        ? {
+                            // array keyframes require a tween (spring doesn't support arrays)
+                            duration: winningPositions[index] ? 0.6 : 0.5,
+                            repeat: winningPositions[index] ? 3 : 0,
+                            type: 'tween',
+                            ease: 'easeOut',
+                          }
+                        : {
+                            // single-value animations can use spring for natural motion
+                            type: 'spring',
+                            stiffness: 300,
+                          }
+                    }
                     className={`text-5xl lg:text-6xl ${symbol.color} z-20 relative ${
                       winningPositions[index] ? 'pulse-win' : ''
                     }`}

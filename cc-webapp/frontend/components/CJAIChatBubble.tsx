@@ -148,7 +148,7 @@ export function CJAIChatBubble({
                     </div>
                     <motion.div
                       animate={{ scale: [1, 1.2, 1] }}
-                      transition={{ duration: 2, repeat: Infinity }}
+                      transition={{ duration: 2, repeat: Infinity, type: 'tween' }}
                       className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-500 rounded-full"
                     />
                   </div>
@@ -199,17 +199,17 @@ export function CJAIChatBubble({
                         <div className="flex items-center gap-1">
                           <motion.div
                             animate={{ opacity: [0.4, 1, 0.4] }}
-                            transition={{ duration: 1.5, repeat: Infinity, delay: 0 }}
+                            transition={{ duration: 1.5, repeat: Infinity, delay: 0, type: 'tween' }}
                             className="w-1 h-1 bg-slate-400 rounded-full"
                           />
                           <motion.div
                             animate={{ opacity: [0.4, 1, 0.4] }}
-                            transition={{ duration: 1.5, repeat: Infinity, delay: 0.2 }}
+                            transition={{ duration: 1.5, repeat: Infinity, delay: 0.2, type: 'tween' }}
                             className="w-1 h-1 bg-slate-400 rounded-full"
                           />
                           <motion.div
                             animate={{ opacity: [0.4, 1, 0.4] }}
-                            transition={{ duration: 1.5, repeat: Infinity, delay: 0.4 }}
+                            transition={{ duration: 1.5, repeat: Infinity, delay: 0.4, type: 'tween' }}
                             className="w-1 h-1 bg-slate-400 rounded-full"
                           />
                         </div>
@@ -286,7 +286,7 @@ export function CJAIChatBubble({
               <MessageCircle className="w-6 h-6 text-white" />
               <motion.div
                 animate={{ scale: [1, 1.3, 1] }}
-                transition={{ duration: 2, repeat: Infinity }}
+                transition={{ duration: 2, repeat: Infinity, type: 'tween' }}
                 className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-400 rounded-full"
               />
             </motion.div>
@@ -296,7 +296,7 @@ export function CJAIChatBubble({
         {/* Pulse Effect */}
         <motion.div
           animate={{ scale: [1, 1.5, 1], opacity: [0.5, 0, 0.5] }}
-          transition={{ duration: 2, repeat: Infinity }}
+          transition={{ duration: 2, repeat: Infinity, type: 'tween' }}
           className="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full"
         />
 

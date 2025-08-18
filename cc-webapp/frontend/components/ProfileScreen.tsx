@@ -138,7 +138,7 @@ export function ProfileScreen({ onBack, onAddNotification }: ProfileScreenProps)
                       try {
                         // 테스트 로그인 시도
                         console.log('테스트 로그인 시도...');
-                        const loginResponse = await fetch('http://localhost:8000/api/auth/login', {
+                        const loginResponse = await fetch('http://127.0.0.1:8000/api/auth/login', {
                           method: 'POST',
                           headers: { 'Content-Type': 'application/json' },
                           body: JSON.stringify({

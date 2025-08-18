@@ -1,7 +1,7 @@
 "use client";
 import React from 'react';
 
-const API = 'http://localhost:8000/api';
+const API = 'http://127.0.0.1:8000/api';
 
 export default function AdminShopPage() {
   const [items, setItems] = React.useState([] as any[]);

@@ -150,7 +150,8 @@ export function CJChatBubble({
             transition={{ 
               duration: 2, 
               repeat: Infinity,
-              ease: "easeInOut"
+              ease: "easeInOut",
+              type: 'tween'
             }}
             className={`absolute inset-0 rounded-full bg-gradient-to-br ${avatarColors.bg} opacity-30`}
           />
@@ -167,26 +168,25 @@ export function CJChatBubble({
                 {state === 'speaking' && (
                   <motion.div
                     animate={{ scale: [1, 1.3, 1] }}
-                    transition={{ duration: 0.6, repeat: Infinity }}
+                    transition={{ duration: 0.6, repeat: Infinity, type: 'tween' }}
                   >
                     <Volume2 className="w-2 h-2 text-white" />
                   </motion.div>
                 )}
-                {state === 'typing' && (
-                  <motion.div
-                    animate={{ rotate: 360 }}
-                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                  >
-                    <div className="w-1 h-1 bg-white rounded-full" />
-                  </motion.div>
-                )}
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </motion.div>
-      </div>
-
-      {/* Chat Bubble */}
+                  {state === 'typing' && (
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                    >
+                      <div className="w-1 h-1 bg-white rounded-full" />
+                    </motion.div>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
+        </div>
+        {/* Chat Bubble */}
       <div className="flex-1 relative">
         <motion.div
           initial={{ scale: 0.8, opacity: 0 }}
@@ -194,7 +194,6 @@ export function CJChatBubble({
           transition={{ delay: 0.2, duration: 0.4, type: "spring", stiffness: 150 }}
           className="relative"
         >
-          {/* Bubble Container */}
           <div className={`
             relative bg-[#2d2d2d] backdrop-blur-xl 
             border border-slate-700/50 rounded-xl rounded-bl-none
@@ -220,12 +219,12 @@ export function CJChatBubble({
                   />
                   <motion.div
                     animate={{ opacity: [0.4, 1, 0.4] }}
-                    transition={{ duration: 1.5, repeat: Infinity, delay: 0.2 }}
+                    transition={{ duration: 1.5, repeat: Infinity, delay: 0.2, type: 'tween' }}
                     className="w-1.5 h-1.5 bg-slate-400 rounded-full"
                   />
                   <motion.div
                     animate={{ opacity: [0.4, 1, 0.4] }}
-                    transition={{ duration: 1.5, repeat: Infinity, delay: 0.4 }}
+                    transition={{ duration: 1.5, repeat: Infinity, delay: 0.4, type: 'tween' }}
                     className="w-1.5 h-1.5 bg-slate-400 rounded-full"
                   />
                 </div>
@@ -239,7 +238,7 @@ export function CJChatBubble({
                   {state === 'typing' && (
                     <motion.span
                       animate={{ opacity: [0, 1, 0] }}
-                      transition={{ duration: 1, repeat: Infinity }}
+                      transition={{ duration: 1, repeat: Infinity, type: 'tween' }}
                       className="ml-1 text-blue-400"
                     >
                       |
@@ -300,7 +299,7 @@ export function CJChatBubble({
                 {isVoiceEnabled && (
                   <motion.div
                     animate={{ scale: [1, 1.5, 1], opacity: [0.6, 0, 0.6] }}
-                    transition={{ duration: 2, repeat: Infinity }}
+                    transition={{ duration: 2, repeat: Infinity, type: 'tween' }}
                     className="absolute inset-0 rounded-full bg-emerald-400/20"
                   />
                 )}

@@ -38,7 +38,7 @@ export function getInteractionLogs() {
 
 export async function sendLogsToBackend() {
   try {
-    const url = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/+$/,'') + '/api/dev/logs';
+  const url = (process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000').replace(/\/+$/,'') + '/api/dev/logs';
     // Best-effort: non-blocking
     await fetch(url, {
       method: 'POST',
