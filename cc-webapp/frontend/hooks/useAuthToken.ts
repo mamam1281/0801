@@ -26,9 +26,17 @@ export function useAuthToken() {
 
     const readBundle = useCallback((): TokenBundle | undefined => {
         try {
-            const raw = typeof window !== 'undefined' ? localStorage.getItem('cc_auth_tokens') : null;
-            if (!raw) return undefined;
-            return JSON.parse(raw) as TokenBundle;
+            if (typeof window === 'undefined') return undefined;
+            const raw = localStorage.getItem('cc_auth_tokens');
+            if (raw) return JSON.parse(raw) as TokenBundle;
+            // 자동 마이그레이션: 이전 단일 키에서 번들 생성 (최소침습)
+            const legacyAccess = localStorage.getItem('cc_access_token');
+            if (legacyAccess) {
+                const bundle: TokenBundle = { access_token: legacyAccess };
+                try { localStorage.setItem('cc_auth_tokens', JSON.stringify(bundle)); } catch { /* ignore */ }
+                return bundle;
+            }
+            return undefined;
         } catch { return undefined; }
     }, []);
 

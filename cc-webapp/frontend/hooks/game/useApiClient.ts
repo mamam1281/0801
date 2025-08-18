@@ -47,11 +47,21 @@ export function useApiClient(baseUrl = '/api') {
   const envBase = (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_API_URL) ? process.env.NEXT_PUBLIC_API_URL : undefined;
   const normalizedBase = normalizeBase(envBase || baseUrl) || '';
 
-  const call: ApiCaller = useCallback(async (path: string, opts: ApiOptions = {}): Promise<any> => {
-    const { method = 'GET', body, params, headers = {}, authToken } = opts;
+    const call: ApiCaller = useCallback(async (path: string, opts: ApiOptions = {}): Promise<any> => {
+    let { method = 'GET', body, params, headers = {}, authToken } = opts;
     const query = buildQuery(params);
     const url = joinUrl(normalizedBase, path + query);
     const h: Record<string, string> = { 'Content-Type': 'application/json', ...headers };
+    // If explicit authToken not provided, attempt to read from unified bundle for convenience
+    if (!authToken && typeof window !== 'undefined') {
+      try {
+        const raw = localStorage.getItem('cc_auth_tokens');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          authToken = parsed?.access_token;
+        }
+      } catch { /* ignore */ }
+    }
     if (authToken) h['Authorization'] = `Bearer ${authToken}`;
     let res = await fetch(url, {
       method,

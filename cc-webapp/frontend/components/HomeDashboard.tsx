@@ -73,20 +73,22 @@ export function HomeDashboard({
       try {
         // Get status first
         const status = await streakApi.status('DAILY_LOGIN');
-        if (mounted)
+        if (mounted && status && typeof status === 'object') {
           setStreak({
-            count: status.count,
-            ttl_seconds: status.ttl_seconds,
-            next_reward: status.next_reward,
+            count: status.count ?? 0,
+            ttl_seconds: status.ttl_seconds ?? null,
+            next_reward: status.next_reward ?? null,
           });
+        }
         // Best-effort tick (backend guards with TTL)
         const after = await streakApi.tick('DAILY_LOGIN');
-        if (mounted)
+        if (mounted && after && typeof after === 'object') {
           setStreak({
-            count: after.count,
-            ttl_seconds: after.ttl_seconds,
-            next_reward: after.next_reward,
+            count: after.count ?? 0,
+            ttl_seconds: after.ttl_seconds ?? null,
+            next_reward: after.next_reward ?? null,
           });
+        }
         // Load protection & this month attendance (UTC now)
         try {
           const prot = await streakApi.protectionGet('DAILY_LOGIN');

@@ -376,6 +376,15 @@ async def refresh(
             req_ip = request.client.host if request and request.client else ""
             req_ua = request.headers.get("User-Agent") if request else ""
             ok, uid, err = TokenManager.verify_refresh_token(provided_token, req_ip, req_ua, db)
+            if err == "REVOKED":
+                # Reuse of a revoked/rotated refresh token → security response: revoke everything and deny
+                try:
+                    if uid:
+                        AuthService.revoke_all_sessions(db, uid)
+                        TokenManager.revoke_all_refresh_tokens(uid, db)
+                except Exception:
+                    logger.exception("Failed cascading revoke after refresh reuse detection")
+                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token reuse detected")
             if ok and uid:
                 user = db.query(User).filter(User.id == uid).first()
         except Exception:
