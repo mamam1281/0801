@@ -38,6 +38,17 @@ jobs:
           # Run onboarding E2E (script will execute onboarding_e2e.py)
           docker run --rm --network host -v ${{ github.workspace }}:/workspace -w /workspace cc-playwright-runner bash -lc "python e2e/onboarding_e2e.py"
 
+      - name: Upload Playwright artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-artifacts
+          path: |
+            e2e/artifacts/**
+            ci/playwright/artifacts/**
+            # include any junit xml reports from the runner
+            e2e/results/**/*.xml
+
       - name: Tear down
         if: always()
         run: docker compose -f docker-compose.yml -f docker-compose.override.yml down -v --remove-orphans
