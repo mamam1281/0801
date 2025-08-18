@@ -1,14 +1,22 @@
-from fastapi import APIRouter, Depends, HTTPException
-from typing import Dict
-from .auth import get_current_user_optional
+from fastapi import APIRouter, Header
+from typing import Dict, Optional
+from jose import jwt, JWTError
+
+# Lightweight stub for frontend to avoid 404 while notification service is small.
+# This route allows anonymous access; when an Authorization header with a valid
+# Bearer token is present, we try to extract the user id from the token payload.
+from ..auth.auth_service import JWT_SECRET_KEY, JWT_ALGORITHM
 
 router = APIRouter(prefix="/api/notification", tags=["Notification Center"])
 
 
 @router.get("/settings")
-def get_notification_settings(current_user = Depends(get_current_user_optional)) -> Dict:
-    """경량 스텁: 유저가 있으면 user:id 키를 참고하는 형태로 응답, 아니면 기본 설정 반환."""
-    # 기본값: 모든 알림 허용
+def get_notification_settings(authorization: Optional[str] = Header(None)) -> Dict:
+    """Return default notification settings; include user_id when available.
+
+    This endpoint intentionally allows anonymous requests and will not trigger
+    the global HTTPBearer auto_error behavior.
+    """
     default = {
         "email": True,
         "push": True,
@@ -16,100 +24,14 @@ def get_notification_settings(current_user = Depends(get_current_user_optional))
         "daily_summary": False,
     }
 
-    # If user present, return same defaults for now (placeholder for real Redis-backed settings)
-    return {"user_id": getattr(current_user, "id", None), "settings": default}
-# cc-webapp/backend/app/routers/notification.py
-from fastapi import APIRouter, Depends, HTTPException, Path
+    user_id = None
+    if authorization and authorization.startswith("Bearer "):
+        token = authorization.split(" ", 1)[1]
+        try:
+            payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
+            user_id = payload.get("sub") or payload.get("user_id")
+        except JWTError:
+            # ignore invalid tokens for this lightweight stub
+            user_id = None
 
-from pydantic import BaseModel, ConfigDict
-from typing import Optional
-from datetime import datetime
-
-from .. import models
-from ..database import get_db
-from ..services.notification_service import NotificationService
-from ..services.user_service import UserService
-
-router = APIRouter()
-
-# Dependency provider for NotificationService
-def get_notification_service(db = Depends(get_db)):
-    return NotificationService(db=db)
-
-# Dependency provider for UserService
-def get_user_service(db = Depends(get_db)):
-    return UserService(db)
-
-# Pydantic model for the pending notification response
-class PendingNotificationResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-    
-    id: Optional[int] = None
-    message: Optional[str] = None
-    created_at: Optional[datetime] = None
-    sent_at: Optional[datetime] = None
-
-
-@router.get(
-    "/notification/pending/{user_id}", # Path maintained from original
-    response_model=PendingNotificationResponse,
-    tags=["notification"]
-)
-async def get_pending_notification(
-    user_id: int = Path(..., title="The ID of the user to check for pending notifications", ge=1),
-    service: NotificationService = Depends(get_notification_service),
-    user_service: UserService = Depends(get_user_service)
-):
-    """
-    Retrieves the oldest pending notification for a user, marks it as sent,
-    and returns its details. If no pending notifications, returns empty object or specific fields as None.
-    """
-    try:
-        user_service.get_user_or_error(user_id)
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-
-    notification = service.get_oldest_pending_notification(user_id=user_id)
-
-    if not notification:
-        # Return a response indicating no pending notification found
-        # Based on the Pydantic model, all fields are Optional, so an empty call works
-        return PendingNotificationResponse()
-
-    # If service might raise an error that should be propagated as HTTP error:
-    # try:
-    #     notification = service.get_oldest_pending_notification(user_id=user_id)
-    # except SomeServiceSpecificException as e:
-    #     raise HTTPException(status_code=400, detail=str(e))
-
-    # The service now handles committing and refreshing.
-    # The router just needs to return the data.
-    return PendingNotificationResponse.model_validate(notification) # Pydantic V2
-
-# Example of how to create a notification (optional, for testing or direct use if needed)
-# class NotificationCreateRequest(BaseModel):
-#     user_id: int
-#     message: str
-#     notification_type: Optional[str] = "general"
-
-# @router.post("/notification/create", response_model=PendingNotificationResponse, tags=["notification"])
-# async def create_new_notification(
-#     request: NotificationCreateRequest,
-#     service: NotificationService = Depends(get_notification_service)
-# ):
-#     try:
-#         notification = service.create_notification(
-#             user_id=request.user_id,
-#             message=request.message
-#             # notification_type=request.notification_type # If model and service support it
-#         )
-#         return PendingNotificationResponse.from_orm(notification)
-#     except Exception as e:
-#         # Handle specific exceptions from service if any (e.g., user not found if service checked)
-#         raise HTTPException(status_code=500, detail=f"Failed to create notification: {str(e)}")
-
-
-# Ensure this router is included in app/main.py:
-# from .routers import notification
-# app.include_router(notification.router, prefix="/api", tags=["notification"])
-# This should already be done.
+    return {"user_id": user_id, "settings": default}

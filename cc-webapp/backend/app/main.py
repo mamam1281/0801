@@ -65,6 +65,7 @@ from app.routers import (
     events,      # 추가 - 이벤트/미션 라우터
     rbac_demo,   # RBAC demo router
 )
+from app.routers import notification
 from app.routers import kafka_api
 from app.routers.notifications import sse_router as notifications_sse_router, api_router as notifications_api_router
 from app.routers import notification_center
@@ -254,6 +255,7 @@ app.include_router(notifications_api_router)
 app.include_router(notification_center.router)
 app.include_router(email_router.router)
 app.include_router(streak.router)
+app.include_router(notification.router, tags=["Notification Center"])  # lightweight stub router
 
 # Individual Games (removed - consolidated into games.router)
 # app.include_router(rps.router, tags=["Rock Paper Scissors"])  # duplicated in games.router

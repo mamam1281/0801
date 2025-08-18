@@ -53,6 +53,16 @@ def cleanup_stale_pending_transactions(max_age_minutes: int = None):
                 print(f"[{datetime.utcnow()}] APScheduler: cleanup skipped - table 'shop_transactions' not present.")
                 return 0
 
+            # Check that expected column(s) exist to avoid SELECT referencing missing columns
+            try:
+                col_names = [c['name'] for c in inspector.get_columns('shop_transactions')]
+            except Exception:
+                print(f"[{datetime.utcnow()}] APScheduler: cleanup skipped - could not inspect 'shop_transactions' columns.")
+                return 0
+            if 'receipt_signature' not in col_names:
+                print(f"[{datetime.utcnow()}] APScheduler: cleanup skipped - column 'receipt_signature' not present in 'shop_transactions'.")
+                return 0
+
             # 조건에 맞는 row 수만 먼저 count -> 과도한 업데이트 방지
             stale_q = (
                 db.query(models.ShopTransaction)
