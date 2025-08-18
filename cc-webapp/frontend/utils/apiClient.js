@@ -7,6 +7,26 @@ import UIRecorder from './uiActionRecorder';
 // Use IPv4 loopback by default in local dev to avoid host IPv6/::1 issues (use NEXT_PUBLIC_API_URL to override).
 const _RAW_API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
 
+// SSR 환경(Next 서버 사이드)에서는 컨테이너 내부 네트워크 접근이 가능하므로 내부용 우선 적용
+// 브라우저에서는 localhost 접근 필요
+function resolveBase() {
+  const browser = typeof window !== 'undefined';
+  if (browser) {
+    return process.env.NEXT_PUBLIC_API_URL_BROWSER || _RAW_API_BASE;
+  }
+  // 서버 사이드: 내부용 환경변수 우선
+  return process.env.NEXT_PUBLIC_API_URL_INTERNAL || _RAW_API_BASE;
+}
+
+const _RESOLVED_BASE = resolveBase();
+// eslint-disable-next-line no-console
+if (typeof window === 'undefined') {
+  console.log('[apiClient] SSR base URL 선택:', _RESOLVED_BASE);
+} else {
+  // eslint-disable-next-line no-console
+  console.log('[apiClient] Browser base URL 선택:', _RESOLVED_BASE);
+}
+
 function normalizeBase(url) {
   if (!url) return '';
   // trim whitespace
@@ -18,7 +38,7 @@ function normalizeBase(url) {
   return u;
 }
 
-let API_BASE_URL = normalizeBase(_RAW_API_BASE);
+let API_BASE_URL = normalizeBase(_RESOLVED_BASE);
 
 // Developer guard: if code later concatenates endpoint starting with /api and base already ends with /api, that's fine.
 // But if an endpoint ALSO includes /api at its start and base does NOT end with /api, it's still fine.

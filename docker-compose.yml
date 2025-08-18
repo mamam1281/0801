@@ -24,6 +24,9 @@ services:
       CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-}
       OLAP_BATCH_SIZE: ${OLAP_BATCH_SIZE:-200}
       OLAP_FLUSH_SECONDS: ${OLAP_FLUSH_SECONDS:-2}
+  # 프론트엔드 포트를 3000 -> 40001 로 이동했으므로 CORS 허용 목록 확장
+  # 쉼표 구분: localhost/127.0.0.1 의 3000,40001 모두 허용
+  CORS_ORIGINS: "http://localhost:3000,http://127.0.0.1:3000,https://localhost:3000,https://127.0.0.1:3000,http://localhost:40001,http://127.0.0.1:40001"
     volumes:
       - ./cc-webapp/backend:/app
       - ./logs/backend:/app/logs:rw
@@ -48,20 +51,27 @@ services:
       dockerfile: Dockerfile.dev
     container_name: cc_frontend
     environment:
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+  # 브라우저에서 호출할 공개 API Base (호스트 PC 접근)
+  NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+  # SSR(Next 서버 런타임)에서 컨테이너 네트워크로 직접 접근할 내부용
+  NEXT_PUBLIC_API_URL_INTERNAL: ${NEXT_PUBLIC_API_URL_INTERNAL:-http://backend:8000}
+  NEXT_DISABLE_WEBPACK_CACHE: "1"
+  NEXT_TELEMETRY_DISABLED: "1"
     volumes:
       - ./cc-webapp/frontend:/app
       - ./logs/frontend:/app/logs:rw
       - /app/node_modules
     ports:
-      - "${FRONTEND_PORT:-3000}:3000"
+      # Windows excluded port range(예: 2919-3518) 회피: 기본 호스트 포트 40001 사용
+      - "${FRONTEND_PORT:-40001}:3000"
     depends_on:
       - backend
     restart: unless-stopped
-    command: ["sh","-c","npm ci || npm install && npm run dev"]
+    command: ["sh","-c","[ -d node_modules ] || npm install && npm run dev"]
     healthcheck:
-      test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:3000',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))\""]
-      interval: 15s
+      test: ["CMD-SHELL","node -e \"require('http').get('http://localhost:3000',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))\""]
+      start_period: 45s
+      interval: 20s
       timeout: 5s
       retries: 5
     networks:
