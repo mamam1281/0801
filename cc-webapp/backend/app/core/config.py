@@ -23,6 +23,10 @@ class Settings(BaseSettings):
     # Redis TTL tunables (seconds)
     IDEMPOTENCY_TTL_SECONDS: int = int(os.getenv("IDEMPOTENCY_TTL_SECONDS", str(60 * 10)))  # default 10 minutes
     LIMITED_HOLD_TTL_SECONDS: int = int(os.getenv("LIMITED_HOLD_TTL_SECONDS", "120"))  # default 120s
+    # Admin gold grant TTLs / rate limit
+    ADMIN_GOLD_GRANT_LOCK_TTL_SECONDS: int = int(os.getenv("ADMIN_GOLD_GRANT_LOCK_TTL_SECONDS", "30"))
+    ADMIN_GOLD_GRANT_RESULT_TTL_SECONDS: int = int(os.getenv("ADMIN_GOLD_GRANT_RESULT_TTL_SECONDS", str(60*60*24)))  # 24h
+    ADMIN_GOLD_GRANT_RATE_LIMIT_PER_MIN: int = int(os.getenv("ADMIN_GOLD_GRANT_RATE_LIMIT_PER_MIN", "30"))  # per admin per minute
 
     # JWT Settings
     SECRET_KEY: str = os.getenv("SECRET_KEY", "secret_key_for_development_only")

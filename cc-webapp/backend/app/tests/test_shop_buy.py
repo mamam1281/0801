@@ -38,8 +38,8 @@ def test_buy_gems_happy_path():
     assert resp.status_code == 200
     body = resp.json()
     assert body["success"] is True
-    assert body["gems_granted"] == 200
-    assert body["new_gem_balance"] >= 200
+    assert body["gold_granted"] == 200
+    assert body["new_gold_balance"] >= 200
     assert body["charge_id"]
 
 
@@ -62,10 +62,10 @@ def test_buy_gems_payment_fail():
     assert resp.status_code == 200
     body = resp.json()
     if not body["success"]:
-        assert body["gems_granted"] == 0
+        assert body["gold_granted"] == 0
     else:
         # if the seed still passed, at least success is coherent
-        assert body["gems_granted"] == 100
+        assert body["gold_granted"] == 100
 
 
 def test_catalog_listing_and_price_structure():
@@ -73,6 +73,6 @@ def test_catalog_listing_and_price_structure():
     assert resp.status_code == 200
     items = resp.json()
     assert isinstance(items, list) and len(items) >= 3
-    required = {"id", "sku", "name", "price_cents", "discounted_price_cents", "gems"}
+    required = {"id", "sku", "name", "price_cents", "discounted_price_cents", "gems"}  # 카탈로그 스키마 후속 gold 전환 예정
     for it in items:
         assert required.issubset(set(it.keys()))

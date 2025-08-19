@@ -224,7 +224,7 @@ class ShopService:
             self.db.query(models.UserAction)
             .filter(
                 models.UserAction.user_id == user_id,
-                models.UserAction.action_type.in_(['PURCHASE_GEMS', 'BUY_PACKAGE'])
+                models.UserAction.action_type.in_(['PURCHASE_GOLD', 'BUY_PACKAGE'])
             )
             .order_by(models.UserAction.id.desc())
             .limit(limit)
@@ -310,9 +310,8 @@ class ShopService:
             return {"success": False, "message": f"Cannot refund transaction in status {tx.status}"}
 
         token_svc = TokenService(self.db)
-        # For gems (top-up), refund by deducting tokens
-        if tx.kind == 'gems':
-            # ensure user has enough tokens to deduct
+        # gold 충전 트랜잭션(kind='gold') 환불은 사용자 잔액에서 차감
+        if tx.kind == 'gold':
             current = token_svc.get_token_balance(tx.user_id)
             if current < tx.amount:
                 return {"success": False, "message": "Insufficient user balance to refund"}
@@ -320,7 +319,7 @@ class ShopService:
             if new_balance is None:
                 return {"success": False, "message": "Failed to deduct tokens for refund"}
         else:
-            # For item purchase, return tokens to user
+            # 아이템 구매(kind='item') 환불은 토큰을 되돌려줌
             token_svc.add_tokens(tx.user_id, tx.amount)
 
         # Update transaction status
@@ -352,7 +351,6 @@ class ShopService:
                 "per_user_limit": p.per_user_limit,
                 "starts_at": p.starts_at.isoformat() if p.starts_at else None,
                 "ends_at": p.ends_at.isoformat() if p.ends_at else None,
-                "emergency_disabled": p.emergency_disabled,
                 "contents": p.contents,
             })
         return out
@@ -535,7 +533,7 @@ class ShopService:
         except Exception:
             pass
 
-    def settle_pending_gems_for_user(self, user_id: int, receipt_code: str, gateway: Optional[PaymentGatewayService] = None) -> Dict[str, Any]:
+    def settle_pending_gold_for_user(self, user_id: int, receipt_code: str, gateway: Optional[PaymentGatewayService] = None) -> Dict[str, Any]:
         tx = self.get_tx_by_receipt_for_user(user_id, receipt_code)
         gateway = gateway or PaymentGatewayService()
         if tx is None:
@@ -544,7 +542,7 @@ class ShopService:
                 self.db.query(models.UserAction)
                 .filter(
                     models.UserAction.user_id == user_id,
-                    models.UserAction.action_type == 'PURCHASE_GEMS',
+                    models.UserAction.action_type == 'PURCHASE_GOLD',
                     models.UserAction.action_data.contains(f'"receipt_code":"{receipt_code}"'),
                 )
                 .order_by(models.UserAction.id.desc())
@@ -567,7 +565,7 @@ class ShopService:
             elif status == 'failed':
                 # Write a follow-up log to indicate failure
                 payload = {**data, 'status': 'failed'}
-                ua = models.UserAction(user_id=user_id, action_type='PURCHASE_GEMS', action_data=json.dumps(payload, ensure_ascii=False))
+                ua = models.UserAction(user_id=user_id, action_type='PURCHASE_GOLD', action_data=json.dumps(payload, ensure_ascii=False))
                 try:
                     self.db.add(ua)
                     self.db.commit()
@@ -579,7 +577,7 @@ class ShopService:
                 amount = int(data.get('amount') or 0)
                 new_balance = TokenService(self.db).add_tokens(user_id, amount)
                 payload = {**data, 'status': 'success'}
-                ua = models.UserAction(user_id=user_id, action_type='PURCHASE_GEMS', action_data=json.dumps(payload, ensure_ascii=False))
+                ua = models.UserAction(user_id=user_id, action_type='PURCHASE_GOLD', action_data=json.dumps(payload, ensure_ascii=False))
                 try:
                     self.db.add(ua)
                     self.db.commit()
@@ -589,8 +587,8 @@ class ShopService:
         # Normal path: have transaction row
         if tx.status != 'pending':
             return {"success": True, "status": tx.status}
-        if tx.kind != 'gems':
-            return {"success": False, "message": "Only gems transactions can be auto-settled"}
+        if tx.kind != 'gold':
+            return {"success": False, "message": "Only gold transactions can be auto-settled"}
         res = gateway.check_status(receipt_code)
         status = res.get('status')
         if status == 'pending':
@@ -623,8 +621,8 @@ class ShopService:
             return {"success": False, "message": "Transaction not found"}
         if tx.status != 'pending':
             return {"success": True, "status": tx.status}
-        if tx.kind != 'gems':
-            return {"success": False, "message": "Only gems transactions can be force-settled"}
+        if tx.kind != 'gold':
+            return {"success": False, "message": "Only gold transactions can be force-settled"}
 
         if outcome == 'failed':
             tx.status = 'failed'

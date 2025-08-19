@@ -197,7 +197,7 @@ class AnalyticsRepository(BaseRepository[models.UserAction]):
             # 구매 관련 액션들 조회
             purchase_actions = self.db.query(models.UserAction)\
                 .filter(models.UserAction.created_at >= cutoff_date)\
-                .filter(models.UserAction.action_type.in_(['PURCHASE_GEMS', 'BUY_PACKAGE']))\
+                .filter(models.UserAction.action_type.in_(['PURCHASE_GOLD', 'BUY_PACKAGE']))\
                 .all()
             
             total_revenue = 0

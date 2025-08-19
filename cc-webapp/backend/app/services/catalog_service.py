@@ -13,8 +13,8 @@ class Product:
     name: str
     # Price in minor currency unit (e.g., cents)
     price_cents: int
-    # Gems granted when purchased
-    gems: int
+    # 구매 시 부여되는 골드(기존 gems 제거)
+    gold: int
     # Optional discount percent (0-100)
     discount_percent: int = 0
     # Optional discount window
@@ -28,15 +28,15 @@ class CatalogService:
 
     # Demo catalog
     _catalog: Dict[int, Product] = {
-        1001: Product(id=1001, sku="GEM_PACK_SMALL", name="Gems x100", price_cents=299, gems=100),
-        1002: Product(id=1002, sku="GEM_PACK_MED", name="Gems x550", price_cents=1299, gems=550, discount_percent=8),
-        1003: Product(id=1003, sku="GEM_PACK_BIG", name="Gems x1200", price_cents=2499, gems=1200, discount_percent=12),
+        1001: Product(id=1001, sku="GOLD_PACK_SMALL", name="Gold x100", price_cents=299, gold=100),
+        1002: Product(id=1002, sku="GOLD_PACK_MED", name="Gold x550", price_cents=1299, gold=550, discount_percent=8),
+        1003: Product(id=1003, sku="GOLD_PACK_BIG", name="Gold x1200", price_cents=2499, gold=1200, discount_percent=12),
         1004: Product(
             id=1004,
-            sku="GEM_PACK_VIP",
-            name="Gems x3000 (VIP)",
+            sku="GOLD_PACK_VIP",
+            name="Gold x3000 (VIP)",
             price_cents=5999,
-            gems=3000,
+            gold=3000,
             discount_percent=15,
             discount_ends_at=datetime.utcnow() + timedelta(days=7),
             min_rank="VIP",

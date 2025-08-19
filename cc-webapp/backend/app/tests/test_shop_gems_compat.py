@@ -30,7 +30,7 @@ def test_catalog_gems_applied_for_gems_purchase():
     assert resp.status_code == 200
     body = resp.json()
     assert body["success"] is True
-    assert body["gems_granted"] == 200
+    assert body["gold_granted"] == 200
 
 
 def test_vip_guard_blocks_non_vip():

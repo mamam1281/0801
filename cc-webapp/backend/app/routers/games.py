@@ -138,6 +138,7 @@ class AchievementProgressItem(BaseModel):
     icon: Optional[str]
     badge_color: Optional[str]
     reward_coins: int
+    # 제거된 gems 필드 대체: 항상 0 반환 (호환 유지 후 추후 스키마 삭제 예정)
     reward_gems: int
     progress: int
     threshold: Optional[int]
@@ -161,7 +162,7 @@ def list_achievements(db: Session = Depends(get_db)):
             icon=a.icon,
             badge_color=a.badge_color,
             reward_coins=a.reward_coins,
-            reward_gems=a.reward_gems,
+            reward_gems=0,
             progress=0,
             threshold=cond.get("threshold"),
             unlocked=False,

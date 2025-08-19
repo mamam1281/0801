@@ -1,7 +1,8 @@
 """Simple Admin API Router - Provides administrative functions for admin users"""
 
 import logging
-from typing import List, Optional
+import uuid
+from typing import List, Optional, Any
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from fastapi.responses import StreamingResponse
@@ -58,6 +59,26 @@ class LimitedPromoRequest(BaseModel):
     code: str
     promo_code: str
     cents_off: int
+
+
+# ====== Gold Grant (단일 통화) ======
+
+class GoldGrantRequest(BaseModel):
+    amount: int = Field(..., gt=0, description="지급할 골드 양 (양수)")
+    reason: str = Field(..., min_length=2, max_length=120)
+    idempotency_key: Optional[str] = Field(None, description="멱등 보장을 위한 클라이언트 키")
+
+class GoldGrantResponse(BaseModel):
+    success: bool
+    user_id: int
+    granted: int
+    new_gold_balance: int
+    reason: str
+    receipt_code: str
+    idempotent_reuse: bool = False
+
+def _gold_idem_key(user_id: int, key: str) -> str:
+    return f"admin:gold:grant:{user_id}:{key}"
 
 
 
@@ -444,20 +465,32 @@ class AdminCatalogItemIn(BaseModel):
     sku: str
     name: str
     price_cents: int = Field(..., ge=0)
-    gems: int = Field(..., ge=0)
+    gold: int = Field(..., ge=0, description="Amount of gold granted (was 'gems')")
     discount_percent: int = Field(0, ge=0, le=100)
     discount_ends_at: Optional[datetime] = None
     min_rank: Optional[str] = None
+
+    class Config:
+        fields = {"gold": {"alias": "gems"}}  # backward compat for clients sending 'gems'
+        allow_population_by_field_name = True
 
 class AdminCatalogItemOut(BaseModel):
     id: int
     sku: str
     name: str
     price_cents: int
-    gems: int
+    gold: int = Field(..., description="Amount of gold granted (was 'gems')")
+    gems: Optional[int] = Field(None, description="DEPRECATED: alias of gold - will be removed", serialization_alias="gems")
     discount_percent: int = 0
     discount_ends_at: Optional[datetime] = None
     min_rank: Optional[str] = None
+
+    def model_post_init(self, __context: Any) -> None:  # type: ignore[override]
+        # ensure deprecated gems mirror
+        object.__setattr__(self, 'gems', self.gold)
+
+    class Config:
+        allow_population_by_field_name = True
 
 @router.get("/shop/items", response_model=list[AdminCatalogItemOut])
 async def admin_list_items(admin_user = Depends(require_admin_access)):
@@ -468,7 +501,7 @@ async def admin_list_items(admin_user = Depends(require_admin_access)):
             sku=p.sku,
             name=p.name,
             price_cents=p.price_cents,
-            gems=p.gems,
+            gold=p.gems,
             discount_percent=p.discount_percent or 0,
             discount_ends_at=p.discount_ends_at,
             min_rank=p.min_rank,
@@ -484,7 +517,7 @@ async def admin_create_item(body: AdminCatalogItemIn, admin_user = Depends(requi
         sku=body.sku,
         name=body.name,
         price_cents=body.price_cents,
-        gems=body.gems,
+        gems=body.gold,
         discount_percent=body.discount_percent or 0,
         discount_ends_at=body.discount_ends_at,
         min_rank=body.min_rank,
@@ -504,7 +537,7 @@ async def admin_update_item(item_id: int, body: AdminCatalogItemIn, admin_user =
         sku=body.sku,
         name=body.name,
         price_cents=body.price_cents,
-        gems=body.gems,
+        gems=body.gold,
         discount_percent=body.discount_percent or 0,
         discount_ends_at=body.discount_ends_at,
         min_rank=body.min_rank,
@@ -816,6 +849,7 @@ class LimitedUpsertRequest(BaseModel):
     emergency_disabled: Optional[bool] = None
     contents: Optional[dict] = None
     is_active: Optional[bool] = None
+    gold: Optional[int] = Field(None, description="Amount of gold granted (was bonus_tokens/gems)")
 
 
 @router.post("/limited-packages/upsert")
@@ -835,17 +869,21 @@ async def admin_limited_upsert(
         except Exception:
             pass
     # contents에서 bonus_tokens를 gems로 활용 (테스트 컨벤션)
+    # Derive gold (legacy: contents.bonus_tokens or gems nomenclature)
     bonus = 0
-    try:
-        bonus = int((req.contents or {}).get("bonus_tokens", 0))
-    except Exception:
-        bonus = 0
+    if req.gold is not None:
+        bonus = int(req.gold)
+    else:
+        try:
+            bonus = int((req.contents or {}).get("bonus_tokens", 0))
+        except Exception:
+            bonus = 0
     pkg = LimitedPackage(
         code=req.package_id,
         name=req.name,
         description=req.description or "",
         price_cents=int(req.price),
-        gems=bonus,
+    gems=bonus,  # internal still uses Product/LimitedPackage.gems until full refactor
         start_at=start_at,
         end_at=end_at,
         per_user_limit=int(req.per_user_limit or 1),
@@ -984,3 +1022,104 @@ async def admin_limited_promo_clear(req: LimitedPromoRequest, admin_user = Depen
     except Exception:
         pass
     return {"success": True}
+
+
+@router.post("/users/{user_id}/gold/grant", response_model=GoldGrantResponse, summary="관리자 골드 지급")
+async def admin_grant_gold(
+    user_id: int,
+    body: GoldGrantRequest,
+    admin_user = Depends(require_admin_access),
+    db: Session = Depends(get_db),
+):
+    # Redis 멱등 처리 (선점 락 + 결과 캐시)
+    try:
+        from ..utils.redis import get_redis_manager
+        rman = get_redis_manager()
+    except Exception:
+        rman = None
+
+    if body.amount <= 0:
+        raise HTTPException(status_code=400, detail="amount_positive_required")
+
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    receipt_code = uuid.uuid4().hex[:12]
+    if body.idempotency_key and getattr(rman, 'redis_client', None):
+        key = _gold_idem_key(user_id, body.idempotency_key.strip())
+        try:
+            cached = rman.redis_client.get(key)
+            if cached:
+                try:
+                    rc, amt, bal = cached.decode().split('|')
+                    return GoldGrantResponse(
+                        success=True,
+                        user_id=user_id,
+                        granted=int(amt),
+                        new_gold_balance=int(bal),
+                        reason=body.reason,
+                        receipt_code=rc,
+                        idempotent_reuse=True,
+                    )
+                except Exception:
+                    pass
+            # 선점 락
+            if not rman.redis_client.set(key+":lock", "1", nx=True, ex=settings.ADMIN_GOLD_GRANT_LOCK_TTL_SECONDS):
+                raise HTTPException(status_code=409, detail="in_progress")
+        except HTTPException:
+            raise
+        except Exception:
+            pass
+
+    # Rate limit: per-admin per minute
+    if getattr(rman, 'redis_client', None):
+        try:
+            rl_key = f"admin:gold:grant:rate:{getattr(admin_user,'id',0)}:{datetime.utcnow().strftime('%Y%m%d%H%M')}"
+            cur = rman.redis_client.incr(rl_key)
+            if cur == 1:
+                # expire after 70s (slightly more than 1 minute window)
+                rman.redis_client.expire(rl_key, 70)
+            if cur > settings.ADMIN_GOLD_GRANT_RATE_LIMIT_PER_MIN:
+                raise HTTPException(status_code=429, detail="rate_limited")
+        except HTTPException:
+            raise
+        except Exception:
+            pass
+
+    from ..services.currency_service import CurrencyService
+    try:
+        cur = CurrencyService(db)
+        new_bal = cur.add(user_id, body.amount, 'gold')  # 내부적으로 gold_balance 증가
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="grant_failed") from e
+
+    # 감사 로그
+    try:
+        db.add(models.UserAction(
+            user_id=user_id,
+            action_type="ADMIN_GRANT_GOLD",
+            action_data=f"{{'amount':{body.amount},'reason':'{body.reason}','admin_id':{getattr(admin_user,'id',None)}}}"
+        ))
+        db.commit()
+    except Exception:
+        try: db.rollback()
+        except Exception: pass
+
+    if body.idempotency_key and getattr(rman, 'redis_client', None):
+        key = _gold_idem_key(user_id, body.idempotency_key.strip())
+        try:
+            rman.redis_client.setex(key, settings.ADMIN_GOLD_GRANT_RESULT_TTL_SECONDS, f"{receipt_code}|{body.amount}|{new_bal}")
+            try: rman.redis_client.delete(key+":lock")
+            except Exception: pass
+        except Exception:
+            pass
+
+    return GoldGrantResponse(
+        success=True,
+        user_id=user_id,
+        granted=body.amount,
+        new_gold_balance=new_bal,
+        reason=body.reason,
+        receipt_code=receipt_code,
+    )
