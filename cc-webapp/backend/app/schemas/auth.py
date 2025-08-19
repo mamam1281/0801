@@ -68,6 +68,10 @@ class UserResponse(BaseModel):
     cyber_token_balance: int = 0
     regular_coin_balance: int = 0
     premium_gem_balance: int = 0
+    # Progress / level (추가: 프론트 경험치/레벨 표시 정합성 확보)
+    battlepass_level: int = 1
+    experience: int = 0  # total_experience (없으면 0)
+    max_experience: int = 1000  # UI에서 maxExperience fallback 사용
     
     model_config = ConfigDict(from_attributes=True)
 

@@ -8,6 +8,12 @@ interface AuthUser {
     cyber_token_balance: number;
     vip_tier?: string;
     created_at?: string;
+    // added for economy sync
+    regular_coin_balance?: number;
+    premium_gem_balance?: number;
+    battlepass_level?: number; // level
+    experience?: number; // current exp
+    max_experience?: number; // cap
 }
 
 interface SignupPayload {
@@ -55,9 +61,10 @@ function readLegacyToken(): { token: string | null; exp: number | null } {
 
 export function useAuth() {
     const api = useApiClient();
-    const [user, setUser] = useState<AuthUser | null>(null);
+    // NOTE: build env currently flags generics; fallback to assertion
+    const [user, setUser] = useState(null as AuthUser | null);
     const [loading, setLoading] = useState(false);
-    const refreshTimer = useRef<number | null>(null);
+    const refreshTimer = useRef(null as number | null);
 
     const scheduleRefresh = useCallback((exp: number | null) => {
         if (refreshTimer.current) window.clearTimeout(refreshTimer.current);

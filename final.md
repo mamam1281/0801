@@ -197,3 +197,14 @@ docker-compose restart backend
 
 *이 문서는 Casino-Club F2P 프로젝트의 최종 상태와 트러블슈팅 기록을 위한 마스터 문서입니다.*
 *모든 변경사항과 이슈는 이 파일에 지속적으로 업데이트해주세요.*
+
+### 2025-08-19 (야간) Economy Profile 정합성 패치
+- 문제: 프론트 `HomeDashboard` / `ProfileScreen`에서 `experience`, `battlepass_level`, `regular_coin_balance` 등이 표시/필요하지만 `/api/auth/profile` 응답에는 통화/경험치 일부 누락 → UI와 실제 DB 잔액/레벨 불일치
+- 원인: `UserResponse` 스키마에 경험치/레벨/이중 통화 필드 미노출, builder `_build_user_response` 에서 경험치 계산 로직 부재
+- 조치:
+   1. `backend/app/schemas/auth.py` `UserResponse`에 `battlepass_level`, `experience`, `max_experience`, `regular_coin_balance`, `premium_gem_balance` 필드 추가
+   2. `_build_user_response`에서 `total_experience` / `experience` 추출, 레벨 기반 `max_experience = 1000 + (level-1)*100` 산출 후 응답 포함
+   3. 프론트 `useAuth.ts` `AuthUser` 인터페이스에 동일 필드 확장 (regular_coin_balance, premium_gem_balance, battlepass_level, experience, max_experience)
+   4. 빌드 타입 오류(제네릭 useState 경고) 임시 해결: non-generic useState + assertion
+- 결과: 로그인/프로필 조회 시 UI가 실데이터와 동기화될 수 있는 필드 세트 확보 (추가 검증 필요: 실제 DB에 `total_experience` 저장 로직 후속 구현)
+- 추후 권장: 경험치 증가 트랜잭션 표준화 및 `UserService` 내 level-up 공식 단일화, OpenAPI 재생성 후 프론트 타입 sync

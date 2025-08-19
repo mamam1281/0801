@@ -24,6 +24,15 @@ router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 
 
 def _build_user_response(user: User) -> UserResponse:
+    # 경험치 관련 source 우선순위: user.total_experience -> user.experience -> 0
+    total_exp = (
+        getattr(user, "total_experience", None)
+        or getattr(user, "experience", None)
+        or 0
+    )
+    level = getattr(user, "battlepass_level", 1) or 1
+    # 단순 max 경험치 규칙: 1000 + (level-1)*100 (프론트 userUtils.ts 로직과 호환)
+    max_exp = 1000 + (level - 1) * 100
     return UserResponse(
         id=user.id,
         site_id=user.site_id,
@@ -33,9 +42,12 @@ def _build_user_response(user: User) -> UserResponse:
         last_login=user.last_login or user.created_at,
         is_admin=getattr(user, "is_admin", False),
         is_active=getattr(user, "is_active", True),
-    cyber_token_balance=getattr(user, "cyber_token_balance", 0),
-    regular_coin_balance=getattr(user, "regular_coin_balance", 0),
-    premium_gem_balance=getattr(user, "premium_gem_balance", 0),
+        cyber_token_balance=getattr(user, "cyber_token_balance", 0),
+        regular_coin_balance=getattr(user, "regular_coin_balance", 0),
+        premium_gem_balance=getattr(user, "premium_gem_balance", 0),
+        battlepass_level=level,
+        experience=int(total_exp) if isinstance(total_exp, (int, float)) else 0,
+        max_experience=int(max_exp),
     )
 
 """NOTE: 2025-08 Consolidation
