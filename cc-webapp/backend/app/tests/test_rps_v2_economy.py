@@ -22,10 +22,10 @@ async def test_rps_play_v2(monkeypatch):
         assert r.status_code == 200, r.text
         token = r.json()["access_token"]
         headers = {"Authorization": f"Bearer {token}"}
-        play = await ac.post("/api/games/rps/play", json={"bet": 10, "player_move": "rock"}, headers=headers)
+        play = await ac.post("/api/games/rps/play", json={"bet_amount": 10, "choice": "rock"}, headers=headers)
         assert play.status_code == 200, play.text
         data = play.json()
         assert data.get("success") is True
-        assert data.get("outcome") in {"win","lose","draw"}
+        assert data.get("result") in {"win", "lose", "draw"}
         # house edge 기준 상수 접근 확인 (단순 존재 검사)
         assert hasattr(economy, "RPS_HOUSE_EDGE")

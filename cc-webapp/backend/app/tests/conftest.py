@@ -102,6 +102,17 @@ def _ensure_schema():
 								conn.execute(_text('UPDATE users SET gold_balance=1000 WHERE gold_balance IS NULL'))
 							except Exception:
 								pass
+					# Legacy dual-currency columns 제거 (ORM 미정의 + NOT NULL 무 default 로 삽입 실패 방지)
+					legacy_cols = {'regular_coin_balance', 'premium_gem_balance', 'cyber_token_balance', 'gem_balance'}
+					present_legacy = legacy_cols & cols
+					if present_legacy:
+						with engine.begin() as conn:
+							for lc in present_legacy:
+								try:
+									conn.execute(_text(f'ALTER TABLE users DROP COLUMN {lc}'))
+								except Exception:
+									# SQLite 구버전 미지원 시 컬럼을 NULL 허용 + default 0 재작성 시나리오는 복잡 -> skip
+									pass
 		except Exception:
 			pass
 	except Exception:
@@ -121,6 +132,15 @@ def _ensure_schema():
 								conn.execute(_text('UPDATE users SET gold_balance=1000 WHERE gold_balance IS NULL'))
 							except Exception:
 								pass
+					legacy_cols = {'regular_coin_balance', 'premium_gem_balance', 'cyber_token_balance', 'gem_balance'}
+					present_legacy = legacy_cols & cols
+					if present_legacy:
+						with engine.begin() as conn:
+							for lc in present_legacy:
+								try:
+									conn.execute(_text(f'ALTER TABLE users DROP COLUMN {lc}'))
+								except Exception:
+									pass
 		except Exception:
 			pass
 	yield

@@ -5,6 +5,7 @@ import uuid
 from typing import List, Optional, Any
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
+from typing import Any
 from fastapi.responses import StreamingResponse
 import csv
 import io
@@ -487,7 +488,7 @@ class AdminCatalogItemOut(BaseModel):
     min_rank: Optional[str] = None
 
     def model_post_init(self, __context: Any) -> None:  # type: ignore[override]
-            # ensure deprecated alias mirrors gold for legacy clients
+        # ensure deprecated alias mirrors gold for legacy clients
         object.__setattr__(self, 'gems', self.gold)
 
     class Config:

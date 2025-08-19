@@ -21,7 +21,7 @@ async def test_slot_spin_v2(monkeypatch):
         assert r.status_code == 200, r.text
         token = r.json()["access_token"]
         headers = {"Authorization": f"Bearer {token}"}
-        spin = await ac.post("/api/games/slot/spin", json={"bet": 10}, headers=headers)
+        spin = await ac.post("/api/games/slot/spin", json={"bet_amount": 10}, headers=headers)
         assert spin.status_code == 200, spin.text
         data = spin.json()
         assert data.get("success") is True
