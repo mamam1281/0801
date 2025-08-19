@@ -262,8 +262,44 @@ class AuthService:
             user_agent=user_agent,
             failure_reason=failure_reason,
         )
-        db.add(attempt)
-        db.commit()
+        try:
+            db.add(attempt)
+            db.commit()
+        except Exception as e:  # Missing table or transient issue must not break auth flow
+            import logging as _log
+            from sqlalchemy import text
+            try:
+                db.rollback()
+            except Exception:
+                pass
+            msg = str(e).lower()
+            # Auto-create table if clearly missing (UndefinedTable, does not exist, etc.)
+            if "login_attempts" in msg and ("undefined" in msg or "does not exist" in msg):
+                try:
+                    db.execute(text("""
+                        CREATE TABLE IF NOT EXISTS login_attempts (
+                            id SERIAL PRIMARY KEY,
+                            site_id VARCHAR(50) NOT NULL,
+                            success BOOLEAN NOT NULL,
+                            ip_address VARCHAR(45),
+                            user_agent TEXT,
+                            created_at TIMESTAMP DEFAULT NOW(),
+                            failure_reason VARCHAR(100)
+                        );
+                    """))
+                    db.commit()
+                    # retry once
+                    db.add(attempt)
+                    db.commit()
+                    return
+                except Exception as ce:
+                    try:
+                        db.rollback()
+                    except Exception:
+                        pass
+                    _log.warning("auto-create login_attempts failed: %s", ce)
+            _log.warning("login_attempts persistence skipped: %s", e)
+            # Swallow error deliberately
     
     @staticmethod
     def authenticate_admin(db: Session, site_id: str, password: str) -> Optional[User]:
