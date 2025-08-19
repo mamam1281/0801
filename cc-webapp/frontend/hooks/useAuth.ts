@@ -102,9 +102,14 @@ export function useAuth() {
     const login = useCallback(async (site_id: string, password: string) => {
         setLoading(true);
         try {
-            const res = await api.call('/api/auth/login', { method: 'POST', body: { site_id, password } }) as Tokens;
+            // Backend returns Token schema (access_token, token_type, user, optional refresh_token)
+            const res = await api.call('/api/auth/login', { method: 'POST', body: { site_id, password } }) as any;
             applyTokens(res);
-            // profile fetch
+            if (res && res.user) {
+                setUser(res.user as AuthUser);
+                return res.user as AuthUser;
+            }
+            // Fallback: fetch profile if user absent (unexpected)
             const profile = await api.call('/api/auth/profile') as AuthUser;
             setUser(profile);
             return profile;

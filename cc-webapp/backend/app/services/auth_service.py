@@ -212,9 +212,30 @@ class AuthService:
     def authenticate_user(db: Session, site_id: str, password: str) -> Optional[User]:
         """사용자 인증"""
         user = db.query(User).filter(User.site_id == site_id).first()
-        if not user or not AuthService.verify_password(password, user.password_hash):
+        if not user:
             return None
-        return user
+        try:
+            if AuthService.verify_password(password, user.password_hash):
+                return user
+        except Exception:
+            # passlib 내부 오류 혹은 손상된 해시 – 후속 legacy 경로 시도
+            pass
+        # Legacy fallback: DB에 평문 저장되어 있거나 (bcrypt prefix 미포함) 이전 포맷일 경우 직접 비교 후 즉시 재해시
+        try:
+            hashed = user.password_hash or ""
+            is_bcrypt = hashed.startswith("$2b$") or hashed.startswith("$2a$") or hashed.startswith("$2y$")
+            if (not is_bcrypt and password == hashed) or password == getattr(user, 'hashed_password', None):  # synonym 대비
+                # 마이그레이션: 안전한 bcrypt로 재해시
+                try:
+                    user.password_hash = AuthService.get_password_hash(password)
+                    db.commit()
+                    db.refresh(user)
+                except Exception:
+                    db.rollback()  # 실패해도 인증 자체는 허용 (다음 로그인 시도에서 다시 시도)
+                return user
+        except Exception:
+            pass
+        return None
 
     @staticmethod
     def is_login_locked(db: Session, site_id: str) -> bool:

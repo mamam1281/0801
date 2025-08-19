@@ -161,6 +161,7 @@ class GachaService:
         except Exception:
             daily_count = 0
         if daily_count >= daily_limit:
+            # 라우터에서 "일일 가챠" 문자열을 탐지하여 429 DAILY_GACHA_LIMIT로 매핑
             raise ValueError(f"일일 가챠 횟수({daily_limit}회)를 초과했습니다.")
 
         pulls = 10 if (count or 1) >= 10 else 1

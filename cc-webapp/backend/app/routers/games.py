@@ -848,8 +848,11 @@ async def pull_gacha(
         try:
             res = game_service.gacha_pull(current_user.id, 10)
         except ValueError as ve:
-            # Convert service-level validation errors to client 400
-            raise HTTPException(status_code=400, detail=str(ve))
+            msg = str(ve)
+            if "일일 가챠" in msg:
+                # 표준화: 일일 한도 초과 → 429 + 구조화 detail
+                raise HTTPException(status_code=429, detail={"code": "DAILY_GACHA_LIMIT", "message": msg})
+            raise HTTPException(status_code=400, detail=msg)
         all_results.extend(res.results)
         last_animation = res.animation_type or last_animation
         last_message = res.psychological_message or last_message
@@ -859,7 +862,10 @@ async def pull_gacha(
         try:
             res = game_service.gacha_pull(current_user.id, 1)
         except ValueError as ve:
-            raise HTTPException(status_code=400, detail=str(ve))
+            msg = str(ve)
+            if "일일 가챠" in msg:
+                raise HTTPException(status_code=429, detail={"code": "DAILY_GACHA_LIMIT", "message": msg})
+            raise HTTPException(status_code=400, detail=msg)
         all_results.extend(res.results)
         last_animation = res.animation_type or last_animation
         last_message = res.psychological_message or last_message
