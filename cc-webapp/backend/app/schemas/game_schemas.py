@@ -53,18 +53,13 @@ class GameStats(BaseModel):
     user_id: int
     total_spins: int = 0
     total_coins_won: int = 0
-    # legacy total_gems_won -> total_gold_won (gems 단일화 이후 rename)
-    total_gold_won: int = 0
+    total_gems_won: int = 0
     special_items_won: int = 0
     jackpots_won: int = 0
     bonus_spins_won: int = 0
     best_streak: int = 0
     current_streak: int = 0
     last_spin_date: Optional[datetime] = None
-
-    model_config = ConfigDict(populate_by_name=True, json_schema_extra={
-        "deprecated": ["total_gems_won"],
-    })
 
 
 class GameSession(BaseModel):

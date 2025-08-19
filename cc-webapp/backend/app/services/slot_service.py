@@ -7,8 +7,6 @@ import datetime
 from .token_service import TokenService
 from ..repositories.game_repository import GameRepository
 from .. import models
-from ..core import economy
-from ..core.config import settings
 
 @dataclass
 class SlotSpinResult:
@@ -56,16 +54,10 @@ class SlotService:
         if deducted_tokens is None:
             raise ValueError("토큰이 부족합니다.")
 
-        # 4. 승리/패배 및 보상 계산
-        # Economy V2 활성 시: 목표 RTP economy.SLOT_RTP_TARGET (예: 0.92)
-        # 간단 모델: 단일 승리 배당 = 2x, 그 외 0 → win_chance * 2 ~= RTP
-        # => win_chance = RTP / 2
-        if economy.is_v2_active(settings):
-            target_rtp = economy.SLOT_RTP_TARGET
-            win_chance = min(max(target_rtp / 2.0, 0.01), 0.49)  # 안정 범위
-        else:
-            # 레거시 고정: 승리확률 7.5%, 배당 2x ≈ RTP 15%
-            win_chance = 0.075
+        # 4. 승리/패배 및 보상 계산 (수익률 85% 기반)
+        # RTP 15% -> 15% 확률로 승리하고, 승리 시 베팅액의 100/15 * 0.15 = 1배, 즉 베팅액만큼 돌려받음.
+        # 더 나은 사용자 경험을 위해, 승리 시 베팅액의 2배를 돌려주고 승리 확률을 7.5%로 조정. RTP는 동일.
+        win_chance = 0.075  # 7.5%
         spin = random.random()
         
         result: str
@@ -73,17 +65,18 @@ class SlotService:
         animation: str
 
         if spin < win_chance:
+            # 승리
             result = "win"
-            reward = bet_amount * 2
+            reward = bet_amount * 2  # 2배 지급
             animation = "win"
         else:
+            # 패배
             result = "lose"
             reward = 0
-            # Economy V2 는 변동/near-miss 억제 (안정적 RTP)
-            if economy.is_v2_active(settings) and (economy.SLOT_DISABLE_RANDOM_VARIATION or economy.SLOT_DISABLE_STREAK_BONUS):
-                animation = "lose"
-            else:
-                animation = "near_miss" if random.random() < 0.5 else "lose"
+            animation = "lose"
+            # 50% 확률로 근접 실패 애니메이션
+            if random.random() < 0.5:
+                animation = "near_miss"
 
         # 5. 보상 지급 (승리 시)
         if reward > 0:

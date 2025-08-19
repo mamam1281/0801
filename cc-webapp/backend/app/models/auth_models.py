@@ -56,6 +56,28 @@ class User(Base):
     # 알림 관계 추가
     notifications = relationship("Notification", back_populates="user", cascade="all, delete-orphan")
 
+    # --- Backwards compatibility aliases (legacy multi-currency -> unified gold) ---
+    # Many existing routers/schemas/tests still reference `cyber_token_balance` which has been
+    # superseded by `gold_balance`. Provide a lightweight Python-level alias so that attribute
+    # access and (limited) assignment continue to work without forcing an immediate wide refactor.
+    # NOTE: We intentionally do NOT add a real column; persistence remains on gold_balance.
+    # TODO(2025-09-15): Remove this property once all references are migrated to gold_balance and
+    # response schemas updated. Track via grep for 'cyber_token_balance'.
+    @property
+    def cyber_token_balance(self) -> int:  # type: ignore[override]
+        try:
+            return int(getattr(self, 'gold_balance', 0) or 0)
+        except Exception:  # defensive: if corrupted value
+            return 0
+
+    @cyber_token_balance.setter
+    def cyber_token_balance(self, value: int) -> None:  # type: ignore[override]
+        try:
+            setattr(self, 'gold_balance', int(value or 0))
+        except Exception:
+            # Silently ignore (tests should surface if this happens)
+            pass
+
 class InviteCode(Base):
     """초대코드 모델"""
     __tablename__ = "invite_codes"

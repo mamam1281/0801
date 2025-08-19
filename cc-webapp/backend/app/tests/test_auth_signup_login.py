@@ -27,10 +27,21 @@ def test_signup_with_default_invite():
 
 
 def test_login_success():
-    # login after signup
-    resp = client.post("/api/auth/login", json={"site_id": "tester1", "password": "pass1234"})
-    assert resp.status_code == 200
-    assert resp.json()["access_token"]
+    # Ensure a user exists by performing signup first (captures dynamic site_id prefix used above)
+    code = "5858"
+    sid = "tester_login_" + uuid.uuid4().hex[:6]
+    s_resp = client.post("/api/auth/signup", json={
+        "site_id": sid,
+        "nickname": sid + "nick",
+        "phone_number": "010-" + uuid.uuid4().hex[:4] + "-" + uuid.uuid4().hex[4:8],
+        "password": "pass1234",
+        "invite_code": code
+    })
+    assert s_resp.status_code == 200, s_resp.text
+    # login after signup using the same site_id
+    resp = client.post("/api/auth/login", json={"site_id": sid, "password": "pass1234"})
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["access_token"].startswith("ey")
 
 
 def test_signup_invalid_invite():

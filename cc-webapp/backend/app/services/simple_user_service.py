@@ -12,37 +12,41 @@ class SimpleUserService:
     
     @staticmethod
     def get_user_tokens(db: Session, user_id: int) -> int:
-        """사용자 골드(단일 통화) 잔액 조회 (legacy cyber_token_balance -> gold_balance)"""
+        """사용자 토큰 잔액 조회"""
         user = db.query(User).filter(User.id == user_id).first()
         if not user:
             return 0
-        return getattr(user, 'gold_balance', 0)
+        return user.cyber_token_balance
     
     @staticmethod
     def update_user_tokens(db: Session, user_id: int, amount: int) -> int:
-        """사용자 골드 잔액 업데이트 (하한 0)"""
+        """사용자 토큰 잔액 업데이트"""
         user = db.query(User).filter(User.id == user_id).first()
         if not user:
             return 0
-        current = getattr(user, 'gold_balance', 0) or 0
-        new_balance = current + amount
-        if new_balance < 0:
-            new_balance = 0
-        setattr(user, 'gold_balance', new_balance)
+        
+        # 잔액 업데이트
+        user.cyber_token_balance += amount
+        
+        # 마이너스 방지
+        if user.cyber_token_balance < 0:
+            user.cyber_token_balance = 0
+            
         db.commit()
-        return new_balance
+        return user.cyber_token_balance
     
     @staticmethod
     def get_user_profile(db: Session, user_id: int) -> Dict[str, Any]:
-        """사용자 프로필 정보 조회 (gold_balance 표준화)"""
+        """사용자 프로필 정보 조회"""
         user = db.query(User).filter(User.id == user_id).first()
         if not user:
             return {}
+            
         return {
             "id": user.id,
             "site_id": user.site_id,
             "nickname": user.nickname,
-            "gold_balance": getattr(user, 'gold_balance', 0),
+            "cyber_token_balance": user.cyber_token_balance,
             "is_active": user.is_active
         }
     

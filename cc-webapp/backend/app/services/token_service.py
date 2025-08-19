@@ -61,17 +61,9 @@ class TokenService:
                 logger.error(f"User {user_id} not found")
                 return 0
                 
-            # Unified currency: prefer gold_balance; fall back to legacy cyber_token_balance
-            current_balance = getattr(user, 'gold_balance', None)
-            legacy_mode = False
-            if current_balance is None:
-                current_balance = getattr(user, 'cyber_token_balance', 0) or 0
-                legacy_mode = True
-            new_balance = (current_balance or 0) + amount
-            if legacy_mode:
-                setattr(user, 'cyber_token_balance', new_balance)
-            else:
-                setattr(user, 'gold_balance', new_balance)
+            current_balance = getattr(user, 'cyber_token_balance', 0) or 0
+            new_balance = current_balance + amount
+            setattr(user, 'cyber_token_balance', new_balance)
             self.db.commit()
             self.db.refresh(user)
             # 브로드캐스트
@@ -116,19 +108,13 @@ class TokenService:
                 logger.error(f"User {user_id} not found")
                 return None
                 
-            current_balance = getattr(user, 'gold_balance', None)
-            legacy_mode = False
-            if current_balance is None:
-                current_balance = getattr(user, 'cyber_token_balance', 0) or 0
-                legacy_mode = True
-            if (current_balance or 0) < amount:
+            current_balance = getattr(user, 'cyber_token_balance', 0) or 0
+            if current_balance < amount:
                 logger.warning(f"Insufficient tokens for user {user_id}: {current_balance} < {amount}")
                 return None
-            new_balance = (current_balance or 0) - amount
-            if legacy_mode:
-                setattr(user, 'cyber_token_balance', new_balance)
-            else:
-                setattr(user, 'gold_balance', new_balance)
+
+            new_balance = current_balance - amount
+            setattr(user, 'cyber_token_balance', new_balance)
             self.db.commit()
             self.db.refresh(user)
             try:
@@ -171,8 +157,7 @@ class TokenService:
                 logger.error(f"User {user_id} not found")
                 return 0
                 
-            balance_src = 'gold_balance' if hasattr(user, 'gold_balance') else 'cyber_token_balance'
-            balance = getattr(user, balance_src, 0) or 0
+            balance = getattr(user, 'cyber_token_balance', 0) or 0
             logger.info(f"Retrieved token balance for user {user_id}: {balance}")
             return balance
             
@@ -233,10 +218,7 @@ class TokenService:
                 logger.error(f"User {user_id} not found")
                 return 0
                 
-            if hasattr(user, 'gold_balance'):
-                setattr(user, 'gold_balance', new_balance)
-            else:
-                setattr(user, 'cyber_token_balance', new_balance)
+            setattr(user, 'cyber_token_balance', new_balance)
             self.db.commit()
             self.db.refresh(user)
             
