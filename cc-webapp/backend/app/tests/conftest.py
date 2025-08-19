@@ -54,25 +54,18 @@ def _ensure_schema():
 		from alembic import command
 		cfg = Config("alembic.ini")
 		command.upgrade(cfg, "head")
-		# Safety net: ensure ORM-declared new columns (e.g., dual currency) exist even if migration head mismatch.
+		# Safety net: 단일 골드 통화 컬럼 존재 보장 (테스트 SQLite 환경 한정)
 		try:
 			from sqlalchemy import inspect, text
 			ins3 = inspect(engine)
 			if ins3.has_table("users"):
 				cols = {c["name"] for c in ins3.get_columns("users")}
-				missing = []
-				if "regular_coin_balance" not in cols:
-					missing.append("regular_coin_balance INTEGER NOT NULL DEFAULT 0")
-				if "premium_gem_balance" not in cols:
-					missing.append("premium_gem_balance INTEGER NOT NULL DEFAULT 0")
-				if missing and engine.url.get_backend_name() == 'sqlite':
-					# SQLite cannot ALTER TABLE ADD multiple at once reliably; add sequentially.
+				if "gold_balance" not in cols and engine.url.get_backend_name() == 'sqlite':
 					with engine.begin() as conn:
-						for col_def in missing:
-							try:
-								conn.execute(text(f"ALTER TABLE users ADD COLUMN {col_def}"))
-							except Exception:
-								pass
+						try:
+							conn.execute(text("ALTER TABLE users ADD COLUMN gold_balance INTEGER NOT NULL DEFAULT 1000"))
+						except Exception:
+							pass
 		except Exception:
 			pass
 		# 스키마 drift 감지: user_actions.action_data 누락 시 전체 DB 재생성 (SQLite 한정)
