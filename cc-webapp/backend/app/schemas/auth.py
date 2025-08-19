@@ -64,10 +64,8 @@ class UserResponse(BaseModel):
     is_admin: bool
     created_at: datetime
     last_login: Optional[datetime] = None
-    # Currency balances (legacy + new dual currency fields)
-    cyber_token_balance: int = 0
-    regular_coin_balance: int = 0
-    premium_gem_balance: int = 0
+    # 단일 통화 시스템 - 골드만 사용
+    gold_balance: int = 0
     # Progress / level (추가: 프론트 경험치/레벨 표시 정합성 확보)
     battlepass_level: int = 1
     experience: int = 0  # total_experience (없으면 0)

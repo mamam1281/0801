@@ -42,9 +42,7 @@ def _build_user_response(user: User) -> UserResponse:
         last_login=user.last_login or user.created_at,
         is_admin=getattr(user, "is_admin", False),
         is_active=getattr(user, "is_active", True),
-        cyber_token_balance=getattr(user, "cyber_token_balance", 0),
-        regular_coin_balance=getattr(user, "regular_coin_balance", 0),
-        premium_gem_balance=getattr(user, "premium_gem_balance", 0),
+        gold_balance=getattr(user, "gold_balance", 0),
         battlepass_level=level,
         experience=int(total_exp) if isinstance(total_exp, (int, float)) else 0,
         max_experience=int(max_exp),
@@ -67,7 +65,7 @@ class _RegisterResponse(BaseModel):
     nickname: str
     access_token: str
     refresh_token: str | None = None
-    cyber_token_balance: int | None = None
+    gold_balance: int | None = None
 
 @router.post("/register", response_model=_RegisterResponse, summary="Register user (temporary minimal endpoint)")
 async def minimal_register(req: _RegisterRequest, db: Session = Depends(get_db)):
@@ -92,7 +90,7 @@ async def minimal_register(req: _RegisterRequest, db: Session = Depends(get_db))
             nickname=user.nickname,
             access_token=access_token,
             refresh_token=refresh_token,
-            cyber_token_balance=getattr(user, 'cyber_token_balance', 0)
+            gold_balance=getattr(user, 'gold_balance', 0)
         )
     except HTTPException:
         raise

@@ -61,12 +61,9 @@ class BuyReceipt(BaseModel):
     user_id: int
     product_id: str
     quantity: int
-    # Gems purchase fields
-    # legacy field names used by tests/clients
-    gems_granted: Optional[int] = None
-    # Backwards-compatible alias for older clients/tests expecting 'granted_gems'
-    granted_gems: Optional[int] = None
-    new_gem_balance: Optional[int] = None
+    # 골드 구매/사용 필드
+    gold_granted: Optional[int] = None
+    new_balance: Optional[int] = None  # 골드 잔액
     charge_id: Optional[str] = None
     # additional fields
     receipt_code: Optional[str] = None
@@ -402,7 +399,7 @@ def buy_limited_compat(req: LimitedBuyCompatRequest, db = Depends(get_db)):
     from app.services.currency_service import CurrencyService
     total_gems = pkg.gems * req.quantity
     try:
-        new_balance = CurrencyService(db).add(user_id, total_gems, 'gem')
+        new_gem_balance = CurrencyService(db).add(user_id, total_gems, 'gem')
     except Exception:
         try: db.rollback()
         except Exception: pass
@@ -501,7 +498,7 @@ def buy_limited_compat(req: LimitedBuyCompatRequest, db = Depends(get_db)):
         quantity=req.quantity,
         total_price_cents=total_price_cents,
         gems_granted=total_gems,
-        new_gem_balance=new_balance,
+    new_gem_balance=new_gem_balance,
         charge_id=cap.charge_id,
         receipt_code=receipt_code,
     )
@@ -630,7 +627,7 @@ def purchase_shop_item(
             return ShopPurchaseResponse(
                 success=False,
                 message=result["message"],
-                new_gold_balance=result["new_balance"],
+                new_gold_balance=result.get("new_gold_balance") or result.get("new_balance"),
                 item_id=request.item_id,
                 item_name=request.item_name,
                 new_item_count=0
@@ -639,7 +636,7 @@ def purchase_shop_item(
         return ShopPurchaseResponse(
             success=True,
             message=result["message"],
-            new_gold_balance=result["new_balance"],
+            new_gold_balance=result.get("new_gold_balance") or result.get("new_balance"),
             item_id=result["item_id"],
             item_name=result["item_name"],
             new_item_count=result["new_item_count"]
@@ -750,7 +747,7 @@ def buy(
                 quantity=req.quantity,
                 item_id=req.product_id,
                 item_name=req.item_name or req.product_id,
-                new_balance=None,
+                new_gem_balance=getattr(user, "cyber_token_balance", 0),
             )
         # Item DB 기록 (기존 ShopService 로직 재사용)
         result = shop_svc.purchase_item(
@@ -771,7 +768,7 @@ def buy(
                 quantity=req.quantity,
                 item_id=req.product_id,
                 item_name=req.item_name or req.product_id,
-                new_balance=new_bal,
+                new_gem_balance=new_bal,
             )
         resp = BuyReceipt(
             success=True,
@@ -781,7 +778,7 @@ def buy(
             quantity=req.quantity,
             item_id=result.get("item_id"),
             item_name=result.get("item_name"),
-            new_balance=new_bal,
+            new_gem_balance=new_bal,
         )
         if idem and rman.redis_client:
             try:
@@ -866,7 +863,7 @@ def buy(
                                     product_id=req.product_id,
                                     quantity=existing_tx.quantity or req.quantity,
                                     receipt_code=existing_tx.receipt_code,
-                                    new_balance=getattr(user, "premium_gem_balance", 0) or getattr(user, "cyber_token_balance", 0),
+                                    new_gem_balance=getattr(user, "premium_gem_balance", 0) or getattr(user, "cyber_token_balance", 0),
                                     reason_code="GRANT_FAILED",
                                 )
                             existing_tx.status = 'success'
@@ -1018,7 +1015,7 @@ def buy(
             else:
                 total_gems = int(req.amount)
             from app.services.currency_service import CurrencyService
-            new_balance = CurrencyService(db).add(req_user_id, total_gems, 'gem')
+            new_gem_balance = CurrencyService(db).add(req_user_id, total_gems, 'gem')
         except Exception:
             try:
                 db.rollback()
@@ -1031,7 +1028,7 @@ def buy(
                 product_id=req.product_id,
                 quantity=req.quantity,
                 receipt_code=receipt_code,
-                new_balance=getattr(user, "premium_gem_balance", 0) or getattr(user, "cyber_token_balance", 0),
+                new_gem_balance=getattr(user, "premium_gem_balance", 0) or getattr(user, "cyber_token_balance", 0),
                 reason_code="GRANT_FAILED",
             )
         # mark success
@@ -1057,7 +1054,7 @@ def buy(
         quantity=req.quantity,
     gems_granted=total_gems,
     granted_gems=total_gems,
-    new_gem_balance=new_balance,
+    new_gem_balance=new_gem_balance,
     charge_id=pres.get("gateway_reference") if isinstance(pres, dict) else None,
     receipt_code=receipt_code,
     )
@@ -1299,10 +1296,12 @@ def buy_limited(req: LimitedBuyRequest, db = Depends(get_db), current_user = Dep
     from app.services.currency_service import CurrencyService
     total_gems = pkg.gems * req.quantity
     try:
-        new_balance = CurrencyService(db).add(user_id, total_gems, 'gem')
+        new_gem_balance = CurrencyService(db).add(user_id, total_gems, 'gem')
     except Exception:
-        try: db.rollback()
-        except Exception: pass
+        try:
+            db.rollback()
+        except Exception:
+            pass
         return LimitedBuyReceipt(
             success=False,
             message="보석 지급 실패",
@@ -1396,7 +1395,7 @@ def buy_limited(req: LimitedBuyRequest, db = Depends(get_db), current_user = Dep
         quantity=req.quantity,
         total_price_cents=total_price_cents,
         gems_granted=total_gems,
-        new_gem_balance=new_balance,
+    new_gem_balance=new_gem_balance,
         charge_id=cap.charge_id,
         receipt_code=receipt_code,
     )

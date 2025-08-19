@@ -8,9 +8,8 @@ interface AuthUser {
     cyber_token_balance: number;
     vip_tier?: string;
     created_at?: string;
-    // added for economy sync
-    regular_coin_balance?: number;
-    premium_gem_balance?: number;
+    // 단일 통화 시스템 - 골드
+    gold_balance?: number;
     battlepass_level?: number; // level
     experience?: number; // current exp
     max_experience?: number; // cap
