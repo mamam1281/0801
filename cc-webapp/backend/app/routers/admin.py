@@ -465,13 +465,14 @@ class AdminCatalogItemIn(BaseModel):
     sku: str
     name: str
     price_cents: int = Field(..., ge=0)
-    gold: int = Field(..., ge=0, description="Amount of gold granted (was 'gems')")
+    gold: int = Field(..., ge=0, description="Amount of gold granted (legacy alias: gems)")
     discount_percent: int = Field(0, ge=0, le=100)
     discount_ends_at: Optional[datetime] = None
     min_rank: Optional[str] = None
 
     class Config:
-        fields = {"gold": {"alias": "gems"}}  # backward compat for clients sending 'gems'
+        # Backward compatibility: accept incoming 'gems' field but internally we are gold-only.
+        fields = {"gold": {"alias": "gems"}}
         allow_population_by_field_name = True
 
 class AdminCatalogItemOut(BaseModel):
@@ -479,14 +480,14 @@ class AdminCatalogItemOut(BaseModel):
     sku: str
     name: str
     price_cents: int
-    gold: int = Field(..., description="Amount of gold granted (was 'gems')")
+    gold: int = Field(..., description="Amount of gold granted")
     gems: Optional[int] = Field(None, description="DEPRECATED: alias of gold - will be removed", serialization_alias="gems")
     discount_percent: int = 0
     discount_ends_at: Optional[datetime] = None
     min_rank: Optional[str] = None
 
     def model_post_init(self, __context: Any) -> None:  # type: ignore[override]
-        # ensure deprecated gems mirror
+            # ensure deprecated alias mirrors gold for legacy clients
         object.__setattr__(self, 'gems', self.gold)
 
     class Config:
@@ -501,7 +502,7 @@ async def admin_list_items(admin_user = Depends(require_admin_access)):
             sku=p.sku,
             name=p.name,
             price_cents=p.price_cents,
-            gold=p.gems,
+                gold=p.gold,
             discount_percent=p.discount_percent or 0,
             discount_ends_at=p.discount_ends_at,
             min_rank=p.min_rank,
@@ -517,7 +518,7 @@ async def admin_create_item(body: AdminCatalogItemIn, admin_user = Depends(requi
         sku=body.sku,
         name=body.name,
         price_cents=body.price_cents,
-        gems=body.gold,
+        gold=body.gold,
         discount_percent=body.discount_percent or 0,
         discount_ends_at=body.discount_ends_at,
         min_rank=body.min_rank,
@@ -537,7 +538,7 @@ async def admin_update_item(item_id: int, body: AdminCatalogItemIn, admin_user =
         sku=body.sku,
         name=body.name,
         price_cents=body.price_cents,
-        gems=body.gold,
+        gold=body.gold,
         discount_percent=body.discount_percent or 0,
         discount_ends_at=body.discount_ends_at,
         min_rank=body.min_rank,
@@ -566,7 +567,7 @@ async def admin_set_discount(item_id: int, body: AdminDiscountPatch, admin_user 
         sku=prod.sku,
         name=prod.name,
         price_cents=prod.price_cents,
-        gems=prod.gems,
+        gold=prod.gold,
         discount_percent=body.discount_percent,
         discount_ends_at=body.discount_ends_at,
         min_rank=prod.min_rank,
@@ -587,7 +588,7 @@ async def admin_set_rank(item_id: int, body: AdminRankPatch, admin_user = Depend
         sku=prod.sku,
         name=prod.name,
         price_cents=prod.price_cents,
-        gems=prod.gems,
+        gold=prod.gold,
         discount_percent=prod.discount_percent or 0,
         discount_ends_at=prod.discount_ends_at,
         min_rank=body.min_rank,
@@ -849,7 +850,7 @@ class LimitedUpsertRequest(BaseModel):
     emergency_disabled: Optional[bool] = None
     contents: Optional[dict] = None
     is_active: Optional[bool] = None
-    gold: Optional[int] = Field(None, description="Amount of gold granted (was bonus_tokens/gems)")
+    gold: Optional[int] = Field(None, description="Amount of gold granted (legacy bonus_tokens alias)")
 
 
 @router.post("/limited-packages/upsert")
@@ -883,7 +884,7 @@ async def admin_limited_upsert(
         name=req.name,
         description=req.description or "",
         price_cents=int(req.price),
-    gems=bonus,  # internal still uses Product/LimitedPackage.gems until full refactor
+        gold=bonus,
         start_at=start_at,
         end_at=end_at,
         per_user_limit=int(req.per_user_limit or 1),

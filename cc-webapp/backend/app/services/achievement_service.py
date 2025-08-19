@@ -36,8 +36,8 @@ class AchievementService:
                 "icon": a.icon,
                 "badge_color": a.badge_color,
                 "reward_coins": a.reward_coins,
-                # gems 제거: 항상 0 (향후 reward_gold 등으로 대체 가능)
-                "reward_gems": 0,
+                # reward_gold 사용 (legacy gems 제거)
+                "reward_gold": 0,
                 "progress": progress_val,
                 "threshold": threshold,
                 "unlocked": unlocked,
@@ -104,8 +104,8 @@ class AchievementService:
                     "code": ach.code,
                     "title": ach.title,
                     "reward_coins": ach.reward_coins,
-                    # gems 제거: 0 고정
-                    "reward_gems": 0,
+                    # reward_gold 사용 (legacy 제거)
+                    "reward_gold": 0,
                 })
         return unlocked_codes
 

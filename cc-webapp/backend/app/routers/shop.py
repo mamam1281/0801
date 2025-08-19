@@ -1013,14 +1013,15 @@ def buy(
         )
     else:
         # success immediately
-        # If catalog product known, use its gems * quantity; otherwise fall back to amount-as-gems
+        # If catalog product known, use its gold * quantity; otherwise fall back to amount-as-gold.
+        # BUGFIX: 이전 코드가 제거된 gems 필드를 참조(getattr(prod,'gems',0))하여 항상 0 지급 → gold 필드로 교체
         try:
             if prod is not None:
-                total_gold = int(getattr(prod, 'gems', 0)) * req.quantity  # 기존 gems 필드 의미를 gold 가치로 해석
+                total_gold = int(getattr(prod, 'gold', 0)) * req.quantity
             else:
                 total_gold = int(req.amount)
             from app.services.currency_service import CurrencyService
-            new_gold_balance = CurrencyService(db).add(req_user_id, total_gold, 'gem')
+            new_gold_balance = CurrencyService(db).add(req_user_id, total_gold, 'gem')  # 'gem' alias → gold_balance 반영
         except Exception:
             try:
                 db.rollback()

@@ -9,6 +9,8 @@ from sqlalchemy.orm import Session
 from .token_service import TokenService
 from ..repositories.game_repository import GameRepository
 from .. import models
+from ..core import economy
+from ..core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -31,12 +33,23 @@ class RPSService:
     VALID_CHOICES = ["rock", "paper", "scissors"]
     WINNING_COMBINATIONS = {"rock": "scissors", "paper": "rock", "scissors": "paper"}
     
-    # 수익성 목표: 하우스 엣지 12% (RTP 88%)
-    # (Win_Rate * 2) + (Draw_Rate * 1) = 0.88
-    # Draw_Rate = 0.10 으로 고정 시, Win_Rate = 0.39
-    WIN_RATE = 0.39  # 39%
-    DRAW_RATE = 0.10 # 10%
-    LOSE_RATE = 0.51 # 51%
+    # 레거시 기본 확률 (RTP ~88%)
+    LEGACY_WIN_RATE = 0.39
+    LEGACY_DRAW_RATE = 0.10
+    LEGACY_LOSE_RATE = 0.51
+
+    def _current_probabilities(self):
+        # Economy V2: 목표 house edge economy.RPS_HOUSE_EDGE → RTP= 1 - edge
+        # 기대값: Win * 2 + Draw * 1 + Lose * 0 = RTP
+        # 단순화: Draw 비율 고정(0.10), 나머지 (1-Draw) 구간에서 Win/Lose 비율 조정
+        if economy.is_v2_active(settings):
+            draw = 0.10
+            rtp = 1 - economy.RPS_HOUSE_EDGE  # 예: 0.95
+            # Win*2 + draw*1 = rtp → Win = (rtp - draw)/2
+            win = max(min((rtp - draw)/2.0, 0.8), 0.01)
+            lose = 1 - win - draw
+            return win, draw, lose
+        return self.LEGACY_WIN_RATE, self.LEGACY_DRAW_RATE, self.LEGACY_LOSE_RATE
 
     def __init__(self, repository: Optional[GameRepository] = None, token_service: Optional[TokenService] = None, db: Optional[Session] = None) -> None:
         # 기존 테스트들이 RPSService() 처럼 인자 없이 호출 → GameRepository도 optional db 허용
@@ -59,15 +72,13 @@ class RPSService:
             if deterministic == "draw":
                 return user_choice, "draw"
             return self._get_winning_choice(user_choice), "lose"
+        win_rate, draw_rate, lose_rate = self._current_probabilities()
         rand = random.random()
-        if rand < self.WIN_RATE:
-            # 승리 (유저가 이김)
+        if rand < win_rate:
             return self.WINNING_COMBINATIONS[user_choice], "win"
-        elif rand < self.WIN_RATE + self.DRAW_RATE:
-            # 무승부
+        elif rand < win_rate + draw_rate:
             return user_choice, "draw"
         else:
-            # 패배 (유저가 짐)
             return self._get_winning_choice(user_choice), "lose"
 
     def play(self, user_id: int, user_choice: str, bet_amount: int, db: Optional[Session] = None, *_, **__) -> RPSResult:

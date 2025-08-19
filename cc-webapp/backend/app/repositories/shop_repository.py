@@ -103,20 +103,20 @@ class ShopRepository(BaseRepository[models.UserAction]):
             logger.error(f"사용자 소비 통계 조회 실패: {e}")
             return {}
     
-    def record_purchase(self, user_id: int, item_name: str, amount: float, 
-                       gems_received: int = 0, metadata: Optional[Dict] = None) -> models.UserAction:
+    def record_purchase(self, user_id: int, item_name: str, amount: float,
+                       gold_received: int = 0, metadata: Optional[Dict] = None) -> models.UserAction:
         """구매 기록"""
         try:
             purchase_metadata = {
                 'item_name': item_name,
                 'amount': amount,
-                'gems_received': gems_received,
+                'gold_received': gold_received,
                 **(metadata or {})
             }
             
             purchase_action = models.UserAction(
                 user_id=user_id,
-                action_type='PURCHASE_GOLD' if gems_received > 0 else 'BUY_PACKAGE',
+                action_type='PURCHASE_GOLD' if gold_received > 0 else 'BUY_PACKAGE',
                 result='success',
                 points_earned=0,
                 metadata=purchase_metadata

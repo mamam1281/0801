@@ -9,6 +9,8 @@ import logging
 from .token_service import TokenService
 from ..repositories.game_repository import GameRepository
 from .. import models
+from ..core import economy
+from ..core.config import settings
 
 
 @dataclass
@@ -41,8 +43,8 @@ class GachaService:
     # 레거시 테스트 호환 (이전 비용 구조: 1회 50 / 10회 450)
     LEGACY_COST_SINGLE = 50
     LEGACY_COST_TEN = 450
-    NEW_COST_SINGLE = 5000
-    NEW_COST_TEN = 50000
+    NEW_COST_SINGLE = economy.GACHA_BASE_COST_SINGLE
+    NEW_COST_TEN = economy.GACHA_BASE_COST_MULTI10
 
     def __init__(self, repository: GameRepository | None = None, token_service: TokenService | None = None, db: Optional[Session] = None, *, legacy_cost_mode: bool | None = None) -> None:
         self.repo = repository or GameRepository()
@@ -198,7 +200,17 @@ class GachaService:
         animation_type = "normal"
         consecutive_fails = current_count
 
-        rarity_table = self.rarity_table
+        # Economy V2 활성 시 중앙 상수 기반 rarity/value 적용 (기본 near-miss 로직 단순화 예정)
+        if economy.is_v2_active(settings):
+            # 확률 테이블 재구성 (near-miss 제외) → EV = Σ p_i * value_i / cost 목표 0.55~0.60
+            rarity_table = [
+                ("legendary", economy.GACHA_RARITY_PROBS["legendary"]),
+                ("epic", economy.GACHA_RARITY_PROBS["epic"]),
+                ("rare", economy.GACHA_RARITY_PROBS["rare"]),
+                ("common", economy.GACHA_RARITY_PROBS["common"]),
+            ]
+        else:
+            rarity_table = self.rarity_table
 
         for _ in range(pulls):
             current_count += 1

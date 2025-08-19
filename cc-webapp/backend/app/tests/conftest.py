@@ -9,6 +9,7 @@ if _backend_root not in sys.path:
 
 # Ensure DB tables exist for tests
 from app.database import Base, engine  # noqa: E402
+from sqlalchemy import text as _text  # 추가: 컬럼 보강용
 import app.models  # noqa: F401, E402 - register all models on Base
 
 
@@ -86,9 +87,42 @@ def _ensure_schema():
 			pass
 		# 일부 신규 모델이 아직 마이그레이션에 반영되지 않았다면 보강 (idempotent)
 		Base.metadata.create_all(bind=engine)
+		# --- Safety net 2: ensure gold_balance column exists after metadata creation (sqlite test env) ---
+		try:
+			if engine.url.get_backend_name() == 'sqlite':
+				from sqlalchemy import inspect as _insp2
+				insp = _insp2(engine)
+				if insp.has_table('users'):
+					cols = {c['name'] for c in insp.get_columns('users')}
+					if 'gold_balance' not in cols:
+						with engine.begin() as conn:
+							# nullable 추가 후 기본값 채우고 NOT NULL 강제는 생략 (테스트 용도)
+							try:
+								conn.execute(_text('ALTER TABLE users ADD COLUMN gold_balance INTEGER DEFAULT 1000'))
+								conn.execute(_text('UPDATE users SET gold_balance=1000 WHERE gold_balance IS NULL'))
+							except Exception:
+								pass
+		except Exception:
+			pass
 	except Exception:
 		# Fallback: ensure at least ORM-known tables exist
 		Base.metadata.create_all(bind=engine)
+		# Fallback path에서도 동일 보강
+		try:
+			if engine.url.get_backend_name() == 'sqlite':
+				from sqlalchemy import inspect as _insp3
+				insp = _insp3(engine)
+				if insp.has_table('users'):
+					cols = {c['name'] for c in insp.get_columns('users')}
+					if 'gold_balance' not in cols:
+						with engine.begin() as conn:
+							try:
+								conn.execute(_text('ALTER TABLE users ADD COLUMN gold_balance INTEGER DEFAULT 1000'))
+								conn.execute(_text('UPDATE users SET gold_balance=1000 WHERE gold_balance IS NULL'))
+							except Exception:
+								pass
+		except Exception:
+			pass
 	yield
 
 
