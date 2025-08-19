@@ -229,6 +229,23 @@ class TokenManager:
             refresh_record = q.first()
 
             if not refresh_record:
+                # Distinguish between: token exists but revoked vs does not exist
+                # For legacy schema we can attempt a lighter lookup ignoring revoked filter to see if it was revoked.
+                try:
+                    from ..models.auth_models import RefreshToken as RT2
+                    probe_q = db.query(RT2)
+                    if has_token_hash:
+                        token_hash = hashlib.sha256(refresh_token.encode()).hexdigest()
+                        probe_q = probe_q.filter(RT2.token_hash == token_hash)
+                    else:
+                        probe_q = probe_q.filter(RT2.token == refresh_token)
+                    probe = probe_q.first()
+                    if probe is not None:
+                        # It matched but failed active/not revoked filter → treat as reuse of revoked token
+                        logger.warning(f"Reuse of revoked refresh token from {ip_address}")
+                        return False, None, "REVOKED"
+                except Exception:
+                    pass
                 logger.warning(f"Invalid refresh token attempt from {ip_address}")
                 return False, None, "유효하지 않은 리프레시 토큰입니다"
 

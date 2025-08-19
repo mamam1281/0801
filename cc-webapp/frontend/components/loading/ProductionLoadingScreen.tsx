@@ -46,7 +46,7 @@ export function ProductionLoadingScreen({
           <motion.div
             initial={{ scale: 0 }}
             animate={{ scale: [0, 1.2, 1] }}
-            transition={{ delay: 0.5, duration: 0.5 }}
+            transition={{ delay: 0.5, duration: 0.5, type: 'tween' }}
             className="absolute -top-2 -right-2"
           >
             <Sparkles className="w-8 h-8 text-gold" />

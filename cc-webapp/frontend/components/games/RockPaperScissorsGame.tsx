@@ -622,7 +622,7 @@ export function RockPaperScissorsGame({
                                   gameResult === 'lose' ? 'rgba(255,51,102,0.5)' : 'rgba(255,170,0,0.5)'}`
                     ]
                   }}
-                  transition={{ duration: 0.8, repeat: 3 }}
+                  transition={{ duration: 0.8, repeat: 3, type: 'tween' }}
                   className={`text-4xl font-black mb-2 ${
                     gameResult === 'win' ? 'text-success' : 
                     gameResult === 'lose' ? 'text-error' : 'text-warning'
@@ -635,7 +635,7 @@ export function RockPaperScissorsGame({
                 {streak > 1 && gameResult === 'win' && (
                   <motion.div
                     animate={{ scale: [1, 1.1, 1] }}
-                    transition={{ duration: 0.5, repeat: 2 }}
+                    transition={{ duration: 0.5, repeat: 2, type: 'tween' }}
                     className="text-lg text-gold font-bold"
                   >
                     🔥 {streak}연승 콤보! 🔥
@@ -645,7 +645,7 @@ export function RockPaperScissorsGame({
                 {isSpecialMove && (
                   <motion.div
                     animate={{ opacity: [0.5, 1, 0.5] }}
-                    transition={{ duration: 0.6, repeat: 3 }}
+                    transition={{ duration: 0.6, repeat: 3, type: 'tween' }}
                     className="text-lg text-gradient-gold font-bold"
                   >
                     ⭐ SPECIAL MOVE! ⭐

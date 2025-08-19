@@ -14,7 +14,7 @@ class LimitedPackage:
     name: str
     description: str
     price_cents: int
-    gems: int
+    gold: int
     start_at: datetime
     end_at: datetime
     per_user_limit: int = 1
@@ -49,9 +49,9 @@ class LimitedPackageService:
             "WEEKEND_STARTER": LimitedPackage(
                 code="WEEKEND_STARTER",
                 name="Weekend Starter Pack",
-                description="Limited-time pack with bonus gems",
+                description="Limited-time pack with bonus gold",
                 price_cents=499,
-                gems=600,
+                gold=600,
                 start_at=now,
                 end_at=now.replace(hour=23, minute=59) ,
                 per_user_limit=1,
@@ -63,7 +63,7 @@ class LimitedPackageService:
                 name="VIP Blitz Pack",
                 description="High value pack for VIPs",
                 price_cents=1999,
-                gems=2600,
+                gold=2600,
                 start_at=now,
                 end_at=now.replace(hour=23, minute=59),
                 per_user_limit=2,

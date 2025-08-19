@@ -8,6 +8,11 @@ interface AuthUser {
     cyber_token_balance: number;
     vip_tier?: string;
     created_at?: string;
+    // 단일 통화 시스템 - 골드
+    gold_balance?: number;
+    battlepass_level?: number; // level
+    experience?: number; // current exp
+    max_experience?: number; // cap
 }
 
 interface SignupPayload {
@@ -18,34 +23,47 @@ interface SignupPayload {
     invite_code: string;
 }
 
-interface Tokens { access_token: string; token_type: string; expires_in?: number | null }
+// Backend may also supply refresh_token (optional) – include for future refresh support
+interface Tokens { access_token: string; token_type: string; expires_in?: number | null; refresh_token?: string | null }
 
-interface SignupResponse { user: AuthUser; tokens: Tokens; initial_balance: number; invite_code_used: string }
+// Backend actually returns flat structure: { access_token, token_type, user, refresh_token }
+interface SignupResponse extends Tokens { user: AuthUser }
 
-const ACCESS_KEY = 'cc_access_token';
-const EXP_KEY = 'cc_access_exp';
+// Canonical combined storage key used elsewhere (tokenStorage.js / useAuthToken.ts)
+const LEGACY_ACCESS_KEY = 'cc_access_token'; // retained for backward compat (will deprecate)
+const LEGACY_EXP_KEY = 'cc_access_exp';
+const BUNDLE_KEY = 'cc_auth_tokens';
 
-function storeToken(token: string, expSeconds?: number) {
-    localStorage.setItem(ACCESS_KEY, token);
-    if (expSeconds) {
-        const abs = Date.now() + expSeconds * 1000;
-        localStorage.setItem(EXP_KEY, abs.toString());
-    } else {
-        localStorage.removeItem(EXP_KEY);
-    }
+import { setTokens } from '../utils/tokenStorage';
+function writeBundle(access: string, refresh?: string | null, expSeconds?: number | null | undefined) {
+    // Unified bundle structure consumed by existing tokenStorage.js & useAuthToken.ts
+    const bundle: Record<string, any> = { access_token: access };
+    if (refresh) bundle.refresh_token = refresh;
+    setTokens(bundle); // tokenStorage.js와 완전 통일
+    // Maintain legacy separate keys to avoid breaking older code paths still reading them
+    try {
+        localStorage.setItem(LEGACY_ACCESS_KEY, access);
+        if (expSeconds) {
+            const abs = Date.now() + expSeconds * 1000;
+            localStorage.setItem(LEGACY_EXP_KEY, abs.toString());
+        } else {
+            localStorage.removeItem(LEGACY_EXP_KEY);
+        }
+    } catch {}
 }
 
-function readToken(): { token: string | null; exp: number | null } {
-    const token = typeof window !== 'undefined' ? localStorage.getItem(ACCESS_KEY) : null;
-    const expStr = typeof window !== 'undefined' ? localStorage.getItem(EXP_KEY) : null;
+function readLegacyToken(): { token: string | null; exp: number | null } {
+    const token = typeof window !== 'undefined' ? localStorage.getItem(LEGACY_ACCESS_KEY) : null;
+    const expStr = typeof window !== 'undefined' ? localStorage.getItem(LEGACY_EXP_KEY) : null;
     return { token, exp: expStr ? parseInt(expStr, 10) : null };
 }
 
 export function useAuth() {
     const api = useApiClient();
-    const [user, setUser] = useState<AuthUser | null>(null);
+    // NOTE: build env currently flags generics; fallback to assertion
+    const [user, setUser] = useState(null as AuthUser | null);
     const [loading, setLoading] = useState(false);
-    const refreshTimer = useRef<number | null>(null);
+    const refreshTimer = useRef(null as number | null);
 
     const scheduleRefresh = useCallback((exp: number | null) => {
         if (refreshTimer.current) window.clearTimeout(refreshTimer.current);
@@ -60,19 +78,20 @@ export function useAuth() {
     }, []);
 
     const applyTokens = useCallback((t: Tokens) => {
-        // access_token만 존재. exp는 JWT 자체에서 파싱
-        storeToken(t.access_token, t.expires_in || undefined);
+        // Persist in unified bundle + legacy keys
+        writeBundle(t.access_token, t.refresh_token, t.expires_in);
         try {
             const payload = JSON.parse(atob(t.access_token.split('.')[1]));
             if (payload.exp) scheduleRefresh(payload.exp * 1000);
-        } catch { }
+        } catch { /* silent */ }
     }, [scheduleRefresh]);
 
     const signup = useCallback(async (data: SignupPayload) => {
         setLoading(true);
         try {
             const res = await api.call('/api/auth/signup', { method: 'POST', body: data }) as SignupResponse;
-            applyTokens(res.tokens);
+            // Backend returns flat structure: { access_token, token_type, user, refresh_token }
+            applyTokens(res);
             setUser(res.user);
             return res.user;
         } finally {
@@ -83,39 +102,56 @@ export function useAuth() {
     const login = useCallback(async (site_id: string, password: string) => {
         setLoading(true);
         try {
-            const res = await api.call('/api/auth/login', { method: 'POST', body: { site_id, password } }) as Tokens;
+            // Backend returns Token schema (access_token, token_type, user, optional refresh_token)
+            const res = await api.call('/api/auth/login', { method: 'POST', body: { site_id, password } }) as any;
             applyTokens(res);
-            // profile fetch
+            if (res && res.user) {
+                setUser(res.user as AuthUser);
+                return res.user as AuthUser;
+            }
+            // Fallback: fetch profile if user absent (unexpected)
             const profile = await api.call('/api/auth/profile') as AuthUser;
             setUser(profile);
             return profile;
         } finally { setLoading(false); }
     }, [api, applyTokens]);
 
-    const refresh = useCallback(async () => {
-        const { token } = readToken();
-        if (!token) return null;
+    // logout 먼저 선언 필요 (refresh 훅 의존 순서 문제 회피)
+    const logout = useCallback(() => {
+        if (refreshTimer.current) window.clearTimeout(refreshTimer.current);
         try {
-            const res = await api.call('/api/auth/refresh', { method: 'POST', body: {} }) as Tokens;
+            localStorage.removeItem(LEGACY_ACCESS_KEY);
+            localStorage.removeItem(LEGACY_EXP_KEY);
+            localStorage.removeItem(BUNDLE_KEY);
+        } catch {}
+        setUser(null);
+    }, []);
+
+    const refresh = useCallback(async () => {
+        let bundle: any = undefined;
+        if (typeof window !== 'undefined') {
+            try { bundle = JSON.parse(localStorage.getItem(BUNDLE_KEY) || 'null'); } catch { /* ignore */ }
+        }
+        const refreshToken: string | undefined = bundle?.refresh_token || undefined;
+        const { token } = readLegacyToken();
+        if (!token) return null;
+        if (!refreshToken) return null;
+        try {
+            const res = await api.call('/api/auth/refresh', { method: 'POST', body: { refresh_token: refreshToken } }) as Tokens;
             applyTokens(res);
             return res;
         } catch {
             logout();
             return null;
         }
-    }, [api, applyTokens]);
+    }, [api, applyTokens, logout]);
 
-    const logout = useCallback(() => {
-        if (refreshTimer.current) window.clearTimeout(refreshTimer.current);
-        localStorage.removeItem(ACCESS_KEY);
-        localStorage.removeItem(EXP_KEY);
-        setUser(null);
-    }, []);
+    // 위로 이동 (중복 선언 방지) 
 
     // init load
     useEffect(() => {
-        const { token } = readToken();
-        if (token) {
+    const { token } = readLegacyToken();
+    if (token) {
             api.call('/api/auth/profile').then((u: any) => setUser(u as AuthUser)).catch(() => logout());
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps

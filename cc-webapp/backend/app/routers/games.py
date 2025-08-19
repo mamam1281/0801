@@ -138,7 +138,7 @@ class AchievementProgressItem(BaseModel):
     icon: Optional[str]
     badge_color: Optional[str]
     reward_coins: int
-    reward_gems: int
+    reward_gold: int
     progress: int
     threshold: Optional[int]
     unlocked: bool
@@ -161,7 +161,7 @@ def list_achievements(db: Session = Depends(get_db)):
             icon=a.icon,
             badge_color=a.badge_color,
             reward_coins=a.reward_coins,
-            reward_gems=a.reward_gems,
+            reward_gold=0,
             progress=0,
             threshold=cond.get("threshold"),
             unlocked=False,
@@ -848,8 +848,11 @@ async def pull_gacha(
         try:
             res = game_service.gacha_pull(current_user.id, 10)
         except ValueError as ve:
-            # Convert service-level validation errors to client 400
-            raise HTTPException(status_code=400, detail=str(ve))
+            msg = str(ve)
+            if "일일 가챠" in msg:
+                # 표준화: 일일 한도 초과 → 429 + 구조화 detail
+                raise HTTPException(status_code=429, detail={"code": "DAILY_GACHA_LIMIT", "message": msg})
+            raise HTTPException(status_code=400, detail=msg)
         all_results.extend(res.results)
         last_animation = res.animation_type or last_animation
         last_message = res.psychological_message or last_message
@@ -859,7 +862,10 @@ async def pull_gacha(
         try:
             res = game_service.gacha_pull(current_user.id, 1)
         except ValueError as ve:
-            raise HTTPException(status_code=400, detail=str(ve))
+            msg = str(ve)
+            if "일일 가챠" in msg:
+                raise HTTPException(status_code=429, detail={"code": "DAILY_GACHA_LIMIT", "message": msg})
+            raise HTTPException(status_code=400, detail=msg)
         all_results.extend(res.results)
         last_animation = res.animation_type or last_animation
         last_message = res.psychological_message or last_message
@@ -982,13 +988,30 @@ async def place_crash_bet(
     
     # 간단한 크래시 시뮬레이션
     # 실제로는 실시간 소켓 연결로 구현해야 함
-    multiplier = random.uniform(1.0, 5.0)
+    # Economy V2 활성 시 하우스 엣지를 반영하여 기대 승수를 낮춤
+    from ..core import economy
+    from ..core.config import settings as _settings
+    v2_active = economy.is_v2_active(_settings)
+    base_multiplier = random.uniform(1.0, 5.0)
+    if v2_active:
+        # 목표 하우스엣지 7%: 간단히 최종 multiplier 를 (1 - edge) 스케일
+        # 추가로 폭발(버스트) 위험을 모사하기 위해 낮은 multiplier 로 클램프
+        adjusted = base_multiplier * (1 - economy.CRASH_HOUSE_EDGE)
+        # 하한/상한 안정화
+        multiplier = max(1.0, min(adjusted, 4.2))
+    else:
+        multiplier = base_multiplier
     win_amount = 0
-    
-    # 자동 캐시아웃 시뮬레이션
+
+    # 자동 캐시아웃 시뮬레이션 (V2에서도 동일 로직, multiplier 는 위에서 조정됨)
     if auto_cashout_multiplier and multiplier >= auto_cashout_multiplier:
-        win_amount = int(bet_amount * auto_cashout_multiplier)
-        new_balance = SimpleUserService.update_user_tokens(db, current_user.id, win_amount)
+        gross_win = bet_amount * auto_cashout_multiplier
+        if v2_active:
+            # 하우스 엣지 재확인: 기대값 줄이기 위해 win 금액에 추가 스케일 적용 (이중 적용 방지 위해 cap)
+            gross_win = int(gross_win * (1 - economy.CRASH_HOUSE_EDGE_ADJUST))
+        win_amount = int(gross_win)
+        if win_amount > 0:
+            new_balance = SimpleUserService.update_user_tokens(db, current_user.id, win_amount)
     
     # 플레이 기록 저장
     action_data = {
@@ -1051,7 +1074,11 @@ async def place_crash_bet(
         # Log softly without breaking API
         logger.warning(f"Crash persistence skipped: {_e}")
     
-    potential_win = int(bet_amount * (auto_cashout_multiplier or multiplier))
+    potential_win_raw = bet_amount * (auto_cashout_multiplier or multiplier)
+    if v2_active:
+        potential_win = int(potential_win_raw * (1 - economy.CRASH_HOUSE_EDGE_ADJUST))
+    else:
+        potential_win = int(potential_win_raw)
     # GameHistory 로그 (return 이전)
     try:
         delta = -bet_amount + win_amount
@@ -1102,7 +1129,7 @@ def get_game_stats(user_id: int, db: Session = Depends(get_db)):
 
     # TODO: 보상 테이블 존재 여부 검증 후 reward 집계 로직 조정 필요
     total_coins_won = 0
-    total_gems_won = 0
+    total_gold_won = 0
     special_items_won = 0
     jackpots_won = db.query(models.UserAction).filter(
         models.UserAction.user_id == user_id,
@@ -1112,8 +1139,8 @@ def get_game_stats(user_id: int, db: Session = Depends(get_db)):
     return GameStats(
         user_id=user_id,
         total_spins=total_spins,
-        total_coins_won=total_coins_won,
-        total_gems_won=total_gems_won,
+    total_coins_won=total_coins_won,
+    total_gold_won=total_gold_won,
         special_items_won=special_items_won,
         jackpots_won=jackpots_won,
         bonus_spins_won=0,

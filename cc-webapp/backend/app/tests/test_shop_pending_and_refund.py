@@ -41,10 +41,10 @@ def test_pending_then_settle_success(client: TestClient):
     # 1) 구매 시도 (pending)
     body = {
         "user_id": 0,
-        "product_id": "gems_pack_small",
+    "product_id": "gold_pack_small",
         "amount": 10,
         "quantity": 1,
-        "kind": "gems",
+    "kind": "gold",
         "payment_method": "card",
     }
     r = client.post("/api/shop/buy", json=body, headers=_auth_headers(token))
@@ -85,10 +85,10 @@ def test_always_fail_records_failed(client: TestClient, monkeypatch):
     monkeypatch.setenv("PAYMENT_GATEWAY_MODE", "always_fail")
     body = {
         "user_id": 0,
-        "product_id": "gems_pack_small",
+    "product_id": "gold_pack_small",
         "amount": 5,
         "quantity": 1,
-        "kind": "gems",
+    "kind": "gold",
         "payment_method": "card",
     }
     r = client.post("/api/shop/buy", json=body, headers=_auth_headers(token))

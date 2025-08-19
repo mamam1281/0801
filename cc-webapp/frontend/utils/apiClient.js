@@ -1,10 +1,31 @@
 import { apiLogTry, apiLogSuccess, apiLogFail } from './apiLogger';
-import { getTokens, getAccessToken, setTokens, clearTokens } from './tokenStorage';
+import { getTokens, setTokens, clearTokens } from './tokenStorage';
 import * as InteractionTracker from './interactionTracker';
 import UIRecorder from './uiActionRecorder';
 
 // Raw base URL from env (can include /api). We normalize to avoid // or /api/api duplication.
-const _RAW_API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+// Use IPv4 loopback by default in local dev to avoid host IPv6/::1 issues (use NEXT_PUBLIC_API_URL to override).
+const _RAW_API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
+
+// SSR 환경(Next 서버 사이드)에서는 컨테이너 내부 네트워크 접근이 가능하므로 내부용 우선 적용
+// 브라우저에서는 localhost 접근 필요
+function resolveBase() {
+  const browser = typeof window !== 'undefined';
+  if (browser) {
+    return process.env.NEXT_PUBLIC_API_URL_BROWSER || _RAW_API_BASE;
+  }
+  // 서버 사이드: 내부용 환경변수 우선
+  return process.env.NEXT_PUBLIC_API_URL_INTERNAL || _RAW_API_BASE;
+}
+
+const _RESOLVED_BASE = resolveBase();
+// eslint-disable-next-line no-console
+if (typeof window === 'undefined') {
+  console.log('[apiClient] SSR base URL 선택:', _RESOLVED_BASE);
+} else {
+  // eslint-disable-next-line no-console
+  console.log('[apiClient] Browser base URL 선택:', _RESOLVED_BASE);
+}
 
 function normalizeBase(url) {
   if (!url) return '';
@@ -17,7 +38,7 @@ function normalizeBase(url) {
   return u;
 }
 
-let API_BASE_URL = normalizeBase(_RAW_API_BASE);
+let API_BASE_URL = normalizeBase(_RESOLVED_BASE);
 
 // Developer guard: if code later concatenates endpoint starting with /api and base already ends with /api, that's fine.
 // But if an endpoint ALSO includes /api at its start and base does NOT end with /api, it's still fine.
@@ -45,10 +66,19 @@ function joinUrl(base, endpoint){
  * 백엔드와의 통신을 처리하는 함수들
  */
 
+// 안전한 액세스 토큰 취득 (빌드/캐시 불일치/esm/cjs import 문제 방지)
+function safeGetAccessToken() {
+  try {
+    const tokens = getTokens();
+    return tokens?.access_token || null;
+  } catch {
+    return null;
+  }
+}
+
 // 인증 헤더 생성
 const getAuthHeaders = () => {
-  const accessToken = getAccessToken();
-  console.log('액세스 토큰 확인:', accessToken ? '토큰 있음' : '토큰 없음');
+  const accessToken = safeGetAccessToken();
   return accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {};
 };
 
@@ -64,7 +94,7 @@ const apiRequest = async (endpoint, options = {}) => {
     method,
     endpoint,
     requestData,
-    auth: !!getAccessToken(),
+    auth: !!safeGetAccessToken(),
   });
 
   const startTime = Date.now();
@@ -140,7 +170,7 @@ const apiRequest = async (endpoint, options = {}) => {
     if (!response.ok) {
       // 403 처리: 인증이 없는 상태에서 403이 응답되는 경우 토큰이 없는지 확인하고 명시적 에러를 던짐
     if (response.status === 403) {
-        if (!getAccessToken()) {
+      if (!safeGetAccessToken()) {
           apiLogFail(`${method} ${endpoint}`, 'Forbidden (no token)');
       // When no token, return null so callers can use defaults instead of spinning retries
       InteractionTracker.recordApiResult(traceId, { status: response.status, reason: 'forbidden_no_token' });

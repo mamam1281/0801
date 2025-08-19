@@ -179,7 +179,7 @@ def test_buy_limited_happy_and_per_user_limit():
     assert resp.status_code == 200
     body = resp.json()
     assert body["success"] is True
-    assert body["gems_granted"] > 0
+    assert body["gold_granted"] > 0
 
     # second purchase should hit per-user limit (limit=1)
     resp2 = client.post(

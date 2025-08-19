@@ -23,14 +23,14 @@ def setup_module(module):
         db.close()
 
 
-def test_catalog_gems_applied_for_gems_purchase():
-    # product 1001 has gems=100, quantity=2 => 200 gems
+def test_catalog_gold_applied_for_purchase():
+    # product 1001 gold=100, quantity=2 => 200 gold
     random.seed(1)
     resp = client.post("/api/shop/buy", json={"user_id": user_id, "product_id": 1001, "quantity": 2})
     assert resp.status_code == 200
     body = resp.json()
     assert body["success"] is True
-    assert body["gems_granted"] == 200
+    assert body["gold_granted"] == 200
 
 
 def test_vip_guard_blocks_non_vip():

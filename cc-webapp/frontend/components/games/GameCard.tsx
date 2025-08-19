@@ -45,6 +45,7 @@ export function GameCard({ game, index, userGoldBalance, onGameClick }: GameCard
               repeat: Infinity,
               repeatType: 'loop',
               ease: 'easeInOut',
+              type: 'tween',
             }}
           >
             🔥 HOT

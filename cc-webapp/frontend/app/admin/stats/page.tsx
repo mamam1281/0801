@@ -2,7 +2,7 @@
 import React from 'react';
 import { apiLogger } from '../../../utils/api';
 
-const API = 'http://localhost:8000/api';
+const API = 'http://127.0.0.1:8000/api';
 
 export default function AdminStatsPage() {
   const [data, setData] = React.useState(null as any);

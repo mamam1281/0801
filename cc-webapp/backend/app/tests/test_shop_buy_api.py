@@ -22,27 +22,27 @@ def _signup(client: TestClient, prefix: str = "buyer"):
     return data["access_token"], data["user"]["id"]
 
 
-def test_buy_gems_and_item_flow():
+def test_buy_gold_and_item_flow():
     token, user_id = _signup(client)
     headers = {"Authorization": f"Bearer {token}"}
 
-    # 1) Buy gems (top-up)
+    # 1) Buy gold (top-up)
     r = client.post(
         "/api/shop/buy",
         headers=headers,
         json={
             "user_id": user_id,
-            "product_id": "gems_pack_small",
+            "product_id": "gold_pack_small",
             "amount": 500,
             "quantity": 1,
-            "kind": "gems",
+            "kind": "gold",
             "payment_method": "card",
         },
     )
     assert r.status_code == 200, r.text
     res = r.json()
     assert res["success"] is True
-    assert res.get("granted_gems") == 500
+    assert res.get("granted_gold") == 500
 
     # 2) Try buying item with insufficient tokens (expect failure if price too high)
     r = client.post(

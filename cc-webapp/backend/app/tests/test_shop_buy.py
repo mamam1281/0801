@@ -29,7 +29,7 @@ def setup_module(module):
         db.close()
 
 
-def test_buy_gems_happy_path():
+def test_buy_gold_happy_path():
     random.seed(1)  # deterministic payment
     resp = client.post(
         "/api/shop/buy",
@@ -38,12 +38,12 @@ def test_buy_gems_happy_path():
     assert resp.status_code == 200
     body = resp.json()
     assert body["success"] is True
-    assert body["gems_granted"] == 200
-    assert body["new_gem_balance"] >= 200
+    assert body["gold_granted"] == 200
+    assert body["new_gold_balance"] >= 200
     assert body["charge_id"]
 
 
-def test_buy_gems_vip_guard():
+def test_buy_gold_vip_guard():
     # product 1004 requires VIP
     resp = client.post(
         "/api/shop/buy",
@@ -52,7 +52,7 @@ def test_buy_gems_vip_guard():
     assert resp.status_code == 403
 
 
-def test_buy_gems_payment_fail():
+def test_buy_gold_payment_fail():
     # Force a failure by tweaking random
     random.seed(999999)  # likely to fail auth ~10%
     resp = client.post(
@@ -62,10 +62,10 @@ def test_buy_gems_payment_fail():
     assert resp.status_code == 200
     body = resp.json()
     if not body["success"]:
-        assert body["gems_granted"] == 0
+        assert body["gold_granted"] == 0
     else:
         # if the seed still passed, at least success is coherent
-        assert body["gems_granted"] == 100
+        assert body["gold_granted"] == 100
 
 
 def test_catalog_listing_and_price_structure():
@@ -73,6 +73,6 @@ def test_catalog_listing_and_price_structure():
     assert resp.status_code == 200
     items = resp.json()
     assert isinstance(items, list) and len(items) >= 3
-    required = {"id", "sku", "name", "price_cents", "discounted_price_cents", "gems"}
+    required = {"id", "sku", "name", "price_cents", "discounted_price_cents", "gold"}
     for it in items:
         assert required.issubset(set(it.keys()))

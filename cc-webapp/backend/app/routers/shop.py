@@ -33,10 +33,11 @@ class BuyRequest(BaseModel):
     user_id: int
     # Support legacy numeric product_id in tests/clients by coercing ints to str
     product_id: str = Field(..., description="Catalog product id or item code")
-    # Make amount optional for gems purchases where catalog price may be used
+    # 금액 (충전형 골드 구매시는 카탈로그 가격 사용 가능)
     amount: int | None = Field(None, ge=0, description="Amount in cents or tokens depending on kind")
     quantity: int = Field(1, ge=1, le=99)
-    kind: Literal["gems", "item"] = Field("gems")
+    # kind: gold | item (legacy 'gems' 제거)
+    kind: Literal["gold", "item"] = Field("gold")
     payment_method: Optional[str] = Field(None, description="card|tokens etc")
     item_name: Optional[str] = None
     currency: str = Field("USD")
@@ -57,23 +58,16 @@ class BuyRequest(BaseModel):
 class BuyReceipt(BaseModel):
     success: bool
     message: str
-    # Common
     user_id: int
     product_id: str
     quantity: int
-    # Gems purchase fields
-    # legacy field names used by tests/clients
-    gems_granted: Optional[int] = None
-    # Backwards-compatible alias for older clients/tests expecting 'granted_gems'
-    granted_gems: Optional[int] = None
-    new_gem_balance: Optional[int] = None
+    gold_granted: Optional[int] = None  # 지급된 골드 (충전/획득형 구매)
+    gold_spent: Optional[int] = None    # 소비된 골드 (아이템 구매)
+    new_gold_balance: Optional[int] = None  # 결과 잔액
     charge_id: Optional[str] = None
-    # additional fields
     receipt_code: Optional[str] = None
-    # Item purchase fields
     item_id: Optional[str] = None
     item_name: Optional[str] = None
-    # Standardized reason codes for failure UI handling
     reason_code: Optional[str] = None
 
 from ..services.shop_service import ShopService
@@ -121,13 +115,13 @@ class CatalogItem(BaseModel):
     name: str
     price_cents: int
     discounted_price_cents: int
-    gems: int
+    gold: int
     discount_percent: int = 0
     discount_ends_at: Optional[datetime] = None
     min_rank: Optional[str] = None
 
 
-@router.get("/catalog", response_model=list[CatalogItem], summary="List shop catalog")
+@router.get("/catalog", response_model=list[CatalogItem], summary="List shop catalog (gold)")
 def list_catalog():
     items = []
     for p in CatalogService.list_products():
@@ -137,7 +131,7 @@ def list_catalog():
             name=p.name,
             price_cents=p.price_cents,
             discounted_price_cents=CatalogService.compute_price_cents(p, 1),
-            gems=p.gems,
+            gold=p.gold,
             discount_percent=p.discount_percent or 0,
             discount_ends_at=p.discount_ends_at,
             min_rank=p.min_rank,
@@ -145,7 +139,7 @@ def list_catalog():
     return items
 
 
-@router.get("/limited-packages", response_model=List[LimitedPackageOut], summary="List active limited packages")
+@router.get("/limited-packages", response_model=List[LimitedPackageOut], summary="List active limited packages (gold)")
 def list_limited_packages(db = Depends(get_db)):
     packages = []
     for p in LimitedPackageService.list_active():
@@ -167,7 +161,7 @@ def list_limited_packages(db = Depends(get_db)):
             name=p.name,
             description=p.description,
             price_cents=p.price_cents,
-            gems=p.gems,
+            gold=p.gold,
             start_at=p.start_at,
             end_at=p.end_at,
             is_active=p.is_active,
@@ -189,7 +183,7 @@ class LimitedBuyCompatRequest(BaseModel):
     idempotency_key: Optional[str] = Field(None, description="Client-provided idempotency key")
 
 
-@router.get("/limited/catalog", response_model=List[LimitedPackageOut], summary="[Compat] List limited packages")
+@router.get("/limited/catalog", response_model=List[LimitedPackageOut], summary="[Compat] List limited packages (gold)")
 def list_limited_catalog_compat():
     packages: List[LimitedPackageOut] = []
     for p in LimitedPackageService.list_active():
@@ -199,7 +193,7 @@ def list_limited_catalog_compat():
             name=p.name,
             description=p.description,
             price_cents=p.price_cents,
-            gems=p.gems,
+            gold=p.gold,
             start_at=p.start_at,
             end_at=p.end_at,
             is_active=p.is_active,
@@ -261,7 +255,7 @@ def buy_limited_compat(req: LimitedBuyCompatRequest, db = Depends(get_db)):
                     db.add(models.ShopTransaction(
                         user_id=user_id,
                         product_id=pkg.code if pkg else req.code,
-                        kind="gems",
+                        kind="gold",
                         quantity=req.quantity,
                         unit_price=0,
                         amount=0,
@@ -331,7 +325,7 @@ def buy_limited_compat(req: LimitedBuyCompatRequest, db = Depends(get_db)):
             db.add(models.ShopTransaction(
                 user_id=user_id,
                 product_id=pkg.code,
-                kind="gems",
+                kind="gold",
                 quantity=req.quantity,
                 unit_price=unit_price,
                 amount=total_price_cents,
@@ -356,8 +350,8 @@ def buy_limited_compat(req: LimitedBuyCompatRequest, db = Depends(get_db)):
             code=pkg.code,
             quantity=req.quantity,
             total_price_cents=total_price_cents,
-            gems_granted=0,
-            new_gem_balance=getattr(user, "cyber_token_balance", 0),
+            gold_granted=0,
+            new_gold_balance=getattr(user, "gold_balance", 0),
             charge_id=None,
             reason_code="PAYMENT_FAILED",
         )
@@ -367,7 +361,7 @@ def buy_limited_compat(req: LimitedBuyCompatRequest, db = Depends(get_db)):
             db.add(models.ShopTransaction(
                 user_id=user_id,
                 product_id=pkg.code,
-                kind="gems",
+                kind="gold",
                 quantity=req.quantity,
                 unit_price=unit_price,
                 amount=total_price_cents,
@@ -392,29 +386,29 @@ def buy_limited_compat(req: LimitedBuyCompatRequest, db = Depends(get_db)):
             code=pkg.code,
             quantity=req.quantity,
             total_price_cents=total_price_cents,
-            gems_granted=0,
-            new_gem_balance=getattr(user, "cyber_token_balance", 0),
+            gold_granted=0,
+            new_gold_balance=getattr(user, "gold_balance", 0),
             charge_id=auth.charge_id,
             reason_code="PAYMENT_FAILED",
         )
 
-    # Grant gems (TokenService -> CurrencyService 사용으로 이원화 통화 반영)
+    # 골드 지급
     from app.services.currency_service import CurrencyService
-    total_gems = pkg.gems * req.quantity
+    total_gold = getattr(pkg, 'gold', 0) * req.quantity
     try:
-        new_balance = CurrencyService(db).add(user_id, total_gems, 'gem')
+        new_gold_balance = CurrencyService(db).add(user_id, total_gold, 'gem')  # 내부적으로 gold 처리
     except Exception:
         try: db.rollback()
         except Exception: pass
         return LimitedBuyReceipt(
             success=False,
-            message="보석 지급 실패",
+            message="골드 지급 실패",
             user_id=user_id,
             code=pkg.code,
             quantity=req.quantity,
             total_price_cents=total_price_cents,
-            gems_granted=0,
-            new_gem_balance=getattr(user, "premium_gem_balance", 0) or getattr(user, "cyber_token_balance", 0),
+            gold_granted=0,
+            new_gold_balance=getattr(user, "gold_balance", 0),
             charge_id=cap.charge_id,
             reason_code="GRANT_FAILED",
         )
@@ -423,8 +417,8 @@ def buy_limited_compat(req: LimitedBuyCompatRequest, db = Depends(get_db)):
     reward = models.Reward(
         name=f"BUY_PACKAGE:{pkg.code}",
         description=f"Purchase {req.quantity}x {pkg.name}",
-        reward_type="TOKEN",
-        value=float(total_gems),
+        reward_type="GOLD",
+        value=float(total_gold),
     )
     db.add(reward)
     db.flush()
@@ -449,7 +443,7 @@ def buy_limited_compat(req: LimitedBuyCompatRequest, db = Depends(get_db)):
             "code": pkg.code,
             "quantity": req.quantity,
             "total_price_cents": total_price_cents,
-            "gems_granted": total_gems,
+            "gold_granted": total_gold,
             "charge_id": cap.charge_id,
             "server_ts": datetime.utcnow().isoformat(),
         })
@@ -500,8 +494,8 @@ def buy_limited_compat(req: LimitedBuyCompatRequest, db = Depends(get_db)):
         code=pkg.code,
         quantity=req.quantity,
         total_price_cents=total_price_cents,
-        gems_granted=total_gems,
-        new_gem_balance=new_balance,
+        gold_granted=total_gold,
+        new_gold_balance=new_gold_balance,
         charge_id=cap.charge_id,
         receipt_code=receipt_code,
     )
@@ -630,7 +624,7 @@ def purchase_shop_item(
             return ShopPurchaseResponse(
                 success=False,
                 message=result["message"],
-                new_gold_balance=result["new_balance"],
+                new_gold_balance=result.get("new_gold_balance") or result.get("new_balance"),
                 item_id=request.item_id,
                 item_name=request.item_name,
                 new_item_count=0
@@ -639,7 +633,7 @@ def purchase_shop_item(
         return ShopPurchaseResponse(
             success=True,
             message=result["message"],
-            new_gold_balance=result["new_balance"],
+            new_gold_balance=result.get("new_gold_balance") or result.get("new_balance"),
             item_id=result["item_id"],
             item_name=result["item_name"],
             new_item_count=result["new_item_count"]
@@ -650,7 +644,7 @@ def purchase_shop_item(
         raise HTTPException(status_code=500, detail="An internal server error occurred.")
 
 
-@router.post("/buy", response_model=BuyReceipt, summary="Buy gems or items")
+@router.post("/buy", response_model=BuyReceipt, summary="Buy gold top-up or items")
 def buy(
     req: BuyRequest,
     db = Depends(get_db),
@@ -708,7 +702,7 @@ def buy(
     except Exception:
         pass
 
-    # Idempotency protection for item/gems purchases (best-effort via Redis)
+    # Idempotency protection for gold/item purchases (best-effort via Redis)
     idem = (req.idempotency_key or '').strip() or None
     rman = get_redis_manager()
 
@@ -728,8 +722,8 @@ def buy(
                 user_id=req_user_id,
                 product_id=req.product_id,
                 quantity=req.quantity,
-                    gems_granted=0,
-                new_gem_balance=getattr(user, "cyber_token_balance", 0),
+                gold_granted=0,
+                new_gold_balance=getattr(user, "gold_balance", 0),
                 charge_id=None,
                 receipt_code=None,
             )
@@ -750,7 +744,7 @@ def buy(
                 quantity=req.quantity,
                 item_id=req.product_id,
                 item_name=req.item_name or req.product_id,
-                new_balance=None,
+                new_gold_balance=getattr(user, "gold_balance", 0),
             )
         # Item DB 기록 (기존 ShopService 로직 재사용)
         result = shop_svc.purchase_item(
@@ -771,7 +765,7 @@ def buy(
                 quantity=req.quantity,
                 item_id=req.product_id,
                 item_name=req.item_name or req.product_id,
-                new_balance=new_bal,
+                new_gold_balance=new_bal,
             )
         resp = BuyReceipt(
             success=True,
@@ -781,7 +775,7 @@ def buy(
             quantity=req.quantity,
             item_id=result.get("item_id"),
             item_name=result.get("item_name"),
-            new_balance=new_bal,
+            new_gold_balance=new_bal,
         )
         if idem and rman.redis_client:
             try:
@@ -809,7 +803,7 @@ def buy(
                 reused_receipt = existing_tx.receipt_code
                 # 상태 분기: success/failed 즉시 재사용, pending이면 게이트웨이 폴링
                 if existing_tx.status in ("success", "failed"):
-                        # Derive gems for legacy stored transactions: if catalog product exists, use its gems * quantity
+                        # Legacy derivation removed: gems -> gold (tx_gold)
                         try:
                             tx_prod = None
                             try:
@@ -819,19 +813,19 @@ def buy(
                             if tx_pid_int is not None:
                                 tx_prod = CatalogService.get_product(tx_pid_int)
                             if tx_prod is not None:
-                                tx_gems = int(getattr(tx_prod, 'gems', 0)) * (existing_tx.quantity or req.quantity)
+                                tx_gold = int(getattr(tx_prod, 'gold', 0)) * (existing_tx.quantity or req.quantity)
                             else:
-                                tx_gems = int(existing_tx.amount) if existing_tx.amount is not None else 0
+                                tx_gold = int(existing_tx.amount) if existing_tx.amount is not None else 0
                         except Exception:
-                            tx_gems = int(existing_tx.amount) if existing_tx.amount is not None else 0
+                            tx_gold = int(existing_tx.amount) if existing_tx.amount is not None else 0
                         return BuyReceipt(
                             success=(existing_tx.status == 'success'),
                             message="구매 완료" if existing_tx.status == 'success' else "결제 실패 재사용",
                             user_id=req_user_id,
                             product_id=req.product_id,
                             quantity=existing_tx.quantity or req.quantity,
-                            gems_granted=tx_gems if existing_tx.status == 'success' else 0,
-                            new_gem_balance=getattr(user, "cyber_token_balance", 0),
+                            gold_granted=tx_gold if existing_tx.status == 'success' else 0,
+                            new_gold_balance=getattr(user, "gold_balance", 0),
                             charge_id=getattr(existing_tx, 'charge_id', None) if hasattr(existing_tx, 'charge_id') else None,
                             receipt_code=reused_receipt,
                             reason_code=None if existing_tx.status == 'success' else 'PAYMENT_DECLINED',
@@ -852,7 +846,7 @@ def buy(
                             pres = {"status": "pending"}
                         polled_status = pres.get("status")
                         if polled_status == 'success':
-                            # 토큰 아직 지급 안된 상태라면 지급 → amount는 gems 수량으로 간주(기존 단가 동일)
+                            # 토큰 아직 지급 안된 상태라면 지급 → amount는 gold 수량으로 간주
                             try:
                                 from app.services.currency_service import CurrencyService
                                 CurrencyService(db).add(req_user_id, existing_tx.amount, 'gem')
@@ -861,12 +855,12 @@ def buy(
                                 except Exception: pass
                                 return BuyReceipt(
                                     success=False,
-                                    message="보석 지급 실패",
+                                    message="골드 지급 실패",
                                     user_id=req_user_id,
                                     product_id=req.product_id,
                                     quantity=existing_tx.quantity or req.quantity,
                                     receipt_code=existing_tx.receipt_code,
-                                    new_balance=getattr(user, "premium_gem_balance", 0) or getattr(user, "cyber_token_balance", 0),
+                                    new_gold_balance=getattr(user, "gold_balance", 0),
                                     reason_code="GRANT_FAILED",
                                 )
                             existing_tx.status = 'success'
@@ -880,8 +874,8 @@ def buy(
                                 user_id=req_user_id,
                                 product_id=req.product_id,
                                 quantity=existing_tx.quantity or req.quantity,
-                                gems_granted=existing_tx.amount,
-                                new_gem_balance=getattr(user, "cyber_token_balance", 0),
+                                gold_granted=existing_tx.amount,
+                                new_gold_balance=getattr(user, "gold_balance", 0),
                                 charge_id=getattr(existing_tx, 'charge_id', None) if hasattr(existing_tx, 'charge_id') else None,
                                 receipt_code=existing_tx.receipt_code,
                             )
@@ -897,9 +891,9 @@ def buy(
                                 user_id=req_user_id,
                                 product_id=req.product_id,
                                 quantity=existing_tx.quantity or req.quantity,
-                                gems_granted=0,
+                                gold_granted=0,
                                 receipt_code=existing_tx.receipt_code,
-                                new_gem_balance=getattr(user, "cyber_token_balance", 0),
+                                new_gold_balance=getattr(user, "gold_balance", 0),
                                 reason_code="PAYMENT_DECLINED",
                             )
                         # 여전히 pending → 현재 상태 그대로 반환
@@ -909,14 +903,14 @@ def buy(
                             user_id=req_user_id,
                             product_id=req.product_id,
                             quantity=existing_tx.quantity or req.quantity,
-                            gems_granted=0,
+                            gold_granted=0,
                             receipt_code=existing_tx.receipt_code,
-                            new_gem_balance=getattr(user, "cyber_token_balance", 0),
+                            new_gold_balance=getattr(user, "gold_balance", 0),
                             reason_code="PAYMENT_PENDING",
                         )
         except Exception:
             existing_tx = None
-    # Gems purchase via external gateway (can be pending)
+    # Gold purchase via external gateway (can be pending)
     gateway = PaymentGatewayService()
     # Create pending transaction record
     from datetime import datetime as _dt
@@ -929,7 +923,7 @@ def buy(
         shop_svc.record_transaction(
             user_id=req_user_id,
             product_id=req.product_id,
-            kind='gems',
+            kind='gold',
             quantity=req.quantity,
             unit_price=int(req.amount),
             amount=int(req.amount),
@@ -945,8 +939,12 @@ def buy(
     try:
         db.add(models.UserAction(
             user_id=req_user_id,
-            action_type='PURCHASE_GEMS',
-            action_data=f'{{"product_id":"{req.product_id}","kind":"gems","quantity":{req.quantity},"amount":{int(req.amount)},"payment_method":"{req.payment_method or "card"}","status":"pending","receipt_code":"{receipt_code}"}}'
+            action_type='PURCHASE_GOLD',
+            action_data=(
+                f'{{"product_id":"{req.product_id}","kind":"gold","quantity":{req.quantity},'
+                f'"amount":{int(req.amount)},"payment_method":"{req.payment_method or "card"}",' 
+                f'"status":"pending","receipt_code":"{receipt_code}"}}'
+            )
         ))
         db.commit()
     except Exception:
@@ -971,9 +969,9 @@ def buy(
             user_id=req_user_id,
             product_id=req.product_id,
             quantity=req.quantity,
-            gems_granted=0,
+            gold_granted=0,
             receipt_code=receipt_code,
-            new_gem_balance=getattr(user, "cyber_token_balance", 0),
+            new_gold_balance=getattr(user, "gold_balance", 0),
             reason_code="PAYMENT_DECLINED",
         )
     elif status == "pending":
@@ -981,8 +979,12 @@ def buy(
         try:
             db.add(models.UserAction(
                 user_id=req_user_id,
-                action_type='PURCHASE_GEMS',
-                action_data=f'{{"product_id":"{req.product_id}","kind":"gems","quantity":{req.quantity},"amount":{int(req.amount)},"payment_method":"{req.payment_method or "card"}","status":"pending","receipt_code":"{receipt_code}","gateway_reference":"{pres.get("gateway_reference")}"}}'
+                action_type='PURCHASE_GOLD',
+                action_data=(
+                    f'{{"product_id":"{req.product_id}","kind":"gold","quantity":{req.quantity},'
+                    f'"amount":{int(req.amount)},"payment_method":"{req.payment_method or "card"}",' 
+                    f'"status":"pending","receipt_code":"{receipt_code}","gateway_reference":"{pres.get("gateway_reference")}"}}'
+                )
             ))
             db.commit()
         except Exception:
@@ -1004,21 +1006,22 @@ def buy(
             user_id=req_user_id,
             product_id=req.product_id,
             quantity=req.quantity,
-            gems_granted=0,
+            gold_granted=0,
             receipt_code=receipt_code,
-            new_gem_balance=getattr(user, "cyber_token_balance", 0),
+            new_gold_balance=getattr(user, "gold_balance", 0),
             reason_code="PAYMENT_PENDING",
         )
     else:
         # success immediately
-        # If catalog product known, use its gems * quantity; otherwise fall back to amount-as-gems
+        # If catalog product known, use its gold * quantity; otherwise fall back to amount-as-gold.
+        # BUGFIX: 이전 코드가 제거된 gems 필드를 참조(getattr(prod,'gems',0))하여 항상 0 지급 → gold 필드로 교체
         try:
             if prod is not None:
-                total_gems = int(getattr(prod, 'gems', 0)) * req.quantity
+                total_gold = int(getattr(prod, 'gold', 0)) * req.quantity
             else:
-                total_gems = int(req.amount)
+                total_gold = int(req.amount)
             from app.services.currency_service import CurrencyService
-            new_balance = CurrencyService(db).add(req_user_id, total_gems, 'gem')
+            new_gold_balance = CurrencyService(db).add(req_user_id, total_gold, 'gem')  # 'gem' alias → gold_balance 반영
         except Exception:
             try:
                 db.rollback()
@@ -1026,12 +1029,12 @@ def buy(
                 pass
             return BuyReceipt(
                 success=False,
-                message="보석 지급 실패",
+                message="골드 지급 실패",
                 user_id=req_user_id,
                 product_id=req.product_id,
                 quantity=req.quantity,
                 receipt_code=receipt_code,
-                new_balance=getattr(user, "premium_gem_balance", 0) or getattr(user, "cyber_token_balance", 0),
+                new_gold_balance=getattr(user, "gold_balance", 0),
                 reason_code="GRANT_FAILED",
             )
         # mark success
@@ -1055,11 +1058,10 @@ def buy(
         user_id=req_user_id,
         product_id=req.product_id,
         quantity=req.quantity,
-    gems_granted=total_gems,
-    granted_gems=total_gems,
-    new_gem_balance=new_balance,
-    charge_id=pres.get("gateway_reference") if isinstance(pres, dict) else None,
-    receipt_code=receipt_code,
+    gold_granted=total_gold,
+        new_gold_balance=new_gold_balance,
+        charge_id=pres.get("gateway_reference") if isinstance(pres, dict) else None,
+        receipt_code=receipt_code,
     )
     if idem and rman.redis_client:
         try:
@@ -1167,7 +1169,7 @@ def buy_limited(req: LimitedBuyRequest, db = Depends(get_db), current_user = Dep
             if rman.redis_client.exists(_idem_key(user_id, req.package_id, idem)):
                 # 이미 성공 처리됨
                 cur_user = db.query(models.User).filter(models.User.id == user_id).first()
-                return LimitedBuyReceipt(success=True, message="중복 요청 처리됨", user_id=user_id, code=req.package_id, new_gem_balance=getattr(cur_user, 'cyber_token_balance', 0) if cur_user else None)
+                return LimitedBuyReceipt(success=True, message="중복 요청 처리됨", user_id=user_id, code=req.package_id, new_gold_balance=getattr(cur_user, 'gold_balance', 0) if cur_user else None)
             # pre-lock 획득 시도
             if not rman.redis_client.set(_idem_lock_key(user_id, req.package_id, idem), "1", nx=True, ex=60):
                 _metric_inc("limited", "fail", "PROCESSING")
@@ -1185,7 +1187,7 @@ def buy_limited(req: LimitedBuyRequest, db = Depends(get_db), current_user = Dep
     if not (pkg.is_active and pkg.start_at <= now <= pkg.end_at):
         cur_user = db.query(models.User).filter(models.User.id == user_id).first()
         _metric_inc("limited", "fail", "WINDOW_CLOSED")
-        return LimitedBuyReceipt(success=False, message="Package not available", user_id=user_id, code=pkg.code, reason_code="WINDOW_CLOSED", new_gem_balance=getattr(cur_user, 'cyber_token_balance', 0) if cur_user else None)
+    return LimitedBuyReceipt(success=False, message="Package not available", user_id=user_id, code=pkg.code, reason_code="WINDOW_CLOSED", new_gold_balance=getattr(cur_user, 'gold_balance', 0) if cur_user else None)
 
     user = db.query(models.User).filter(models.User.id == user_id).first()
     if not user:
@@ -1195,7 +1197,7 @@ def buy_limited(req: LimitedBuyRequest, db = Depends(get_db), current_user = Dep
             message="User not found",
             user_id=user_id,
             reason_code="UNAUTHORIZED",
-            new_gem_balance=None,
+            new_gold_balance=None,
         )
 
     # Fast path: if idempotency key already seen, acknowledge
@@ -1205,7 +1207,7 @@ def buy_limited(req: LimitedBuyRequest, db = Depends(get_db), current_user = Dep
     already = LimitedPackageService.get_user_purchased(pkg.code, user_id)
     if pkg.per_user_limit and already + req.quantity > pkg.per_user_limit:
         _metric_inc("limited", "fail", "USER_LIMIT")
-        return LimitedBuyReceipt(success=False, message="Per-user limit exceeded", user_id=user_id, code=pkg.code, reason_code="USER_LIMIT", new_gem_balance=getattr(user, 'cyber_token_balance', 0))
+    return LimitedBuyReceipt(success=False, message="Per-user limit exceeded", user_id=user_id, code=pkg.code, reason_code="USER_LIMIT", new_gold_balance=getattr(user, 'gold_balance', 0))
 
     # Sweep expired holds to return any timed-out reservations back to stock (best-effort)
     try:
@@ -1217,7 +1219,7 @@ def buy_limited(req: LimitedBuyRequest, db = Depends(get_db), current_user = Dep
     hold_id: Optional[str] = None
     if not LimitedPackageService.try_reserve(pkg.code, req.quantity):
         _metric_inc("limited", "fail", "OUT_OF_STOCK")
-        return LimitedBuyReceipt(success=False, message="Out of stock", user_id=user_id, code=pkg.code, reason_code="OUT_OF_STOCK", new_gem_balance=getattr(user, 'cyber_token_balance', 0))
+    return LimitedBuyReceipt(success=False, message="Out of stock", user_id=user_id, code=pkg.code, reason_code="OUT_OF_STOCK", new_gold_balance=getattr(user, 'gold_balance', 0))
 
     # add a short hold so that if payment fails or client drops, stock returns after TTL
     try:
@@ -1244,8 +1246,8 @@ def buy_limited(req: LimitedBuyRequest, db = Depends(get_db), current_user = Dep
                 code=pkg.code,
                 quantity=req.quantity,
                 total_price_cents=pkg.price_cents * req.quantity,
-                gems_granted=0,
-                new_gem_balance=getattr(user, "cyber_token_balance", 0),
+                gold_granted=0,
+                new_gold_balance=getattr(user, "gold_balance", 0),
                 charge_id=None,
                 reason_code="PROMO_EXHAUSTED",
             )
@@ -1269,8 +1271,8 @@ def buy_limited(req: LimitedBuyRequest, db = Depends(get_db), current_user = Dep
             code=pkg.code,
             quantity=req.quantity,
             total_price_cents=total_price_cents,
-            gems_granted=0,
-            new_gem_balance=getattr(user, "cyber_token_balance", 0),
+            gold_granted=0,
+            new_gold_balance=getattr(user, "gold_balance", 0),
             charge_id=None,
             reason_code="PAYMENT_FAILED",
         )
@@ -1290,28 +1292,30 @@ def buy_limited(req: LimitedBuyRequest, db = Depends(get_db), current_user = Dep
             code=pkg.code,
             quantity=req.quantity,
             total_price_cents=total_price_cents,
-            gems_granted=0,
-            new_gem_balance=getattr(user, "cyber_token_balance", 0),
+            gold_granted=0,
+            new_gold_balance=getattr(user, "gold_balance", 0),
             charge_id=auth.charge_id,
             reason_code="PAYMENT_FAILED",
         )
 
     from app.services.currency_service import CurrencyService
-    total_gems = pkg.gems * req.quantity
+    total_gold = getattr(pkg, 'gold', 0) * req.quantity  # 이전 gems 필드 대체
     try:
-        new_balance = CurrencyService(db).add(user_id, total_gems, 'gem')
+        new_gold_balance = CurrencyService(db).add(user_id, total_gold, 'gem')  # 내부적으로 gold 처리
     except Exception:
-        try: db.rollback()
-        except Exception: pass
+        try:
+            db.rollback()
+        except Exception:
+            pass
         return LimitedBuyReceipt(
             success=False,
-            message="보석 지급 실패",
+            message="골드 지급 실패",
             user_id=user_id,
             code=pkg.code,
             quantity=req.quantity,
             total_price_cents=total_price_cents,
-            gems_granted=0,
-            new_gem_balance=getattr(user, "premium_gem_balance", 0) or getattr(user, "cyber_token_balance", 0),
+            gold_granted=0,
+            new_gold_balance=getattr(user, "gold_balance", 0),
             charge_id=cap.charge_id,
             reason_code="GRANT_FAILED",
         )
@@ -1321,7 +1325,7 @@ def buy_limited(req: LimitedBuyRequest, db = Depends(get_db), current_user = Dep
         name=f"BUY_PACKAGE:{pkg.code}",
         description=f"Purchase {req.quantity}x {pkg.name}",
         reward_type="TOKEN",
-        value=float(total_gems),
+        value=float(total_gold),
     )
     db.add(reward)
     db.flush()
@@ -1351,7 +1355,7 @@ def buy_limited(req: LimitedBuyRequest, db = Depends(get_db), current_user = Dep
         db.add(models.ShopTransaction(
             user_id=user_id,
             product_id=pkg.code,
-            kind="gems",
+            kind="gold",
             quantity=req.quantity,
             unit_price=unit_price,
             amount=total_price_cents,
@@ -1380,7 +1384,7 @@ def buy_limited(req: LimitedBuyRequest, db = Depends(get_db), current_user = Dep
             "code": pkg.code,
             "quantity": req.quantity,
             "total_price_cents": total_price_cents,
-            "gems_granted": total_gems,
+            "gold_granted": total_gold,
             "charge_id": cap.charge_id,
             "server_ts": datetime.utcnow().isoformat(),
         })
@@ -1395,8 +1399,8 @@ def buy_limited(req: LimitedBuyRequest, db = Depends(get_db), current_user = Dep
         code=pkg.code,
         quantity=req.quantity,
         total_price_cents=total_price_cents,
-        gems_granted=total_gems,
-        new_gem_balance=new_balance,
+    gold_granted=total_gold,
+    new_gold_balance=new_gold_balance,
         charge_id=cap.charge_id,
         receipt_code=receipt_code,
     )

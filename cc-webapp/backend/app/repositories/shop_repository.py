@@ -26,7 +26,7 @@ class ShopRepository(BaseRepository[models.UserAction]):
         try:
             return self.db.query(models.UserAction)\
                 .filter(models.UserAction.user_id == user_id)\
-                .filter(models.UserAction.action_type.in_(['PURCHASE_GEMS', 'BUY_PACKAGE']))\
+                .filter(models.UserAction.action_type.in_(['PURCHASE_GOLD', 'BUY_PACKAGE']))\
                 .order_by(models.UserAction.created_at.desc())\
                 .limit(limit)\
                 .all()
@@ -39,7 +39,7 @@ class ShopRepository(BaseRepository[models.UserAction]):
         try:
             cutoff_time = datetime.utcnow() - timedelta(hours=hours)
             return self.db.query(models.UserAction)\
-                .filter(models.UserAction.action_type.in_(['PURCHASE_GEMS', 'BUY_PACKAGE']))\
+                .filter(models.UserAction.action_type.in_(['PURCHASE_GOLD', 'BUY_PACKAGE']))\
                 .filter(models.UserAction.created_at >= cutoff_time)\
                 .order_by(models.UserAction.created_at.desc())\
                 .all()
@@ -54,7 +54,7 @@ class ShopRepository(BaseRepository[models.UserAction]):
             
             # 구매 액션에서 상품별 구매 횟수 집계
             purchases = self.db.query(models.UserAction)\
-                .filter(models.UserAction.action_type.in_(['PURCHASE_GEMS', 'BUY_PACKAGE']))\
+                .filter(models.UserAction.action_type.in_(['PURCHASE_GOLD', 'BUY_PACKAGE']))\
                 .filter(models.UserAction.created_at >= cutoff_date)\
                 .all()
             
@@ -82,7 +82,7 @@ class ShopRepository(BaseRepository[models.UserAction]):
             
             purchases = self.db.query(models.UserAction)\
                 .filter(models.UserAction.user_id == user_id)\
-                .filter(models.UserAction.action_type.in_(['PURCHASE_GEMS', 'BUY_PACKAGE']))\
+                .filter(models.UserAction.action_type.in_(['PURCHASE_GOLD', 'BUY_PACKAGE']))\
                 .filter(models.UserAction.created_at >= cutoff_date)\
                 .all()
             
@@ -103,20 +103,20 @@ class ShopRepository(BaseRepository[models.UserAction]):
             logger.error(f"사용자 소비 통계 조회 실패: {e}")
             return {}
     
-    def record_purchase(self, user_id: int, item_name: str, amount: float, 
-                       gems_received: int = 0, metadata: Optional[Dict] = None) -> models.UserAction:
+    def record_purchase(self, user_id: int, item_name: str, amount: float,
+                       gold_received: int = 0, metadata: Optional[Dict] = None) -> models.UserAction:
         """구매 기록"""
         try:
             purchase_metadata = {
                 'item_name': item_name,
                 'amount': amount,
-                'gems_received': gems_received,
+                'gold_received': gold_received,
                 **(metadata or {})
             }
             
             purchase_action = models.UserAction(
                 user_id=user_id,
-                action_type='PURCHASE_GEMS' if gems_received > 0 else 'BUY_PACKAGE',
+                action_type='PURCHASE_GOLD' if gold_received > 0 else 'BUY_PACKAGE',
                 result='success',
                 points_earned=0,
                 metadata=purchase_metadata
@@ -138,7 +138,7 @@ class ShopRepository(BaseRepository[models.UserAction]):
             cutoff_date = datetime.utcnow() - timedelta(days=days)
             
             purchases = self.db.query(models.UserAction)\
-                .filter(models.UserAction.action_type.in_(['PURCHASE_GEMS', 'BUY_PACKAGE']))\
+                .filter(models.UserAction.action_type.in_(['PURCHASE_GOLD', 'BUY_PACKAGE']))\
                 .filter(models.UserAction.created_at >= cutoff_date)\
                 .all()
             
@@ -168,7 +168,7 @@ class ShopRepository(BaseRepository[models.UserAction]):
             cutoff_date = datetime.utcnow() - timedelta(days=days)
             
             purchases = self.db.query(models.UserAction)\
-                .filter(models.UserAction.action_type.in_(['PURCHASE_GEMS', 'BUY_PACKAGE']))\
+                .filter(models.UserAction.action_type.in_(['PURCHASE_GOLD', 'BUY_PACKAGE']))\
                 .filter(models.UserAction.created_at >= cutoff_date)\
                 .all()
             

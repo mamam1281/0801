@@ -212,6 +212,20 @@ class AuthService:
     def authenticate_user(db: Session, site_id: str, password: str) -> Optional[User]:
         """사용자 인증"""
         user = db.query(User).filter(User.site_id == site_id).first()
+        # 1차: site_id 일치
+        if not user:
+            # 2차: site_id 로 못 찾으면 nickname 매칭 (대소문자 관용) 지원 – 프론트 라벨이 '닉네임' 인 혼동 완화
+            try:
+                # PostgreSQL ILIKE 사용 가능(다른 DB에서는 fallback 소문자 비교)
+                from sqlalchemy import func
+                user = (
+                    db.query(User)
+                    .filter(func.lower(User.nickname) == site_id.lower())
+                    .first()
+                )
+            except Exception:
+                # DB 백엔드 차이/호환 문제 시 단순 반복 필터
+                user = db.query(User).filter(User.nickname == site_id).first()
         if not user or not AuthService.verify_password(password, user.password_hash):
             return None
         return user

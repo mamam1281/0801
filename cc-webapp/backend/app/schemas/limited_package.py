@@ -10,7 +10,7 @@ class LimitedPackageOut(BaseModel):
     name: str
     description: Optional[str] = None
     price_cents: int
-    gems: int = Field(0, description="Number of premium gems granted")
+    gold: int = Field(0, description="구매 시 부여되는 골드 양 (이전 gems 필드 대체)")
     start_at: datetime
     end_at: datetime
     is_active: bool
@@ -37,9 +37,8 @@ class LimitedBuyReceipt(BaseModel):
     code: Optional[str] = None
     quantity: Optional[int] = None
     total_price_cents: Optional[int] = None
-    gems_granted: Optional[int] = None
-    new_gem_balance: Optional[int] = None
+    gold_granted: Optional[int] = None
+    new_gold_balance: Optional[int] = None
     charge_id: Optional[str] = None
     receipt_code: Optional[str] = None
-    # Optional standardized reason code for failures/UI handling (e.g., OUT_OF_STOCK, USER_LIMIT, WINDOW_CLOSED)
-    reason_code: Optional[str] = Field(None, description="Standardized reason code for failure states")
+    reason_code: Optional[str] = Field(None, description="실패 사유 코드 (OUT_OF_STOCK, USER_LIMIT 등)")

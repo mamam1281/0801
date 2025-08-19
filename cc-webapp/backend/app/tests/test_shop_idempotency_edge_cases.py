@@ -42,7 +42,7 @@ def test_purchase_insufficient_balance_idempotent_fail():
         'product_id': 'expensive_item_x',  # 가짜 SKU
         'amount': 10_000_000,  # 과도한 금액 → 실패 유도
         'quantity': 1,
-        'kind': 'gems',
+    'kind': 'gold',
         'payment_method': 'card',
         'idempotency_key': idem_key,
     }
@@ -69,10 +69,10 @@ def test_purchase_always_fail_gateway_reuse_failed_tx(monkeypatch):
     idem_key = 'GWFAIL1'
     body = {
         'user_id': user_id,
-        'product_id': 'gems_pack_small',
+    'product_id': 'gold_pack_small',
         'amount': 300,
         'quantity': 1,
-        'kind': 'gems',
+    'kind': 'gold',
         'payment_method': 'card',
         'idempotency_key': idem_key,
     }
@@ -96,10 +96,10 @@ def test_purchase_pending_then_success(monkeypatch):
     idem_key = 'PENDING1'
     body = {
         'user_id': user_id,
-        'product_id': 'gems_pack_small',
+    'product_id': 'gold_pack_small',
         'amount': 300,
         'quantity': 1,
-        'kind': 'gems',
+    'kind': 'gold',
         'payment_method': 'card',
         'idempotency_key': idem_key,
     }
@@ -127,10 +127,10 @@ def test_purchase_concurrency_race_single_record():
     idem_key = 'RACE1'
     body = {
         'user_id': user_id,
-        'product_id': 'gems_pack_small',
+    'product_id': 'gold_pack_small',
         'amount': 300,
         'quantity': 1,
-        'kind': 'gems',
+    'kind': 'gold',
         'payment_method': 'card',
         'idempotency_key': idem_key,
     }

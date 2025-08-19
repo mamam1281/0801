@@ -55,16 +55,16 @@ export function LoginScreen({
 
     setIsSubmitting(true);
     try {
-  const success = onLogin ? await onLogin(nickname, password) : false;
+      const success = onLogin ? await onLogin(nickname, password) : false;
       if (success) {
         apiLogSuccess('POST /api/auth/login');
       } else {
-        apiLogFail('POST /api/auth/login', '잘못된 정보');
-        setError('닉네임 또는 비밀번호가 올바르지 않습니다.');
+        apiLogFail('POST /api/auth/login', '잘못된 정보 또는 서버 거부');
+        setError('로그인 실패: 자격 증명이 올바르지 않거나 서버에서 거부되었습니다.');
       }
-    } catch (err) {
-      apiLogFail('POST /api/auth/login', err);
-      setError('로그인 중 오류가 발생했습니다.');
+    } catch (err: any) {
+      apiLogFail('POST /api/auth/login', err?.message || err);
+      setError('로그인 중 시스템 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.');
     } finally {
       setIsSubmitting(false);
     }

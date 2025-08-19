@@ -24,6 +24,15 @@ router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 
 
 def _build_user_response(user: User) -> UserResponse:
+    # 경험치 관련 source 우선순위: user.total_experience -> user.experience -> 0
+    total_exp = (
+        getattr(user, "total_experience", None)
+        or getattr(user, "experience", None)
+        or 0
+    )
+    level = getattr(user, "battlepass_level", 1) or 1
+    # 단순 max 경험치 규칙: 1000 + (level-1)*100 (프론트 userUtils.ts 로직과 호환)
+    max_exp = 1000 + (level - 1) * 100
     return UserResponse(
         id=user.id,
         site_id=user.site_id,
@@ -33,9 +42,10 @@ def _build_user_response(user: User) -> UserResponse:
         last_login=user.last_login or user.created_at,
         is_admin=getattr(user, "is_admin", False),
         is_active=getattr(user, "is_active", True),
-    cyber_token_balance=getattr(user, "cyber_token_balance", 0),
-    regular_coin_balance=getattr(user, "regular_coin_balance", 0),
-    premium_gem_balance=getattr(user, "premium_gem_balance", 0),
+        gold_balance=getattr(user, "gold_balance", 0),
+        battlepass_level=level,
+        experience=int(total_exp) if isinstance(total_exp, (int, float)) else 0,
+        max_experience=int(max_exp),
     )
 
 """NOTE: 2025-08 Consolidation
@@ -55,7 +65,7 @@ class _RegisterResponse(BaseModel):
     nickname: str
     access_token: str
     refresh_token: str | None = None
-    cyber_token_balance: int | None = None
+    gold_balance: int | None = None
 
 @router.post("/register", response_model=_RegisterResponse, summary="Register user (temporary minimal endpoint)")
 async def minimal_register(req: _RegisterRequest, db: Session = Depends(get_db)):
@@ -80,7 +90,7 @@ async def minimal_register(req: _RegisterRequest, db: Session = Depends(get_db))
             nickname=user.nickname,
             access_token=access_token,
             refresh_token=refresh_token,
-            cyber_token_balance=getattr(user, 'cyber_token_balance', 0)
+            gold_balance=getattr(user, 'gold_balance', 0)
         )
     except HTTPException:
         raise
@@ -376,6 +386,15 @@ async def refresh(
             req_ip = request.client.host if request and request.client else ""
             req_ua = request.headers.get("User-Agent") if request else ""
             ok, uid, err = TokenManager.verify_refresh_token(provided_token, req_ip, req_ua, db)
+            if err == "REVOKED":
+                # Reuse of a revoked/rotated refresh token → security response: revoke everything and deny
+                try:
+                    if uid:
+                        AuthService.revoke_all_sessions(db, uid)
+                        TokenManager.revoke_all_refresh_tokens(uid, db)
+                except Exception:
+                    logger.exception("Failed cascading revoke after refresh reuse detection")
+                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token reuse detected")
             if ok and uid:
                 user = db.query(User).filter(User.id == uid).first()
         except Exception:

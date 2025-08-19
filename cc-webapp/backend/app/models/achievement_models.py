@@ -19,7 +19,8 @@ class Achievement(Base):
     # condition JSON example: {"type": "CUMULATIVE_BET", "game_type": "SLOT", "threshold": 1000}
     condition: Mapped[Dict[str, Any]] = mapped_column(JSON, nullable=False)
     reward_coins: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    reward_gems: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    # 기존 reward_gems -> reward_gold 전환
+    reward_gold: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     icon: Mapped[Optional[str]] = mapped_column(String(80))
     badge_color: Mapped[Optional[str]] = mapped_column(String(32))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
