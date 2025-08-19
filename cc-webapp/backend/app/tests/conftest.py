@@ -1,4 +1,5 @@
 import os, sys, pytest
+from types import SimpleNamespace
 from fastapi.testclient import TestClient
 
 # Add backend root to sys.path if missing (when pytest launched from repo root)
@@ -9,15 +10,21 @@ if _backend_root not in sys.path:
 
 # Ensure DB tables exist for tests
 from app.database import Base, engine  # noqa: E402
+from app.main import app as fastapi_app  # noqa: E402
+try:
+	from app.routers.admin_content import require_admin as _require_admin  # noqa: E402
+	# Ensure admin dependency always passes during tests (isolated persistence tests)
+	fastapi_app.dependency_overrides[_require_admin] = lambda: SimpleNamespace(is_admin=True, id=0)
+except Exception:
+	pass
 from sqlalchemy import text as _text  # 추가: 컬럼 보강용
 import app.models  # noqa: F401, E402 - register all models on Base
 
 
 try:
-	from app.main import app
-except Exception as e:
-	# Fallback: try alternate import paths if needed
-	raise
+	from app.main import app as _app_reload  # noqa
+except Exception:
+	pass
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -148,7 +155,8 @@ def _ensure_schema():
 
 @pytest.fixture(scope="session")
 def client():
-	with TestClient(app) as c:
+	from fastapi.testclient import TestClient as _TC
+	with _TC(fastapi_app) as c:
 		yield c
 
 

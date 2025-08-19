@@ -14,9 +14,18 @@ import { getTokens, setTokens } from '../utils/tokenStorage';
 interface ProfileScreenProps {
   onBack: () => void;
   onAddNotification: (message: string) => void;
+  retryEnabled?: boolean; // 추가: 재시도 허용 여부 (기본 true)
+  maxRetries?: number; // 추가: 최대 재시도 횟수 (기본 1)
+  retryDelayMs?: number; // 추가: 재시도 사이 딜레이
 }
 
-export function ProfileScreen({ onBack, onAddNotification }: ProfileScreenProps) {
+export function ProfileScreen({
+  onBack,
+  onAddNotification,
+  retryEnabled = true,
+  maxRetries = 1,
+  retryDelayMs = 800,
+}: ProfileScreenProps) {
   const [user, setUser] = useState(null);
   const [stats, setStats] = useState(null);
   const [balance, setBalance] = useState(null);
@@ -25,6 +34,7 @@ export function ProfileScreen({ onBack, onAddNotification }: ProfileScreenProps)
   const [authChecked, setAuthChecked] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
     const checkAuthAndFetchData = async () => {
       try {
         setLoading(true);
@@ -121,8 +131,20 @@ export function ProfileScreen({ onBack, onAddNotification }: ProfileScreenProps)
       }
     };
 
-    checkAuthAndFetchData();
-  }, [onAddNotification]);
+    let attempt = 0;
+    const run = async () => {
+      await checkAuthAndFetchData();
+      if (!cancelled && retryEnabled && attempt < maxRetries && error) {
+        attempt += 1;
+        await new Promise((r) => setTimeout(r, retryDelayMs));
+        if (!cancelled) await checkAuthAndFetchData();
+      }
+    };
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [onAddNotification, retryEnabled, maxRetries, retryDelayMs]);
 
   if (loading) {
     return (

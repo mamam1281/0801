@@ -105,3 +105,31 @@ pytest -q -m ci_core
 - Generate trimmed `openapi_minimal.json` containing only critical schemas for faster diff.
 
 ---
+## 2025-08-19 Sync Update: Gacha / Notification / Profile XP / OpenAPI
+
+### 변경 요약
+1. Gacha Pull Hook: `useGachaPull.ts` 경로 고정(`/api/games/gacha/pull`) 및 body 필드 `pull_count` 반영.
+2. Notification Settings 분리: 익명 `/api/notification/settings/anon`, 인증 `/api/notification/settings/auth`(GET/PUT). 충돌 제거.
+3. Profile XP 소스 체인: Redis `battlepass:xp:<user_id>` → `user.total_experience` → `user.experience` → 0.
+4. ProfileScreen 재시도 제어: `retryEnabled`, `maxRetries`, `retryDelayMs` 옵션 추가 (기본 1회 재시도)로 무한 로딩 방지.
+5. OpenAPI 재생성: paths=185 (신규 anon/auth settings 경로 포함).
+
+### 기술 세부
+- Auth Router `_build_user_response` 가 Redis 조회 및 in-memory `total_experience` sync 수행.
+- Notification anon stub 반환에 `scope: "anon"` 추가하여 클라이언트 구분 명확화.
+- Gacha hook base `/api` 로 단순화 → 상대 합성시 중복 제거 로직과 충돌 방지.
+- ProfileScreen 내부 fetch 로직: 실패 시 조건부 단일 재시도 후 graceful error UI.
+
+### 검증
+- 런타임 route 검사: anon/auth settings 존재 확인.
+- OpenAPI spec regenerate 성공 (185 paths).
+- 기존 기능 호환: GachaSystem.tsx 서버 응답 매핑 영향 없음 (이미 `pull_count`).
+
+### 추후 권장
+1. Notification settings schema 버전 필드(`schemaVersion`) 추가.
+2. Gacha pity/animation 메타 OpenAPI 명세화.
+3. Profile XP/Level 계산 로직 분리(Service) 후 캐시 TTL 정책 설정.
+4. OpenAPI 타입 자동 생성 파이프라인(frontend types) 추가.
+5. Redis 키 네임스페이스 일관성 가이드 문서화.
+
+---

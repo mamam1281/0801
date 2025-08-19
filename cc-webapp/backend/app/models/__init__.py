@@ -80,13 +80,16 @@ from .chat_models import (
     ChatModeration,
 )
 
-# Event 모델들 추가
+# Event / Mission (legacy gameplay) 모델들
 from .event_models import (
     Event,
     EventParticipation,
     Mission,
-    UserMission
+    UserMission,
 )
+
+# New admin persistence models (events / missions templates / reward catalog / audit)
+from .admin_content_models import *  # noqa: F401,F403
 
 # History / Social 모델 추가
 from .history_models import GameHistory
@@ -134,6 +137,7 @@ __all__ = [
     "UserQuizAttempt",
     "UserQuizAnswer",
     "QuizLeaderboard",
+    "QuizResult",
     
     # AI Recommendation
     "RecommendationTemplate",
@@ -199,6 +203,12 @@ __all__ = [
     "ShopPromoCode",
     "ShopPromoUsage",
     "AdminAuditLog",
+    # Admin content persistence
+    "AdminEvent",
+    "MissionTemplate",
+    "EventMissionLink",
+    "RewardCatalog",
+    "RewardAudit",
 ]
 
 # Content 모델들 추가

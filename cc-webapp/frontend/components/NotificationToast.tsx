@@ -1,22 +1,23 @@
 "use client";
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { useApiClient } from '../hooks/game/useApiClient';
 
 type Toast = {
-	id: string;
-	message: string;
-	type?: string;
+  id: string;
+  message: string;
+  type?: string;
 };
 
 type ToastContextValue = {
-	push: (message: string, type?: string) => void;
+  push: (message: string, type?: string) => void;
 };
 
 const ToastContext = createContext(null as unknown as ToastContextValue);
 
 export function useToast() {
-	const ctx = useContext(ToastContext);
-	if (!ctx) throw new Error('useToast must be used within <ToastProvider>');
-	return ctx;
+  const ctx = useContext(ToastContext);
+  if (!ctx) throw new Error('useToast must be used within <ToastProvider>');
+  return ctx;
 }
 
 type Settings = {
@@ -42,6 +43,8 @@ export function ToastProvider(props: ToastProviderProps) {
   const lastKeyRef = useRef(null as string | null);
   const lastAtRef = useRef(0 as number);
   const settingsRef = useRef(DEFAULTS as Settings);
+  // Reuse authenticated API client so settings endpoint (auth-protected) doesn't 404 when fetched via Next dev server
+  const { call } = useApiClient('/api/notification');
 
   // 설정 로딩: 로컬 우선, 서버 합치기(가능 시)
   useEffect(() => {
@@ -53,20 +56,20 @@ export function ToastProvider(props: ToastProviderProps) {
       }
     } catch {}
 
-    // 서버 설정 시도(로그인 사용자만 가능). 실패해도 무시
+    // 서버 설정 시도(로그인 사용자만 가능). 실패해도 무시 (401 등)
     (async () => {
       try {
-        const res = await fetch('/api/notification/settings', { method: 'GET' });
-        if (res.ok) {
-          const s = await res.json();
-          // 서버 응답을 로컬과 병합(서버 우선)
+        const s = await call<Settings>('/settings', { method: 'GET' });
+        if (s && typeof s === 'object') {
           const merged = { ...settingsRef.current, ...s } as Settings;
           settingsRef.current = merged;
           try {
             localStorage.setItem(LS_KEY, JSON.stringify(merged));
           } catch {}
         }
-      } catch {}
+      } catch {
+        // ignore (likely not logged in yet)
+      }
     })();
   }, []);
 

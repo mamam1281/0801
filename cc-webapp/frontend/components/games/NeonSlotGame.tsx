@@ -95,7 +95,8 @@ interface SlotSpinApiResponse {
 
 export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: NeonSlotGameProps) {
   const { fromApi } = useFeedback();
-  const { call } = useApiClient('/api/games/slot');
+  // Use /api/games base so subsequent call('/slot/spin') maps to /api/games/slot/spin
+  const { call } = useApiClient('/api/games');
   const [reels, setReels] = useState([
     SLOT_SYMBOLS[0],
     SLOT_SYMBOLS[1],
@@ -281,7 +282,8 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
     let serverResult: SlotSpinApiResponse | null = null;
     // Attempt authoritative server spin
     try {
-      const raw = await (call as any)('/spin', {
+      // Backend endpoint: POST /api/games/slot/spin
+      const raw = await (call as any)('/slot/spin', {
         method: 'POST',
         body: { bet_amount: betAmount },
         authToken:
@@ -665,7 +667,7 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
                           : {}
                     }
                     transition={
-                      (reelStopOrder.includes(index) || winningPositions[index])
+                      reelStopOrder.includes(index) || winningPositions[index]
                         ? {
                             // array keyframes require a tween (spring doesn't support arrays)
                             duration: winningPositions[index] ? 0.6 : 0.5,

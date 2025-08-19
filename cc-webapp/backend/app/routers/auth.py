@@ -24,15 +24,45 @@ router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 
 
 def _build_user_response(user: User) -> UserResponse:
-    # 경험치 관련 source 우선순위: user.total_experience -> user.experience -> 0
-    total_exp = (
-        getattr(user, "total_experience", None)
-        or getattr(user, "experience", None)
-        or 0
-    )
+    """Assemble UserResponse with robust XP sourcing.
+
+    Priority chain for experience:
+      1. Redis key battlepass:xp:<user_id> (if present and int convertible)
+      2. user.total_experience attribute
+      3. user.experience attribute
+      4. 0 (default)
+    Additionally, if total_experience missing but a legacy 'experience' value exists, mirror it
+    into user.total_experience in-memory (no commit) for downstream consistency.
+    """
+    redis_xp = None
+    try:
+        from ..utils.redis import RedisManager  # local import to avoid circular on startup
+        rm = RedisManager()
+        key = f"battlepass:xp:{user.id}"
+        cached = rm.get_cached_data(key)
+        if isinstance(cached, (int, float)):
+            redis_xp = int(cached)
+        elif isinstance(cached, dict):  # Support stored structures {"xp": N}
+            maybe = cached.get("xp") if hasattr(cached, 'get') else None
+            if isinstance(maybe, (int, float)):
+                redis_xp = int(maybe)
+    except Exception:
+        redis_xp = None  # silent fallback
+
+    attr_total = getattr(user, "total_experience", None)
+    legacy_exp = getattr(user, "experience", None)
+    total_exp = redis_xp if redis_xp is not None else (attr_total if attr_total is not None else (legacy_exp if legacy_exp is not None else 0))
+
+    # In-memory sync for downstream code expecting total_experience
+    if attr_total is None and legacy_exp is not None:
+        try:
+            setattr(user, "total_experience", legacy_exp)
+        except Exception:
+            pass
+
     level = getattr(user, "battlepass_level", 1) or 1
-    # 단순 max 경험치 규칙: 1000 + (level-1)*100 (프론트 userUtils.ts 로직과 호환)
-    max_exp = 1000 + (level - 1) * 100
+    max_exp = 1000 + (level - 1) * 100  # keep existing simple progression
+
     return UserResponse(
         id=user.id,
         site_id=user.site_id,

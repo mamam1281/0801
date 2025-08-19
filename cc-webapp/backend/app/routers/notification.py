@@ -10,8 +10,8 @@ from ..auth.auth_service import JWT_SECRET_KEY, JWT_ALGORITHM
 router = APIRouter(prefix="/api/notification", tags=["Notification Center"])
 
 
-@router.get("/settings")
-def get_notification_settings(authorization: Optional[str] = Header(None)) -> Dict:
+@router.get("/settings/anon")
+def get_notification_settings_anon(authorization: Optional[str] = Header(None)) -> Dict:
     """Return default notification settings; include user_id when available.
 
     This endpoint intentionally allows anonymous requests and will not trigger
@@ -34,4 +34,4 @@ def get_notification_settings(authorization: Optional[str] = Header(None)) -> Di
             # ignore invalid tokens for this lightweight stub
             user_id = None
 
-    return {"user_id": user_id, "settings": default}
+    return {"scope": "anon", "user_id": user_id, "settings": default}

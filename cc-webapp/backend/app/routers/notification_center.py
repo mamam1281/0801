@@ -112,8 +112,8 @@ async def unread_count(
     return {"count": service.unread_count(current_user.id)}
 
 
-@router.get("/settings", response_model=NotificationSettings)
-async def get_settings(
+@router.get("/settings/auth", response_model=NotificationSettings)
+async def get_settings_auth(
     current_user: User = Depends(get_current_user),
 ):
     rm = RedisManager()
@@ -128,8 +128,8 @@ async def get_settings(
     return NotificationSettings()
 
 
-@router.put("/settings", response_model=NotificationSettings)
-async def put_settings(
+@router.put("/settings/auth", response_model=NotificationSettings)
+async def put_settings_auth(
     body: NotificationSettings,
     current_user: User = Depends(get_current_user),
 ):

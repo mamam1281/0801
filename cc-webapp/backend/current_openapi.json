@@ -1,9 +1,8 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "Casino-Club F2P API",
-    "description": "Backend API for Casino-Club F2P gaming platform",
-    "version": "1.0.0"
+    "title": "cc-webapp",
+    "version": "2025-08-19T06:50:59.672940"
   },
   "paths": {
     "/api/auth/register": {
@@ -4581,77 +4580,46 @@
         ]
       }
     },
-    "/api/notification/settings": {
+    "/api/notification/settings/auth": {
       "get": {
         "tags": [
-          "Notification Center",
           "Notification Center"
         ],
-        "summary": "Get Notification Settings",
-        "description": "Return default notification settings; include user_id when available.\n\nThis endpoint intentionally allows anonymous requests and will not trigger\nthe global HTTPBearer auto_error behavior.",
-        "operationId": "get_notification_settings_api_notification_settings_get",
-        "parameters": [
-          {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          }
-        ],
+        "summary": "Get Settings Auth",
+        "operationId": "get_settings_auth_api_notification_settings_auth_get",
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "title": "Response Get Notification Settings Api Notification Settings Get"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/NotificationSettings"
                 }
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       },
       "put": {
         "tags": [
           "Notification Center"
         ],
-        "summary": "Put Settings",
-        "operationId": "put_settings_api_notification_settings_put",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
+        "summary": "Put Settings Auth",
+        "operationId": "put_settings_auth_api_notification_settings_auth_put",
         "requestBody": {
-          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/NotificationSettings"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
@@ -4674,7 +4642,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/notification/push/subscribe": {
@@ -5337,6 +5310,918 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ProtectionStatus"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/notification/settings/anon": {
+      "get": {
+        "tags": [
+          "Notification Center",
+          "Notification Center"
+        ],
+        "summary": "Get Notification Settings Anon",
+        "description": "Return default notification settings; include user_id when available.\n\nThis endpoint intentionally allows anonymous requests and will not trigger\nthe global HTTPBearer auto_error behavior.",
+        "operationId": "get_notification_settings_anon_api_notification_settings_anon_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "title": "Response Get Notification Settings Anon Api Notification Settings Anon Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/content/events": {
+      "get": {
+        "tags": [
+          "Admin Content"
+        ],
+        "summary": "List Events",
+        "operationId": "list_events_api_admin_content_events_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/app__routers__admin_content__EventResponse"
+                  },
+                  "type": "array",
+                  "title": "Response List Events Api Admin Content Events Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Admin Content"
+        ],
+        "summary": "Create Event",
+        "operationId": "create_event_api_admin_content_events_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EventCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/app__routers__admin_content__EventResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/admin/content/events/{event_id}": {
+      "get": {
+        "tags": [
+          "Admin Content"
+        ],
+        "summary": "Get Event",
+        "operationId": "get_event_api_admin_content_events__event_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "title": "Event Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/app__routers__admin_content__EventResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Admin Content"
+        ],
+        "summary": "Update Event",
+        "operationId": "update_event_api_admin_content_events__event_id__put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Event Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EventUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/app__routers__admin_content__EventResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Admin Content"
+        ],
+        "summary": "Delete Event",
+        "operationId": "delete_event_api_admin_content_events__event_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Event Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/content/events/{event_id}/activate": {
+      "post": {
+        "tags": [
+          "Admin Content"
+        ],
+        "summary": "Activate Event",
+        "operationId": "activate_event_api_admin_content_events__event_id__activate_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Event Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/content/events/{event_id}/deactivate": {
+      "post": {
+        "tags": [
+          "Admin Content"
+        ],
+        "summary": "Deactivate Event",
+        "operationId": "deactivate_event_api_admin_content_events__event_id__deactivate_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Event Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/content/missions/templates": {
+      "get": {
+        "tags": [
+          "Admin Content"
+        ],
+        "summary": "List Mission Templates",
+        "operationId": "list_mission_templates_api_admin_content_missions_templates_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/MissionTemplateResponse"
+                  },
+                  "type": "array",
+                  "title": "Response List Mission Templates Api Admin Content Missions Templates Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Admin Content"
+        ],
+        "summary": "Create Mission Template",
+        "operationId": "create_mission_template_api_admin_content_missions_templates_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MissionTemplateCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MissionTemplateResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/admin/content/missions/templates/{template_id}": {
+      "put": {
+        "tags": [
+          "Admin Content"
+        ],
+        "summary": "Update Mission Template",
+        "operationId": "update_mission_template_api_admin_content_missions_templates__template_id__put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "template_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Template Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MissionTemplateUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MissionTemplateResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Admin Content"
+        ],
+        "summary": "Delete Mission Template",
+        "operationId": "delete_mission_template_api_admin_content_missions_templates__template_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "template_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Template Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/content/rewards/catalog": {
+      "get": {
+        "tags": [
+          "Admin Content"
+        ],
+        "summary": "List Reward Catalog",
+        "operationId": "list_reward_catalog_api_admin_content_rewards_catalog_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RewardCatalogItem"
+                  },
+                  "type": "array",
+                  "title": "Response List Reward Catalog Api Admin Content Rewards Catalog Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Admin Content"
+        ],
+        "summary": "Create Reward Catalog",
+        "operationId": "create_reward_catalog_api_admin_content_rewards_catalog_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RewardCatalogCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RewardCatalogItem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/admin/content/rewards/catalog/{reward_id}": {
+      "put": {
+        "tags": [
+          "Admin Content"
+        ],
+        "summary": "Update Reward Catalog",
+        "operationId": "update_reward_catalog_api_admin_content_rewards_catalog__reward_id__put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "reward_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Reward Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RewardCatalogUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RewardCatalogItem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Admin Content"
+        ],
+        "summary": "Delete Reward Catalog",
+        "operationId": "delete_reward_catalog_api_admin_content_rewards_catalog__reward_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "reward_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Reward Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/content/rewards/catalog/{reward_id}/activate": {
+      "post": {
+        "tags": [
+          "Admin Content"
+        ],
+        "summary": "Activate Reward",
+        "operationId": "activate_reward_api_admin_content_rewards_catalog__reward_id__activate_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "reward_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Reward Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/content/rewards/catalog/{reward_id}/deactivate": {
+      "post": {
+        "tags": [
+          "Admin Content"
+        ],
+        "summary": "Deactivate Reward",
+        "operationId": "deactivate_reward_api_admin_content_rewards_catalog__reward_id__deactivate_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "reward_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Reward Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/content/rewards/audit": {
+      "get": {
+        "tags": [
+          "Admin Content"
+        ],
+        "summary": "Reward Audit",
+        "operationId": "reward_audit_api_admin_content_rewards_audit_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "User Id"
+            }
+          },
+          {
+            "name": "event_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Event Id"
+            }
+          },
+          {
+            "name": "source",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 100
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Source"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Page Size"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RewardAuditResponse"
                 }
               }
             }
@@ -7397,7 +8282,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "$ref": "#/components/schemas/EventResponse"
+                    "$ref": "#/components/schemas/app__schemas__event_schemas__EventResponse"
                   },
                   "type": "array",
                   "title": "Response Get Active Events Api Events  Get"
@@ -7443,7 +8328,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EventResponse"
+                  "$ref": "#/components/schemas/app__schemas__event_schemas__EventResponse"
                 }
               }
             }
@@ -8390,7 +9275,7 @@
             "type": "integer",
             "minimum": 0.0,
             "title": "Gold",
-            "description": "Amount of gold granted (was 'gems')"
+            "description": "Amount of gold granted (legacy alias: gems)"
           },
           "discount_percent": {
             "type": "integer",
@@ -8454,7 +9339,7 @@
           "gold": {
             "type": "integer",
             "title": "Gold",
-            "description": "Amount of gold granted (was 'gems')"
+            "description": "Amount of gold granted"
           },
           "gems": {
             "anyOf": [
@@ -9415,6 +10300,35 @@
         ],
         "title": "EmotionFeedbackRequest"
       },
+      "EventCreate": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "start_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start At"
+          },
+          "end_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "End At"
+          },
+          "reward_scheme": {
+            "type": "object",
+            "title": "Reward Scheme"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "start_at",
+          "end_at"
+        ],
+        "title": "EventCreate"
+      },
       "EventJoin": {
         "properties": {
           "event_id": {
@@ -9482,7 +10396,7 @@
           "event": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/EventResponse"
+                "$ref": "#/components/schemas/app__schemas__event_schemas__EventResponse"
               },
               {
                 "type": "null"
@@ -9514,13 +10428,9 @@
         ],
         "title": "EventProgressUpdate"
       },
-      "EventResponse": {
+      "EventUpdate": {
         "properties": {
-          "title": {
-            "type": "string",
-            "title": "Title"
-          },
-          "description": {
+          "name": {
             "anyOf": [
               {
                 "type": "string"
@@ -9529,27 +10439,33 @@
                 "type": "null"
               }
             ],
-            "title": "Description"
+            "title": "Name"
           },
-          "event_type": {
-            "type": "string",
-            "title": "Event Type"
+          "start_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start At"
           },
-          "start_date": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Start Date"
+          "end_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End At"
           },
-          "end_date": {
-            "type": "string",
-            "format": "date-time",
-            "title": "End Date"
-          },
-          "rewards": {
-            "type": "object",
-            "title": "Rewards"
-          },
-          "requirements": {
+          "reward_scheme": {
             "anyOf": [
               {
                 "type": "object"
@@ -9558,74 +10474,25 @@
                 "type": "null"
               }
             ],
-            "title": "Requirements",
-            "default": {}
+            "title": "Reward Scheme"
           },
-          "image_url": {
+          "missions": {
             "anyOf": [
               {
-                "type": "string"
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Image Url"
-          },
-          "priority": {
-            "type": "integer",
-            "title": "Priority",
-            "default": 0
-          },
-          "id": {
-            "type": "integer",
-            "title": "Id"
-          },
-          "is_active": {
-            "type": "boolean",
-            "title": "Is Active"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
-          },
-          "participation_count": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Participation Count",
-            "default": 0
-          },
-          "user_participation": {
-            "anyOf": [
-              {
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "User Participation"
+            "title": "Missions"
           }
         },
         "type": "object",
-        "required": [
-          "title",
-          "event_type",
-          "start_date",
-          "end_date",
-          "rewards",
-          "id",
-          "is_active",
-          "created_at"
-        ],
-        "title": "EventResponse"
+        "title": "EventUpdate"
       },
       "FeedbackResponse": {
         "properties": {
@@ -11422,7 +12289,7 @@
               }
             ],
             "title": "Gold",
-            "description": "Amount of gold granted (was bonus_tokens/gems)"
+            "description": "Amount of gold granted (legacy bonus_tokens alias)"
           }
         },
         "type": "object",
@@ -11564,6 +12431,135 @@
           "created_at"
         ],
         "title": "MissionResponse"
+      },
+      "MissionTemplateCreate": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "mission_type": {
+            "type": "string",
+            "pattern": "^(daily|weekly|event)$",
+            "title": "Mission Type"
+          },
+          "target": {
+            "type": "integer",
+            "title": "Target",
+            "default": 1
+          },
+          "reward": {
+            "type": "object",
+            "title": "Reward"
+          }
+        },
+        "type": "object",
+        "required": [
+          "title",
+          "mission_type"
+        ],
+        "title": "MissionTemplateCreate"
+      },
+      "MissionTemplateResponse": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "mission_type": {
+            "type": "string",
+            "pattern": "^(daily|weekly|event)$",
+            "title": "Mission Type"
+          },
+          "target": {
+            "type": "integer",
+            "title": "Target",
+            "default": 1
+          },
+          "reward": {
+            "type": "object",
+            "title": "Reward"
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "title",
+          "mission_type",
+          "id",
+          "is_active",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "MissionTemplateResponse"
+      },
+      "MissionTemplateUpdate": {
+        "properties": {
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "mission_type": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(daily|weekly|event)$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mission Type"
+          },
+          "target": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target"
+          },
+          "reward": {
+            "anyOf": [
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reward"
+          }
+        },
+        "type": "object",
+        "title": "MissionTemplateUpdate"
       },
       "ModelPredictionResponse": {
         "properties": {
@@ -12528,6 +13524,228 @@
         },
         "type": "object",
         "title": "ResetRequest"
+      },
+      "RewardAuditItem": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Id"
+          },
+          "reward_type": {
+            "type": "string",
+            "title": "Reward Type"
+          },
+          "amount": {
+            "type": "integer",
+            "title": "Amount"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "event_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "reward_type",
+          "amount",
+          "created_at"
+        ],
+        "title": "RewardAuditItem"
+      },
+      "RewardAuditResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/RewardAuditItem"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "page_size": {
+            "type": "integer",
+            "title": "Page Size"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size"
+        ],
+        "title": "RewardAuditResponse"
+      },
+      "RewardCatalogCreate": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "reward_type": {
+            "type": "string",
+            "title": "Reward Type"
+          },
+          "amount": {
+            "type": "integer",
+            "title": "Amount"
+          },
+          "meta": {
+            "anyOf": [
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Meta"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "reward_type",
+          "amount"
+        ],
+        "title": "RewardCatalogCreate"
+      },
+      "RewardCatalogItem": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "reward_type": {
+            "type": "string",
+            "title": "Reward Type"
+          },
+          "amount": {
+            "type": "integer",
+            "title": "Amount"
+          },
+          "meta": {
+            "anyOf": [
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Meta"
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "active": {
+            "type": "boolean",
+            "title": "Active"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "reward_type",
+          "amount",
+          "id",
+          "active",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "RewardCatalogItem"
+      },
+      "RewardCatalogUpdate": {
+        "properties": {
+          "reward_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reward Type"
+          },
+          "amount": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount"
+          },
+          "meta": {
+            "anyOf": [
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Meta"
+          }
+        },
+        "type": "object",
+        "title": "RewardCatalogUpdate"
       },
       "RewardDistributionRequest": {
         "properties": {
@@ -14302,6 +15520,57 @@
         ],
         "title": "_RegisterResponse"
       },
+      "app__routers__admin_content__EventResponse": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "start_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start At"
+          },
+          "end_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "End At"
+          },
+          "reward_scheme": {
+            "type": "object",
+            "title": "Reward Scheme"
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "start_at",
+          "end_at",
+          "id",
+          "is_active",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "EventResponse"
+      },
       "app__schemas__auth__UserResponse": {
         "properties": {
           "id": {
@@ -14378,6 +15647,119 @@
         ],
         "title": "UserResponse",
         "description": "사용자 응답 스키마"
+      },
+      "app__schemas__event_schemas__EventResponse": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "event_type": {
+            "type": "string",
+            "title": "Event Type"
+          },
+          "start_date": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start Date"
+          },
+          "end_date": {
+            "type": "string",
+            "format": "date-time",
+            "title": "End Date"
+          },
+          "rewards": {
+            "type": "object",
+            "title": "Rewards"
+          },
+          "requirements": {
+            "anyOf": [
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requirements",
+            "default": {}
+          },
+          "image_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Url"
+          },
+          "priority": {
+            "type": "integer",
+            "title": "Priority",
+            "default": 0
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "participation_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Participation Count",
+            "default": 0
+          },
+          "user_participation": {
+            "anyOf": [
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Participation"
+          }
+        },
+        "type": "object",
+        "required": [
+          "title",
+          "event_type",
+          "start_date",
+          "end_date",
+          "rewards",
+          "id",
+          "is_active",
+          "created_at"
+        ],
+        "title": "EventResponse"
       },
       "app__schemas__user__UserResponse": {
         "properties": {

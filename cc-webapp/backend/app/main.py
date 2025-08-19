@@ -289,6 +289,8 @@ app.include_router(notification_center.router)
 app.include_router(email_router.router)
 app.include_router(streak.router)
 app.include_router(notification.router, tags=["Notification Center"])  # lightweight stub router
+from .routers import admin_content as admin_content_router
+app.include_router(admin_content_router.router)
 # Development-only endpoints (not included in OpenAPI schema)
 try:
     from app.routers.dev_logs import router as dev_logs_router
