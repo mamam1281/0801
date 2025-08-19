@@ -24,7 +24,8 @@ import { StreamingScreen } from '../components/StreamingScreen';
 import { useNotificationSystem } from '../components/NotificationSystem';
 import { useUserManager } from '../hooks/useUserManager';
 import { useAppNavigation } from '../hooks/useAppNavigation';
-import { useAuthHandlers } from '../hooks/useAuthHandlers';
+// NOTE: Deprecated useAuthHandlers (local simulation) removed – now using real backend auth via useAuth
+import { useAuth } from '../hooks/useAuth';
 import { 
   APP_CONFIG, 
   SCREENS_WITH_BOTTOM_NAV, 
@@ -61,17 +62,82 @@ export default function App() {
   // 📱 알림 시스템
   const { notifications, addNotification } = useNotificationSystem();
 
-  // 🔐 인증 핸들러들
-  const { handleLogin, handleSignup, handleAdminLogin, handleLogout } = useAuthHandlers({
-    setIsLoading,
-    isAdminAccount,
-    createUserData,
-    updateUser,
-    navigationHandlers,
-    addNotification,
-    logout,
-    closeSideMenu
-  });
+  // 🔐 실제 백엔드 인증 훅 (JWT 토큰 저장 & 프로필 fetch)
+  const auth = useAuth();
+
+  // ---------------------------------------------------------------------------
+  // Backend 연동 어댑터 함수들
+  // 기존 컴포넌트들은 nickname 기반 User (game-user) 객체를 기대하므로
+  // 서버 인증 성공 후 기존 createUserData 로 UI용 사용자 상태를 구성 (임시)
+  // 향후: 서버 프로필 스키마와 UI User 타입 통합 예정.
+  // ---------------------------------------------------------------------------
+
+  const handleLogin = React.useCallback(async (nickname: string, password: string): Promise<boolean> => {
+    setIsLoading(true);
+    try {
+      // backend login 은 site_id 를 요구 – 현재 UI 입력 nickname 을 site_id 로 간주
+      await auth.login(nickname, password); // 실패 시 throw
+      const userData = createUserData(nickname, password, false);
+      updateUser(userData);
+      navigationHandlers.toHome();
+      addNotification(NOTIFICATION_MESSAGES.LOGIN_SUCCESS(nickname, isAdminAccount(nickname, password)));
+      return true;
+    } catch (e) {
+      console.error('[App] 로그인 실패:', e);
+      return false;
+    } finally { setIsLoading(false); }
+  }, [auth, setIsLoading, createUserData, updateUser, navigationHandlers, addNotification, isAdminAccount]);
+
+  const handleSignup = React.useCallback(async (formData: any): Promise<boolean> => {
+    setIsLoading(true);
+    try {
+      // formData: { userId, nickname, phoneNumber, password, confirmPassword, inviteCode }
+      await auth.signup({
+        site_id: formData.userId,
+        nickname: formData.nickname,
+        phone_number: formData.phoneNumber,
+        password: formData.password,
+        invite_code: formData.inviteCode || ''
+      });
+      const userData = createUserData(formData.nickname, '', true, formData.inviteCode);
+      updateUser(userData);
+      navigationHandlers.toHome();
+      addNotification(NOTIFICATION_MESSAGES.SIGNUP_SUCCESS(userData.goldBalance));
+      return true;
+    } catch (e) {
+      console.error('[App] 회원가입 실패:', e);
+      return false;
+    } finally { setIsLoading(false); }
+  }, [auth, setIsLoading, createUserData, updateUser, navigationHandlers, addNotification]);
+
+  const handleAdminLogin = React.useCallback(async (adminId: string, password: string): Promise<boolean> => {
+    setIsLoading(true);
+    try {
+      await auth.login(adminId, password);
+      if (!isAdminAccount(adminId, password)) {
+        console.warn('[App] 관리자 계정이 아님 – 토큰 폐기');
+        try { auth.logout(); } catch { /* ignore */ }
+        logout();
+        return false; // UI 에 실패 처리
+      }
+      const adminUser = createUserData(adminId, password, false);
+      updateUser(adminUser);
+      addNotification(NOTIFICATION_MESSAGES.ADMIN_LOGIN_SUCCESS);
+      navigationHandlers.toAdminPanel();
+      return true;
+    } catch (e) {
+      console.error('[App] 관리자 로그인 실패:', e);
+      return false;
+    } finally { setIsLoading(false); }
+  }, [auth, setIsLoading, createUserData, updateUser, navigationHandlers, addNotification, isAdminAccount]);
+
+  const handleLogout = React.useCallback(() => {
+    try { auth.logout(); } catch { /* ignore */ }
+    logout(); // UI user state
+    closeSideMenu();
+    navigationHandlers.toLogin();
+    addNotification(NOTIFICATION_MESSAGES.LOGOUT_SUCCESS);
+  }, [auth, logout, closeSideMenu, navigationHandlers, addNotification]);
 
   // 🔄 앱 초기화 - 한 번만 실행되도록 개선
   useEffect(() => {

@@ -50,22 +50,25 @@ services:
       dockerfile: Dockerfile.dev
     container_name: cc_frontend
     environment:
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
-      NEXT_PUBLIC_API_URL_INTERNAL: ${NEXT_PUBLIC_API_URL_INTERNAL:-http://backend:8000}
-      NEXT_DISABLE_WEBPACK_CACHE: "1"
-      NEXT_TELEMETRY_DISABLED: "1"
+      # 브라우저에서 직접 호출되는 외부 API 베이스 URL
+      NEXT_PUBLIC_API_URL: "${NEXT_PUBLIC_API_URL:-http://localhost:8000}"
+      # SSR (Next 서버) 내부에서 backend 컨테이너로 접근 시 사용
+      NEXT_PUBLIC_API_URL_INTERNAL: "${NEXT_PUBLIC_API_URL_INTERNAL:-http://backend:8000}"
+      # 개발 편의 설정
+      NEXT_DISABLE_WEBPACK_CACHE: "1"        # persistent cache 비활성화 (메모리 사용량 감소)
+      NEXT_TELEMETRY_DISABLED: "1"          # Next.js telemetry 비활성화
     volumes:
       - ./cc-webapp/frontend:/app
       - ./logs/frontend:/app/logs:rw
       - /app/node_modules
     ports:
-      - "${FRONTEND_PORT:-40001}:3000"
+      - "${FRONTEND_PORT:-3000}:3000"
     depends_on:
       - backend
     restart: unless-stopped
     command: ["sh","-c","[ -d node_modules ] || npm install && npm run dev"]
     healthcheck:
-      test: ["CMD-SHELL","node -e \"require('http').get('http://localhost:3000',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))\""]
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:3000',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))\""]
       start_period: 45s
       interval: 20s
       timeout: 5s

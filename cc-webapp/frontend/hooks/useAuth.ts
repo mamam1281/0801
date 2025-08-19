@@ -21,18 +21,20 @@ interface SignupPayload {
 // Backend may also supply refresh_token (optional) – include for future refresh support
 interface Tokens { access_token: string; token_type: string; expires_in?: number | null; refresh_token?: string | null }
 
-interface SignupResponse { user: AuthUser; tokens: Tokens; initial_balance: number; invite_code_used: string }
+// Backend actually returns flat structure: { access_token, token_type, user, refresh_token }
+interface SignupResponse extends Tokens { user: AuthUser }
 
 // Canonical combined storage key used elsewhere (tokenStorage.js / useAuthToken.ts)
 const LEGACY_ACCESS_KEY = 'cc_access_token'; // retained for backward compat (will deprecate)
 const LEGACY_EXP_KEY = 'cc_access_exp';
 const BUNDLE_KEY = 'cc_auth_tokens';
 
+import { setTokens } from '../utils/tokenStorage';
 function writeBundle(access: string, refresh?: string | null, expSeconds?: number | null | undefined) {
     // Unified bundle structure consumed by existing tokenStorage.js & useAuthToken.ts
     const bundle: Record<string, any> = { access_token: access };
     if (refresh) bundle.refresh_token = refresh;
-    try { localStorage.setItem(BUNDLE_KEY, JSON.stringify(bundle)); } catch {}
+    setTokens(bundle); // tokenStorage.js와 완전 통일
     // Maintain legacy separate keys to avoid breaking older code paths still reading them
     try {
         localStorage.setItem(LEGACY_ACCESS_KEY, access);
@@ -82,7 +84,8 @@ export function useAuth() {
         setLoading(true);
         try {
             const res = await api.call('/api/auth/signup', { method: 'POST', body: data }) as SignupResponse;
-            applyTokens(res.tokens);
+            // Backend returns flat structure: { access_token, token_type, user, refresh_token }
+            applyTokens(res);
             setUser(res.user);
             return res.user;
         } finally {

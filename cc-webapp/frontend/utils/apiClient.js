@@ -1,5 +1,5 @@
 import { apiLogTry, apiLogSuccess, apiLogFail } from './apiLogger';
-import { getTokens, getAccessToken, setTokens, clearTokens } from './tokenStorage';
+import { getTokens, setTokens, clearTokens } from './tokenStorage';
 import * as InteractionTracker from './interactionTracker';
 import UIRecorder from './uiActionRecorder';
 
@@ -66,10 +66,19 @@ function joinUrl(base, endpoint){
  * 백엔드와의 통신을 처리하는 함수들
  */
 
+// 안전한 액세스 토큰 취득 (빌드/캐시 불일치/esm/cjs import 문제 방지)
+function safeGetAccessToken() {
+  try {
+    const tokens = getTokens();
+    return tokens?.access_token || null;
+  } catch {
+    return null;
+  }
+}
+
 // 인증 헤더 생성
 const getAuthHeaders = () => {
-  const accessToken = getAccessToken();
-  console.log('액세스 토큰 확인:', accessToken ? '토큰 있음' : '토큰 없음');
+  const accessToken = safeGetAccessToken();
   return accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {};
 };
 
@@ -85,7 +94,7 @@ const apiRequest = async (endpoint, options = {}) => {
     method,
     endpoint,
     requestData,
-    auth: !!getAccessToken(),
+    auth: !!safeGetAccessToken(),
   });
 
   const startTime = Date.now();
@@ -161,7 +170,7 @@ const apiRequest = async (endpoint, options = {}) => {
     if (!response.ok) {
       // 403 처리: 인증이 없는 상태에서 403이 응답되는 경우 토큰이 없는지 확인하고 명시적 에러를 던짐
     if (response.status === 403) {
-        if (!getAccessToken()) {
+      if (!safeGetAccessToken()) {
           apiLogFail(`${method} ${endpoint}`, 'Forbidden (no token)');
       // When no token, return null so callers can use defaults instead of spinning retries
       InteractionTracker.recordApiResult(traceId, { status: response.status, reason: 'forbidden_no_token' });

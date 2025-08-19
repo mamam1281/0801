@@ -52,6 +52,7 @@ export function HomeDashboard({
   onAddNotification,
   onToggleSideMenu,
 }: HomeDashboardProps) {
+  // 카운트다운 (기존 로직 유지 – 추후 이벤트 TTL 연동 가능)
   const [timeLeft, setTimeLeft] = useState({ hours: 23, minutes: 45, seconds: 12 });
   const [showLevelUpModal, setShowLevelUpModal] = useState(false);
   const [showDailyReward, setShowDailyReward] = useState(false);
@@ -65,6 +66,34 @@ export function HomeDashboard({
   });
   const [streakProtection, setStreakProtection] = useState(null as boolean | null);
   const [attendanceDays, setAttendanceDays] = useState(null as string[] | null);
+  // 매 렌더마다 Math.random() 호출 → 1초마다 interval 재렌더 시 수십개의 motion div 재마운트 → passive effect stack 증가
+  // 1회만 좌표를 생성하여 렌더 루프/마운트 폭증을 방지
+  const [backgroundPoints] = useState(() => {
+    if (typeof window === 'undefined')
+      return [] as { id: number; x: number; y: number; delay: number }[];
+    return Array.from({ length: 20 }).map((_, i) => ({
+      id: i,
+      x: Math.random() * window.innerWidth,
+      y: Math.random() * window.innerHeight,
+      delay: i * 0.3,
+    }));
+  });
+
+  // streak state 동등성 비교 후 변경시에만 set → 동일 데이터 반복 set으로 인한 불필요 재렌더 방지
+  interface StreakState {
+    count: number;
+    ttl_seconds: number | null;
+    next_reward: string | null;
+  }
+  const safeSetStreak = (next: StreakState) => {
+    setStreak((prev: StreakState) =>
+      prev.count === next.count &&
+      prev.ttl_seconds === next.ttl_seconds &&
+      prev.next_reward === next.next_reward
+        ? prev
+        : next
+    );
+  };
 
   // Fetch and tick daily login streak on mount (idempotent per backend TTL)
   useEffect(() => {
@@ -74,7 +103,7 @@ export function HomeDashboard({
         // Get status first
         const status = await streakApi.status('DAILY_LOGIN');
         if (mounted && status && typeof status === 'object') {
-          setStreak({
+          safeSetStreak({
             count: status.count ?? 0,
             ttl_seconds: status.ttl_seconds ?? null,
             next_reward: status.next_reward ?? null,
@@ -83,7 +112,7 @@ export function HomeDashboard({
         // Best-effort tick (backend guards with TTL)
         const after = await streakApi.tick('DAILY_LOGIN');
         if (mounted && after && typeof after === 'object') {
-          setStreak({
+          safeSetStreak({
             count: after.count ?? 0,
             ttl_seconds: after.ttl_seconds ?? null,
             next_reward: after.next_reward ?? null,
@@ -221,23 +250,15 @@ export function HomeDashboard({
     <div className="min-h-screen bg-gradient-to-br from-background via-black to-primary-soft relative overflow-hidden pb-20">
       {/* Animated Background */}
       <div className="absolute inset-0">
-        {[...Array(20)].map((_, i) => (
+        {backgroundPoints.map((p: { id: number; x: number; y: number; delay: number }) => (
           <motion.div
-            key={i}
-            initial={{
-              opacity: 0,
-              x: Math.random() * window.innerWidth,
-              y: Math.random() * window.innerHeight,
-            }}
-            animate={{
-              opacity: [0, 0.2, 0],
-              scale: [0, 1.2, 0],
-              rotate: 360,
-            }}
+            key={p.id}
+            initial={{ opacity: 0, x: p.x, y: p.y }}
+            animate={{ opacity: [0, 0.2, 0], scale: [0, 1.2, 0], rotate: 360 }}
             transition={{
               duration: 10,
               repeat: Infinity,
-              delay: i * 0.3,
+              delay: p.delay,
               ease: 'easeInOut',
               type: 'tween',
             }}
