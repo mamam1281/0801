@@ -29,27 +29,16 @@ class PaymentGateway:
     """매우 단순한 authorize/capture 기반 목 게이트웨이 (기존 코드 호환)."""
 
     def authorize(self, amount_cents: int, currency: str = "USD", *, card_token: str | None = None) -> PaymentResult:
-        # 테스트 안정성 확보: PAYMENT_GATEWAY_MODE 환경변수로 동작 제어
-        mode = os.getenv("PAYMENT_GATEWAY_MODE", "always_success").lower().strip()
-        if mode == "always_fail":
-            return PaymentResult(False, "failed", None, "Card declined (forced)")
-        if mode in ("random", "prob" ):
-            # 과거 랜덤 동작 유지 옵션(회귀 필요시)
-            if random.random() < 0.9:
-                return PaymentResult(True, "authorized", str(uuid4()), "Authorized")
-            return PaymentResult(False, "failed", None, "Card declined")
-        # 기본(always_success): 결정론적 성공 -> 테스트 플레이크 제거
-        return PaymentResult(True, "authorized", str(uuid4()), "Authorized")
+        # 데모용으로 90% 성공
+        if random.random() < 0.9:
+            return PaymentResult(True, "authorized", str(uuid4()), "Authorized")
+        return PaymentResult(False, "failed", None, "Card declined")
 
     def capture(self, charge_id: str) -> PaymentResult:
-        mode = os.getenv("PAYMENT_GATEWAY_MODE", "always_success").lower().strip()
-        if mode == "always_fail":
-            return PaymentResult(False, "failed", charge_id, "Capture failed (forced)")
-        if mode in ("random", "prob"):
-            if random.random() < 0.99:
-                return PaymentResult(True, "captured", charge_id, "Captured")
-            return PaymentResult(False, "failed", charge_id, "Capture failed")
-        return PaymentResult(True, "captured", charge_id, "Captured")
+        # authorize 된 건의 99% 캡처 성공
+        if random.random() < 0.99:
+            return PaymentResult(True, "captured", charge_id, "Captured")
+        return PaymentResult(False, "failed", charge_id, "Capture failed")
 
 
 # ===== 신규 테스트 호환 서비스 어댑터 =====

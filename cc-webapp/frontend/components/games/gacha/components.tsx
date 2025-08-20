@@ -13,16 +13,6 @@ import {
 import { SEXY_EMOJIS, RARITY_COLORS } from './constants';
 
 // 배너 선택 컴포넌트
-// Perf: introduce lightweight reduction of heavy, continuous animations (sparkles/emojis)
-// to address reported long load & browser sluggishness. We intentionally only dial back
-// 1-2 visually non-critical effects (sparkle density + global floating emojis) to minimize
-// design intrusion.
-const prefersReducedMotion = typeof window !== 'undefined' && typeof window.matchMedia === 'function'
-  ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  : false;
-// Gate for heavy ambient FX (sparkles + floating emojis). Can be extended or toggled via env later.
-const DISABLE_HEAVY_GACHA_FX = prefersReducedMotion; // auto-disable if user requests reduced motion
-
 export function SexyBannerSelector({
   banners,
   onSelectBanner,
@@ -37,8 +27,7 @@ export function SexyBannerSelector({
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
       {banners.map((banner, index) => {
-  // Reduce sparkle count or remove entirely when heavy FX disabled
-  const sparkles = DISABLE_HEAVY_GACHA_FX ? [] : generateSparkles().slice(0, 4);
+        const sparkles = generateSparkles();
         const isSelected = selectedBanner.id === banner.id;
 
         return (
@@ -320,15 +309,19 @@ export function SexyResultOverlay({
 
 // 이모지 반짝임 효과
 export function SexyEmojis() {
-  // Skip rendering the floating emoji cloud entirely if heavy FX disabled.
-  if (DISABLE_HEAVY_GACHA_FX) return null;
   const sexyEmojis = SEXY_EMOJIS;
+
   return (
     <div className="absolute inset-0 overflow-hidden pointer-events-none">
       {sexyEmojis.map((emoji, index) => (
         <motion.div
           key={`emoji_${index}`}
-          initial={{ opacity: 0, x: Math.random() * 100 + '%', y: Math.random() * 100 + '%', scale: 0.5 }}
+          initial={{
+            opacity: 0,
+            x: Math.random() * 100 + '%',
+            y: Math.random() * 100 + '%',
+            scale: 0.5,
+          }}
           animate={{
             opacity: [0, 1, 0],
             scale: [0.5, 1, 0.5],

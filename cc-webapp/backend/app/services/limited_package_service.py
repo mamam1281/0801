@@ -689,11 +689,3 @@ class LimitedPackageService:
             return
         code = promo_code.upper()
         cls._promo_used_count[code] = int(cls._promo_used_count.get(code, 0)) + 1
-
-    # 테스트/재배포 환경에서 동일 프로모 코드 재업서트 시 이전 사용량이 남아 첫 구매가 곧바로 소진 상태가 되는 문제 방지용
-    @classmethod
-    def reset_promo_usage(cls, promo_code: str) -> None:
-        try:
-            cls._promo_used_count[promo_code.upper()] = 0
-        except Exception:
-            pass
