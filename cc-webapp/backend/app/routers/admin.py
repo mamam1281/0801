@@ -27,11 +27,30 @@ from ..services import email_templates
 router = APIRouter(prefix="/api/admin", tags=["Admin"])
 
 class AdminStatsResponse(BaseModel):
-    """Admin statistics response"""
-    total_users: int
-    active_users: int
-    total_games_played: int
-    total_tokens_in_circulation: int
+        """Admin statistics response (확장)
+
+        필드 설명:
+            - total_users: 전체 가입 사용자 수
+            - active_users: is_active = true 사용자 수
+            - total_games_played: UserAction 총 레코드 수 (임시 지표)
+            - total_tokens_in_circulation: users.cyber_token_balance 총합
+            - online_users: 최근 5분 내 활동 세션 사용자 수
+            - total_revenue: 누적 성공 거래 금액 (amount 단위 그대로)
+            - today_revenue: 금일 00:00 이후 성공 거래 금액
+            - critical_alerts: 최근 10분 내 주요 경보성 action 카운트
+            - pending_actions: pending 상태 거래 수
+            - generated_at: 서버 생성 시각 ISO8601
+        """
+        total_users: int
+        active_users: int
+        total_games_played: int
+        total_tokens_in_circulation: int
+        online_users: int = 0
+        total_revenue: int = 0
+        today_revenue: int = 0
+        critical_alerts: int = 0
+        pending_actions: int = 0
+        generated_at: str | None = None
 
 class UserBanRequest(BaseModel):
     """User ban request"""
@@ -604,16 +623,40 @@ async def get_admin_stats(
     db = Depends(get_db),
     admin_service: AdminService = Depends(get_admin_service)
 ):
-    """Get admin statistics"""
+    """확장 관리자 통계 반환 (Redis 5s 캐시).
+
+    캐시 키: admin:stats:cache:v1
+    실패 시 안전하게 빈 기본값 반환.
+    """
+    cache_key = "admin:stats:cache:v1"
+    cached = None
+    rman = None
     try:
-        stats = admin_service.get_system_stats()
-        
-        return AdminStatsResponse(
-            total_users=getattr(stats, 'total_users', 0),
-            active_users=getattr(stats, 'active_users', 0),
-            total_games_played=getattr(stats, 'total_games_played', 0),
-            total_tokens_in_circulation=getattr(stats, 'total_tokens_in_circulation', 0)
-        )
+        from ..utils.redis import get_redis_manager
+        rman = get_redis_manager()
+        if getattr(rman, 'redis_client', None):
+            raw = rman.redis_client.get(cache_key)
+            if raw:
+                import json as _json
+                try:
+                    data = _json.loads(raw.decode())
+                    return AdminStatsResponse(**data)
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
+    try:
+        ext = admin_service.get_system_stats_extended()
+        resp = AdminStatsResponse(**ext)
+        # 캐시 저장
+        try:
+            if getattr(rman, 'redis_client', None):
+                import json as _json
+                rman.redis_client.setex(cache_key, 5, _json.dumps(ext))
+        except Exception:
+            pass
+        return resp
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

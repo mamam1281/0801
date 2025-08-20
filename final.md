@@ -143,6 +143,24 @@ frontend:
 - 저장 방식: `window.__telemetryBuffer` 누적 + 개발환경 console.debug
 - 향후: 배치 업로드 → 백엔드 ingestion → Prometheus/ClickHouse 연동 예정
 
+### 5. Admin Stats 확장 (online_users / revenue / alerts / pending)
+**변경 요약**
+- `/api/admin/stats` 응답 모델 필드 추가: `online_users`, `total_revenue`, `today_revenue`, `pending_actions`, `critical_alerts`, `generated_at`.
+- AdminService: `get_system_stats_extended` 신규(멀티 쿼리 집계) + Redis 캐시(`admin:stats:cache:v1`, TTL 5s) 도입.
+- 기존 기본 필드 구조 유지(역호환), Frontend 별도 수정 없이 신규 필드 자동 표시(주석 보강 위주).
+
+**검증 결과**
+- 통합 테스트 `test_admin_stats.py` 추가: 필드 존재/타입, today_revenue <= total_revenue, 캐시 HIT 시 generated_at 동일 확인.
+- 수동 재호출(5초 이내) 캐시 HIT → 5초 초과 시 재계산.
+- Alembic 변경 없음(head 단일 유지), 스키마(OpenAPI) 재수출 예정.
+
+**다음 단계**
+1. Batch User Import 엔드포인트 설계/구현(`/api/admin/users/import?dry_run=1`).
+2. SSE `/api/admin/stream` 구현(이벤트: stats|alert|transaction) + 폴백 폴링 전략 문서화.
+3. critical_alerts 분류 체계(심각도 레벨/룰 저장) 및 Admin UI 표시.
+4. today_revenue 로컬 타임존/캘린더 경계 옵션 파라미터 고려.
+5. pending_actions 세분화(오래된 stale pending 별도 지표).
+
 ## 🔭 다음 예정 작업 (우선순위)
 1. 비로그인 Public Preview Events API 설계 및 문서화
 2. Fraud Service import 경로 정리

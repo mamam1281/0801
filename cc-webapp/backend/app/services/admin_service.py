@@ -75,6 +75,79 @@ class AdminService:
             total_tokens_in_circulation=total_tokens_sum,
         )
 
+    # --- 확장 통계 (캐싱은 라우터에서 처리) ---
+    def get_system_stats_extended(self) -> dict:
+        """확장된 관리자 통계 집계.
+
+        반환 필드:
+          - total_users
+          - active_users
+          - total_games_played
+          - total_tokens_in_circulation
+          - online_users: 최근 5분 내 active 세션 사용자 수
+          - total_revenue: 모든 success 거래 amount 합계
+          - today_revenue: 금일 00:00 이후 success 거래 amount 합계
+          - pending_actions: pending 상태 거래 수
+          - critical_alerts: 최근 10분 내 지정 action 발생 수
+        """
+        from datetime import datetime, timedelta
+        now = datetime.utcnow()
+        five_min_ago = now - timedelta(minutes=5)
+        ten_min_ago = now - timedelta(minutes=10)
+        today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+
+        # 기본 통계 재사용
+        basic = self.get_system_stats()
+
+        # 온라인 사용자 (최근 5분 세션)
+        try:
+            online_users = self.db.query(models.UserSession.user_id) \
+                .filter(models.UserSession.last_used_at > five_min_ago, models.UserSession.is_active == True) \
+                .distinct().count()
+        except Exception:
+            online_users = 0
+
+        # 매출 합계 (ShopTransaction)
+        from sqlalchemy import func
+        try:
+            total_revenue = self.db.query(func.coalesce(func.sum(models.ShopTransaction.amount), 0)) \
+                .filter(models.ShopTransaction.status == 'success').scalar() or 0
+        except Exception:
+            total_revenue = 0
+        try:
+            today_revenue = self.db.query(func.coalesce(func.sum(models.ShopTransaction.amount), 0)) \
+                .filter(models.ShopTransaction.status == 'success', models.ShopTransaction.created_at >= today_start).scalar() or 0
+        except Exception:
+            today_revenue = 0
+
+        # Pending actions (pending 거래)
+        try:
+            pending_actions = self.db.query(models.ShopTransaction.id) \
+                .filter(models.ShopTransaction.status == 'pending').count()
+        except Exception:
+            pending_actions = 0
+
+        # Critical alerts (최근 10분 지정 action)
+        CRITICAL_ACTIONS = ['LIMITED_STOCK_ZERO', 'FRAUD_BLOCK', 'PAYMENT_FAIL_SPIKE']
+        try:
+            critical_alerts = self.db.query(models.AdminAuditLog.id) \
+                .filter(models.AdminAuditLog.created_at > ten_min_ago, models.AdminAuditLog.action.in_(CRITICAL_ACTIONS)).count()
+        except Exception:
+            critical_alerts = 0
+
+        return {
+            'total_users': basic.total_users,
+            'active_users': basic.active_users,
+            'total_games_played': basic.total_games_played,
+            'total_tokens_in_circulation': basic.total_tokens_in_circulation,
+            'online_users': online_users,
+            'total_revenue': int(total_revenue),
+            'today_revenue': int(today_revenue),
+            'pending_actions': pending_actions,
+            'critical_alerts': critical_alerts,
+            'generated_at': now.isoformat() + 'Z'
+        }
+
     class _BanResult:
         def __init__(self, banned_until=None) -> None:
             self.banned_until = banned_until

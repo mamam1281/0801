@@ -39,8 +39,8 @@ export default function AdminPage() {
       }
       setMe(profile);
       try {
-  // 실제 백엔드 엔드포인트 경로: /api/admin/stats
-  const stats = await apiGet<any>('/api/admin/stats');
+        // 백엔드 확장 통계 (/api/admin/stats) : 모든 필드 서버 계산/캐시 5s
+        const stats = await apiGet<any>('/api/admin/stats');
         setCoreStats({
           total_users: stats.total_users ?? stats.totalUsers ?? 0,
           active_users: stats.active_users ?? stats.activeUsers ?? 0,
