@@ -398,6 +398,51 @@ docker-compose restart backend
 - 추후 권장: 경험치 증가 트랜잭션 표준화 및 `UserService` 내 level-up 공식 단일화, OpenAPI 재생성 후 프론트 타입 sync
 
 ### 2025-08-20 게임 안정화 & 출석 UI 전환
+### 2025-08-20 (추가) 이벤트 시스템 통합 & Admin 관리 UI 1차 구현
+**변경 요약**
+- 프론트 `EventMissionPanel` 이 기존 개별 fetch → 중앙 `useEvents` 훅으로 통합 (중복 제거, 캐시 활용).
+- 이벤트 참여(join), 진행(progress), 보상 수령(claim) 모두 훅 액션 사용. 진행 증가 임시 버튼(모델 지수 포인트 수동 +Δ) 추가.
+- 백엔드 Admin 전용 라우터(`/api/admin/events`) 활용 위한 프론트 관리 페이지 `/admin/events` 신규:
+   - 목록 조회 / 생성 / 비활성화 / 참여자 조회 / 강제 보상(force-claim) / 모델 지수 seed 버튼.
+   - JSON 요구치/보상 편집 폼(검증은 추후 개선 예정). 
+- Admin 이벤트 API 유틸(`frontend/utils/adminEventsApi.ts`) 추가로 클라이언트 코드 단순화.
+
+**주요 파일**
+- `frontend/components/EventMissionPanel.tsx`: useEvents 연동, 모델 지수 progress 증가 핸들러.
+- `frontend/hooks/useEvents.ts`: 이벤트 캐시/조작 훅 (join/claim/updateProgress/refresh).
+- `frontend/utils/adminEventsApi.ts`: Admin 이벤트 CRUD/보조 액션 클라이언트.
+- `frontend/app/admin/events/page.tsx`: Admin UI 페이지(1차 프로토타입).
+
+**스모크 테스트 시나리오 (수동)**
+1. (관리자) `/admin/events` 접속 → "모델지수 Seed" 실행 → 목록에 모델 지수 이벤트(id 기록) 존재 확인.
+2. (일반 사용자) 메인 패널 로드 → 해당 이벤트 표시, 참여 전 상태(join 버튼 표시) 확인.
+3. 참여(join) 클릭 → 참여자 수 증가(또는 새 refetch 후 반영) & 상태 joined.
+4. 모델 지수 +10 두세 번 실행 → progress 누적 확인(임시 로직: 현재 progress + delta → PUT).
+5. 요구치 도달 후 claim 버튼 → 보상 수령 → claimed=true 반영.
+6. 관리자 페이지에서 해당 이벤트 비활성화 → 사용자 측 상태 refresh 후 inactive UI 처리 (또는 사라짐).
+7. 관리자 force-claim (다른 user id) 수행 → 참여자 목록에서 claimed=true 확인.
+
+**검증 결과 (현재)**
+- 빌드 성공(Next.js 15.3.3) 및 타입/린트 치명적 오류 없음(ESLint next/core-web-vitals config 미존재 경고는 별도 환경 이슈).
+- useEvents 훅 캐시 정상 작동(비로그인 시 조용히 skip).
+- Admin 페이지 주요 액션 로컬 테스트 필요(네트워크 200 OK 기대) → 후속 자동화 테스트 미구현.
+
+**추후 작업**
+1. 이벤트 진행(progress) API 다중 지표 확장 대비: updateProgress 인터페이스 progress:number → object payload 전환 리팩토링.
+2. Admin 이벤트 폼 유효성 검증 / JSON Schema 적용 & 에러 메시지 개선.
+3. Cypress/Playwright E2E: seed→join→progress→claim→deactivate 자동화.
+4. 퍼블릭 프리뷰 이벤트 API (`/api/public/events`) 통합 후 비로그인 노출 전략.
+5. 모델 지수 자동 증가(실제 모델/게임 연계) 로직 연결 및 수동 버튼 제거.
+
+**위험/주의**
+- useEvents updateProgress 현재 단일 progress 숫자 덮어쓰기 → 병렬 증가 경합 시 손실 가능 (낙관적 업데이트 vs 서버 원자 증가 엔드포인트 필요).
+- Admin 강제 보상(force-claim) 다중 호출 시 중복 처리 재검증 필요(서버 멱등성 가드 확인).
+- any/assertion 증가로 타입 안전성 저하 → ESLint/TS 설정 정상화 후 재도입 필요.
+
+**다음 단계 권장 품질 가드**
+- 이벤트/참여/보상 테스트(pytest) 추가: join 멱등, progress 경계(요구치 초과), claim 중복, force-claim 후 상태.
+- OpenAPI 재수출 (`python -m app.export_openapi`) 및 `api docs/20250808.md` 변경 요약 반영.
+
 - 크래시 베팅 원자성 개선: `backend/app/routers/games.py` 크래시 베팅 처리 구간을 단일 DB 트랜잭션 + 행 잠금(row-level lock) 적용하여 중복 결과/골드 미반영 위험 감소. 응답 스키마(`CrashBetResponse`)에 `status`, `simulated_max_win` 필드 추가하여 클라이언트 측 후행 UI/리스크 계산 근거 제공.
 - 출석(Attendance) 월간 달력 → 주간 전환: `HomeDashboard.tsx` 기존 월 단위 격자 생성 로직 제거, 현재 주(일~토) 7일만 표시. 오늘 강조 및 이번 주 출석 카운트 단순화로 가시성 향상. 문구: "이번 주 출석".
 - 슬롯 당첨금 역표시 이슈 조사: 슬롯 컴포넌트 내 금액 표기(`+{winAmount.toLocaleString()}G`) 방향 전환/역정렬/transform 없음 확인. 현 단계 재현 불가 → 추가 스크린샷/DOM 캡처 필요.

@@ -6,9 +6,9 @@ interface RpsPlayResponse { result: 'win' | 'lose' | 'draw'; player_hand: RpsHan
 
 export function useRpsPlay(authToken: string | null) {
   const { call } = useApiClient('/api/games/rps');
-  const [last, setLast] = useState<RpsPlayResponse | null>(null);
+  const [last, setLast] = useState(null as RpsPlayResponse | null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState(null as string | null);
 
   const play = useCallback(async (hand: RpsHand) => {
     setLoading(true); setError(null);

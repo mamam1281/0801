@@ -9,9 +9,9 @@ interface GameSession {
 
 export function useGameSession(authToken: string | null) {
   const { call } = useApiClient('/api/games');
-  const [session, setSession] = useState<GameSession | null>(null);
+  const [session, setSession] = useState(null as GameSession | null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState(null as string | null);
 
   const start = useCallback(async () => {
     setLoading(true); setError(null);

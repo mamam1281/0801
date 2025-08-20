@@ -114,20 +114,39 @@ export function HomeDashboard({
     );
   };
 
+  // 활성 이벤트 중 가장 높은 priority(또는 start_date 최신) 1개 선택 → 핫 이벤트 카드로 사용
+  const hotEvent = (() => {
+    if (!activeEvents || activeEvents.length === 0) return null;
+    // priority desc, start_date desc 정렬 시도
+    const sorted = [...(activeEvents as any[])].sort((a, b) => {
+      const pa = a.priority ?? 0; const pb = b.priority ?? 0;
+      if (pb !== pa) return pb - pa;
+      const sa = new Date(a.start_date || a.start || 0).getTime();
+      const sb = new Date(b.start_date || b.start || 0).getTime();
+      return sb - sa;
+    });
+    return sorted[0];
+  })();
+
   useEffect(() => {
-    if (!activeEvents || activeEvents.length === 0) return;
-    const doubleGoldEvent = (activeEvents as any[]).find((e) => e.title === '더블 골드 이벤트!');
-    if (!doubleGoldEvent) return;
-    const endTime = new Date(doubleGoldEvent.end_date);
-    const now = new Date();
-    const diff = endTime.getTime() - now.getTime();
-    if (diff > 0) {
-      const hours = Math.floor(diff / (1000 * 60 * 60));
-      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-      setTimeLeft({ hours, minutes, seconds });
-    }
-  }, [activeEvents]);
+    if (!hotEvent?.end_date) return;
+    const endTime = new Date(hotEvent.end_date);
+    const tick = () => {
+      const now = new Date();
+      const diff = endTime.getTime() - now.getTime();
+      if (diff > 0) {
+        const hours = Math.floor(diff / (1000 * 60 * 60));
+        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+        setTimeLeft({ hours, minutes, seconds });
+      } else {
+        setTimeLeft({ hours: 0, minutes: 0, seconds: 0 });
+      }
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [hotEvent?.end_date]);
 
   // Fetch & tick with client once-per-day guard (auth gate 의존)
   useEffect(() => {
@@ -900,80 +919,41 @@ export function HomeDashboard({
                 <Gift className="w-5 h-5 text-error" />핫 이벤트
               </h2>
               <div className="space-y-3">
-                <motion.div
-                  whileHover={{
-                    scale: 1.05,
-                    y: -5,
-                    boxShadow: '0 10px 25px rgba(230, 51, 107, 0.3)',
-                  }}
-                  whileTap={{ scale: 0.98 }}
-                  transition={{ duration: 0.2, ease: 'easeOut' }}
-                  className="glass-effect rounded-xl p-4 border-2 border-error/30 soft-glow cursor-pointer card-hover-float relative overflow-hidden group"
-                >
-                  {/* 호버시 배경 빛 효과 */}
+                {hotEvent ? (
                   <motion.div
-                    initial={{ opacity: 0 }}
-                    whileHover={{ opacity: 1 }}
-                    className="absolute inset-0 bg-gradient-to-r from-error/10 to-warning/10 rounded-xl"
-                  />
-
-                  {/* 호버시 펄스 효과 */}
-                  <motion.div
-                    animate={{
-                      scale: [1, 1.02, 1],
-                      opacity: [0.3, 0.6, 0.3],
-                    }}
-                    transition={{
-                      duration: 2,
-                      repeat: Infinity,
-                      ease: 'easeInOut',
-                    }}
-                    className="absolute inset-0 bg-error/20 rounded-xl group-hover:bg-error/30"
-                  />
-
-                  <div className="relative z-10">
-                    <div className="flex items-center gap-3">
-                      <motion.div
-                        whileHover={{
-                          rotate: [0, -10, 10, -10, 0],
-                          scale: 1.1,
-                        }}
-                        transition={{ duration: 0.5, type: 'tween' }}
-                        className="w-12 h-12 bg-gradient-to-r from-error to-warning rounded-lg flex items-center justify-center"
-                      >
-                        <Gift className="w-6 h-6 text-white" />
-                      </motion.div>
-                      <div className="flex-1">
-                        <motion.div whileHover={{ x: 5 }} className="font-bold text-error">
-                          더블 골드 이벤트!
+                    whileHover={{ scale: 1.05, y: -5, boxShadow: '0 10px 25px rgba(230, 51, 107, 0.3)' }}
+                    whileTap={{ scale: 0.98 }}
+                    transition={{ duration: 0.2, ease: 'easeOut' }}
+                    className="glass-effect rounded-xl p-4 border-2 border-error/30 soft-glow cursor-pointer card-hover-float relative overflow-hidden group"
+                  >
+                    <motion.div initial={{ opacity: 0 }} whileHover={{ opacity: 1 }} className="absolute inset-0 bg-gradient-to-r from-error/10 to-warning/10 rounded-xl" />
+                    <motion.div animate={{ scale: [1,1.02,1], opacity: [0.3,0.6,0.3] }} transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }} className="absolute inset-0 bg-error/20 rounded-xl group-hover:bg-error/30" />
+                    <div className="relative z-10">
+                      <div className="flex items-center gap-3">
+                        <motion.div whileHover={{ rotate: [0,-10,10,-10,0], scale: 1.1 }} transition={{ duration: 0.5, type: 'tween' }} className="w-12 h-12 bg-gradient-to-r from-error to-warning rounded-lg flex items-center justify-center">
+                          <Gift className="w-6 h-6 text-white" />
                         </motion.div>
-                        <div className="text-sm text-muted-foreground">
-                          모든 게임에서 골드 2배 획득
+                        <div className="flex-1">
+                          <motion.div whileHover={{ x: 5 }} className="font-bold text-error">
+                            {hotEvent.title}
+                          </motion.div>
+                          <div className="text-sm text-muted-foreground line-clamp-2">
+                            {hotEvent.description || '이벤트 진행중'}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                    <motion.div
-                      whileHover={{ scale: 1.02 }}
-                      className="mt-3 bg-error-soft rounded-lg p-2 text-center"
-                    >
-                      <motion.div
-                        animate={{
-                          color: ['#e6336b', '#ff4d9a', '#e6336b'],
-                        }}
-                        transition={{
-                          duration: 1.5,
-                          repeat: Infinity,
-                          type: 'tween',
-                        }}
-                        className="text-error text-sm font-medium"
-                      >
-                        {String(timeLeft.hours).padStart(2, '0')}:
-                        {String(timeLeft.minutes).padStart(2, '0')}:
-                        {String(timeLeft.seconds).padStart(2, '0')} 남음
+                      <motion.div whileHover={{ scale: 1.02 }} className="mt-3 bg-error-soft rounded-lg p-2 text-center">
+                        <motion.div animate={{ color: ['#e6336b','#ff4d9a','#e6336b'] }} transition={{ duration: 1.5, repeat: Infinity, type: 'tween' }} className="text-error text-sm font-medium">
+                          {String(timeLeft.hours).padStart(2,'0')}:{String(timeLeft.minutes).padStart(2,'0')}:{String(timeLeft.seconds).padStart(2,'0')} 남음
+                        </motion.div>
                       </motion.div>
-                    </motion.div>
+                    </div>
+                  </motion.div>
+                ) : (
+                  <div className="glass-effect rounded-xl p-4 text-sm text-muted-foreground border border-dashed border-border-secondary">
+                    현재 진행중인 이벤트가 없습니다.
                   </div>
-                </motion.div>
+                )}
 
                 <motion.div
                   whileHover={{

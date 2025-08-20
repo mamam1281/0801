@@ -41,15 +41,24 @@ const notify = () => { cache.listeners.forEach(l => { try { l(); } catch {} }); 
 async function loadEvents() {
   if (cache.loading) return;
   // 토큰 없으면 비로그인 상태이므로 호출 스킵 (403 Forbidden (no token) 콘솔 노이즈 방지)
+  let hasToken = false;
   try {
     const tokens = getTokens();
-    if (!tokens?.access_token) {
-      return; // 조용히 중단
-    }
+    hasToken = !!tokens?.access_token;
   } catch { /* ignore */ }
   cache.loading = true; cache.error = null; notify();
   try {
-    const data = await apiRequest('/api/events/');
+    let data: any = null;
+    if (hasToken) {
+      data = await apiRequest('/api/events/');
+    } else {
+      // 비로그인 사용자를 위해 최소 공개 리스트 시도 (서버 인증 의존 → 실패시 무시)
+      try {
+        data = await apiRequest('/api/events/'); // 401/403 발생시 catch에서 무시
+      } catch (e) {
+        data = [];
+      }
+    }
     if (Array.isArray(data)) {
       cache.items = data as EventItem[];
       cache.lastLoadedAt = Date.now();

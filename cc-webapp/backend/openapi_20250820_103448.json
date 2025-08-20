@@ -5566,7 +5566,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/app__routers__admin_content__EventCreate"
+                "$ref": "#/components/schemas/EventCreate"
               }
             }
           },
@@ -5675,7 +5675,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/app__routers__admin_content__EventUpdate"
+                "$ref": "#/components/schemas/EventUpdate"
               }
             }
           }
@@ -6385,371 +6385,6 @@
             }
           }
         }
-      }
-    },
-    "/api/admin/events/": {
-      "post": {
-        "tags": [
-          "Admin Events"
-        ],
-        "summary": "Create Event",
-        "operationId": "create_event_api_admin_events__post",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/app__schemas__event_schemas__EventCreate"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/app__schemas__event_schemas__EventResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      },
-      "get": {
-        "tags": [
-          "Admin Events"
-        ],
-        "summary": "List Events",
-        "operationId": "list_events_api_admin_events__get",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "include_inactive",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "boolean",
-              "default": false,
-              "title": "Include Inactive"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/app__schemas__event_schemas__EventResponse"
-                  },
-                  "title": "Response List Events Api Admin Events  Get"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/admin/events/{event_id}": {
-      "put": {
-        "tags": [
-          "Admin Events"
-        ],
-        "summary": "Update Event",
-        "operationId": "update_event_api_admin_events__event_id__put",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "event_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Event Id"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/app__schemas__event_schemas__EventUpdate"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/app__schemas__event_schemas__EventResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/admin/events/{event_id}/deactivate": {
-      "post": {
-        "tags": [
-          "Admin Events"
-        ],
-        "summary": "Deactivate Event",
-        "operationId": "deactivate_event_api_admin_events__event_id__deactivate_post",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "event_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Event Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/app__schemas__event_schemas__EventResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/admin/events/{event_id}/participations": {
-      "get": {
-        "tags": [
-          "Admin Events"
-        ],
-        "summary": "List Participations",
-        "operationId": "list_participations_api_admin_events__event_id__participations_get",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "event_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Event Id"
-            }
-          },
-          {
-            "name": "completed",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "boolean"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Completed"
-            }
-          },
-          {
-            "name": "claimed",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "boolean"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Claimed"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EventParticipationResponse"
-                  },
-                  "title": "Response List Participations Api Admin Events  Event Id  Participations Get"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/admin/events/{event_id}/force-claim/{user_id}": {
-      "post": {
-        "tags": [
-          "Admin Events"
-        ],
-        "summary": "Force Claim",
-        "operationId": "force_claim_api_admin_events__event_id__force_claim__user_id__post",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "event_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Event Id"
-            }
-          },
-          {
-            "name": "user_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "User Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ClaimRewardResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/admin/events/seed/model-index": {
-      "post": {
-        "tags": [
-          "Admin Events"
-        ],
-        "summary": "Seed Model Index Event",
-        "operationId": "seed_model_index_event_api_admin_events_seed_model_index_post",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/app__schemas__event_schemas__EventResponse"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
       }
     },
     "/api/doc-titles/docs/titles": {
@@ -11024,6 +10659,35 @@
         ],
         "title": "EmotionFeedbackRequest"
       },
+      "EventCreate": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "start_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start At"
+          },
+          "end_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "End At"
+          },
+          "reward_scheme": {
+            "type": "object",
+            "title": "Reward Scheme"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "start_at",
+          "end_at"
+        ],
+        "title": "EventCreate"
+      },
       "EventJoin": {
         "properties": {
           "event_id": {
@@ -11122,6 +10786,72 @@
           "progress"
         ],
         "title": "EventProgressUpdate"
+      },
+      "EventUpdate": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "start_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start At"
+          },
+          "end_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End At"
+          },
+          "reward_scheme": {
+            "anyOf": [
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reward Scheme"
+          },
+          "missions": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Missions"
+          }
+        },
+        "type": "object",
+        "title": "EventUpdate"
       },
       "FeedbackResponse": {
         "properties": {
@@ -16327,35 +16057,6 @@
         ],
         "title": "_RegisterResponse"
       },
-      "app__routers__admin_content__EventCreate": {
-        "properties": {
-          "name": {
-            "type": "string",
-            "title": "Name"
-          },
-          "start_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Start At"
-          },
-          "end_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "End At"
-          },
-          "reward_scheme": {
-            "type": "object",
-            "title": "Reward Scheme"
-          }
-        },
-        "type": "object",
-        "required": [
-          "name",
-          "start_at",
-          "end_at"
-        ],
-        "title": "EventCreate"
-      },
       "app__routers__admin_content__EventResponse": {
         "properties": {
           "name": {
@@ -16406,72 +16107,6 @@
           "updated_at"
         ],
         "title": "EventResponse"
-      },
-      "app__routers__admin_content__EventUpdate": {
-        "properties": {
-          "name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Name"
-          },
-          "start_at": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Start At"
-          },
-          "end_at": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "End At"
-          },
-          "reward_scheme": {
-            "anyOf": [
-              {
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Reward Scheme"
-          },
-          "missions": {
-            "anyOf": [
-              {
-                "items": {
-                  "type": "integer"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Missions"
-          }
-        },
-        "type": "object",
-        "title": "EventUpdate"
       },
       "app__schemas__auth__UserResponse": {
         "properties": {
@@ -16554,80 +16189,6 @@
         ],
         "title": "UserResponse",
         "description": "사용자 응답 스키마"
-      },
-      "app__schemas__event_schemas__EventCreate": {
-        "properties": {
-          "title": {
-            "type": "string",
-            "title": "Title"
-          },
-          "description": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Description"
-          },
-          "event_type": {
-            "type": "string",
-            "title": "Event Type"
-          },
-          "start_date": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Start Date"
-          },
-          "end_date": {
-            "type": "string",
-            "format": "date-time",
-            "title": "End Date"
-          },
-          "rewards": {
-            "type": "object",
-            "title": "Rewards"
-          },
-          "requirements": {
-            "anyOf": [
-              {
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Requirements",
-            "default": {}
-          },
-          "image_url": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Image Url"
-          },
-          "priority": {
-            "type": "integer",
-            "title": "Priority",
-            "default": 0
-          }
-        },
-        "type": "object",
-        "required": [
-          "title",
-          "event_type",
-          "start_date",
-          "end_date",
-          "rewards"
-        ],
-        "title": "EventCreate"
       },
       "app__schemas__event_schemas__EventResponse": {
         "properties": {
@@ -16741,68 +16302,6 @@
           "created_at"
         ],
         "title": "EventResponse"
-      },
-      "app__schemas__event_schemas__EventUpdate": {
-        "properties": {
-          "title": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Title"
-          },
-          "description": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Description"
-          },
-          "end_date": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "End Date"
-          },
-          "rewards": {
-            "anyOf": [
-              {
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Rewards"
-          },
-          "is_active": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Is Active"
-          }
-        },
-        "type": "object",
-        "title": "EventUpdate"
       },
       "app__schemas__user__UserResponse": {
         "properties": {

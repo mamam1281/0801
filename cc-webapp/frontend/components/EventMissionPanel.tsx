@@ -31,6 +31,7 @@ import {
 import { User, Event, Mission } from '../types';
 import { EventBackend, MissionBackend, UserMissionBackend } from '../types/eventMission';
 import { eventMissionApi } from '../utils/eventMissionApi';
+import { useEvents } from '../hooks/useEvents';
 import useAuthGate from '../hooks/useAuthGate';
 import useTelemetry from '../hooks/useTelemetry';
 import { Button } from './ui/button';
@@ -64,9 +65,46 @@ export function EventMissionPanel({
   const [searchQuery, setSearchQuery] = useState('');
 
   // 실제 데이터 로드 전까지는 빈 배열 + 로딩/인증 플래그 사용 (하드코딩 Mock 제거)
-  const [events, setEvents] = useState([] as Event[]);
+  const [events, setEvents] = useState([] as Event[]); // 화면 표현용 포맷
   const [missions, setMissions] = useState([] as Mission[]);
   const [loading, setLoading] = useState(true);
+  // useEvents 훅 (이벤트 목록/참여/보상)
+  const {
+    events: rawEvents,
+    loading: eventsLoading,
+    error: eventsError,
+    join: joinEvent,
+    claim: claimEvent,
+    updateProgress: updateEventProgress,
+    refresh: refreshEvents,
+  } = useEvents();
+
+  // rawEvents 변경 시 포맷 → 기존 UI 구조에 맞게 매핑
+  useEffect(() => {
+    const formattedEvents = (rawEvents || []).map((event: any) => ({
+      id: String(event.id),
+      title: event.title,
+      description: event.description || '',
+      type: event.event_type,
+      status: event.is_active ? 'active' : 'inactive',
+      startDate: new Date(event.start_date),
+      endDate: new Date(event.end_date),
+      rewards: Object.entries(event.rewards || {}).map(([type, amount]) => ({
+        type,
+        amount: Number(amount),
+      })),
+      participants: event.participation_count ?? 0,
+      maxParticipants: 10000,
+      requirements: Object.keys(event.requirements || {}),
+      icon: '🎮',
+      progress: event.user_participation?.progress || {},
+      completed: event.user_participation?.completed || false,
+      claimed: event.user_participation?.claimed || false,
+      joined: event.user_participation?.joined || false,
+    }));
+    setEvents(formattedEvents);
+  }, [rawEvents]);
+
   const [authRequired, setAuthRequired] = useState(false);
   const [loadError, setLoadError] = useState(null as string | null);
 
@@ -84,39 +122,8 @@ export function EventMissionPanel({
     setLoadError(null);
     setAuthRequired(false);
     try {
-      // 이벤트 데이터
-      const eventsData = await eventMissionApi.events.getAll();
-      if (eventsData === null) {
-        // null == 403(no token) or 404 handled by apiClient
-        if (!checkAuthStatus()) {
-          setAuthRequired(true);
-        }
-        t('fetch_events_null');
-      } else if (Array.isArray(eventsData)) {
-        const formattedEvents = eventsData.map((event: EventBackend) => ({
-          id: String(event.id),
-          title: event.title,
-          description: event.description || '',
-          type: event.event_type,
-          status: event.is_active ? 'active' : 'inactive',
-          startDate: new Date(event.start_date),
-          endDate: new Date(event.end_date),
-          rewards: Object.entries(event.rewards || {}).map(([type, amount]) => ({
-            type,
-            amount: Number(amount),
-          })),
-          participants: event.participation_count ?? 0,
-          maxParticipants: 10000, // placeholder
-          requirements: Object.keys(event.requirements || {}),
-          icon: '🎮', // placeholder
-          progress: event.user_participation?.progress || {},
-          completed: event.user_participation?.completed || false,
-          claimed: event.user_participation?.claimed || false,
-          joined: event.user_participation?.joined || false,
-        }));
-        setEvents(formattedEvents);
-        t('fetch_events_success', { count: formattedEvents.length });
-      }
+      // 이벤트는 useEvents 훅이 자동 로드 (refreshEvents 필요 시 재호출)
+      await refreshEvents();
 
       // 미션 데이터
       const missionsData = await eventMissionApi.missions.getAll();
@@ -289,20 +296,12 @@ export function EventMissionPanel({
       return;
     }
     try {
-      // API를 통한 이벤트 참여
-      await eventMissionApi.events.join(parseInt(eventId));
-
-      // 로컬 상태 업데이트
-      setEvents((prev: Event[]) =>
-        prev.map((e: Event) =>
-          e.id === eventId ? { ...e, participants: (e.participants || 0) + 1, joined: true } : e
-        )
-      );
+      await joinEvent(parseInt(eventId));
 
       onAddNotification(`🎉 이벤트에 참여했습니다! 조건을 달성하여 보상을 받으세요.`);
 
       // 최신 데이터로 업데이트
-      fetchData();
+      refreshEvents();
       t('event_join_success', { eventId });
     } catch (error) {
       console.error('이벤트 참여 중 오류:', error);
@@ -320,7 +319,7 @@ export function EventMissionPanel({
       return;
     }
     try {
-      const response = await eventMissionApi.events.claimRewards(parseInt(eventId));
+      const response = await claimEvent(parseInt(eventId));
 
       if (response && response.success) {
         // 보상 내역 표시
@@ -341,13 +340,33 @@ export function EventMissionPanel({
         });
 
         // 데이터 다시 로드
-        fetchData();
+        refreshEvents();
         t('event_claim_success', { eventId });
       }
     } catch (error) {
       console.error('이벤트 보상 수령 중 오류:', error);
       onAddNotification('이벤트 보상을 받는 중 문제가 발생했습니다.');
       t('event_claim_error', { eventId });
+    }
+  };
+
+  // 모델 지수 이벤트 진행도 수동 증가 (임시 UI)
+  const handleIncrementModelIndex = async (eventId: string, delta: number) => {
+    try {
+      // 기존 훅은 단일 progress 숫자만 전달 -> 누적 대신 덮어쓰므로 우선 증가 방식: 현재 progress 읽어와 + delta
+      const target = events.find((e: any) => e.id === eventId);
+      const current =
+        typeof target?.progress?.model_index_points === 'number'
+          ? target.progress.model_index_points
+          : 0;
+      await updateEventProgress(parseInt(eventId), current + delta);
+      await refreshEvents();
+      onAddNotification(`모델 지수 +${delta}`);
+      t('event_progress_update', { eventId, delta });
+    } catch (e) {
+      console.error('모델 지수 증가 실패', e);
+      onAddNotification('모델 지수 증가 실패');
+      t('event_progress_error', { eventId });
     }
   };
 

@@ -335,6 +335,14 @@ app.include_router(vip.router)  # Include VIP router
 app.include_router(notification.router, tags=["Notification Center"])  # lightweight stub router
 from .routers import admin_content as admin_content_router
 app.include_router(admin_content_router.router)
+
+# Admin Events (이전에 누락되어 OpenAPI 및 기능에서 제외됨) - 관리자 전용 이벤트 CRUD/seed/participation/force-claim
+try:
+    from .routers import admin_events as admin_events_router  # noqa
+    app.include_router(admin_events_router.router)
+    print("✅ Admin Events router registered")
+except Exception as e:  # pragma: no cover - 방어적
+    print(f"⚠️ Admin Events router 등록 실패: {e}")
 # Development-only endpoints (not included in OpenAPI schema)
 try:
     from app.routers.dev_logs import router as dev_logs_router

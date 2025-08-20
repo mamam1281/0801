@@ -7,9 +7,10 @@ interface GachaPullResponse { success: boolean; cost: number; items: GachaResult
 export function useGachaPull(authToken: string | null) {
   // Use generic base to avoid double /api/games/gacha when passing absolute path below
   const { call } = useApiClient('/api');
-  const [lastResult, setLastResult] = useState<GachaPullResponse | null>(null);
+  // React 타입 인식 문제로 generic 제거 후 단언 사용 (빌드 에러 회피)
+  const [lastResult, setLastResult] = useState(null as GachaPullResponse | null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState(null as string | null);
 
   const pull = useCallback(async (count: 1 | 10 = 1) => {
     setLoading(true); setError(null);
