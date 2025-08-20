@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Crown,
@@ -60,6 +61,7 @@ export function HomeDashboard({
   onAddNotification,
   onToggleSideMenu,
 }: HomeDashboardProps) {
+  const router = useRouter();
   // Auth Gate (클라이언트 마운트 후 토큰 판정)
   const { isReady: authReady, authenticated } = useAuthGate();
   // 이벤트: 비로그인 시 자동 로드 skip
@@ -478,6 +480,15 @@ export function HomeDashboard({
           </div>
 
           <div className="flex items-center gap-3">
+            { (user as any)?.is_admin || (user as any)?.isAdmin ? (
+              <Button
+                variant="outline"
+                onClick={() => router.push('/admin')}
+                className="h-10 border-border-secondary hover:border-primary text-xs px-3 hidden md:inline-flex"
+              >
+                Admin
+              </Button>
+            ) : null }
             <motion.div
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
