@@ -9,7 +9,7 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
 
 from ..database import get_db
-from ..dependencies import get_current_user
+from ..dependencies import get_current_user, get_current_admin_user as get_current_admin
 from ..models.auth_models import User
 from ..models.game_models import Game, UserAction, GameSession as GameSessionModel
 from ..services.simple_user_service import SimpleUserService
@@ -413,9 +413,20 @@ async def start_game_session(
         "session_id": ext_id,
         "status": "active",
         "started_at": now,
-        "game_type": payload.game_type,
-        "bet_amount": payload.bet_amount or 0,
     }
+
+# ---------------------------------------------------------------------------
+# Admin utility endpoints
+# ---------------------------------------------------------------------------
+@router.post("/stats/recalculate/{user_id}")
+def recalc_user_game_stats(user_id: int, db: Session = Depends(get_db), current_admin = Depends(get_current_admin)):
+    """Recalculate authoritative aggregated stats for a user (crash only MVP)."""
+    from ..services.game_stats_service import GameStatsService
+    svc = GameStatsService(db)
+    stats = svc.recalculate_user(user_id)
+    if not stats:
+        raise HTTPException(status_code=404, detail="No stats or history found")
+    return {"success": True, "stats": stats.as_dict()}
 
 @router.post("/session/end", response_model=GameSessionEndResponse)
 async def end_game_session(
@@ -1134,6 +1145,19 @@ async def place_crash_bet(
         except Exception as e:
             logger.warning(f"crash game stats update failed: {e}")
 
+        # Server-authoritative aggregate stats (user_game_stats)
+        try:
+            from ..services.game_stats_service import GameStatsService as _GSS
+            gss = _GSS(db)
+            gss.update_from_round(
+                user_id=current_user.id,
+                bet_amount=bet_amount,
+                win_amount=win_amount,
+                final_multiplier=float(auto_cashout_multiplier or multiplier)
+            )
+        except Exception as e:  # pragma: no cover
+            logger.warning("GameStatsService.update_from_round failed user=%s err=%s", current_user.id, e)
+
         # GameHistory
         try:
             delta = -bet_amount + win_amount
@@ -1234,6 +1258,32 @@ def get_game_stats(user_id: int, db: Session = Depends(get_db)):
         current_streak=calculate_user_streak(user_id, db),
         last_spin_date=None
     )
+
+# -------------------------------------------------------------------------
+# Server-authoritative per-user aggregated crash stats (user_game_stats)
+@router.get("/stats/me")
+def get_my_authoritative_game_stats(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """현재 로그인 사용자에 대한 서버 권위 Crash GameStats.
+
+    user_game_stats 테이블 row 없으면 생성 후 반환. (MVP: crash 전용)
+    TODO: 멀티 게임 타입 확장 시 game_type 파라미터 도입.
+    """
+    try:
+        from ..services.game_stats_service import GameStatsService as _GSS
+        svc = _GSS(db)
+        stats = svc.get_or_create(current_user.id)
+        return {"success": True, "stats": {
+            "user_id": stats.user_id,
+            "total_bets": int(stats.total_bets or 0),
+            "total_wins": int(stats.total_wins or 0),
+            "total_losses": int(stats.total_losses or 0),
+            "total_profit": float(stats.total_profit or 0),
+            "highest_multiplier": float(stats.highest_multiplier) if stats.highest_multiplier is not None else None,
+            "updated_at": stats.updated_at.isoformat() if stats.updated_at else None,
+        }}
+    except Exception as e:  # pragma: no cover
+        logger.error("get_my_authoritative_game_stats failed user=%s err=%s", current_user.id, e)
+        raise HTTPException(status_code=500, detail="GameStats 조회 실패")
 
 @router.get("/profile/{user_id}/stats", response_model=ProfileGameStats)
 def get_profile_game_stats(user_id: int, db: Session = Depends(get_db)):

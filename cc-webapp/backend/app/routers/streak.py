@@ -20,6 +20,7 @@ from ..utils.redis import (
     get_streak_protection,
     set_streak_protection,
 )
+from app.utils.redis import get_redis  # 일일 중복 가드용 직접 Redis 접근
 
 router = APIRouter(prefix="/api/streak", tags=["Streaks"])
 
@@ -63,16 +64,41 @@ async def tick(
     current_user: User = Depends(get_current_user),
 ):
     action_type = body.action_type or DEFAULT_ACTION
-    cnt = update_streak_counter(str(current_user.id), action_type, increment=True)
+
+    # ------------------------------
+    # 일일 중복 증가 가드 (UTC 기준)
+    # 동일 user/action/date 조합에서 하루 1회만 streak 증가.
+    # Redis NX 키: user:{id}:streak_daily_lock:{action}:{YYYY-MM-DD}
+    # TTL 48h: 자정 교차 시점 여유 확보.
+    # Redis 미연결/예외 시엔 기존 동작(증가) 유지 → 가용성 우선.
+    # ------------------------------
+    allow_increment = True
+    today_iso = datetime.utcnow().date().isoformat()
+    daily_lock_key = f"user:{current_user.id}:streak_daily_lock:{action_type}:{today_iso}"
+    try:
+        r = get_redis()
+        if r is not None:
+            # setnx (nx=True) 실패하면 이미 오늘 증가 처리된 것 → 증가 생략
+            if not r.set(daily_lock_key, "1", nx=True, ex=60 * 60 * 48):
+                allow_increment = False
+    except Exception:
+        # Redis 문제는 가드 비활성(증가 허용)
+        pass
+
+    if allow_increment:
+        cnt = update_streak_counter(str(current_user.id), action_type, increment=True)
+    else:
+        cnt = get_streak_counter(str(current_user.id), action_type)
+
     ttl = get_streak_ttl(str(current_user.id), action_type)
     next_reward = _calc_next_reward(cnt + 1)
-    # 출석 기록: 오늘 날짜를 YYYY-MM-DD로 저장 (월별 집합)
+
+    # 출석 기록 (증가 여부와 무관하게 하루 한 번 기록 시도 – SADD idempotent)
     try:
-        today = datetime.utcnow().date().isoformat()
-        record_attendance_day(str(current_user.id), action_type, today)
+        record_attendance_day(str(current_user.id), action_type, today_iso)
     except Exception:
-        # 출석 기록 실패는 본 API 성공과 분리
         pass
+
     return StreakStatus(action_type=action_type, count=cnt, ttl_seconds=ttl, next_reward=next_reward)
 
 

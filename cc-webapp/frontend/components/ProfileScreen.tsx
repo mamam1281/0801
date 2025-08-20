@@ -32,6 +32,51 @@ export function ProfileScreen({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
+  // 자동 실시간 동기화: 탭 포커스 복귀 또는 주기적 리프레시
+  const AUTO_REFRESH_MS = 60_000; // 1분
+
+  const fetchProfileBundle = async () => {
+    const [rawProfile, rawStats, rawBalance] = await Promise.all([
+      userApi.getProfile(),
+      userApi.getStats(),
+      userApi.getBalance(),
+    ]);
+    const profileData: any = {
+      ...rawProfile,
+      experience: (rawProfile as any).experience ?? (rawProfile as any).xp ?? 0,
+      maxExperience:
+        (rawProfile as any).maxExperience ?? (rawProfile as any).max_experience ?? 1000,
+      dailyStreak:
+        (rawProfile as any).dailyStreak ||
+        (rawProfile as any).daily_streak ||
+        (rawProfile as any).streak ||
+        0,
+      level: (rawProfile as any).level ?? (rawProfile as any).lvl ?? 1,
+      gameStats: (rawProfile as any).gameStats || (rawProfile as any).game_stats || {},
+    };
+    const statsData: any = {
+      ...rawStats,
+      total_games_played:
+        (rawStats as any).total_games_played ||
+        (rawStats as any).totalGamesPlayed ||
+        (rawStats as any).total_games ||
+        (rawStats as any).totalGames ||
+        0,
+      total_wins:
+        (rawStats as any).total_wins || (rawStats as any).totalWins || (rawStats as any).wins || 0,
+    };
+    const balanceData: any = {
+      ...rawBalance,
+      cyber_token_balance:
+        (rawBalance as any).cyber_token_balance ||
+        (rawBalance as any).gold ||
+        (rawBalance as any).tokens ||
+        0,
+    };
+    setUser(profileData as any);
+    setStats(statsData as any);
+    setBalance(balanceData as any);
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -54,61 +99,8 @@ export function ProfileScreen({
         console.log('액세스 토큰이 있습니다. 프로필 데이터를 가져옵니다...');
 
         // 인증된 경우 프로필 데이터 가져오기
-        const [rawProfile, rawStats, rawBalance] = await Promise.all([
-          userApi.getProfile(),
-          userApi.getStats(),
-          userApi.getBalance(),
-        ]);
-
-        // ---- 최소 침습 어댑터: 백엔드/임시 fallback 객체의 키 불일치 보정 ----
-        // profile
-        const profileData: any = {
-          ...rawProfile,
-          // xp → experience 매핑 (기존 UI 기대 키)
-          experience: (rawProfile as any).experience ?? (rawProfile as any).xp ?? 0,
-          maxExperience:
-            (rawProfile as any).maxExperience ?? (rawProfile as any).max_experience ?? 1000,
-          dailyStreak:
-            (rawProfile as any).dailyStreak ||
-            (rawProfile as any).daily_streak ||
-            (rawProfile as any).streak ||
-            0,
-          level: (rawProfile as any).level ?? (rawProfile as any).lvl ?? 1,
-          gameStats: (rawProfile as any).gameStats || (rawProfile as any).game_stats || {},
-        };
-
-        // stats
-        const statsData: any = {
-          ...rawStats,
-          // 다양한 케이스 대비 스네이크/카멜/축약 대응
-          total_games_played:
-            (rawStats as any).total_games_played ||
-            (rawStats as any).totalGamesPlayed ||
-            (rawStats as any).total_games ||
-            (rawStats as any).totalGames ||
-            0,
-          total_wins:
-            (rawStats as any).total_wins ||
-            (rawStats as any).totalWins ||
-            (rawStats as any).wins ||
-            0,
-        };
-
-        // balance → cyber_token_balance 통일
-        const balanceData: any = {
-          ...rawBalance,
-          cyber_token_balance:
-            (rawBalance as any).cyber_token_balance ||
-            (rawBalance as any).gold ||
-            (rawBalance as any).tokens ||
-            0,
-        };
-
-        console.log('프로필 데이터 로드 성공(정규화 후):', { profileData, statsData, balanceData });
-
-        setUser(profileData as any);
-        setStats(statsData as any);
-        setBalance(balanceData as any);
+        await fetchProfileBundle();
+        console.log('프로필 데이터 로드 성공(정규화 후)');
         setAuthChecked(true);
       } catch (err) {
         console.error('프로필 데이터 로드 에러:', err);
@@ -145,6 +137,25 @@ export function ProfileScreen({
       cancelled = true;
     };
   }, [onAddNotification, retryEnabled, maxRetries, retryDelayMs]);
+
+  // 탭 포커스 복귀 시 즉시 갱신
+  useEffect(() => {
+    const handler = () => {
+      if (document.visibilityState === 'visible') {
+        fetchProfileBundle().catch(() => {});
+      }
+    };
+    document.addEventListener('visibilitychange', handler);
+    return () => document.removeEventListener('visibilitychange', handler);
+  }, []);
+
+  // 주기 갱신 타이머
+  useEffect(() => {
+    const id = setInterval(() => {
+      fetchProfileBundle().catch(() => {});
+    }, AUTO_REFRESH_MS);
+    return () => clearInterval(id);
+  }, []);
 
   if (loading) {
     return (

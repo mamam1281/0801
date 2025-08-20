@@ -74,6 +74,7 @@
     "next-env.d.ts",
     "app/**/*",
     "components/**/*",
+  "hooks/**/*",
     "pages/**/*",
     "src/**/*",
     "types/**/*.d.ts",

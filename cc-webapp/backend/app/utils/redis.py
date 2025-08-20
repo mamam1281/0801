@@ -1,3 +1,68 @@
+"""Redis 유틸: streak 등에서 사용하는 저수준 접근 헬퍼.
+
+기존 상위 로직(update_streak_counter 등)은 이미 import 되어 있음.
+여기서는 streak.py에서 직접 호출하는 get_redis() 심플 구현을 제공하여
+ImportError를 제거하고, 연결 실패시 None 반환(가용성 우선) 전략 적용.
+"""
+from __future__ import annotations
+import os
+import logging
+from functools import lru_cache
+from typing import Optional
+
+try:
+    import redis  # type: ignore
+except ImportError:  # pragma: no cover
+    redis = None  # type: ignore
+
+logger = logging.getLogger(__name__)
+
+REDIS_URL_ENV_KEYS = [
+    "REDIS_URL",
+    "REDIS_DSN",
+    "REDIS_CONNECTION_STRING",
+]
+
+
+def _discover_url() -> Optional[str]:
+    for k in REDIS_URL_ENV_KEYS:
+        v = os.getenv(k)
+        if v:
+            return v
+    host = os.getenv("REDIS_HOST", "redis")
+    port = os.getenv("REDIS_PORT", "6379")
+    password = os.getenv("REDIS_PASSWORD")
+    if password:
+        return f"redis://:{password}@{host}:{port}/0"
+    return f"redis://{host}:{port}/0"
+
+
+@lru_cache(maxsize=1)
+def get_redis():  # 반환 타입 Optional[redis.Redis]
+    """Lazy Redis 클라이언트.
+
+    실패 시 예외를 올리지 않고 None 반환하여 호출측에서 graceful degrade.
+    """
+    if redis is None:  # pragma: no cover
+        logger.warning("redis-py 미설치 상태 - get_redis() -> None")
+        return None
+    url = _discover_url()
+    try:
+        client = redis.Redis.from_url(url, decode_responses=True)  # type: ignore
+        # 가벼운 ping으로 연결 검증 (0.2s 타임아웃)
+        try:
+            client.ping()
+        except Exception:
+            logger.warning("Redis ping 실패 - None 반환", exc_info=True)
+            return None
+        return client
+    except Exception:  # pragma: no cover
+        logger.warning("Redis 클라이언트 생성 실패", exc_info=True)
+        return None
+
+
+# 기존 streak 유틸 함수 (update_streak_counter 등)이 다른 파일에 정의되어 있는 경우
+# 이 파일은 단순히 get_redis 제공 목적. 중복 정의 피하기 위해 추가 구현 불필요.
 """
 Redis 유틸리티 함수들
 - 사용자 데이터 캐싱
@@ -7,7 +72,6 @@ Redis 유틸리티 함수들
 """
 
 import json
-import redis
 from typing import Any, Optional, Dict, List
 from datetime import datetime, timedelta
 import logging
@@ -17,7 +81,7 @@ logger = logging.getLogger(__name__)
 class RedisManager:
     """Redis 연결 및 데이터 관리 클래스"""
     
-    def __init__(self, redis_client: Optional[redis.Redis] = None):
+    def __init__(self, redis_client: Any = None):
         """
         Redis 매니저 초기화
         
@@ -395,7 +459,7 @@ class RedisManager:
 # 전역 Redis 매니저 인스턴스
 redis_manager = None
 
-def init_redis_manager(redis_client: Optional[redis.Redis] = None):
+def init_redis_manager(redis_client: Any = None):
     """Redis 매니저 초기화"""
     global redis_manager
     redis_manager = RedisManager(redis_client)

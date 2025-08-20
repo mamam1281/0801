@@ -46,7 +46,7 @@ export function ToastProvider(props: ToastProviderProps) {
   // Reuse authenticated API client so settings endpoint (auth-protected) doesn't 404 when fetched via Next dev server
   const { call } = useApiClient('/api/notification');
 
-  // 설정 로딩: 로컬 우선, 서버 합치기(가능 시)
+  // 설정 로딩: 로컬 스토리지만 사용 (서버 /settings 제거 → 404 소음 방지)
   useEffect(() => {
     try {
       const raw = localStorage.getItem(LS_KEY);
@@ -54,23 +54,9 @@ export function ToastProvider(props: ToastProviderProps) {
         const parsed = { ...DEFAULTS, ...JSON.parse(raw) } as Settings;
         settingsRef.current = parsed;
       }
-    } catch {}
-
-    // 서버 설정 시도(로그인 사용자만 가능). 실패해도 무시 (401 등)
-    (async () => {
-      try {
-        const s = await call<Settings>('/settings', { method: 'GET' });
-        if (s && typeof s === 'object') {
-          const merged = { ...settingsRef.current, ...s } as Settings;
-          settingsRef.current = merged;
-          try {
-            localStorage.setItem(LS_KEY, JSON.stringify(merged));
-          } catch {}
-        }
-      } catch {
-        // ignore (likely not logged in yet)
-      }
-    })();
+    } catch {
+      // ignore
+    }
   }, []);
 
   const isDndActive = (s: Settings, nowDate: Date) => {

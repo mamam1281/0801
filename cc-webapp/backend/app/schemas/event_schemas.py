@@ -28,6 +28,7 @@ class EventResponse(EventBase):
     id: int
     is_active: bool
     created_at: datetime
+    # 서비스 레이어에서 동적으로 setattr(e, 'participation_count', count) 로 주입
     participation_count: Optional[int] = 0
     user_participation: Optional[Dict[str, Any]] = None
     

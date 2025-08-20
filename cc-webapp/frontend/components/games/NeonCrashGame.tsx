@@ -1,6 +1,13 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+declare global {
+  interface Window {
+    _crashGameTarget?: number;
+    _crashGameWin?: number;
+    _crashGameIsWin?: boolean;
+  }
+}
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft,
@@ -16,10 +23,13 @@ import {
   ChevronDown,
   Settings,
   RefreshCw,
+  BarChart2,
+  History,
 } from 'lucide-react';
 import { User } from '../../types';
 import { Button } from '../ui/button';
 import { Slider } from '../ui/slider';
+import { apiGet, apiPost } from '@/lib/simpleApi';
 
 interface NeonCrashGameProps {
   user: User;
@@ -54,20 +64,44 @@ export function NeonCrashGame({
   const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
   const [graphTimeScale, setGraphTimeScale] = useState(10); // 그래프 시간 스케일 (초)
   const [gameStartTime, setGameStartTime] = useState(0);
+  // 오류 상태 및 재시도 트리거
+  const [errorMessage, setErrorMessage] = useState(null as string | null);
+  const [retryKey, setRetryKey] = useState(0);
 
   // Canvas 및 애니메이션 관련 Refs
   const canvasRef = useRef(null) as { current: HTMLCanvasElement | null };
   const animationRef = useRef(null) as { current: number | null };
   const lastTimestamp = useRef(null) as { current: number | null };
 
-  // 게임 세션 통계
-  const [sessionStats, setSessionStats] = useState({
-    totalBets: 0,
-    wins: 0,
-    losses: 0,
-    highestMultiplier: 0,
-    totalProfit: 0,
-  });
+  // 서버 권위 GameStats (crash) - /games/stats/me
+  const [authoritativeStats, setAuthoritativeStats] = useState(
+    null as null | {
+      total_bets: number;
+      total_wins: number;
+      total_losses: number;
+      total_profit: number;
+      highest_multiplier: number | null;
+    }
+  );
+  const fetchAuthoritativeStats = useCallback(async () => {
+    try {
+      const res = await apiGet('/games/stats/me');
+      if (res?.success && res.stats) {
+        setAuthoritativeStats({
+          total_bets: res.stats.total_bets ?? 0,
+          total_wins: res.stats.total_wins ?? 0,
+          total_losses: res.stats.total_losses ?? 0,
+          total_profit: res.stats.total_profit ?? 0,
+          highest_multiplier: res.stats.highest_multiplier ?? null,
+        });
+      }
+    } catch (e) {
+      console.warn('authoritative stats fetch 실패', e);
+    }
+  }, []);
+  useEffect(() => {
+    fetchAuthoritativeStats();
+  }, [fetchAuthoritativeStats]);
 
   // 게임 시작 - 서버에서 실제 베팅 처리
   const startGame = async () => {
@@ -83,24 +117,11 @@ export function NeonCrashGame({
 
     try {
       // 서버에 크래시 베팅 요청
-      const response = await fetch('/api/games/crash/bet', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
-        },
-        body: JSON.stringify({
-          bet_amount: betAmount,
-          auto_cashout_multiplier:
-            showAdvancedSettings && manualAutoCashout > 0 ? manualAutoCashout : null,
-        }),
+      const gameResult = await apiPost('/games/crash/bet', {
+        bet_amount: betAmount,
+        auto_cashout_multiplier:
+          showAdvancedSettings && manualAutoCashout > 0 ? manualAutoCashout : null,
       });
-
-      if (!response.ok) {
-        throw new Error('서버 요청 실패');
-      }
-
-      const gameResult = await response.json();
 
       // 서버에서 받은 게임 결과로 애니메이션 시작
       const finalMultiplier = gameResult.max_multiplier || 1.01;
@@ -133,28 +154,16 @@ export function NeonCrashGame({
       lastTimestamp.current = performance.now();
       animationRef.current = requestAnimationFrame(updateGame);
 
-      // 세션 통계 업데이트
-      setSessionStats((prev: any) => ({
-        ...prev,
-        totalBets: prev.totalBets + 1,
-      }));
+      fetchAuthoritativeStats();
 
       // 사용자 잔액 업데이트 (서버에서 처리된 결과)
       try {
-        const profileResponse = await fetch('/api/auth/profile', {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
-          },
+        const updatedProfile = await apiGet('/auth/profile');
+        onUpdateUser({
+          ...user,
+          goldBalance: updatedProfile.gold_balance || user.goldBalance,
+          gameStats: updatedProfile.game_stats || user.gameStats,
         });
-
-        if (profileResponse.ok) {
-          const updatedProfile = await profileResponse.json();
-          onUpdateUser({
-            ...user,
-            goldBalance: updatedProfile.gold_balance || user.goldBalance,
-            gameStats: updatedProfile.game_stats || user.gameStats,
-          });
-        }
       } catch (error) {
         console.error('프로필 업데이트 실패:', error);
       }
@@ -331,7 +340,7 @@ export function NeonCrashGame({
 
       // 자동 캐시아웃 체크
       if (autoCashout > 0 && newMultiplier >= autoCashout && !hasCashedOut) {
-        cashout();
+        void cashout();
       }
 
       // 폭발 체크 (서버에서 받은 목표 멀티플라이어 사용)
@@ -356,8 +365,8 @@ export function NeonCrashGame({
     ]
   );
 
-  // 게임 캐시아웃
-  const cashout = () => {
+  // 게임 캐시아웃 (프로필 재조회 비동기 수행 위해 async 추가)
+  const cashout = async () => {
     if (!isRunning || hasCashedOut) return;
 
     // 애니메이션 정지
@@ -373,27 +382,12 @@ export function NeonCrashGame({
     // 로컬 상태 업데이트는 일시적이며, 실제 게임 통계는 서버에서 관리됩니다
     try {
       // 프로필을 다시 로드하여 서버에서 업데이트된 게임 통계를 가져옵니다
-      const response = await fetch('/api/auth/profile', {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
-        },
+      const updatedProfile = await apiGet('/auth/profile');
+      onUpdateUser({
+        ...user,
+        goldBalance: user.goldBalance + winnings,
+        gameStats: updatedProfile.game_stats || user.gameStats,
       });
-
-      if (response.ok) {
-        const updatedProfile = await response.json();
-        onUpdateUser({
-          ...user,
-          goldBalance: user.goldBalance + winnings,
-          gameStats: updatedProfile.game_stats || user.gameStats,
-        });
-      } else {
-        // 프로필 로드 실패 시 로컬 상태만 업데이트
-        const updatedUser = {
-          ...user,
-          goldBalance: user.goldBalance + winnings,
-        };
-        onUpdateUser(updatedUser);
-      }
     } catch (error) {
       console.error('Failed to fetch updated profile:', error);
       // 에러 시 로컬 상태만 업데이트
@@ -418,13 +412,7 @@ export function NeonCrashGame({
       ...prev,
     ]);
 
-    // 세션 통계 업데이트
-    setSessionStats((prev: any) => ({
-      ...prev,
-      wins: prev.wins + 1,
-      highestMultiplier: Math.max(prev.highestMultiplier, multiplier),
-      totalProfit: prev.totalProfit + (winnings - betAmount),
-    }));
+    fetchAuthoritativeStats();
 
     // 알림
     onAddNotification(`${winnings} 골드를 획득했습니다! (${multiplier.toFixed(2)}x)`);
@@ -454,13 +442,7 @@ export function NeonCrashGame({
         ...prev,
       ]);
 
-      // 세션 통계 업데이트
-      setSessionStats((prev: any) => ({
-        ...prev,
-        wins: prev.wins + 1,
-        highestMultiplier: Math.max(prev.highestMultiplier, finalMultiplier),
-        totalProfit: prev.totalProfit + serverWinAmount - betAmount,
-      }));
+      fetchAuthoritativeStats();
 
       onAddNotification(
         `자동 캐시아웃! ${serverWinAmount} 골드를 획득했습니다! (${finalMultiplier.toFixed(2)}x)`
@@ -479,12 +461,7 @@ export function NeonCrashGame({
           ...prev,
         ]);
 
-        // 세션 통계 업데이트
-        setSessionStats((prev: any) => ({
-          ...prev,
-          losses: prev.losses + 1,
-          totalProfit: prev.totalProfit - betAmount,
-        }));
+        fetchAuthoritativeStats();
 
         onAddNotification(`크래시! ${finalMultiplier.toFixed(2)}x에서 터졌습니다.`);
       }
@@ -582,7 +559,32 @@ export function NeonCrashGame({
           className="lg:col-span-2 glass-effect rounded-2xl overflow-hidden p-6 flex flex-col"
         >
           {/* 게임 영역 */}
-          <div className="flex-1 flex flex-col items-center justify-center py-4 relative">
+          <div className="flex-1 flex flex-col items-center justify-center py-4 relative w-full">
+            {errorMessage && (
+              <div className="w-full max-w-xl mb-4 bg-destructive/15 border border-destructive/40 text-destructive px-4 py-3 rounded-lg shadow-sm animate-in fade-in">
+                <div className="flex justify-between items-start gap-4">
+                  <div className="flex-1">
+                    <div className="font-semibold mb-1">오류 발생</div>
+                    <div className="text-sm leading-relaxed break-all">{errorMessage}</div>
+                  </div>
+                  <div className="flex gap-2 shrink-0">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        setRetryKey((k: number) => k + 1);
+                        void startGame();
+                      }}
+                    >
+                      재시도
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => setErrorMessage(null)}>
+                      닫기
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
             {/* 그래프 영역 */}
             {showGraph && (
               <div className="w-full h-60 sm:h-72 md:h-80 mb-6 bg-background/30 rounded-lg p-3 border border-border/50 relative">

@@ -24,6 +24,7 @@ export interface EventBackend {
   is_active: boolean;
   priority: number;
   created_at: string;
+  participation_count?: number; // backend injected participant count
   user_participation?: {
     joined: boolean;
     progress: any;

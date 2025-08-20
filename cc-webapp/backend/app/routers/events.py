@@ -2,6 +2,7 @@
 이벤트 라우터 수정
 """
 from fastapi import APIRouter, Depends, HTTPException, Query
+import logging
 from sqlalchemy.orm import Session
 from typing import List, Optional, Dict
 from ..database import get_db
@@ -13,6 +14,26 @@ from ..schemas.event_schemas import *
 
 router = APIRouter(prefix="/api/events", tags=["Events & Missions"])
 
+# --- Metrics (best-effort) ---
+try:  # pragma: no cover - optional metrics
+    from prometheus_client import Counter  # type: ignore
+    EVENT_MISSION_COUNTER = Counter(
+        "event_mission_requests_total",
+        "Events & Missions 엔드포인트 호출 카운터",
+        ["endpoint", "action", "status", "auth"],
+    )
+except Exception:  # pragma: no cover
+    EVENT_MISSION_COUNTER = None
+
+def _metric(endpoint: str, action: str, status: str, auth: str):
+    if EVENT_MISSION_COUNTER:
+        try:
+            EVENT_MISSION_COUNTER.labels(endpoint=endpoint, action=action, status=status, auth=auth).inc()
+        except Exception:
+            pass
+
+logger = logging.getLogger(__name__)
+
 # 이벤트 엔드포인트
 @router.get("/", response_model=List[EventResponse])
 async def get_active_events(
@@ -20,24 +41,31 @@ async def get_active_events(
     db: Session = Depends(get_db)
 ):
     """활성 이벤트 목록 조회"""
-    events = EventService.get_active_events(db)
-    
-    # 사용자 참여 정보 추가
-    for event in events:
-        participation = db.query(EventParticipation).filter(
-            EventParticipation.user_id == current_user.id,
-            EventParticipation.event_id == event.id
-        ).first()
-        
-        if participation:
-            event.user_participation = {
-                "joined": True,
-                "progress": participation.progress,
-                "completed": participation.completed,
-                "claimed": participation.claimed_rewards
-            }
-    
-    return events
+    auth = "y" if current_user else "n"
+    try:
+        events = EventService.get_active_events(db)
+        _metric("events", "list", "success", auth)
+        # 사용자 참여 정보 추가
+        for event in events:
+            participation = db.query(EventParticipation).filter(
+                EventParticipation.user_id == current_user.id,
+                EventParticipation.event_id == event.id
+            ).first()
+            if participation:
+                event.user_participation = {
+                    "joined": True,
+                    "progress": participation.progress,
+                    "completed": participation.completed,
+                    "claimed": participation.claimed_rewards
+                }
+        return events
+    except HTTPException:
+        _metric("events", "list", "error", auth)
+        raise
+    except Exception as e:
+        logger.exception("events list 실패")
+        _metric("events", "list", "error", auth)
+        raise
 
 @router.get("/{event_id}", response_model=EventResponse)
 async def get_event_detail(
@@ -48,7 +76,9 @@ async def get_event_detail(
     """이벤트 상세 조회"""
     event = EventService.get_event_by_id(db, event_id)
     if not event:
+        _metric("events", "detail", "not_found", "y")
         raise HTTPException(status_code=404, detail="이벤트를 찾을 수 없습니다")
+    _metric("events", "detail", "success", "y")
     return event
 
 @router.post("/join", response_model=EventParticipationResponse)
@@ -62,8 +92,10 @@ async def join_event(
         participation = EventService.join_event(
             db, current_user.id, request.event_id
         )
+        _metric("events", "join", "success", "y")
         return participation
     except Exception as e:
+        _metric("events", "join", "error", "y")
         raise HTTPException(status_code=400, detail=str(e))
 
 @router.put("/progress/{event_id}", response_model=EventParticipationResponse)
@@ -78,8 +110,10 @@ async def update_event_progress(
         participation = EventService.update_event_progress(
             db, current_user.id, event_id, request.progress
         )
+        _metric("events", "progress", "success", "y")
         return participation
     except Exception as e:
+        _metric("events", "progress", "error", "y")
         raise HTTPException(status_code=400, detail=str(e))
 
 @router.post("/claim/{event_id}", response_model=ClaimRewardResponse)
@@ -93,12 +127,14 @@ async def claim_event_rewards(
         rewards = EventService.claim_event_rewards(
             db, current_user.id, event_id
         )
+        _metric("events", "claim", "success", "y")
         return ClaimRewardResponse(
             success=True,
             rewards=rewards,
             message="보상을 성공적으로 수령했습니다!"
         )
     except ValueError as e:
+        _metric("events", "claim", "error", "y")
         raise HTTPException(status_code=400, detail=str(e))
 
 # 미션 엔드포인트
@@ -115,6 +151,7 @@ async def get_daily_missions(
         MissionService.initialize_daily_missions(db, current_user.id)
         missions = MissionService.get_user_missions(db, current_user.id, 'daily')
     
+    _metric("missions", "list_daily", "success", "y")
     return missions
 
 @router.get("/missions/weekly", response_model=List[UserMissionResponse])
@@ -123,6 +160,7 @@ async def get_weekly_missions(
     db: Session = Depends(get_db)
 ):
     """주간 미션 목록 조회"""
+    _metric("missions", "list_weekly", "success", "y")
     return MissionService.get_user_missions(db, current_user.id, 'weekly')
 
 @router.get("/missions/all", response_model=List[UserMissionResponse])
@@ -131,6 +169,7 @@ async def get_all_missions(
     db: Session = Depends(get_db)
 ):
     """모든 미션 목록 조회"""
+    _metric("missions", "list_all", "success", "y")
     return MissionService.get_user_missions(db, current_user.id)
 
 @router.put("/missions/progress", response_model=Dict)
@@ -146,6 +185,7 @@ async def update_mission_progress(
         request.mission_id,
         request.progress_increment
     )
+    _metric("missions", "progress", "success", "y")
     
     return {
         "updated": True,
@@ -164,10 +204,12 @@ async def claim_mission_rewards(
         rewards = MissionService.claim_mission_rewards(
             db, current_user.id, mission_id
         )
+        _metric("missions", "claim", "success", "y")
         return ClaimRewardResponse(
             success=True,
             rewards=rewards,
             message="미션 보상을 성공적으로 수령했습니다!"
         )
     except ValueError as e:
+        _metric("missions", "claim", "error", "y")
         raise HTTPException(status_code=400, detail=str(e))

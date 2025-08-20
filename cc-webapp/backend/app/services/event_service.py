@@ -1,4 +1,5 @@
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from datetime import datetime, timedelta
 from typing import List, Optional, Dict, Any
 from ..models.event_models import Event, EventParticipation, Mission, UserMission
@@ -14,11 +15,26 @@ class EventService:
     def get_active_events(db: Session) -> List[Event]:
         """활성 이벤트 목록 조회"""
         now = datetime.utcnow()
-        return db.query(Event).filter(
+        events = db.query(Event).filter(
             Event.is_active == True,
             Event.start_date <= now,
             Event.end_date >= now
         ).order_by(Event.priority.desc()).all()
+
+        # 참여자 수를 각 인스턴스에 임시 속성으로 부여 (Pydantic 직렬화 시 participation_count 사용)
+        if events:
+            # 이벤트별 참여 카운트 일괄 조회
+            counts = (
+                db.query(EventParticipation.event_id, func.count(EventParticipation.id).label("cnt"))
+                .filter(EventParticipation.event_id.in_([e.id for e in events]))
+                .group_by(EventParticipation.event_id)
+                .all()
+            )
+            count_map = {row.event_id: row.cnt for row in counts}
+            for e in events:
+                # 모델에 없는 임시 속성 지정 -> schema.EventResponse.participation_count 매핑
+                setattr(e, "participation_count", count_map.get(e.id, 0))
+        return events
     
     @staticmethod
     def get_event_by_id(db: Session, event_id: int) -> Optional[Event]:

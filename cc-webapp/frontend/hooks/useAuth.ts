@@ -49,7 +49,7 @@ function writeBundle(access: string, refresh?: string | null, expSeconds?: numbe
         } else {
             localStorage.removeItem(LEGACY_EXP_KEY);
         }
-    } catch {}
+    } catch { }
 }
 
 function readLegacyToken(): { token: string | null; exp: number | null } {
@@ -100,19 +100,32 @@ export function useAuth() {
     }, [api, applyTokens]);
 
     const login = useCallback(async (site_id: string, password: string) => {
+        if (!site_id || !password) {
+            throw new Error('아이디와 비밀번호를 입력하세요');
+        }
         setLoading(true);
         try {
-            // Backend returns Token schema (access_token, token_type, user, optional refresh_token)
-            const res = await api.call('/api/auth/login', { method: 'POST', body: { site_id, password } }) as any;
-            applyTokens(res);
-            if (res && res.user) {
-                setUser(res.user as AuthUser);
-                return res.user as AuthUser;
+            try {
+                const res = await api.call('/api/auth/login', { method: 'POST', body: { site_id: site_id.trim(), password } }) as any;
+                applyTokens(res);
+                if (res && res.user) {
+                    setUser(res.user as AuthUser);
+                    return res.user as AuthUser;
+                }
+                // Fallback: profile fetch
+                const profile = await api.call('/api/auth/profile') as AuthUser;
+                setUser(profile);
+                return profile;
+            } catch (e: any) {
+                const msg = e?.message || '';
+                if (/Invalid credentials/i.test(msg)) {
+                    throw new Error('아이디 또는 비밀번호가 올바르지 않습니다. 다시 시도하세요.');
+                }
+                if (/Too many failed attempts/i.test(msg)) {
+                    throw new Error('로그인 시도 제한에 도달했습니다. 잠시 후 다시 시도하세요.');
+                }
+                throw e;
             }
-            // Fallback: fetch profile if user absent (unexpected)
-            const profile = await api.call('/api/auth/profile') as AuthUser;
-            setUser(profile);
-            return profile;
         } finally { setLoading(false); }
     }, [api, applyTokens]);
 
@@ -123,7 +136,7 @@ export function useAuth() {
             localStorage.removeItem(LEGACY_ACCESS_KEY);
             localStorage.removeItem(LEGACY_EXP_KEY);
             localStorage.removeItem(BUNDLE_KEY);
-        } catch {}
+        } catch { }
         setUser(null);
     }, []);
 
@@ -150,8 +163,8 @@ export function useAuth() {
 
     // init load
     useEffect(() => {
-    const { token } = readLegacyToken();
-    if (token) {
+        const { token } = readLegacyToken();
+        if (token) {
             api.call('/api/auth/profile').then((u: any) => setUser(u as AuthUser)).catch(() => logout());
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
