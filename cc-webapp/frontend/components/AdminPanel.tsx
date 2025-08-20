@@ -38,6 +38,17 @@ interface AdminPanelProps {
   onBack: () => void;
   onUpdateUser: (user: User) => void;
   onAddNotification: (message: string) => void;
+  coreStats?: {
+    total_users: number;
+    active_users: number;
+    online_users: number;
+    total_revenue: number;
+    today_revenue: number;
+    critical_alerts: number;
+    pending_actions: number;
+  };
+  loadingStats?: boolean;
+  statsError?: string | null;
 }
 
 // 💼 빠른 작업 메뉴 인터페이스
@@ -52,22 +63,22 @@ interface QuickAction {
   onClick: () => void;
 }
 
-export function AdminPanel({ user, onBack, onUpdateUser, onAddNotification }: AdminPanelProps) {
+export function AdminPanel({ user, onBack, onUpdateUser, onAddNotification, coreStats, loadingStats, statsError }: AdminPanelProps) {
   const [activeView, setActiveView] = useState(
     'menu' as 'menu' | 'dashboard' | 'users' | 'shop' | 'security' | 'system'
   );
   const [searchQuery, setSearchQuery] = useState('');
 
-  // 📊 핵심 통계 (간소화)
-  const [coreStats] = useState({
-    totalUsers: 12847,
-    activeUsers: 3521,
-    onlineUsers: 247,
-    totalRevenue: 1250000,
-    todayRevenue: 45000,
-    criticalAlerts: 2,
-    pendingActions: 7,
-  });
+  // 📊 핵심 통계: 전달된 props 기반 가공
+  const statsView = {
+    totalUsers: coreStats?.total_users ?? 0,
+    activeUsers: coreStats?.active_users ?? 0,
+    onlineUsers: coreStats?.online_users ?? 0,
+    totalRevenue: coreStats?.total_revenue ?? 0,
+    todayRevenue: coreStats?.today_revenue ?? 0,
+    criticalAlerts: coreStats?.critical_alerts ?? 0,
+    pendingActions: coreStats?.pending_actions ?? 0,
+  };
 
   // 💼 빠른 작업 메뉴 정의 (globals.css 클래스 사용)
   const quickActions: QuickAction[] = [
@@ -264,6 +275,21 @@ export function AdminPanel({ user, onBack, onUpdateUser, onAddNotification }: Ad
 
   return (
     <div className="min-h-screen bg-background relative overflow-hidden">
+      {loadingStats && (
+        <div className="absolute top-2 left-1/2 -translate-x-1/2 w-full max-w-md px-4 z-50">
+          <div className="animate-pulse rounded-md bg-gradient-to-r from-neutral-800/70 via-neutral-700/40 to-neutral-800/70 h-14 border border-neutral-700 shadow-lg" />
+        </div>
+      )}
+      {statsError && !loadingStats && (
+        <div className="absolute top-2 left-1/2 -translate-x-1/2 w-full max-w-lg px-4 z-50">
+          <Alert variant="destructive" className="glass-metal border-error/50">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>
+              실시간 통계 로딩 실패: {statsError} (기본값 표시중)
+            </AlertDescription>
+          </Alert>
+        </div>
+      )}
       {/* 🎯 상단 헤더 */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
@@ -286,17 +312,15 @@ export function AdminPanel({ user, onBack, onUpdateUser, onAddNotification }: Ad
           {/* 🎯 상단 빠른 통계 */}
           <div className="hidden md:flex items-center gap-6">
             <div className="text-center">
-              <div className="text-lg text-primary">{coreStats.onlineUsers}</div>
+              <div className="text-lg text-primary">{loadingStats ? '…' : statsView.onlineUsers}</div>
               <div className="text-xs text-muted-foreground">온라인</div>
             </div>
             <div className="text-center">
-              <div className="text-lg text-gradient-gold">
-                ${(coreStats.todayRevenue / 1000).toFixed(0)}K
-              </div>
+              <div className="text-lg text-gradient-gold">{loadingStats ? '…' : `${(statsView.todayRevenue / 1000).toFixed(0)}K`}</div>
               <div className="text-xs text-muted-foreground">오늘 수익</div>
             </div>
             <div className="text-center">
-              <div className="text-lg text-error">{coreStats.criticalAlerts}</div>
+              <div className="text-lg text-error">{loadingStats ? '…' : statsView.criticalAlerts}</div>
               <div className="text-xs text-muted-foreground">긴급 알림</div>
             </div>
 
@@ -352,12 +376,12 @@ export function AdminPanel({ user, onBack, onUpdateUser, onAddNotification }: Ad
               className="space-y-8"
             >
               {/* 🚨 긴급 알림 */}
-              {coreStats.criticalAlerts > 0 && (
+              {statsView.criticalAlerts > 0 && (
                 <Alert className="border-error bg-error-soft glass-metal">
                   <AlertTriangle className="h-4 w-4" />
                   <AlertDescription className="text-foreground">
                     <span className="text-gradient-primary">
-                      {coreStats.criticalAlerts}개의 긴급 알림
+                      {statsView.criticalAlerts}개의 긴급 알림
                     </span>
                     이 있습니다.
                     <Button
@@ -458,7 +482,7 @@ export function AdminPanel({ user, onBack, onUpdateUser, onAddNotification }: Ad
                   <Card className="glass-metal">
                     <CardContent className="p-4 text-center">
                       <div className="text-2xl text-success mb-1">
-                        {coreStats.activeUsers.toLocaleString()}
+                        {statsView.activeUsers.toLocaleString()}
                       </div>
                       <div className="text-sm text-muted-foreground">활성 사용자</div>
                     </CardContent>
@@ -467,7 +491,7 @@ export function AdminPanel({ user, onBack, onUpdateUser, onAddNotification }: Ad
                   <Card className="glass-metal">
                     <CardContent className="p-4 text-center">
                       <div className="text-2xl text-gradient-gold mb-1">
-                        ${(coreStats.totalRevenue / 1000000).toFixed(1)}M
+                        ${(statsView.totalRevenue / 1000000).toFixed(1)}M
                       </div>
                       <div className="text-sm text-muted-foreground">총 수익</div>
                     </CardContent>
@@ -475,7 +499,7 @@ export function AdminPanel({ user, onBack, onUpdateUser, onAddNotification }: Ad
 
                   <Card className="glass-metal">
                     <CardContent className="p-4 text-center">
-                      <div className="text-2xl text-primary mb-1">{coreStats.pendingActions}</div>
+                      <div className="text-2xl text-primary mb-1">{statsView.pendingActions}</div>
                       <div className="text-sm text-muted-foreground">대기 작업</div>
                     </CardContent>
                   </Card>
@@ -512,7 +536,7 @@ export function AdminPanel({ user, onBack, onUpdateUser, onAddNotification }: Ad
                       </div>
                       <div>
                         <div className="text-2xl text-foreground">
-                          {coreStats.totalUsers.toLocaleString()}
+                          {statsView.totalUsers.toLocaleString()}
                         </div>
                         <div className="text-sm text-muted-foreground">총 사용자</div>
                       </div>
@@ -528,7 +552,7 @@ export function AdminPanel({ user, onBack, onUpdateUser, onAddNotification }: Ad
                       </div>
                       <div>
                         <div className="text-2xl text-foreground">
-                          {coreStats.activeUsers.toLocaleString()}
+                          {statsView.activeUsers.toLocaleString()}
                         </div>
                         <div className="text-sm text-muted-foreground">활성 사용자</div>
                       </div>
@@ -544,7 +568,7 @@ export function AdminPanel({ user, onBack, onUpdateUser, onAddNotification }: Ad
                       </div>
                       <div>
                         <div className="text-2xl text-foreground">
-                          ${(coreStats.totalRevenue / 1000).toFixed(0)}K
+                          ${(statsView.totalRevenue / 1000).toFixed(0)}K
                         </div>
                         <div className="text-sm text-muted-foreground">총 수익</div>
                       </div>
@@ -559,7 +583,7 @@ export function AdminPanel({ user, onBack, onUpdateUser, onAddNotification }: Ad
                         <AlertTriangle className="w-6 h-6 text-error" />
                       </div>
                       <div>
-                        <div className="text-2xl text-foreground">{coreStats.criticalAlerts}</div>
+                        <div className="text-2xl text-foreground">{statsView.criticalAlerts}</div>
                         <div className="text-sm text-muted-foreground">긴급 알림</div>
                       </div>
                     </div>

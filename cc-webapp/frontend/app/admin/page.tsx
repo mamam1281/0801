@@ -39,7 +39,8 @@ export default function AdminPage() {
       }
       setMe(profile);
       try {
-        const stats = await apiGet<any>('/api/admin/core-stats');
+  // 실제 백엔드 엔드포인트 경로: /api/admin/stats
+  const stats = await apiGet<any>('/api/admin/stats');
         setCoreStats({
           total_users: stats.total_users ?? stats.totalUsers ?? 0,
           active_users: stats.active_users ?? stats.activeUsers ?? 0,
@@ -98,6 +99,9 @@ export default function AdminPage() {
           onBack={()=>router.push('/')}
           onUpdateUser={()=>{}}
           onAddNotification={()=>{}}
+          coreStats={coreStats || undefined}
+          loadingStats={loading}
+          statsError={error}
         />
       </div>
     </motion.div>

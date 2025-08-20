@@ -910,6 +910,20 @@ def buy(
                         )
         except Exception:
             existing_tx = None
+    # Validate/derive amount before proceeding (legacy tests omit amount)
+    if req.amount is None:
+        # Final fallback: if still None after earlier catalog attempt, treat as 0 and fail gracefully later
+        try:
+            if prod is not None:
+                req.amount = int(getattr(prod, 'price_cents', 0))
+            else:
+                # Unknown product with no amount provided
+                raise HTTPException(status_code=400, detail="amount missing for product")
+        except HTTPException:
+            raise
+        except Exception:
+            raise HTTPException(status_code=400, detail="invalid amount")
+
     # Gold purchase via external gateway (can be pending)
     gateway = PaymentGatewayService()
     # Create pending transaction record
@@ -925,8 +939,8 @@ def buy(
             product_id=req.product_id,
             kind='gold',
             quantity=req.quantity,
-            unit_price=int(req.amount),
-            amount=int(req.amount),
+            unit_price=int(req.amount) if req.amount is not None else 0,
+            amount=int(req.amount) if req.amount is not None else 0,
             payment_method=req.payment_method or 'card',
             status='pending',
             receipt_code=reused_receipt or receipt_code,

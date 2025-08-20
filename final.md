@@ -303,6 +303,21 @@ docker-compose restart backend
 *이 문서는 Casino-Club F2P 프로젝트의 최종 상태와 트러블슈팅 기록을 위한 마스터 문서입니다.*
 *모든 변경사항과 이슈는 이 파일에 지속적으로 업데이트해주세요.*
 
+### 2025-08-20 (추가) Crash 게임 Illegal constructor 오류 상세 분석 & 해결
+- 증상: `NeonCrashGame.tsx:919:15` 렌더 시 `Uncaught Error: Illegal constructor` 스택 트레이스에 `<History>` 컴포넌트 표기.
+- 원인 추정: `lucide-react` 의 `History` 아이콘 이름이 브라우저 내장 `window.History` (History 인터페이스) 와 동일하여 번들/헬퍼 변환 과정 혹은 Dev overlay 에서 잘못된 참조를 유발(React DevTools / error boundary 스택 serialization 시 native constructor 검사) → Illegal constructor 에러 발생 가능.
+- 검증: 동일 파일에서 다른 아이콘들은 정상. `<History />` 부분만 제거 후 정상 렌더 → 아이콘 명 충돌이 근본 원인으로 확인.
+- 조치: `import { History as HistoryIcon } from 'lucide-react'` 로 alias 후 JSX `<HistoryIcon ...>` 사용. 주석으로 충돌 회피 이유 명시.
+- 재현 절차 (이전 상태):
+   1. `NeonCrashGame` 진입.
+   2. 사이드 패널 "최근 게임 기록" 헤더 렌더 시 즉시 콘솔에 Illegal constructor 오류.
+   3. 히스토리 아이콘 제거/변경 시 오류 소멸.
+- 수정 후 검증:
+   - 페이지 리로드 후 동일 위치 정상 렌더, 콘솔 오류 미발생.
+   - Crash 게임 플레이(시작→캐시아웃) 흐름 영향 없음.
+- 추후 예방: 네이티브 DOM/브라우저 API 명칭과 동일한 아이콘/컴포넌트 이름 사용 시 즉시 alias (`*Icon`) 규칙 문서화.
+
+
 ### 2025-08-20 (추가) Streak Claim 네트워크 오류 대응 & 랭킹 준비중 모달 / 프로필 실시간 동기화
 - Streak Claim Failed to fetch 원인: 클라이언트 fetch 네트워크 오류 시 통합 에러 메시지("Failed to fetch")만 노출 → 사용자 혼란.
    - 조치: `HomeDashboard.tsx` claim 핸들러에서 `Failed to fetch` 케이스 별도 처리(네트워크 안내 메시지) + 프로필 재조회 실패 fallback 로직 추가.

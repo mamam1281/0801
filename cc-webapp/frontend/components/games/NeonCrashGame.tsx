@@ -24,7 +24,8 @@ import {
   Settings,
   RefreshCw,
   BarChart2,
-  History,
+  // History 아이콘은 window.History (Illegal constructor) 네이티브 객체와 이름 충돌 가능성 있으므로 alias
+  History as HistoryIcon,
 } from 'lucide-react';
 import { User } from '../../types';
 import { Button } from '../ui/button';
@@ -927,7 +928,8 @@ export function NeonCrashGame({
             className="glass-effect rounded-xl p-6"
           >
             <h3 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
-              <History className="w-5 h-5 text-primary" />
+              {/* History 네이티브 객체(브라우저 History)와 충돌 방지 위해 HistoryIcon 사용 */}
+              <HistoryIcon className="w-5 h-5 text-primary" />
               최근 게임 기록
             </h3>
 
