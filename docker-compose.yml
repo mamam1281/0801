@@ -26,7 +26,7 @@ services:
       OLAP_BATCH_SIZE: ${OLAP_BATCH_SIZE:-200}
       OLAP_FLUSH_SECONDS: ${OLAP_FLUSH_SECONDS:-2}
       CORS_ORIGINS: "http://localhost:3000,http://127.0.0.1:3000,https://localhost:3000,https://127.0.0.1:3000,http://localhost:40001,http://127.0.0.1:40001"
-  AUTO_SEED_BASIC: "1" # 기본 관리자/테스트 계정 자동 시드 (멱등)
+      AUTO_SEED_BASIC: "1" # 기본 관리자/테스트 계정 자동 시드 (멱등)
     volumes:
       - ./cc-webapp/backend:/app
       - ./logs/backend:/app/logs:rw

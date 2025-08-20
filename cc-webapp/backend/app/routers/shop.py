@@ -1201,7 +1201,14 @@ def buy_limited(req: LimitedBuyRequest, db = Depends(get_db), current_user = Dep
     if not (pkg.is_active and pkg.start_at <= now <= pkg.end_at):
         cur_user = db.query(models.User).filter(models.User.id == user_id).first()
         _metric_inc("limited", "fail", "WINDOW_CLOSED")
-    return LimitedBuyReceipt(success=False, message="Package not available", user_id=user_id, code=pkg.code, reason_code="WINDOW_CLOSED", new_gold_balance=getattr(cur_user, 'gold_balance', 0) if cur_user else None)
+        return LimitedBuyReceipt(
+            success=False,
+            message="Package not available",
+            user_id=user_id,
+            code=pkg.code,
+            reason_code="WINDOW_CLOSED",
+            new_gold_balance=getattr(cur_user, 'gold_balance', 0) if cur_user else None,
+        )
 
     user = db.query(models.User).filter(models.User.id == user_id).first()
     if not user:
@@ -1221,7 +1228,14 @@ def buy_limited(req: LimitedBuyRequest, db = Depends(get_db), current_user = Dep
     already = LimitedPackageService.get_user_purchased(pkg.code, user_id)
     if pkg.per_user_limit and already + req.quantity > pkg.per_user_limit:
         _metric_inc("limited", "fail", "USER_LIMIT")
-    return LimitedBuyReceipt(success=False, message="Per-user limit exceeded", user_id=user_id, code=pkg.code, reason_code="USER_LIMIT", new_gold_balance=getattr(user, 'gold_balance', 0))
+        return LimitedBuyReceipt(
+            success=False,
+            message="Per-user limit exceeded",
+            user_id=user_id,
+            code=pkg.code,
+            reason_code="USER_LIMIT",
+            new_gold_balance=getattr(user, 'gold_balance', 0),
+        )
 
     # Sweep expired holds to return any timed-out reservations back to stock (best-effort)
     try:
@@ -1233,7 +1247,14 @@ def buy_limited(req: LimitedBuyRequest, db = Depends(get_db), current_user = Dep
     hold_id: Optional[str] = None
     if not LimitedPackageService.try_reserve(pkg.code, req.quantity):
         _metric_inc("limited", "fail", "OUT_OF_STOCK")
-    return LimitedBuyReceipt(success=False, message="Out of stock", user_id=user_id, code=pkg.code, reason_code="OUT_OF_STOCK", new_gold_balance=getattr(user, 'gold_balance', 0))
+        return LimitedBuyReceipt(
+            success=False,
+            message="Out of stock",
+            user_id=user_id,
+            code=pkg.code,
+            reason_code="OUT_OF_STOCK",
+            new_gold_balance=getattr(user, 'gold_balance', 0),
+        )
 
     # add a short hold so that if payment fails or client drops, stock returns after TTL
     try:
@@ -1362,30 +1383,47 @@ def buy_limited(req: LimitedBuyRequest, db = Depends(get_db), current_user = Dep
 
     # 트랜잭션 영속화 (limited purchase)
     try:
-        # integrity hash 계산
-        import hashlib
+        import hashlib, sqlalchemy as sa
         raw = f"{user_id}|{pkg.code}|{req.quantity}|{unit_price}|{total_price_cents}|{cap.charge_id}|{receipt_code}".encode()
         integrity_hash = hashlib.sha256(raw).hexdigest()
-        db.add(models.ShopTransaction(
+        insp_cols = [c['name'] for c in sa.inspect(db.bind).get_columns('shop_transactions')]
+        has_col = lambda c: c in insp_cols  # noqa: E731
+        # 공통 파라미터
+        base_params = dict(
             user_id=user_id,
             product_id=pkg.code,
-            kind="gold",
+            kind='gold',
             quantity=req.quantity,
             unit_price=unit_price,
             amount=total_price_cents,
-            payment_method="card" if req.card_token else "unknown",
-            status="success",
+            payment_method='card' if req.card_token else 'unknown',
+            status='success',
             receipt_code=receipt_code,
             integrity_hash=integrity_hash,
-            receipt_signature=receipt_signature,
-            extra={
-                "limited": True,
-                "promo_code": req.promo_code,
-                "charge_id": cap.charge_id,
-            },
-        ))
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow(),
+        )
+        if has_col('receipt_signature'):
+            base_params['receipt_signature'] = receipt_signature
+        if has_col('idempotency_key'):
+            base_params['idempotency_key'] = None
+        # 최신 스키마(extra 존재) → ORM 사용 (flush로 즉시 검증)
+        if has_col('extra'):
+            db.add(models.ShopTransaction(
+                **{k: v for k, v in base_params.items() if k not in {'created_at','updated_at'}},
+                extra={
+                    'limited': True,
+                    'promo_code': req.promo_code,
+                    'charge_id': cap.charge_id,
+                },
+            ))
+            db.flush()  # flush here so schema 문제 즉시 감지
+        else:
+            # 레거시 스키마: 수동 INSERT (extra 컬럼 생략)
+            cols_clause = ",".join(base_params.keys())
+            values_clause = ",".join(f":{k}" for k in base_params.keys())
+            db.execute(sa.text(f"INSERT INTO shop_transactions ({cols_clause}) VALUES ({values_clause})"), base_params)
     except Exception:
-        # 영속화 실패는 치명적이지 않으나 감사 추적 공백 -> 메트릭/로그 필요 (간단히 패스)
         _metric_inc("limited", "fail", "TX_PERSIST")
 
     db.commit()

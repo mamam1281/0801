@@ -982,6 +982,8 @@ async def admin_promo_upsert(
         # 글로벌 코드로 취급: 모든 패키지에서 동일 코드 사용 시, 호출 시점에 필요한 패키지에 설정 필요
         pass
     LimitedPackageService.set_promo_max_uses(req.code, req.max_uses)
+    # 재업서트 시 이전 사용량 초기화 (테스트 일관성 위해)
+    LimitedPackageService.reset_promo_usage(req.code)
     return {"success": True, "message": "Upserted"}
 
 @router.post("/limited/period")
