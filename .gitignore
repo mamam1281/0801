@@ -14,7 +14,9 @@ dist/
 downloads/
 eggs/
 .eggs/
+# NOTE: Top-level Python lib/ ignored, but we need to keep frontend source in cc-webapp/frontend/lib
 lib/
+!cc-webapp/frontend/lib/
 lib64/
 parts/
 sdist/
