@@ -129,6 +129,39 @@ export function useAuth() {
         } finally { setLoading(false); }
     }, [api, applyTokens]);
 
+    const adminLogin = useCallback(async (site_id: string, password: string) => {
+        if (!site_id || !password) {
+            throw new Error('아이디와 비밀번호를 입력하세요');
+        }
+        setLoading(true);
+        try {
+            try {
+                const res = await api.call('/api/auth/admin/login', { method: 'POST', body: { site_id: site_id.trim(), password } }) as any;
+                applyTokens(res);
+                if (res && res.user) {
+                    setUser(res.user as AuthUser);
+                    return res.user as AuthUser;
+                }
+                // Fallback: profile fetch
+                const profile = await api.call('/api/auth/profile') as AuthUser;
+                setUser(profile);
+                return profile;
+            } catch (e: any) {
+                const msg = e?.message || '';
+                if (/Invalid credentials/i.test(msg)) {
+                    throw new Error('아이디 또는 비밀번호가 올바르지 않습니다. 다시 시도하세요.');
+                }
+                if (/Only admin users allowed/i.test(msg)) {
+                    throw new Error('관리자 계정만 접근할 수 있습니다.');
+                }
+                if (/Too many failed attempts/i.test(msg)) {
+                    throw new Error('로그인 시도 제한에 도달했습니다. 잠시 후 다시 시도하세요.');
+                }
+                throw e;
+            }
+        } finally { setLoading(false); }
+    }, [api, applyTokens]);
+
     // logout 먼저 선언 필요 (refresh 훅 의존 순서 문제 회피)
     const logout = useCallback(() => {
         if (refreshTimer.current) window.clearTimeout(refreshTimer.current);
@@ -170,7 +203,7 @@ export function useAuth() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    return { user, loading, signup, login, refresh, logout };
+    return { user, loading, signup, login, adminLogin, refresh, logout };
 }
 
 export type UseAuthReturn = ReturnType<typeof useAuth>;

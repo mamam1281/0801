@@ -110,26 +110,26 @@ export default function App() {
     } finally { setIsLoading(false); }
   }, [auth, setIsLoading, createUserData, updateUser, navigationHandlers, addNotification]);
 
-  const handleAdminLogin = React.useCallback(async (adminId: string, password: string): Promise<boolean> => {
-    setIsLoading(true);
-    try {
-      await auth.login(adminId, password);
-      if (!isAdminAccount(adminId, password)) {
-        console.warn('[App] 관리자 계정이 아님 – 토큰 폐기');
-        try { auth.logout(); } catch { /* ignore */ }
-        logout();
-        return false; // UI 에 실패 처리
+  const handleAdminLogin = React.useCallback(
+    async (adminId: string, password: string): Promise<boolean> => {
+      setIsLoading(true);
+      try {
+        await auth.adminLogin(adminId, password);
+        // 백엔드에서 관리자 검증을 처리하므로 프론트엔드 검증 불필요
+        const adminUser = createUserData(adminId, password, false);
+        updateUser(adminUser);
+        addNotification(NOTIFICATION_MESSAGES.ADMIN_LOGIN_SUCCESS);
+        navigationHandlers.toAdminPanel();
+        return true;
+      } catch (e) {
+        console.error('[App] 관리자 로그인 실패:', e);
+        return false;
+      } finally {
+        setIsLoading(false);
       }
-      const adminUser = createUserData(adminId, password, false);
-      updateUser(adminUser);
-      addNotification(NOTIFICATION_MESSAGES.ADMIN_LOGIN_SUCCESS);
-      navigationHandlers.toAdminPanel();
-      return true;
-    } catch (e) {
-      console.error('[App] 관리자 로그인 실패:', e);
-      return false;
-    } finally { setIsLoading(false); }
-  }, [auth, setIsLoading, createUserData, updateUser, navigationHandlers, addNotification, isAdminAccount]);
+    },
+    [auth, setIsLoading, createUserData, updateUser, navigationHandlers, addNotification]
+  );
 
   const handleLogout = React.useCallback(() => {
     try { auth.logout(); } catch { /* ignore */ }

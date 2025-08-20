@@ -13,7 +13,7 @@ export const APP_CONFIG = {
 // 🔐 관리자 계정 정보
 export const ADMIN_ACCOUNTS = [
   { id: 'md001', password: '123456' },
-  { id: 'admin', password: 'admin123' }
+  { id: 'admin', password: '123456' }
 ] as const;
 
 export const ADMIN_SECURITY_CODE = '123456';
