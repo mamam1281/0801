@@ -260,3 +260,37 @@ docker-compose restart backend
 4. (완료) OpenAPI 재생성: `backend/app/current_openapi.json` 및 timestamped 스냅샷 생성
 5. (완료) User02 익명화 스크립트 `scripts/reset_user_02.sql` 추가
 6. (예정) Admin DEV 전용 라우터에 User02 reset endpoint 추가 / 보상 경계 테스트(pytest)
+
+### 2025-08-20 (야간) VIP 일일 포인트 & Daily Claim 멱등 개선
+- 백엔드 변경:
+   - `users.vip_points` 컬럼 추가 (idempotent migration `add_vip_points.py`).
+   - `UserResponse` 스키마에 `vip_points` 노출 및 `/api/auth/me` 등 프로필 응답 경로 반영.
+   - 신규 라우터 `vip.py`:
+      - `POST /api/vip/claim` (멱등키: `vip:{user_id}:{UTC_YYYY-MM-DD}` + Redis 플래그 `vip_claimed:{user_id}:{date}` TTL 26h)
+      - `GET /api/vip/status` (금일 수령 여부/포인트 조회 `claimed_today`, `vip_points`, `last_claim_at`).
+   - Reward 로그: `UserReward(reward_type='VIP_DAILY', idempotency_key=...)` 기록.
+- 프론트 변경 (`HomeDashboard.tsx`):
+   - 하드코드된 `vipPoints=1250` 제거 → 서버 값 초기화(fallback camelCase/underscore).
+   - 일일 보상 모달 버튼 수령 후 비활성(`이미 수령됨`) 처리; 중복 클릭 로컬 증가 제거.
+   - TODO 주석: 보상 미리보기 금액을 서버 산식 응답으로 치환 예정.
+- 테스트: `test_vip_daily_claim.py` 추가 (동일일 중복 수령 시 단일 레코드 + idempotent 응답 확인).
+
+검증 결과:
+- VIP 첫 수령 후 동일 일자 재요청: HTTP 200, `idempotent=True`, DB `user_rewards` 동일 idempotency_key 1건 유지.
+- Streak 일일 보상: 로컬 임의 증가 제거 후 서버 authoritative 값만 반영(중복 수령 시 기존 값 재표시, gold 재증가 없음 확인).
+- User 프로필 응답에 `vip_points` 필드 노출 확인 (/api/auth/me).
+
+다음 단계:
+1. HomeDashboard 보상 미리보기 산식 → 서버 streak status 확장(예: 예상 next reward 금액)으로 완전 이관.
+2. user02 데이터 정리 자동화: `/api/dev/reset_user02` 호출 절차 final.md에 사용 예 추가 + CI 전 pre-step 스크립트화.
+3. VIP status 전용 E2E & OpenAPI 문서 스냅샷 재생성 (`python -m app.export_openapi`).
+
+### user02 데이터 초기화 실행 지침
+개발 중 잔여 목업 수치(골드/연속일)가 분석을 방해할 경우 dev 전용 리셋 엔드포인트 사용.
+1. 토큰 발급 후:
+    ```bash
+    curl -H "Authorization: Bearer <ACCESS_TOKEN>" -X POST http://localhost:8000/api/dev/reset_user02
+    ```
+2. 성공 시 user02 골드/경험치/출석 Redis 키 초기화, 익명화 규칙 적용.
+3. 프론트 재로그인 또는 `/api/auth/me` 재조회로 반영 확인.
+

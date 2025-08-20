@@ -17,6 +17,8 @@ class User(Base):
     invite_code = Column(String(10), nullable=False)  # 초대코드 (5858)
     # 단일 통화 시스템 - 골드만 사용
     gold_balance = Column(Integer, default=1000, nullable=False)  # 신규 가입 시 1000 골드 지급
+    # VIP 포인트 (일일 VIP 보상 전용 포인트)
+    vip_points = Column(Integer, default=0, nullable=False)
     is_active = Column(Boolean, default=True)
     is_admin = Column(Boolean, default=False)  # 관리자 여부
     # DB의 컬럼명은 'vip_tier' 이므로 name='vip_tier'로 매핑 (기존 'rank' 예약어 사용 회피)

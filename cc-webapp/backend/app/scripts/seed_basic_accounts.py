@@ -25,10 +25,18 @@ ADMIN_SPEC = {
     'is_admin': True,
 }
 
-USER_SPECS = [
-    {'site_id': f'user{n:03d}', 'nickname': f'유저{n:02d}', 'password': '123455'}
-    for n in range(1,5)
-]
+# user002 (유저02) 는 정책상 완전 삭제/비생성 요구 → 기본 시드에서 제외
+# 환경변수 INCLUDE_USER02=1 설정 시 임시 복구 가능
+import os
+EXCLUDED_SITE_IDS = {"user002"}
+INCLUDE_USER02 = os.getenv('INCLUDE_USER02', '0') == '1'
+
+USER_SPECS = []
+for n in range(1,5):
+    sid = f'user{n:03d}'
+    if sid in EXCLUDED_SITE_IDS and not INCLUDE_USER02:
+        continue
+    USER_SPECS.append({'site_id': sid, 'nickname': f'유저{n:02d}', 'password': '123455'})
 
 INVITE_CODE = '5858'
 
@@ -64,6 +72,20 @@ def main():
     sess = SessionLocal()
     results = []
     try:
+        # 먼저 제외 대상(user002) 존재 시 삭제 또는 익명화
+        for sid in EXCLUDED_SITE_IDS:
+            u = sess.execute(select(User).where(User.site_id == sid)).scalar_one_or_none()
+            if u is not None:
+                try:
+                    sess.delete(u)
+                    sess.flush()
+                    results.append({'site_id': sid, 'action': 'deleted'})
+                except Exception:
+                    # 삭제 실패(외래키 참조 등) 시 최소 익명화 처리
+                    u.nickname = f'{sid}_removed'
+                    u.password_hash = AuthService.get_password_hash('REMOVED!')
+                    u.is_active = False
+                    results.append({'site_id': sid, 'action': 'anonymized'})
         u, a = ensure_user(sess, ADMIN_SPEC)
         results.append({'site_id': u.site_id, 'action': a, 'is_admin': u.is_admin})
         for spec in USER_SPECS:

@@ -66,6 +66,8 @@ class UserResponse(BaseModel):
     last_login: Optional[datetime] = None
     # 단일 통화 시스템 - 골드만 사용
     gold_balance: int = 0
+    # VIP 일일 포인트 (별도 적립 시스템)
+    vip_points: int = 0
     # Progress / level (추가: 프론트 경험치/레벨 표시 정합성 확보)
     battlepass_level: int = 1
     experience: int = 0  # total_experience (없으면 0)

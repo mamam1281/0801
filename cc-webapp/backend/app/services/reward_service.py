@@ -1,8 +1,9 @@
-"""보상 관련 공용 유틸/service 모듈.
+"""보상 관련 최소 유틸/service 모듈.
 
-현재 streak 일일 보상에 사용되는 지수 감쇠 산식을 중앙화하여
-백엔드/프론트 간 일관성 유지. 추후 배틀패스/가챠/이벤트 보상 산식도
-여기에 집약 가능.
+슬림화 정책(2025-08-20):
+ - streak 일일 보상 산식만 유지 (calculate_streak_daily_reward)
+ - RewardService 에서 브로드캐스트/이메일 사이드이펙트 제거 (성능/결합도 축소)
+ - TokenService 잔액 업데이트만 보존
 """
 from __future__ import annotations
 from math import exp
@@ -24,21 +25,11 @@ def calculate_streak_daily_reward(streak_count: int) -> tuple[int, int]:
     return g, xp
 
 __all__ = ["calculate_streak_daily_reward"]
-import json
-import asyncio
 from typing import Optional, Dict, Any
-
 from sqlalchemy.orm import Session
-from sqlalchemy.exc import SQLAlchemyError  # Import SQLAlchemyError
-
+from sqlalchemy.exc import SQLAlchemyError
 from app import models
 from .token_service import TokenService
-# realtime hub (단순 브로드캐스트만 사용)
-try:  # pragma: no cover - optional during tests
-    from ..realtime import hub as _realtime_hub  # type: ignore
-except Exception:  # pragma: no cover
-    _realtime_hub = None
-from .email_service import EmailService
 
 class RewardService:
     """Service for handling reward distribution and management"""
@@ -47,8 +38,7 @@ class RewardService:
         self.db = db
         self.token_service = token_service or TokenService(db)
 
-    # 단일 add(commit) 호환 모드 플래그 (테스트 호환 목적)
-    SINGLE_ADD_COMPAT = True
+    SINGLE_ADD_COMPAT = True  # 기존 테스트 호환을 위한 최소 플래그 유지
 
     def distribute_reward(
         self,
@@ -93,7 +83,7 @@ class RewardService:
                             "awarded_at": link.claimed_at,
                         }
 
-        # Fresh grant path within a DB transaction
+    # Fresh grant path within a DB transaction (사이드이펙트 제거 버전)
         try:
             now = datetime.now(timezone.utc)
             # Currency effects
@@ -144,39 +134,6 @@ class RewardService:
             self.db.commit()
             self.db.refresh(user_reward)
 
-            # 브로드캐스트 (best-effort, 스로틀 적용 대상)
-            if _realtime_hub is not None:
-                try:
-                    loop = asyncio.get_running_loop()
-                    # reward_grant 이벤트
-                    loop.create_task(
-                        _realtime_hub.broadcast(
-                            {
-                                "type": "reward_grant",
-                                "user_id": user_id,
-                                "reward_type": reward.reward_type,
-                                "amount": amount,
-                                "source": source_description,
-                            }
-                        )
-                    )
-                    # balance_update 이벤트 (현재 토큰/코인 잔액 포함)
-                    try:
-                        balance = self.token_service.get_token_balance(user_id)
-                    except Exception:
-                        balance = None
-                    loop.create_task(
-                        _realtime_hub.broadcast(
-                            {
-                                "type": "balance_update",
-                                "user_id": user_id,
-                                "balance": balance,
-                            }
-                        )
-                    )
-                except RuntimeError:
-                    pass
-
             return {
                 "reward_id": reward.id,
                 "reward_type": reward.reward_type,
@@ -186,23 +143,7 @@ class RewardService:
         except SQLAlchemyError as e:
             self.db.rollback()
             raise e
-        finally:
-            # Best-effort reward email (do not block the transaction outcome)
-            try:
-                user = self.db.query(models.User).filter(models.User.id == user_id).first()
-                if user:
-                    EmailService().send_template_to_user(
-                        user,
-                        "reward",
-                        {
-                            "nickname": getattr(user, "nickname", getattr(user, "site_id", "user")),
-                            "reward": f"{reward_type}:{amount}",
-                            "balance": TokenService(self.db).get_token_balance(user_id),
-                        },
-                    )
-            except Exception:
-                # swallow errors (logging optional)
-                pass
+    # 이메일/브로드캐스트 사이드이펙트 제거 버전: finally 블록 삭제
 
     def grant_content_unlock(
         self,

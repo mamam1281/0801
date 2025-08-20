@@ -56,8 +56,10 @@ export function HomeDashboard({
   const [timeLeft, setTimeLeft] = useState({ hours: 23, minutes: 45, seconds: 12 });
   const [showLevelUpModal, setShowLevelUpModal] = useState(false);
   const [showDailyReward, setShowDailyReward] = useState(false);
+  const [dailyClaimed, setDailyClaimed] = useState(false); // 서버 상태 기반 일일 보상 수령 여부
   const [treasureProgress, setTreasureProgress] = useState(65);
-  const [vipPoints, setVipPoints] = useState(1250);
+  // vipPoints: 백엔드 UserResponse 필드 vip_points → 프론트 User 타입 camelCase 매핑 필요 시 fallback
+  const [vipPoints, setVipPoints] = useState((user as any)?.vip_points ?? (user as any)?.vipPoints ?? 0);
   const [isAchievementsExpanded, setIsAchievementsExpanded] = useState(false);
   const [streak, setStreak] = useState({
     count: user?.dailyStreak ?? 0,
@@ -118,6 +120,17 @@ export function HomeDashboard({
             next_reward: after.next_reward ?? null,
           });
         }
+        // VIP / streak claim status (daily claimed?)
+        try {
+          const resp = await fetch('/api/vip/status');
+          if (resp.ok) {
+            const vs = await resp.json();
+            if (mounted) {
+              setDailyClaimed(!!vs.claimed_today);
+              if (typeof vs.vip_points === 'number') setVipPoints(vs.vip_points);
+            }
+          }
+        } catch {}
         // Load protection & this month attendance (UTC now)
         try {
           const prot = await streakApi.protectionGet('DAILY_LOGIN');
@@ -177,11 +190,12 @@ export function HomeDashboard({
       }
       const data = await res.json();
       // data: { awarded_gold, awarded_xp, new_gold_balance, streak_count }
+      // 서버 authoritative 값 사용. fallback 로컬 계산 제거 (중복 증가 방지)
       const updatedUser = {
         ...user,
-        goldBalance: data.new_gold_balance ?? user.goldBalance + (data.awarded_gold || 0),
+        goldBalance: data.new_gold_balance ?? user.goldBalance,
         experience: (user.experience || 0) + (data.awarded_xp || 0),
-        dailyStreak: data.streak_count ?? user.dailyStreak + 1,
+        dailyStreak: data.streak_count ?? user.dailyStreak, // 서버 streak_count 그대로 반영
       };
       const { updatedUser: finalUser, leveledUp } = checkLevelUp(updatedUser);
       if (leveledUp) {
@@ -191,6 +205,8 @@ export function HomeDashboard({
       onUpdateUser(finalUser);
       onAddNotification(`🎁 일일 보상: ${(data.awarded_gold||0).toLocaleString()}G + ${(data.awarded_xp||0)}XP`);
       setShowDailyReward(false);
+  setDailyClaimed(true);
+  // 최신 프로필 재조회 대신 VIP 포인트는 streak 보상과 별개이므로 그대로 유지
     } catch (e:any) {
       onAddNotification('⚠️ 네트워크 오류: 보상 수령 실패');
     }
@@ -891,18 +907,21 @@ export function HomeDashboard({
 
               <div className="bg-gold-soft rounded-lg p-4 mb-6">
                 <div className="text-gold font-bold text-xl">
+                  {/* TODO: 서버 계산된 awarded_gold 표시로 대체. 현재 모달 오픈 시 미리보기는 streak.count 기반 예상치 */}
                   {(1000 + (streak.count ?? user.dailyStreak) * 500).toLocaleString()}G
                 </div>
                 <div className="text-sm text-muted-foreground">
+                  {/* TODO: 서버 계산 XP 반영 */}
                   + {50 + (streak.count ?? user.dailyStreak) * 25} XP
                 </div>
               </div>
 
               <Button
                 onClick={claimDailyReward}
-                className="w-full bg-gradient-gold hover:opacity-90 text-black font-bold py-3 btn-hover-lift"
+                disabled={dailyClaimed}
+                className="w-full bg-gradient-gold hover:opacity-90 text-black font-bold py-3 btn-hover-lift disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                보상 받기!
+                {dailyClaimed ? '이미 수령됨' : '보상 받기!'}
               </Button>
             </motion.div>
           </motion.div>
