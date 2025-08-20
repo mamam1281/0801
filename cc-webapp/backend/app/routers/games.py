@@ -969,70 +969,81 @@ async def place_crash_bet(
     db: Session = Depends(get_db)
 ):
     """
-    크래시 게임 베팅
+    크래시 게임 베팅 (단일 요청 내 시뮬레이션) 
+    개선 사항:
+    - 사용자 잔액 차감/승리 가산 단일 트랜잭션 처리
+    - 동시 중복 제출 방지용 행 잠금(SELECT ... FOR UPDATE) 기반 멱등 (초간단)
+    - broadcast 에 status 추가 (placed|auto_cashed)
+    - potential_win 과 별도로 simulated_max_win 제공 (auto_cashout 미지정 시 혼동 제거)
     """
     bet_amount = request.bet_amount
     auto_cashout_multiplier = request.auto_cashout_multiplier
-    
-    # 잔액 확인
-    current_tokens = SimpleUserService.get_user_tokens(db, current_user.id)
-    if current_tokens < bet_amount:
-        raise HTTPException(status_code=400, detail="토큰이 부족합니다")
-    
-    # 게임 ID 생성
-    import uuid
-    game_id = str(uuid.uuid4())
-    
-    # 잔액 차감
-    new_balance = SimpleUserService.update_user_tokens(db, current_user.id, -bet_amount)
-    
-    # 간단한 크래시 시뮬레이션
-    # 실제로는 실시간 소켓 연결로 구현해야 함
-    # Economy V2 활성 시 하우스 엣지를 반영하여 기대 승수를 낮춤
+
+    # ---- 트랜잭션 스코프 시작 ----
+    from sqlalchemy import select, text as _text
+    from sqlalchemy.exc import SQLAlchemyError
+    from ..models.auth_models import User as UserModel
     from ..core import economy
     from ..core.config import settings as _settings
-    v2_active = economy.is_v2_active(_settings)
-    base_multiplier = random.uniform(1.0, 5.0)
-    if v2_active:
-        # 목표 하우스엣지 7%: 간단히 최종 multiplier 를 (1 - edge) 스케일
-        # 추가로 폭발(버스트) 위험을 모사하기 위해 낮은 multiplier 로 클램프
-        adjusted = base_multiplier * (1 - economy.CRASH_HOUSE_EDGE)
-        # 하한/상한 안정화
-        multiplier = max(1.0, min(adjusted, 4.2))
-    else:
-        multiplier = base_multiplier
-    win_amount = 0
 
-    # 자동 캐시아웃 시뮬레이션 (V2에서도 동일 로직, multiplier 는 위에서 조정됨)
-    if auto_cashout_multiplier and multiplier >= auto_cashout_multiplier:
-        gross_win = bet_amount * auto_cashout_multiplier
-        if v2_active:
-            # 하우스 엣지 재확인: 기대값 줄이기 위해 win 금액에 추가 스케일 적용 (이중 적용 방지 위해 cap)
-            gross_win = int(gross_win * (1 - economy.CRASH_HOUSE_EDGE_ADJUST))
-        win_amount = int(gross_win)
-        if win_amount > 0:
-            new_balance = SimpleUserService.update_user_tokens(db, current_user.id, win_amount)
-    
-    # 플레이 기록 저장
-    action_data = {
-        "game_type": "crash",
-        "bet_amount": bet_amount,
-        "game_id": game_id,
-        "auto_cashout": auto_cashout_multiplier,
-        "actual_multiplier": multiplier,
-        "win_amount": win_amount
-    }
-    
-    _log_user_action(
-        db,
-        user_id=current_user.id,
-        action_type="CRASH_BET",
-        data=action_data
-    )
-
-    # Optional crash persistence (best-effort, no hard failure)
     try:
-        # Ensure session row exists
+        # 사용자 행 잠금 (비관적 락) → 동시 중복 베팅 중복 차감 방지
+        user_row = db.execute(
+            select(UserModel).where(UserModel.id == current_user.id).with_for_update()
+        ).scalar_one_or_none()
+        if not user_row:
+            raise HTTPException(status_code=404, detail="사용자 없음")
+        if user_row.cyber_token_balance < bet_amount:
+            raise HTTPException(status_code=400, detail="토큰이 부족합니다")
+
+        import uuid, random as _r
+        game_id = str(uuid.uuid4())
+
+        # Economy V2 활성화 여부 및 multiplier 결정
+        v2_active = economy.is_v2_active(_settings)
+        base_multiplier = _r.uniform(1.0, 5.0)
+        if v2_active:
+            adjusted = base_multiplier * (1 - economy.CRASH_HOUSE_EDGE)
+            multiplier = max(1.0, min(adjusted, 4.2))
+        else:
+            multiplier = base_multiplier
+
+        # 잔액 차감
+        user_row.cyber_token_balance -= bet_amount
+        if user_row.cyber_token_balance < 0:
+            user_row.cyber_token_balance = 0
+
+        win_amount = 0
+        status = "placed"
+        if auto_cashout_multiplier and multiplier >= auto_cashout_multiplier:
+            gross_win = bet_amount * auto_cashout_multiplier
+            if v2_active:
+                gross_win = int(gross_win * (1 - economy.CRASH_HOUSE_EDGE_ADJUST))
+            win_amount = int(gross_win)
+            if win_amount > 0:
+                user_row.cyber_token_balance += win_amount
+                status = "auto_cashed"
+
+        new_balance = user_row.cyber_token_balance
+
+        # 로그(UserAction) → 기존 함수 재사용
+        action_data = {
+            "game_type": "crash",
+            "bet_amount": bet_amount,
+            "game_id": game_id,
+            "auto_cashout": auto_cashout_multiplier,
+            "actual_multiplier": multiplier,
+            "win_amount": win_amount,
+            "status": status,
+        }
+        _log_user_action(
+            db,
+            user_id=current_user.id,
+            action_type="CRASH_BET",
+            data=action_data
+        )
+
+        # crash_sessions / crash_bets upsert (동일 트랜잭션)
         db.execute(text(
             """
             INSERT INTO crash_sessions (external_session_id, user_id, bet_amount, status, auto_cashout_multiplier, actual_multiplier, win_amount)
@@ -1047,12 +1058,11 @@ async def place_crash_bet(
             "external_session_id": game_id,
             "user_id": current_user.id,
             "bet_amount": bet_amount,
-            "status": "active",
+            "status": status if win_amount > 0 else "active",
             "auto_cashout_multiplier": auto_cashout_multiplier,
             "actual_multiplier": multiplier,
             "win_amount": win_amount,
         })
-        # Insert bet row
         db.execute(text(
             """
             INSERT INTO crash_bets (session_id, user_id, bet_amount, payout_amount, cashout_multiplier, status)
@@ -1068,31 +1078,37 @@ async def place_crash_bet(
             "payout_amount": win_amount if win_amount > 0 else None,
             "cashout_multiplier": auto_cashout_multiplier if win_amount > 0 else None,
         })
+
+        # GameHistory
+        try:
+            delta = -bet_amount + win_amount
+            log_game_history(
+                db,
+                user_id=current_user.id,
+                game_type="crash",
+                action_type="WIN" if win_amount > 0 else "BET",
+                delta_coin=delta,
+                result_meta={
+                    "bet": bet_amount,
+                    "auto_cashout": auto_cashout_multiplier,
+                    "actual_multiplier": multiplier,
+                    "win": win_amount,
+                    "status": status,
+                }
+            )
+        except Exception as e:
+            logger.warning(f"crash bet history log failed: {e}")
+
         db.commit()
-    except Exception as _e:
+    except HTTPException:
         db.rollback()
-        # Log softly without breaking API
-        logger.warning(f"Crash persistence skipped: {_e}")
-    
-    potential_win_raw = bet_amount * (auto_cashout_multiplier or multiplier)
-    if v2_active:
-        potential_win = int(potential_win_raw * (1 - economy.CRASH_HOUSE_EDGE_ADJUST))
-    else:
-        potential_win = int(potential_win_raw)
-    # GameHistory 로그 (return 이전)
-    try:
-        delta = -bet_amount + win_amount
-        log_game_history(
-            db,
-            user_id=current_user.id,
-            game_type="crash",
-            action_type="WIN" if win_amount > 0 else "BET",
-            delta_coin=delta,
-            result_meta={"bet": bet_amount, "auto_cashout": auto_cashout_multiplier, "actual_multiplier": multiplier, "win": win_amount}
-        )
-    except Exception as e:
-        logger.warning(f"crash bet history log failed: {e}")
-    # 실시간 브로드캐스트 (실패 허용)
+        raise
+    except SQLAlchemyError as e:
+        db.rollback()
+        logger.error(f"crash bet failed: {e}")
+        raise HTTPException(status_code=500, detail="크래시 베팅 처리 오류")
+
+    # 실시간 브로드캐스트 (commit 후)
     try:
         from ..realtime import hub
         await hub.broadcast({
@@ -1104,17 +1120,32 @@ async def place_crash_bet(
             "auto_cashout": auto_cashout_multiplier,
             "actual_multiplier": multiplier,
             "win": win_amount,
+            "status": status,
         })
     except Exception:
         pass
+
+    # potential_win / simulated_max_win 계산 (표시용)
+    potential_win_raw = bet_amount * (auto_cashout_multiplier or multiplier)
+    from ..core import economy as _economy  # 재사용
+    v2_active = _economy.is_v2_active(_settings)
+    if v2_active:
+        potential_win = int(potential_win_raw * (1 - _economy.CRASH_HOUSE_EDGE_ADJUST))
+    else:
+        potential_win = int(potential_win_raw)
+    simulated_max_win = int(bet_amount * multiplier)
+
     return {
         'success': True,
         'game_id': game_id,
         'bet_amount': bet_amount,
         'potential_win': potential_win,
         'max_multiplier': round(multiplier, 2),
-        'message': 'Bet placed' if win_amount == 0 else 'Auto-cashout triggered',
-        'balance': new_balance
+        'message': 'Bet placed' if status == 'placed' else 'Auto-cashout triggered',
+        'balance': new_balance,
+        # 추가 노출(스키마에는 없지만 프론트 용 확장 - 추후 스키마 업데이트 필요 시 반영)
+        'status': status,
+        'simulated_max_win': simulated_max_win,
     }
 
 # -------------------------------------------------------------------------

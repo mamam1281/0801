@@ -291,3 +291,5 @@ class CrashBetResponse(BaseModel):
     max_multiplier: Optional[float] = None
     message: str
     balance: int
+    status: Optional[str] = Field(default=None, description="베팅 직후 상태 placed|auto_cashed|active 등")
+    simulated_max_win: Optional[int] = Field(default=None, description="UI 표시용 – 현재 multiplier 기반 가상의 최대 승리금 (auto_cashout 미지정 시 안내)")
