@@ -28,6 +28,12 @@ import { QUICK_ACTIONS, ACHIEVEMENTS_DATA } from '../constants/dashboardData';
 import { Button } from './ui/button';
 import { Progress } from './ui/progress';
 import { streakApi } from '../utils/apiClient';
+import { getTokens } from '../utils/tokenStorage';
+import { useEvents } from '../hooks/useEvents';
+// useAuthGate 훅: default + named export 모두 지원. 경로/타입 오류 해결 위해 명시적 import
+// 경로 해석 문제로 상대경로 대신 tsconfig paths alias 사용
+import useAuthGate from '@/hooks/useAuthGate';
+import { apiGet } from '@/lib/simpleApi';
 
 interface HomeDashboardProps {
   user: User;
@@ -36,6 +42,7 @@ interface HomeDashboardProps {
   onNavigateToSettings?: () => void;
   onNavigateToShop?: () => void;
   onNavigateToStreaming?: () => void;
+  onNavigateToEvents?: () => void;
   onUpdateUser: (user: User) => void;
   onAddNotification: (message: string) => void;
   onToggleSideMenu: () => void;
@@ -48,18 +55,26 @@ export function HomeDashboard({
   onNavigateToSettings,
   onNavigateToShop,
   onNavigateToStreaming,
+  onNavigateToEvents,
   onUpdateUser,
   onAddNotification,
   onToggleSideMenu,
 }: HomeDashboardProps) {
-  // 카운트다운 (기존 로직 유지 – 추후 이벤트 TTL 연동 가능)
-  const [timeLeft, setTimeLeft] = useState({ hours: 23, minutes: 45, seconds: 12 });
+  // Auth Gate (클라이언트 마운트 후 토큰 판정)
+  const { isReady: authReady, authenticated } = useAuthGate();
+  // 이벤트: 비로그인 시 자동 로드 skip
+  const { events: activeEvents } = useEvents({ autoLoad: authenticated });
+  const [timeLeft, setTimeLeft] = useState({ hours: 0, minutes: 0, seconds: 0 });
   const [showLevelUpModal, setShowLevelUpModal] = useState(false);
   const [showDailyReward, setShowDailyReward] = useState(false);
+  // 랭킹 준비중 모달 상태
+  const [showRankingModal, setShowRankingModal] = useState(false);
   const [dailyClaimed, setDailyClaimed] = useState(false); // 서버 상태 기반 일일 보상 수령 여부
   const [treasureProgress, setTreasureProgress] = useState(65);
   // vipPoints: 백엔드 UserResponse 필드 vip_points → 프론트 User 타입 camelCase 매핑 필요 시 fallback
-  const [vipPoints, setVipPoints] = useState((user as any)?.vip_points ?? (user as any)?.vipPoints ?? 0);
+  const [vipPoints, setVipPoints] = useState(
+    (user as any)?.vip_points ?? (user as any)?.vipPoints ?? 0
+  );
   const [isAchievementsExpanded, setIsAchievementsExpanded] = useState(false);
   const [streak, setStreak] = useState({
     count: user?.dailyStreak ?? 0,
@@ -97,10 +112,31 @@ export function HomeDashboard({
     );
   };
 
-  // Fetch and tick daily login streak on mount (idempotent per backend TTL)
+  useEffect(() => {
+    if (!activeEvents || activeEvents.length === 0) return;
+    const doubleGoldEvent = (activeEvents as any[]).find((e) => e.title === '더블 골드 이벤트!');
+    if (!doubleGoldEvent) return;
+    const endTime = new Date(doubleGoldEvent.end_date);
+    const now = new Date();
+    const diff = endTime.getTime() - now.getTime();
+    if (diff > 0) {
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+      setTimeLeft({ hours, minutes, seconds });
+    }
+  }, [activeEvents]);
+
+  // Fetch & tick with client once-per-day guard (auth gate 의존)
   useEffect(() => {
     let mounted = true;
     const load = async () => {
+      if (!authReady) return; // 아직 판정 전
+      if (!authenticated) {
+        // eslint-disable-next-line no-console
+        console.debug('[HomeDashboard] 비로그인 → streak 관련 API skip');
+        return;
+      }
       try {
         // Get status first
         const status = await streakApi.status('DAILY_LOGIN');
@@ -111,26 +147,39 @@ export function HomeDashboard({
             next_reward: status.next_reward ?? null,
           });
         }
-        // Best-effort tick (backend guards with TTL)
-        const after = await streakApi.tick('DAILY_LOGIN');
-        if (mounted && after && typeof after === 'object') {
-          safeSetStreak({
-            count: after.count ?? 0,
-            ttl_seconds: after.ttl_seconds ?? null,
-            next_reward: after.next_reward ?? null,
-          });
+        const LS_KEY = 'streak.daily_login.lastTickUTCDate';
+        const todayUTC = new Date().toISOString().slice(0, 10);
+        let shouldTick = false;
+        try {
+          const last = localStorage.getItem(LS_KEY);
+          if (last !== todayUTC) shouldTick = true;
+        } catch {}
+        if (shouldTick) {
+          const after = await streakApi.tick('DAILY_LOGIN');
+          try {
+            localStorage.setItem(LS_KEY, todayUTC);
+          } catch {}
+          if (mounted && after && typeof after === 'object') {
+            safeSetStreak({
+              count: after.count ?? 0,
+              ttl_seconds: after.ttl_seconds ?? null,
+              next_reward: after.next_reward ?? null,
+            });
+          }
         }
         // VIP / streak claim status (daily claimed?)
         try {
-          const resp = await fetch('/api/vip/status');
-          if (resp.ok) {
-            const vs = await resp.json();
-            if (mounted) {
-              setDailyClaimed(!!vs.claimed_today);
-              if (typeof vs.vip_points === 'number') setVipPoints(vs.vip_points);
-            }
+          const vs = await apiGet('/api/vip/status');
+          if (mounted && vs && typeof vs === 'object') {
+            setDailyClaimed(!!vs.claimed_today);
+            if (typeof (vs as any).vip_points === 'number') setVipPoints((vs as any).vip_points);
           }
-        } catch {}
+        } catch (e: any) {
+          if (e?.status === 404) {
+            if (mounted) setDailyClaimed(false);
+          }
+          // 그 외 네트워크 오류는 무시
+        }
         // Load protection & this month attendance (UTC now)
         try {
           const prot = await streakApi.protectionGet('DAILY_LOGIN');
@@ -154,7 +203,7 @@ export function HomeDashboard({
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [authReady, authenticated]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -176,39 +225,90 @@ export function HomeDashboard({
   const experiencePercentage = calculateExperiencePercentage(user);
   const winRate = calculateWinRate(user);
 
+  const renderStreakLocked = () => (
+    <div className="mt-4 rounded-md border border-dashed border-neutral-600 p-4 text-sm text-neutral-400">
+      🔐 로그인 후 출석(스트릭) 정보와 일일 보상을 확인할 수 있습니다.
+    </div>
+  );
+
   const claimDailyReward = async () => {
+    const tokens = getTokens();
+    if (!tokens?.access_token) {
+      onAddNotification('🔐 로그인 후 이용 가능한 보상입니다. 먼저 로그인해주세요.');
+      return;
+    }
+    if (dailyClaimed) {
+      onAddNotification('🌞 오늘 일일 보상은 이미 수령 완료! 내일 다시 도전해주세요.');
+      return;
+    }
+
     try {
-      const res = await fetch('/api/streak/claim', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        onAddNotification(`⚠️ 수령 실패: ${err.detail || res.status}`);
-        return;
-      }
-      const data = await res.json();
+      const data = await streakApi.claim('DAILY_LOGIN');
       // data: { awarded_gold, awarded_xp, new_gold_balance, streak_count }
       // 서버 authoritative 값 사용. fallback 로컬 계산 제거 (중복 증가 방지)
-      const updatedUser = {
-        ...user,
-        goldBalance: data.new_gold_balance ?? user.goldBalance,
-        experience: (user.experience || 0) + (data.awarded_xp || 0),
-        dailyStreak: data.streak_count ?? user.dailyStreak, // 서버 streak_count 그대로 반영
-      };
-      const { updatedUser: finalUser, leveledUp } = checkLevelUp(updatedUser);
-      if (leveledUp) {
-        setShowLevelUpModal(true);
-        onAddNotification(`🆙 레벨업! ${finalUser.level}레벨 달성!`);
+      // 프로필 재조회 (실시간 동기화) - 서버 최종 상태 반영
+      try {
+        const fresh = await apiGet('/auth/profile');
+        if (fresh && typeof fresh === 'object') {
+          const mapped: any = {
+            ...user,
+            goldBalance: fresh.gold_balance ?? data.new_gold_balance ?? user.goldBalance,
+            experience: fresh.experience ?? fresh.xp ?? user.experience,
+            dailyStreak:
+              fresh.daily_streak ||
+              fresh.dailyStreak ||
+              fresh.streak ||
+              data.streak_count ||
+              user.dailyStreak,
+            level: fresh.level ?? user.level,
+            gameStats: fresh.game_stats || fresh.gameStats || user.gameStats,
+            vipPoints:
+              (fresh as any).vip_points ?? (fresh as any).vipPoints ?? (user as any).vipPoints,
+          };
+          const { updatedUser: finalUser, leveledUp } = checkLevelUp(mapped);
+          if (leveledUp) {
+            setShowLevelUpModal(true);
+            onAddNotification(`🆙 레벨업! ${finalUser.level}레벨 달성!`);
+          }
+          onUpdateUser(finalUser);
+        }
+      } catch (profileErr) {
+        // 재조회 실패 시 최소한 원래 계산 방식 fallback
+        const fallback = {
+          ...user,
+          goldBalance: data.new_gold_balance ?? user.goldBalance,
+          experience: (user.experience || 0) + (data.awarded_xp || 0),
+          dailyStreak: data.streak_count ?? user.dailyStreak,
+        };
+        const { updatedUser: finalUser, leveledUp } = checkLevelUp(fallback);
+        if (leveledUp) {
+          setShowLevelUpModal(true);
+          onAddNotification(`🆙 레벨업! ${finalUser.level}레벨 달성!`);
+        }
+        onUpdateUser(finalUser);
       }
-      onUpdateUser(finalUser);
-      onAddNotification(`🎁 일일 보상: ${(data.awarded_gold||0).toLocaleString()}G + ${(data.awarded_xp||0)}XP`);
+      onAddNotification(
+        `🎁 오늘 보상 획득! +${(data.awarded_gold || 0).toLocaleString()}G / +${data.awarded_xp || 0}XP`
+      );
       setShowDailyReward(false);
-  setDailyClaimed(true);
-  // 최신 프로필 재조회 대신 VIP 포인트는 streak 보상과 별개이므로 그대로 유지
-    } catch (e:any) {
-      onAddNotification('⚠️ 네트워크 오류: 보상 수령 실패');
+      setDailyClaimed(true);
+      // 최신 프로필 재조회 대신 VIP 포인트는 streak 보상과 별개이므로 그대로 유지
+    } catch (e: any) {
+      if (e?.message === 'Failed to fetch') {
+        onAddNotification(
+          '🌐 네트워크 문제로 보상 수령에 실패했습니다. 연결을 확인 후 다시 시도해주세요.'
+        );
+        return;
+      }
+      if (
+        e?.message?.includes('한 회원당 하루에 1번만') ||
+        e?.message?.includes('already claimed')
+      ) {
+        onAddNotification('🌞 오늘 보상은 이미 받으셨어요. 내일 접속하면 또 드릴게요!');
+        setDailyClaimed(true);
+      } else {
+        onAddNotification(`⚠️ 보상 수령 실패: ${e?.message || '네트워크 오류'}`);
+      }
     }
   };
 
@@ -242,7 +342,7 @@ export function HomeDashboard({
           }
           break;
         case '랭킹':
-          onAddNotification('🏆 랭킹 기능 준비중!');
+          setShowRankingModal(true);
           break;
       }
     },
@@ -294,6 +394,50 @@ export function HomeDashboard({
       </div>
 
       {/* Header */}
+      <AnimatePresence>
+        {showRankingModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="w-full max-w-md rounded-xl border border-neutral-700 bg-gradient-to-br from-background/90 to-black/80 p-6 shadow-2xl relative overflow-hidden"
+            >
+              <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_30%_20%,rgba(255,215,0,0.08),transparent_70%)]" />
+              <div className="relative z-10 text-center space-y-4">
+                <div className="mx-auto w-16 h-16 flex items-center justify-center rounded-full bg-gradient-to-br from-warning to-warning/30 border border-warning/40 shadow-inner">
+                  <Trophy className="w-8 h-8 text-warning" />
+                </div>
+                <h3 className="text-2xl font-bold bg-gradient-to-r from-warning to-gold bg-clip-text text-transparent">
+                  랭킹 준비중
+                </h3>
+                <p className="text-sm text-neutral-300 leading-relaxed">
+                  랭킹 시스템을 멋지게 준비하고 있어요!
+                  <br />곧 시즌 보상과 실시간 순위를 만나볼 수 있습니다.
+                </p>
+                <div className="flex flex-col gap-2 text-xs text-neutral-400">
+                  <div>예정 기능: 시즌제 포인트, 주간 TOP 100, 친구 비교</div>
+                  <div>필요한 의견이 있다면 피드백을 보내주세요.</div>
+                </div>
+                <div className="pt-2">
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => setShowRankingModal(false)}
+                  >
+                    닫기
+                  </Button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -911,8 +1055,7 @@ export function HomeDashboard({
                   {(1000 + (streak.count ?? user.dailyStreak) * 500).toLocaleString()}G
                 </div>
                 <div className="text-sm text-muted-foreground">
-                  {/* TODO: 서버 계산 XP 반영 */}
-                  + {50 + (streak.count ?? user.dailyStreak) * 25} XP
+                  {/* TODO: 서버 계산 XP 반영 */}+ {50 + (streak.count ?? user.dailyStreak) * 25} XP
                 </div>
               </div>
 

@@ -993,38 +993,57 @@ async def place_crash_bet(
         ).scalar_one_or_none()
         if not user_row:
             raise HTTPException(status_code=404, detail="사용자 없음")
-        if user_row.cyber_token_balance < bet_amount:
-            raise HTTPException(status_code=400, detail="토큰이 부족합니다")
+        if user_row.gold_balance < bet_amount:
+            raise HTTPException(status_code=400, detail="골드가 부족합니다")
 
         import uuid, random as _r
         game_id = str(uuid.uuid4())
 
-        # Economy V2 활성화 여부 및 multiplier 결정
-        v2_active = economy.is_v2_active(_settings)
-        base_multiplier = _r.uniform(1.0, 5.0)
-        if v2_active:
-            adjusted = base_multiplier * (1 - economy.CRASH_HOUSE_EDGE)
-            multiplier = max(1.0, min(adjusted, 4.2))
-        else:
-            multiplier = base_multiplier
+        # 개선된 크래시 멀티플라이어 로직 - 더 실제적이고 예측 불가능한 시스템
+        import time, hashlib
+        seed = f"{current_user.id}:{int(time.time() * 1000)}:{game_id}"
+        hash_val = int(hashlib.md5(seed.encode()).hexdigest()[:8], 16)
+        
+        # 5단계 확률 시스템으로 더 현실적인 분포 구현
+        random_val = (hash_val % 10000) / 10000.0  # 0.0000 - 0.9999
+        
+        if random_val < 0.35:    # 35% - 1.0x ~ 1.5x (낮은 배수, 높은 확률)
+            multiplier = 1.0 + (random_val / 0.35) * 0.5
+        elif random_val < 0.60:  # 25% - 1.5x ~ 2.5x (중간 배수)  
+            multiplier = 1.5 + ((random_val - 0.35) / 0.25) * 1.0
+        elif random_val < 0.80:  # 20% - 2.5x ~ 5.0x (높은 배수)
+            multiplier = 2.5 + ((random_val - 0.60) / 0.20) * 2.5
+        elif random_val < 0.95:  # 15% - 5.0x ~ 10.0x (매우 높은 배수)
+            multiplier = 5.0 + ((random_val - 0.80) / 0.15) * 5.0
+        else:                   # 5% - 10.0x ~ 50.0x (잭팟 배수)
+            multiplier = 10.0 + ((random_val - 0.95) / 0.05) * 40.0
+            
+        # 하우스 엣지 적용 (약 5% 하우스 수수료)
+        multiplier = max(1.01, multiplier * 0.95)
+        
+        # 소수점 둘째 자리로 반올림
+        multiplier = round(multiplier, 2)
 
         # 잔액 차감
-        user_row.cyber_token_balance -= bet_amount
-        if user_row.cyber_token_balance < 0:
-            user_row.cyber_token_balance = 0
+        user_row.gold_balance -= bet_amount
+        if user_row.gold_balance < 0:
+            user_row.gold_balance = 0
 
         win_amount = 0
         status = "placed"
+        
+        # 자동 캐시아웃 로직 - 중복 당첨 방지
         if auto_cashout_multiplier and multiplier >= auto_cashout_multiplier:
-            gross_win = bet_amount * auto_cashout_multiplier
-            if v2_active:
-                gross_win = int(gross_win * (1 - economy.CRASH_HOUSE_EDGE_ADJUST))
-            win_amount = int(gross_win)
-            if win_amount > 0:
-                user_row.cyber_token_balance += win_amount
-                status = "auto_cashed"
+            # 자동 캐시아웃 성공 - 한 번만 당첨 처리
+            net_win = int(bet_amount * (auto_cashout_multiplier - 1.0))  # 순이익만 계산
+            win_amount = net_win
+            user_row.gold_balance += net_win  # 순이익만 추가
+            status = "auto_cashed"
+        else:
+            # 크래시 발생 - 손실
+            status = "crashed"
 
-        new_balance = user_row.cyber_token_balance
+        new_balance = user_row.gold_balance
 
         # 로그(UserAction) → 기존 함수 재사용
         action_data = {
@@ -1078,6 +1097,42 @@ async def place_crash_bet(
             "payout_amount": win_amount if win_amount > 0 else None,
             "cashout_multiplier": auto_cashout_multiplier if win_amount > 0 else None,
         })
+
+        # 유저 게임 통계 업데이트
+        try:
+            current_stats = current_user.game_stats or {}
+            crash_stats = current_stats.get('crash', {
+                'totalGames': 0,
+                'highestMultiplier': 0,
+                'totalCashedOut': 0,
+                'averageMultiplier': 0
+            })
+            
+            # 게임 카운트 증가
+            crash_stats['totalGames'] = crash_stats.get('totalGames', 0) + 1
+            
+            # 성공적으로 캐시아웃한 경우에만 통계 업데이트
+            if win_amount > 0:
+                crash_stats['totalCashedOut'] = crash_stats.get('totalCashedOut', 0) + 1
+                crash_stats['highestMultiplier'] = max(
+                    crash_stats.get('highestMultiplier', 0),
+                    auto_cashout_multiplier or 0
+                )
+                
+                # 평균 멀티플라이어 계산
+                current_avg = crash_stats.get('averageMultiplier', 0)
+                total_cashed = crash_stats.get('totalCashedOut', 1)
+                crash_stats['averageMultiplier'] = (
+                    (current_avg * (total_cashed - 1) + (auto_cashout_multiplier or 0)) / total_cashed
+                )
+            
+            # 업데이트된 통계를 저장
+            current_stats['crash'] = crash_stats
+            current_user.game_stats = current_stats
+            db.add(current_user)
+            
+        except Exception as e:
+            logger.warning(f"crash game stats update failed: {e}")
 
         # GameHistory
         try:

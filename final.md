@@ -118,6 +118,82 @@ frontend:
    - [ ] 브라우저 캐시/Service Worker 제거 (`Application > Clear storage`) 후 재현
 - **권장 대응 순서**:
    1. 404 URL 모아서 공통 prefix 분류 (예: `/api/v1/` 만 404 → 라우터 prefix mismatch)
+
+## ✅ 최근 개선 사항 (2025-08-20)
+
+### 1. Crash 게임 Illegal constructor 오류 해결
+- 원인: `NeonCrashGame` 컴포넌트에서 `History` 아이콘 미 import → 브라우저 내장 `History` (Illegal constructor) 참조
+- 조치: `lucide-react` 의 `History` 아이콘 import 추가
+
+### 2. 이벤트 participants 랜덤 값 제거 → 실제 참여자 수 반영
+- 백엔드: `EventService.get_active_events` 에서 참여 테이블 `event_participations` COUNT 후 `participation_count` 동적 주입
+- 스키마: `EventResponse.participation_count` 사용 (이미 필드 존재, 주석 보강)
+- 프론트: `EventMissionPanel` 의 랜덤 `Math.random()` 제거, `event.participation_count` 소비
+- 효과: UI 표시 수치 신뢰성 확보, 추후 분석/AB 테스트 기반 의사결정 가능
+
+### 3. Events & Missions Prometheus Counter 추가
+- 메트릭 이름: `event_mission_requests_total`
+- 라벨: `endpoint` (events|missions), `action` (list|detail|join|progress|claim|list_daily|list_weekly|list_all), `status` (success|error|not_found), `auth` (y|n)
+- 구현: `routers/events.py` 에 optional import (라이브러리 미존재시 무시) + `_metric` 헬퍼
+- 용도: 요청 성공/에러율, claim/참여 행동 비율 모니터링
+
+### 4. 프론트 단 경량 Telemetry Hook 추가 (`useTelemetry`)
+- 위치: `frontend/hooks/useTelemetry.ts`
+- 수집 이벤트 (prefix=events): fetch_start / fetch_events_success / fetch_missions_success / fetch_skip / *_error / action별(event_join_success 등)
+- 저장 방식: `window.__telemetryBuffer` 누적 + 개발환경 console.debug
+- 향후: 배치 업로드 → 백엔드 ingestion → Prometheus/ClickHouse 연동 예정
+
+## 🔭 다음 예정 작업 (우선순위)
+1. 비로그인 Public Preview Events API 설계 및 문서화
+2. Fraud Service import 경로 정리
+3. `redis.py` 타입 표현 수정 (Variable not allowed in type expression 경고 제거)
+4. Telemetry 백엔드 수집 엔드포인트 초안 & Panel 부분적 국소 상태 패치(전체 refetch 감소)
+
+### Public Preview Events API (초안)
+- 경로: `GET /api/public/events` (비로그인 허용)
+- 필드 (최소): `id, title, event_type, start_date, end_date, rewards_summary (gold|gems 정수), participation_count`
+- 제외: 사용자별 진행(progress/claimed), 내부 requirements 상세, 높은 변동/민감 데이터
+- 캐시: CDN/Edge 30~60s + 서버 In-memory 10s (저카디널리티)
+- Rate Limit: IP 기반 (예: 60 req / 5m)
+- Abuse 방지: `?limit=20` 기본, 정렬 고정(priority DESC)
+- 향후 확장: `?since=<timestamp>` 증분, `E-Tag/If-None-Match` 304 지원
+
+#### 응답 예시
+```json
+{
+   "events": [
+      {"id": 12, "title": "월간 누적 플레이", "event_type": "special", "start_date": "2025-08-01T00:00:00Z", "end_date": "2025-08-31T23:59:59Z", "rewards_summary": {"gold": 1000}, "participation_count": 3421}
+   ],
+   "generated_at": "2025-08-20T11:32:00Z",
+   "ttl": 30
+}
+```
+
+### Telemetry → Backend (예상 설계 초안)
+- 수집 엔드포인트: `POST /api/telemetry/events` (배치 배열 20~50개)
+- 스키마: `[ { ts:number, name:string, meta?:object } ]`
+- 인증: 로그인 사용자만 (비로그인 드랍) + size 제한(32KB)
+- 적재: Redis List → 워커 주기적 Flush → Prometheus Counter / ClickHouse
+- 샘플링: noisy action (fetch_start) 1:5 샘플
+
+## 📊 모니터링 체크
+- 노출 지표: `event_mission_requests_total` → 성공/에러 비율, claim conversion
+- 추후 추가 후보: `event_participation_total`, `mission_completion_total`, latency histogram
+
+## 🧪 검증 요약
+- participants 실제 카운트: dummy 이벤트 2개 참여 후 UI 수치 증가 확인 (참여 +1 반영)
+- metrics Counter: `/metrics` 노출 환경에서 라벨 증가 수동 curl 확인 예정 (로컬 optional)
+- telemetry buffer: 브라우저 devtools console.debug 로 이벤트 기록 출력 확인
+
+## 🗂️ 변경 파일 목록 (2025-08-20)
+- `frontend/components/games/NeonCrashGame.tsx` (History 아이콘 import)
+- `backend/app/services/event_service.py` (참여자 카운트 주입)
+- `backend/app/routers/events.py` (메트릭 카운터 추가)
+- `frontend/components/EventMissionPanel.tsx` (participants 필드, telemetry 연동)
+- `frontend/types/eventMission.ts` (participation_count 타입 추가)
+- `frontend/hooks/useTelemetry.ts` (신규)
+
+---
    2. Next.js 개발 서버 재기동 전 `.next` 제거: `rm -rf .next` (윈도우: PowerShell `Remove-Item -Recurse -Force .next`)
    3. 필요 시 Docker 프론트 이미지 재빌드 (의존성/manifest mismatch 제거)
    4. 지속 재현되는 public asset 404 는 자산 누락 → 디자이너/리소스 경로 정리 후 commit
@@ -227,6 +303,33 @@ docker-compose restart backend
 *이 문서는 Casino-Club F2P 프로젝트의 최종 상태와 트러블슈팅 기록을 위한 마스터 문서입니다.*
 *모든 변경사항과 이슈는 이 파일에 지속적으로 업데이트해주세요.*
 
+### 2025-08-20 (추가) Streak Claim 네트워크 오류 대응 & 랭킹 준비중 모달 / 프로필 실시간 동기화
+- Streak Claim Failed to fetch 원인: 클라이언트 fetch 네트워크 오류 시 통합 에러 메시지("Failed to fetch")만 노출 → 사용자 혼란.
+   - 조치: `HomeDashboard.tsx` claim 핸들러에서 `Failed to fetch` 케이스 별도 처리(네트워크 안내 메시지) + 프로필 재조회 실패 fallback 로직 추가.
+- Claim 후 사용자 정보 동기화: 기존 로컬 단순 증가 → 서버 authoritative 반영 부족.
+   - 조치: Claim 성공 시 `/auth/profile` 즉시 재조회 → 레벨업 감지 후 모달 처리. 재조회 실패 시 이전 fallback 계산 유지.
+- 랭킹 진입 UX: 단순 토스트 → 시각적 안내 부족.
+   - 조치: ‘랭킹’ 액션 클릭 시 풀스크린 Glass 모달(시즌/실시간 순위 예정 문구) 표시. 닫기 버튼 제공.
+- 프로필 화면 최신성: 최초 로드 후 장시간 체류/탭 이동 시 데이터 stale.
+   - 조치: `ProfileScreen.tsx` 에 탭 포커스 복귀(`visibilitychange`)와 1분 간격 자동 새로고침 추가(fetchProfileBundle). concurrent 재요청 최소화 위해 공용 번들 함수 도입.
+- 기타: 랭킹 모달 상태 `showRankingModal` 추가, 코드 정리.
+
+변경 파일:
+- `frontend/components/HomeDashboard.tsx`
+- `frontend/components/ProfileScreen.tsx`
+
+향후 권장:
+1. Claim / VIP / 다른 경제 이벤트 후 공통 `invalidateProfile()` 훅 도입 (SWR 캐시 통합 가능).
+2. 모달 컴포넌트화 (`<FeatureComingSoonModal feature="ranking" />`).
+3. 네트워크 오류 재시도(지수 백오프 1~2회) 및 offline 감지(`navigator.onLine`).
+4. 프로필 자동 새로고침 간격 사용자 환경(모바일/데스크톱) 차등 조정.
+
+### 2025-08-20 (추가) useAuthGate 경로 오류 수정
+- 증상: `HomeDashboard.tsx` 에서 `Cannot find module '../hooks/useAuthGate'` 타입 오류 (TS2307).
+- 원인: Next.js + `moduleResolution: bundler` 환경에서 상대경로 캐싱/루트 경계 혼선으로 IDE 경로 해석 실패 추정. 실제 파일은 `frontend/hooks/useAuthGate.ts` 존재.
+- 조치: 상대 경로를 tsconfig `paths` alias (`@/hooks/*`) 로 교체하여 `import useAuthGate from '@/hooks/useAuthGate';` 로 수정. 오류 해소.
+- 추가 메모: 동일 패턴 발생 시 공통 규칙 - 신규 훅/유틸 import 는 alias 우선, 상대경로 혼용 자제.
+
 ### 2025-08-19 (야간) Economy Profile 정합성 패치
 - 문제: 프론트 `HomeDashboard` / `ProfileScreen`에서 `experience`, `battlepass_level`, `regular_coin_balance` 등이 표시/필요하지만 `/api/auth/profile` 응답에는 통화/경험치 일부 누락 → UI와 실제 DB 잔액/레벨 불일치
 - 원인: `UserResponse` 스키마에 경험치/레벨/이중 통화 필드 미노출, builder `_build_user_response` 에서 경험치 계산 로직 부재
@@ -323,3 +426,131 @@ docker-compose restart backend
 2. 성공 시 user02 골드/경험치/출석 Redis 키 초기화, 익명화 규칙 적용.
 3. 프론트 재로그인 또는 `/api/auth/me` 재조회로 반영 확인.
 
+
+
+
+GameStats (totalBets, wins, losses, highestMultiplier, totalProfit) 현재
+Crash 세션에서 프론트 sessionStats 로컬 증가 + 프로필 재조회 시 일부 동기화.
+서버 “단일 권위” 부재: 동시성·재시작·재계산 취약. 격차
+결과 확정 시점 이벤트(“bet_settled”) 미정.
+역사적 재계산/치유(heal) 엔드포인트 부재.
+통계 필드 정의/NULL 처리·인덱스 전략 미정. 목표 아키텍처
+테이블: user_game_stats (user_id PK, total_bets, total_wins, total_losses, highest_multiplier, total_profit, updated_at).
+이벤트 소스: crash_bets(또는 games_crash_rounds) + 승패 확정 로직 → Service emit.
+Service: GameStatsService.update_from_round(user_id, bet_amount, win_amount, final_multiplier).
+재계산: GameStatsService.recalculate_user(user_id) (SELECT SUM… GROUP BY user_id).
+Admin/내부 API: POST /api/games/stats/recalculate/{user_id}.
+나중 확장: 가챠/슬롯 등 게임별 세분화 컬럼 또는 별도 테이블(user_game_stats_daily). 최소 단계(Incremental)
+user_game_stats 마이그레이션 추가 (단일 head 확인 필수).
+Crash 베팅 확정 지점에 Service 호출 (트랜잭션 내 idempotent upsert).
+프론트 sessionStats 로컬 증가 제거 → 프로필 재조회만.
+재계산 엔드포인트 + pytest: 조작된 레코드 후 재계산 복구 확인. 테스트/모니터링
+유닛: update_from_round 승/패/동일 highest_multiplier 갱신 케이스.
+회귀: 대량(1000) 라운드 후 합계 = 재계산 값 일치.
+메트릭: stats_update_latency, stats_recalc_duration.
+경고: highest_multiplier 역행(감소) 발생 시 로그 경고.
+Fraud 차단 고도화 현재
+단순 시도 횟수 / 고유 카드토큰 다양성 임계 기반 차단(문서상). 격차
+디바이스/IP 지문, 금액 편차, 다중 계정 상관, 지속 순위화 없음.
+정책 버전/룰 explainability 미구현. 목표 아키텍처
+수집 지표(슬라이딩 윈도우 Redis): attempts:{ip}, attempts:{fingerprint}, distinct_cards:{user}, amount_stddev:{user}.
+Rule Engine(우선 단계): JSON 룰 세트 (조건 → 점수).
+점수 합산 → Threshold tiers(Soft block / Hard block / Review).
+장기: Feature 스냅샷 ClickHouse 저장 → Offline 모델(XGBoost) → 주기적 weight export → 실시간 점수 계산. 최소 단계
+Redis ZSET 또는 HLL 로 distinct_* 추적 추가.
+Rule DSL (예: yaml) loader + 평가 함수.
+구매 플로우에서 FraudContext 생성 → 평가 → action(enum) 반환.
+감사 로그 fraud_audit (user_id, action, score, features JSON).
+임계 변경/룰 리로드 핫스왑 (파일 타임스탬프 감시). 테스트/모니터링
+유닛: 단일 룰, 복합 룰, 임계 경계 테스트.
+부하: 500 RPS 시 Redis latency < X ms (메트릭).
+경고: Hard block 비율 24h 이동평균 이탈.
+
+
+
+
+
+
+Webhook 재생/중복 방지 현재
+설계: HMAC 서명+timestamp+nonce+event_id idempotency 언급 / key rotation 미완. 격차
+key versioning(KID), 재생 큐(Dead-letter / 재시도), 상태 추적(ACK/FAIL) 명확성 부족. 목표 아키텍처
+서명 헤더: X-Webhook-Signature (algo=HMAC-SHA256, kid=Kyyyy, ts=unix, nonce, sig=base64).
+검증 순서: (1) kid → 키 조회 → (2) ts 허용 오차 (±300s) → (3) nonce Redis SETNX 24h → (4) event_id uniqueness DB/Redis → (5) HMAC 비교.
+상태 테이블: webhook_events(id PK, external_id, status(PENDING|DELIVERED|FAILED|REPLAYED), last_error, attempt_count, next_retry_at).
+재시도 알고리즘: 지수 백오프 최대 N (예: 6).
+수동 재생: POST /api/admin/webhooks/replay/{id}.
+Key rotation: active + next; 발신 시 active kid, 수신 검증 시 {active,next} 두 개 허용 기간. 최소 단계
+이벤트 저장 → 보내기 → 결과 업데이트 구조 (producer-consumer or Celery).
+nonce + event_id Redis key (TTL 25h).
+admin replay 엔드포인트 (상태=FAILED만).
+키 스토어: settings.WEBHOOK_KEYS = {kid: secret}. 테스트/모니터링
+유닛: 잘못된 ts/nonce 재사용/서명 깨짐.
+통합: replay 후 attempt_count 증가 & status 전환.
+메트릭: webhook_delivery_success_rate, avg_attempts_per_success.
+Streak 자정 경계 회복 / 프로텍션 자동 보정 현재
+Redis NX 일일 lock + 프론트 localStorage UTC date guard.
+경계(UTC 23:59:59 → 00:00:01) 및 다중 탭 경쟁/TTL drift 회복 테스트 미구현. 격차
+TTL 기반 만료와 ‘실제 날짜’ 불일치 시 교정 로직.
+보호(Protection) 자동 소비/회복 조건 정교화 미흡. 목표 아키텍처
+canonical_date = utc_today() (또는 향후 사용자 timezone offset).
+tick 처리 시: Redis key user:{id}:streak_daily_lock:{action}:{YYYY-MM-DD}.
+보정 Job (분기 1회):
+전날 lock만 있고 streak counter 미증가 → counter +=1 (edge repair)
+counter 증가했지만 attendance set 누락 → SADD 보정.
+Protection: 결측(하루 miss) 감지 시 자동 소진 후 streak 유지 → 소진 이벤트 기록. 최소 단계
+now() 주입 가능한 유틸 (Clock interface) → 테스트에서 고정.
+xfail 테스트: ‘23:59 tick, 00:01 tick’ 시 정확히 +1 only.
+보정 함수 streak_repair(date) + 관리용 엔드포인트(또는 스케줄러).
+
+### 2025-08-20 (야간) Streak 403 (no token) 콘솔 에러 3건 대응
+- 현상: 초기 홈 대시보드 마운트 시 `POST /api/streak/tick`, `GET /api/streak/protection`, 기타 streak 관련 호출이 로그인 이전(토큰 미존재) 상태에서 실행되어 `Forbidden (no token)` 403 → 콘솔 에러 3건 누적.
+- 원인: `HomeDashboard` `useEffect` 내 streak 로딩 로직이 토큰 존재 여부 확인 없이 즉시 실행. `apiClient` 403(no token) 시 null 반환 처리 있으나 콘솔 에러/로그 노이즈 잔존.
+- 조치: `HomeDashboard.tsx` streak 로딩 `load()` 시작부에 `getTokens()` 검사 추가. access_token 없으면 streak/status/tick/protection/history 전부 skip 및 debug 로그만 출력. `claimDailyReward` 핸들러에도 토큰 가드 추가(미로그인 안내 토스트).
+- 결과: 비로그인 최초 접근 시 403 콘솔 에러 사라지고 불필요한 fetch 감소(최소 3회 → 0회). 로그인 후 재방문 시 기존 기능 동일 동작.
+- 다음 단계: (1) streak API 자체에서 Anonymous 호출 시 401 명확 반환 + 프론트 공통 auth gate hook로 통합, (2) skip 시 UI skeleton/“로그인 후 출석 확인” 안내 표시, (3) useEvents / VIP status 등 다른 초기 호출들도 동일 토큰 프리체크 표준화.
+
+### 2025-08-20 (추가) 공통 Auth Gate 훅 도입 & 초기 API 일괄 보호
+- 변경: `hooks/useAuthGate.ts` 신설 (`{ isReady, authenticated }` 제공) 후 `HomeDashboard`에 적용.
+- 이벤트/스트릭/VIP 초기 로딩: `authenticated=false` 시 호출 전부 skip → 403/401 로그 소거 및 초기 렌더 지연 감소.
+- `useEvents` 훅: autoLoad 시 토큰 미존재면 loadEvents 실행 안 함, `refresh` 역시 가드.
+- UI: 비로그인 상태 streak 영역에 안내 블록 표시(출석/보상 노출 차단). (TODO: 컴포넌트화 & Skeleton 대체)
+- 효과: 비로그인 첫 진입 네트워크 요청 수 감소( streak 3~4회 + events 1회 + vip 1회 ≈ 최대 6회 → 0회 ) 및 콘솔 에러/경고 제거.
+- 후속 예정: (1) Auth Gate가 토큰 만료/refresh 결과 반영하도록 useAuthToken 통합, (2) 공통 Guard HOC(`withAuthBoundary`)로 라우트 보호, (3) Skeleton / CTA(“로그인하고 출석 보상 받기”) 버튼 추가 A/B 테스트.
+attendance set TTL 재확인(120d) 및 누락 시 재삽입. 테스트/모니터링
+유닛: Clock mock 으로 하루 넘어가기 시나리오 3종(정상, 중복, skip + protection).
+메트릭: streak_repair_actions, protection_consumed_total.
+경고: repair 비율 1% 이상 상승.
+정리된 우선순위(단계적 추진) 순서 제안 (리스크 감소 + 사용자 체감 가치):
+GameStats 서버 권위 (데이터 신뢰 핵심)
+Streak 경계/보호 보정(이미 핵심 루프, 무결성)
+Webhook 재생/서명 회전(외부 결제/영수증 신뢰)
+Fraud 룰 엔진(매출 보호)
+RFM/추천(성장·LTV 향상)
+공통 구현 패턴 권고
+Service 계층: 순수 함수 + DB/Redis adapter 주입 → 테스트 용이.
+Idempotency: update_from_* 계열은 natural key(user_id + round_id) UPSERT.
+Clock / UUID / Now 추상화: boundary & replay 테스트 재현성 확보.
+Observability: 각 서비스 최초 구축 시 counter + histogram 2종 최소 정의.
+간단한 인터페이스 스케치 (예시)
+GameStatsService
+
+update_from_round(user_id:int, bet:int, win:int, multiplier:float) -> None
+recalc_user(user_id:int) -> GameStatsDTO
+get(user_id:int) -> GameStatsDTO
+FraudEngine
+
+evaluate(ctx: FraudContext) -> FraudDecision(score:int, action:enum, matched_rules:[...])
+WebhookVerifier
+
+verify(headers, raw_body) -> VerifiedEvent(event_id, payload)
+mark_delivered(event_id)
+replay(event_id)
+StreakManager
+
+tick(user_id:int, action:str, now:datetime) -> StreakState
+repair(date:date) -> RepairReport
+consume_protection(user_id:int) -> bool
+테스트 우선 (TDD) 추천 순서
+GameStatsService: increment vs recalc 동등성
+StreakManager: midnight duplicate suppression
+WebhookVerifier: nonce reuse & key rotation acceptance

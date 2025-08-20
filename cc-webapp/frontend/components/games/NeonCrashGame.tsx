@@ -11,13 +11,9 @@ import {
   Volume2,
   VolumeX,
   Target,
-  Trophy,
-  Flame,
   AlertTriangle,
   ChevronUp,
   ChevronDown,
-  BarChart2,
-  History,
   Settings,
   RefreshCw,
 } from 'lucide-react';
@@ -44,8 +40,12 @@ export function NeonCrashGame({
   const [hasCashedOut, setHasCashedOut] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [autoCashout, setAutoCashout] = useState(0);
-  const [gameHistory, setGameHistory] = useState([] as Array<{ multiplier: number; win: boolean; amount: number }>);
-  const [lastCrashMultipliers, setLastCrashMultipliers] = useState([1.2, 3.7, 1.5, 8.2, 2.1] as number[]);
+  const [gameHistory, setGameHistory] = useState(
+    [] as Array<{ multiplier: number; win: boolean; amount: number }>
+  );
+  const [lastCrashMultipliers, setLastCrashMultipliers] = useState([
+    1.2, 3.7, 1.5, 8.2, 2.1,
+  ] as number[]);
   const [winAmount, setWinAmount] = useState(0);
   const [showGraph, setShowGraph] = useState(true);
   const [gameDataPoints, setGameDataPoints] = useState([] as Array<{ x: number; y: number }>);
@@ -69,52 +69,99 @@ export function NeonCrashGame({
     totalProfit: 0,
   });
 
-  // 게임 시작
-  const startGame = () => {
+  // 게임 시작 - 서버에서 실제 베팅 처리
+  const startGame = async () => {
     if (user.goldBalance < betAmount) {
       onAddNotification('베팅할 골드가 부족합니다.');
       return;
     }
 
-    // 유저 잔액 차감
-    onUpdateUser({
-      ...user,
-      goldBalance: user.goldBalance - betAmount,
-      gameStats: {
-        ...user.gameStats,
-        crash: {
-          ...user.gameStats.crash,
-          totalGames: user.gameStats.crash.totalGames + 1,
+    // 게임이 이미 실행 중이면 중복 시작 방지
+    if (isRunning) {
+      return;
+    }
+
+    try {
+      // 서버에 크래시 베팅 요청
+      const response = await fetch('/api/games/crash/bet', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${localStorage.getItem('token')}`,
         },
-      },
-    });
+        body: JSON.stringify({
+          bet_amount: betAmount,
+          auto_cashout_multiplier:
+            showAdvancedSettings && manualAutoCashout > 0 ? manualAutoCashout : null,
+        }),
+      });
 
-    // 이전 게임의 곡선 저장
-    if (gameDataPoints.length > 0) {
-      setLastGameCurve([...gameDataPoints]);
+      if (!response.ok) {
+        throw new Error('서버 요청 실패');
+      }
+
+      const gameResult = await response.json();
+
+      // 서버에서 받은 게임 결과로 애니메이션 시작
+      const finalMultiplier = gameResult.max_multiplier || 1.01;
+      const winAmount = gameResult.win_amount || 0;
+      const isWin = gameResult.status === 'auto_cashed';
+
+      // 이전 게임의 곡선 저장
+      if (gameDataPoints.length > 0) {
+        setLastGameCurve([...gameDataPoints]);
+      }
+
+      // 게임 상태 초기화
+      setMultiplier(1.0);
+      setIsRunning(true);
+      setHasCashedOut(isWin);
+      setWinAmount(winAmount);
+      setGameDataPoints([]);
+
+      // 자동 캐시아웃 설정
+      if (showAdvancedSettings && manualAutoCashout > 0) {
+        setAutoCashout(manualAutoCashout);
+      }
+
+      // 애니메이션을 위해 목표 멀티플라이어 설정
+      window._crashGameTarget = finalMultiplier;
+      window._crashGameWin = winAmount;
+      window._crashGameIsWin = isWin;
+
+      // 애니메이션 시작
+      lastTimestamp.current = performance.now();
+      animationRef.current = requestAnimationFrame(updateGame);
+
+      // 세션 통계 업데이트
+      setSessionStats((prev: any) => ({
+        ...prev,
+        totalBets: prev.totalBets + 1,
+      }));
+
+      // 사용자 잔액 업데이트 (서버에서 처리된 결과)
+      try {
+        const profileResponse = await fetch('/api/auth/profile', {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('token')}`,
+          },
+        });
+
+        if (profileResponse.ok) {
+          const updatedProfile = await profileResponse.json();
+          onUpdateUser({
+            ...user,
+            goldBalance: updatedProfile.gold_balance || user.goldBalance,
+            gameStats: updatedProfile.game_stats || user.gameStats,
+          });
+        }
+      } catch (error) {
+        console.error('프로필 업데이트 실패:', error);
+      }
+    } catch (error) {
+      console.error('크래시 게임 시작 실패:', error);
+      onAddNotification('게임 시작에 실패했습니다. 다시 시도해주세요.');
     }
-
-    // 게임 상태 초기화
-    setMultiplier(1.0);
-    setIsRunning(true);
-    setHasCashedOut(false);
-    setWinAmount(0);
-    setGameDataPoints([]);
-
-    // 자동 캐시아웃이 활성화된 경우 설정
-    if (showAdvancedSettings && manualAutoCashout > 0) {
-      setAutoCashout(manualAutoCashout);
-    }
-
-    // 애니메이션 시작
-    lastTimestamp.current = performance.now();
-    animationRef.current = requestAnimationFrame(updateGame);
-
-    // 세션 통계 업데이트
-    setSessionStats((prev: any) => ({
-      ...prev,
-      totalBets: prev.totalBets + 1,
-    }));
   };
 
   // 서버/클라이언트 사이드 렌더링을 위한 안전한 난수 생성기
@@ -190,7 +237,7 @@ export function NeonCrashGame({
       ctx.lineWidth = 2;
       ctx.beginPath();
 
-  lastGameCurve.forEach((point: { x: number; y: number }, index: number) => {
+      lastGameCurve.forEach((point: { x: number; y: number }, index: number) => {
         const x = (point.x / graphTimeScale) * rect.width;
         const y = rect.height - (point.y / 5) * rect.height;
 
@@ -215,7 +262,7 @@ export function NeonCrashGame({
       ctx.lineWidth = 3;
       ctx.beginPath();
 
-  gameDataPoints.forEach((point: { x: number; y: number }, index: number) => {
+      gameDataPoints.forEach((point: { x: number; y: number }, index: number) => {
         const x = (point.x / graphTimeScale) * rect.width;
         const y = rect.height - (point.y / 5) * rect.height;
 
@@ -287,10 +334,10 @@ export function NeonCrashGame({
         cashout();
       }
 
-      // 폭발 체크 (랜덤 시드 기반)
-      const crashProbability = 0.01 + newMultiplier * 0.005;
-      if (getRandomValue() < crashProbability) {
-        gameCrashed(newMultiplier);
+      // 폭발 체크 (서버에서 받은 목표 멀티플라이어 사용)
+      const targetMultiplier = (window as any)._crashGameTarget || 1.5;
+      if (newMultiplier >= targetMultiplier) {
+        gameCrashed(targetMultiplier);
         return;
       }
 
@@ -322,24 +369,40 @@ export function NeonCrashGame({
     const winnings = Math.floor(betAmount * multiplier);
     setWinAmount(winnings);
 
-    // 유저 잔액 증가 및 통계 업데이트
-    const updatedUser = {
-      ...user,
-      goldBalance: user.goldBalance + winnings,
-      gameStats: {
-        ...user.gameStats,
-        crash: {
-          ...user.gameStats.crash,
-          totalCashedOut: user.gameStats.crash.totalCashedOut + 1,
-          highestMultiplier: Math.max(user.gameStats.crash.highestMultiplier, multiplier),
-          averageMultiplier:
-            (user.gameStats.crash.averageMultiplier * user.gameStats.crash.totalCashedOut +
-              multiplier) /
-            (user.gameStats.crash.totalCashedOut + 1),
+    // 서버에서 업데이트된 유저 데이터를 다시 가져와야 합니다
+    // 로컬 상태 업데이트는 일시적이며, 실제 게임 통계는 서버에서 관리됩니다
+    try {
+      // 프로필을 다시 로드하여 서버에서 업데이트된 게임 통계를 가져옵니다
+      const response = await fetch('/api/auth/profile', {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('token')}`,
         },
-      },
-    };
-    onUpdateUser(updatedUser);
+      });
+
+      if (response.ok) {
+        const updatedProfile = await response.json();
+        onUpdateUser({
+          ...user,
+          goldBalance: user.goldBalance + winnings,
+          gameStats: updatedProfile.game_stats || user.gameStats,
+        });
+      } else {
+        // 프로필 로드 실패 시 로컬 상태만 업데이트
+        const updatedUser = {
+          ...user,
+          goldBalance: user.goldBalance + winnings,
+        };
+        onUpdateUser(updatedUser);
+      }
+    } catch (error) {
+      console.error('Failed to fetch updated profile:', error);
+      // 에러 시 로컬 상태만 업데이트
+      const updatedUser = {
+        ...user,
+        goldBalance: user.goldBalance + winnings,
+      };
+      onUpdateUser(updatedUser);
+    }
 
     // 게임 상태 업데이트
     setHasCashedOut(true);
@@ -367,22 +430,26 @@ export function NeonCrashGame({
     onAddNotification(`${winnings} 골드를 획득했습니다! (${multiplier.toFixed(2)}x)`);
   };
 
-  // 게임 폭발 (패배)
+  // 게임 종료 (크래시 또는 자동 캐시아웃)
   const gameCrashed = (finalMultiplier: number) => {
     if (animationRef.current) {
       cancelAnimationFrame(animationRef.current);
     }
 
     // 최근 멀티플라이어 업데이트
-  setLastCrashMultipliers((prev: number[]) => [finalMultiplier, ...prev].slice(0, 5));
+    setLastCrashMultipliers((prev: number[]) => [finalMultiplier, ...prev].slice(0, 5));
 
-    // 게임 기록 업데이트
-    if (!hasCashedOut) {
+    // 서버에서 받은 게임 결과 확인
+    const isWin = (window as any)._crashGameIsWin || false;
+    const serverWinAmount = (window as any)._crashGameWin || 0;
+
+    if (isWin && serverWinAmount > 0) {
+      // 자동 캐시아웃 성공
       setGameHistory((prev: Array<{ multiplier: number; win: boolean; amount: number }>) => [
         {
           multiplier: finalMultiplier,
-          win: false,
-          amount: -betAmount,
+          win: true,
+          amount: serverWinAmount,
         },
         ...prev,
       ]);
@@ -390,13 +457,46 @@ export function NeonCrashGame({
       // 세션 통계 업데이트
       setSessionStats((prev: any) => ({
         ...prev,
-        losses: prev.losses + 1,
-        totalProfit: prev.totalProfit - betAmount,
+        wins: prev.wins + 1,
+        highestMultiplier: Math.max(prev.highestMultiplier, finalMultiplier),
+        totalProfit: prev.totalProfit + serverWinAmount - betAmount,
       }));
+
+      onAddNotification(
+        `자동 캐시아웃! ${serverWinAmount} 골드를 획득했습니다! (${finalMultiplier.toFixed(2)}x)`
+      );
+      setWinAmount(serverWinAmount);
+      setHasCashedOut(true);
+    } else {
+      // 크래시 (패배)
+      if (!hasCashedOut) {
+        setGameHistory((prev: Array<{ multiplier: number; win: boolean; amount: number }>) => [
+          {
+            multiplier: finalMultiplier,
+            win: false,
+            amount: -betAmount,
+          },
+          ...prev,
+        ]);
+
+        // 세션 통계 업데이트
+        setSessionStats((prev: any) => ({
+          ...prev,
+          losses: prev.losses + 1,
+          totalProfit: prev.totalProfit - betAmount,
+        }));
+
+        onAddNotification(`크래시! ${finalMultiplier.toFixed(2)}x에서 터졌습니다.`);
+      }
     }
 
     // 게임 종료
     setIsRunning(false);
+
+    // 전역 변수 정리
+    delete (window as any)._crashGameTarget;
+    delete (window as any)._crashGameWin;
+    delete (window as any)._crashGameIsWin;
   };
 
   // 베팅 금액 변경
@@ -831,25 +931,29 @@ export function NeonCrashGame({
 
             <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2">
               {gameHistory.length > 0 ? (
-                gameHistory.slice(0, 8).map((game: { multiplier: number; win: boolean; amount: number }, index: number) => (
-                  <div
-                    key={index}
-                    className={`flex justify-between items-center p-3 rounded-lg ${
-                      game.win
-                        ? 'bg-success/10 border border-success/20'
-                        : 'bg-error/10 border border-error/20'
-                    }`}
-                  >
-                    <div className="flex flex-col">
-                      <span className="font-medium">{game.multiplier.toFixed(2)}x</span>
-                      <span className="text-xs text-muted-foreground">베팅: {betAmount} G</span>
-                    </div>
-                    <div className={`font-bold ${game.win ? 'text-success' : 'text-error'}`}>
-                      {game.win ? '+' : ''}
-                      {game.amount}
-                    </div>
-                  </div>
-                ))
+                gameHistory
+                  .slice(0, 8)
+                  .map(
+                    (game: { multiplier: number; win: boolean; amount: number }, index: number) => (
+                      <div
+                        key={index}
+                        className={`flex justify-between items-center p-3 rounded-lg ${
+                          game.win
+                            ? 'bg-success/10 border border-success/20'
+                            : 'bg-error/10 border border-error/20'
+                        }`}
+                      >
+                        <div className="flex flex-col">
+                          <span className="font-medium">{game.multiplier.toFixed(2)}x</span>
+                          <span className="text-xs text-muted-foreground">베팅: {betAmount} G</span>
+                        </div>
+                        <div className={`font-bold ${game.win ? 'text-success' : 'text-error'}`}>
+                          {game.win ? '+' : ''}
+                          {game.amount}
+                        </div>
+                      </div>
+                    )
+                  )
               ) : (
                 <div className="text-center text-muted-foreground py-4">게임 기록이 없습니다</div>
               )}
@@ -868,178 +972,6 @@ export function NeonCrashGame({
                 </Button>
               </div>
             )}
-          </motion.div>
-
-          {/* 상세 게임 통계 */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.6 }}
-            className="glass-effect rounded-xl p-6"
-          >
-            <h3 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
-              <Trophy className="w-5 h-5 text-gold" />
-              게임 통계
-            </h3>
-
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-background/50 p-3 rounded-lg">
-                  <div className="text-xs text-muted-foreground">총 게임 수</div>
-                  <div className="font-bold">{user.gameStats.crash.totalGames}</div>
-                </div>
-                <div className="bg-background/50 p-3 rounded-lg">
-                  <div className="text-xs text-muted-foreground">최고 멀티플라이어</div>
-                  <div className="font-bold text-primary">
-                    {user.gameStats.crash.highestMultiplier
-                      ? user.gameStats.crash.highestMultiplier.toFixed(2)
-                      : '0.00'}
-                    x
-                  </div>
-                </div>
-                <div className="bg-background/50 p-3 rounded-lg">
-                  <div className="text-xs text-muted-foreground">캐시아웃 횟수</div>
-                  <div className="font-bold">{user.gameStats.crash.totalCashedOut}</div>
-                </div>
-                <div className="bg-background/50 p-3 rounded-lg">
-                  <div className="text-xs text-muted-foreground">평균 멀티플라이어</div>
-                  <div className="font-bold">
-                    {user.gameStats.crash.averageMultiplier
-                      ? user.gameStats.crash.averageMultiplier.toFixed(2)
-                      : '0.00'}
-                    x
-                  </div>
-                </div>
-              </div>
-
-              {/* 추가 통계 패널 */}
-              <div className="space-y-2 mt-3">
-                <div className="bg-background/30 p-3 rounded-lg">
-                  <div className="flex justify-between items-center mb-1.5">
-                    <div className="text-xs text-muted-foreground">성공률</div>
-                    <div className="text-xs font-medium">
-                      {user.gameStats.crash.totalGames > 0
-                        ? Math.floor(
-                            (user.gameStats.crash.totalCashedOut /
-                              user.gameStats.crash.totalGames) *
-                              100
-                          )
-                        : 0}
-                      %
-                    </div>
-                  </div>
-                  <div className="w-full bg-background/50 h-1.5 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-primary"
-                      style={{
-                        width: `${
-                          user.gameStats.crash.totalGames > 0
-                            ? (user.gameStats.crash.totalCashedOut /
-                                user.gameStats.crash.totalGames) *
-                              100
-                            : 0
-                        }%`,
-                      }}
-                    ></div>
-                  </div>
-                </div>
-
-                <div className="bg-background/30 p-3 rounded-lg">
-                  <div className="flex justify-between items-center mb-1.5">
-                    <div className="text-xs text-muted-foreground">예상 수익률</div>
-                    <div
-                      className={`text-xs font-medium ${
-                        sessionStats.totalBets > 0 && sessionStats.totalProfit > 0
-                          ? 'text-success'
-                          : sessionStats.totalBets > 0 && sessionStats.totalProfit < 0
-                            ? 'text-error'
-                            : ''
-                      }`}
-                    >
-                      {sessionStats.totalBets > 0
-                        ? `${(
-                            (sessionStats.totalProfit / (sessionStats.totalBets * betAmount)) *
-                            100
-                          ).toFixed(1)}%`
-                        : '0.0%'}
-                    </div>
-                  </div>
-                  <div className="flex text-xs justify-between">
-                    <div className="text-muted-foreground">누적 베팅:</div>
-                    <div className="font-medium">{sessionStats.totalBets * betAmount} G</div>
-                  </div>
-                </div>
-              </div>
-
-              {/* 세션 통계 */}
-              <div className="mt-4 pt-4 border-t border-border">
-                <h4 className="text-sm font-semibold mb-3 flex items-center gap-1">
-                  <Flame className="w-4 h-4 text-error" />
-                  현재 세션
-                </h4>
-
-                <div className="grid grid-cols-3 gap-2 text-center">
-                  <div>
-                    <div className="text-xs text-muted-foreground">승리</div>
-                    <div className="font-medium text-success">{sessionStats.wins}</div>
-                  </div>
-                  <div>
-                    <div className="text-xs text-muted-foreground">패배</div>
-                    <div className="font-medium text-error">{sessionStats.losses}</div>
-                  </div>
-                  <div>
-                    <div className="text-xs text-muted-foreground">승률</div>
-                    <div className="font-medium">
-                      {sessionStats.totalBets > 0
-                        ? Math.floor((sessionStats.wins / sessionStats.totalBets) * 100)
-                        : 0}
-                      %
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-2 p-2 rounded bg-background/50 flex justify-between items-center">
-                  <div className="text-xs">총 수익:</div>
-                  <div
-                    className={`font-bold ${
-                      sessionStats.totalProfit > 0
-                        ? 'text-success'
-                        : sessionStats.totalProfit < 0
-                          ? 'text-error'
-                          : ''
-                    }`}
-                  >
-                    {sessionStats.totalProfit > 0 ? '+' : ''}
-                    {sessionStats.totalProfit} G
-                  </div>
-                </div>
-
-                <div className="mt-3">
-                  <div className="text-xs mb-1 flex justify-between">
-                    <span className="text-muted-foreground">최고 멀티플라이어:</span>
-                    <span className="font-medium text-primary">
-                      {sessionStats.highestMultiplier > 0
-                        ? sessionStats.highestMultiplier.toFixed(2)
-                        : '0.00'}
-                      x
-                    </span>
-                  </div>
-                  <div className="text-xs mb-1 flex justify-between">
-                    <span className="text-muted-foreground">연승/연패:</span>
-                    <span className="font-medium">0승 / 0패</span>
-                  </div>
-                  <div className="text-xs flex justify-between">
-                    <span className="text-muted-foreground">평균 캐시아웃:</span>
-                    <span className="font-medium">
-                      {sessionStats.wins > 0
-                        ? (sessionStats.highestMultiplier / sessionStats.wins).toFixed(2)
-                        : '0.00'}
-                      x
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
           </motion.div>
         </div>
       </div>

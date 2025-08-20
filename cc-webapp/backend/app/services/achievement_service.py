@@ -49,6 +49,11 @@ class AchievementService:
 
         Returns list of unlocked achievement codes.
         """
+        # 하드코딩된 설정값을 사용하지 않도록 실제 유저 액션인지 확인
+        metadata = history.metadata or {}
+        if not metadata.get("is_user_action", False):
+            return []  # 실제 유저 액션이 아니면 업적 처리 안함
+            
         unlocked_codes: List[str] = []
         active = self.list_active()
         for ach in active:

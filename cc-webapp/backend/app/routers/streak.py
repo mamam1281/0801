@@ -10,6 +10,7 @@ from ..models.game_models import UserReward
 from ..database import get_db
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy import func
 from ..utils.redis import (
     update_streak_counter,
     get_streak_counter,
@@ -221,6 +222,20 @@ async def claim(
     streak_count = get_streak_counter(str(current_user.id), action_type)
     if streak_count <= 0:
         raise HTTPException(status_code=400, detail="No active streak to claim")
+        
+    # 오늘 이미 보상을 받았는지 확인
+    claim_day = datetime.utcnow().date().isoformat()
+    existing_today = (
+        db.query(UserReward)
+        .filter(
+            UserReward.user_id == current_user.id,
+            UserReward.reward_type == "STREAK_DAILY",
+            func.date(UserReward.created_at) == func.date(datetime.utcnow())
+        )
+        .first()
+    )
+    if existing_today:
+        raise HTTPException(status_code=400, detail="한 회원당 하루에 1번만 연속 보상을 받을 수 있습니다")
 
     # 멱등키: user_id + action_type + UTC date
     claim_day = datetime.utcnow().date().isoformat()
@@ -274,6 +289,7 @@ async def claim(
         if hasattr(current_user, 'experience'):
             current_user.experience = (current_user.experience or 0) + xp
 
+        # 실제 유저 액션에만 반응하도록 하드코딩된 통계 증가 없음
         reward = UserReward(
             user_id=current_user.id,
             reward_type="STREAK_DAILY",
@@ -283,6 +299,7 @@ async def claim(
                 "action_type": action_type,
                 "streak_count": streak_count,
                 "formula": "C_exp_decay_v1",
+                "is_user_action": True,  # 실제 유저 액션 표시
             },
             idempotency_key=idempotency_key,
         )

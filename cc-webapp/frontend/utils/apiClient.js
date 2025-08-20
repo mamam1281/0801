@@ -364,6 +364,12 @@ export const streakApi = {
       body: JSON.stringify({ action_type: actionType })
     });
   },
+  claim: async (actionType = 'DAILY_LOGIN') => {
+    return await apiRequest('/api/streak/claim', {
+      method: 'POST',
+      body: JSON.stringify({ action_type: actionType })
+    });
+  },
   history: async (year, month, actionType = 'DAILY_LOGIN') => {
     return await apiRequest(`/api/streak/history?action_type=${encodeURIComponent(actionType)}&year=${year}&month=${month}`);
   },
