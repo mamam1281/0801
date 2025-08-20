@@ -433,6 +433,8 @@ docker-compose restart backend
 3. Cypress/Playwright E2E: seed→join→progress→claim→deactivate 자동화.
 4. 퍼블릭 프리뷰 이벤트 API (`/api/public/events`) 통합 후 비로그인 노출 전략.
 5. 모델 지수 자동 증가(실제 모델/게임 연계) 로직 연결 및 수동 버튼 제거.
+6. progress 덮어쓰기 레이스 방지: 서버 atomic increment endpoint 또는 SELECT ... FOR UPDATE 로직 도입.
+7. force-claim 멱등 표준화: already_claimed 상태 코드/에러 바디 명확화 및 문서화.
 
 **위험/주의**
 - useEvents updateProgress 현재 단일 progress 숫자 덮어쓰기 → 병렬 증가 경합 시 손실 가능 (낙관적 업데이트 vs 서버 원자 증가 엔드포인트 필요).
