@@ -74,6 +74,7 @@ from app.routers import email as email_router
 from app.kafka_client import start_consumer, stop_consumer, get_last_messages, is_consumer_ready
 from app.routers import streak
 from app.routers import abtest
+from app.routers import metrics  # Global metrics (social proof)
 
 # AI recommendation system router separate import (removed duplicate)
 
@@ -156,6 +157,37 @@ async def lifespan(app: FastAPI):
     except Exception as _:
         # Non-fatal: fail silently in production or if DB not ready
         pass
+
+    # --- AUTO_SEED_BASIC: 기본 관리자/테스트 유저 자동 시드 (멱등) ---
+    # 조건:
+    #   환경변수 AUTO_SEED_BASIC=1 이고 admin 계정이 없을 때만 실행 (멱등 보장)
+    # 목적:
+    #   컨테이너 재시작/초기 부팅 시 수동 seed 명령 누락으로 발생하는 로그인 실패 제거
+    # 위험 최소화:
+    #   프로덕션(ENVIRONMENT=prod)에서는 기본값 비활성; 명시 활성 시에도 admin 이미 존재하면 skip
+    try:
+        if os.getenv("AUTO_SEED_BASIC", "0") == "1":
+            from app.database import SessionLocal as _SeedSession
+            from app.models.auth_models import User as _SeedUser
+            seed_db = _SeedSession()
+            try:
+                has_admin = seed_db.query(_SeedUser).filter(_SeedUser.site_id == 'admin').first()
+                if not has_admin:
+                    try:
+                        from app.scripts import seed_basic_accounts as _seed_mod
+                        _seed_mod.main()
+                        print("🔧 AUTO_SEED_BASIC 적용: 기본 계정 생성 완료 (admin,user001~)")
+                        app.state.auto_seed_basic_applied = True  # 상태 플래그 (AdminStats 등에서 활용 가능)
+                    except Exception as se:
+                        print(f"⚠️ AUTO_SEED_BASIC 실패: {se}")
+                        app.state.auto_seed_basic_applied = False
+                else:
+                    app.state.auto_seed_basic_applied = False  # 이미 존재 → 신규 생성 아님
+            finally:
+                seed_db.close()
+    except Exception as e:
+        print(f"⚠️ AUTO_SEED_BASIC 래퍼 오류: {e}")
+
     start_scheduler()
     # Redis 초기화 (실패 허용)
     try:
@@ -331,6 +363,7 @@ app.include_router(games.router)
 # Phase 5: Invite System (no prefix - routers have their own)
 app.include_router(invite_router.router)  # 태그 오버라이드 제거 - 이미 invite_router.py에서 "Invite Codes" 태그를 지정함
 app.include_router(rbac_demo.router)  # New RBAC demo router included
+app.include_router(metrics.router)  # Global metrics endpoint
 
 # Phase 6: Analytics (no prefix - routers have their own)
 app.include_router(analyze.router)

@@ -5,6 +5,7 @@ Delegates business logic to services.auth_service.AuthService.
 """
 
 import logging
+import os
 from fastapi import APIRouter, Depends, HTTPException, status, Body, Request
 from pydantic import BaseModel, Field
 from fastapi.security import HTTPAuthorizationCredentials
@@ -317,6 +318,7 @@ async def login(data: UserLogin, request: Request, db: Session = Depends(get_db)
     try:
         # Lockout check
         if AuthService.is_login_locked(db, data.site_id):
+            # 실패 로그 기록
             AuthService.record_login_attempt(
                 db,
                 site_id=data.site_id,
@@ -325,7 +327,15 @@ async def login(data: UserLogin, request: Request, db: Session = Depends(get_db)
                 user_agent=request.headers.get("User-Agent") if request else None,
                 failure_reason="locked_out",
             )
-            raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Too many failed attempts")
+            # 사용자 친화 + 클라이언트 로직 구분이 가능한 구조적 detail 제공
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail={
+                    "error": "login_locked",
+                    "message": "로그인 시도 제한을 초과했습니다. 잠시 후 다시 시도해주세요.",
+                    "retry_after_minutes": int(os.getenv("LOGIN_LOCKOUT_MINUTES", "10")),
+                },
+            )
         user = AuthService.authenticate_user(db, data.site_id, data.password)
         if not user:
             # Record failure
@@ -337,7 +347,13 @@ async def login(data: UserLogin, request: Request, db: Session = Depends(get_db)
                 user_agent=request.headers.get("User-Agent") if request else None,
                 failure_reason="invalid_credentials",
             )
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail={
+                    "error": "invalid_credentials",
+                    "message": "아이디 또는 비밀번호가 올바르지 않습니다.",
+                },
+            )
         AuthService.update_last_login(db, user)
         # Record success
         AuthService.record_login_attempt(

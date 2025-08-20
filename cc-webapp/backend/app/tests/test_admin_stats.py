@@ -4,6 +4,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import text
 
 from app.main import app
+from app.routers import admin as admin_router
 from app.routers.admin import require_admin_access, get_admin_service
 from app.database import engine, SessionLocal
 from app.tests._testdb import reset_db
@@ -19,6 +20,12 @@ def setup_module(module):
     reset_db(engine)
     db = SessionLocal()
     try:
+        # Dependency override: require_admin_access 우회
+        async def _fake_admin():
+            class _U:  # 최소 속성만
+                is_admin = True
+            return _U()
+        app.dependency_overrides[admin_router.require_admin_access] = _fake_admin
         # 테스트 환경: Alembic 일괄 적용되지 않은 상태에서 모델이 receipt_signature 컬럼을 기대하여
         # INSERT 시 UndefinedColumn 오류가 발생하므로 컬럼 존재 검사 후 동적 추가 (idempotent)
         try:

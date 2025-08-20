@@ -64,10 +64,15 @@ class AdminService:
         total_users = self.db.query(models.User).count()
         active_users = self.db.query(models.User).filter(models.User.is_active == True).count()  # noqa: E712
         total_games_played = self.db.query(models.UserAction).count()
-        total_tokens_in_circulation = (
-            self.db.query(models.User.cyber_token_balance).all()
-        )
-        total_tokens_sum = sum(v[0] or 0 for v in total_tokens_in_circulation)
+        # cyber_token_balance 는 Python property (실제 컬럼 아님) 이므로 직접 SELECT 하면 SQLAlchemy 에러 발생.
+        # 통합 통화: gold_balance 컬럼 합계를 사용.
+        try:
+            from sqlalchemy import func
+            total_tokens_sum = self.db.query(func.coalesce(func.sum(models.User.gold_balance), 0)).scalar() or 0
+        except Exception:
+            # fallback: 전량 로드 (소규모 테스트 환경 안전)
+            balances = self.db.query(models.User.gold_balance).all()
+            total_tokens_sum = sum(b[0] or 0 for b in balances)
         return AdminService._Stats(
             total_users=total_users,
             active_users=active_users,
