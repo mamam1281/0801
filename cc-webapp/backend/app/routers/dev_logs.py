@@ -25,21 +25,16 @@ async def receive_logs(request: Request):
 
 
 @router.post('/reset_user02')
-async def reset_user02(db: Session = Depends(get_db), delete: bool = False):
-    """개발 전용: user id=2 (user02) 초기화 또는 완전 삭제.
-
-    기본(previous) 동작: 존재 없으면 생성 후 초기화 / 존재 시 상태 재설정.
-    신규(delete=true): user02 관련 모든 연관 레코드 삭제 후 users 행 제거 (요구: 목업 데이터 완전 제거).
+async def reset_user02(db: Session = Depends(get_db)):
+    """개발 전용: user id=2 (user02) 상태 초기화 / 존재하지 않으면 생성.
 
     수행 내용:
-    - ENVIRONMENT 이 development/local/dev 가 아니면 403
-    - delete 모드:
-        * user_actions / user_rewards / user_sessions 등 연관 데이터 삭제
-        * users.id=2 행 삭제 (존재하지 않으면 no-op)
-        * 반환: {action: deleted, deleted: {...}}
-    - reset 모드:
-        * 미존재 시 생성(site_id/nickname=user02) - 단 정책상 제거 요구이므로 호출자가 delete=false 를 의도적으로 사용할 때만 생성
-        * gold_balance=1000 등 기본값 재설정
+    - ENVIRONMENT 이 development 가 아니면 403
+    - 사용자(id=2) 없으면 생성(site_id/nickname=user02)
+    - gold_balance=1000, rank STANDARD, 기본 프로필 값 초기화
+    - 연관 활동/보상/세션 테이블 데이터 정리 (존재 시) - 대량 삭제 (성능 고려, synchronize_session=False)
+    - updated_at 갱신
+    반환: {action: created|reset, deleted: {actions,rewards,sessions}, user_id, gold_balance}
     """
     if settings.ENVIRONMENT not in ("development", "local", "dev"):
         raise HTTPException(status_code=403, detail="development only")
@@ -47,35 +42,6 @@ async def reset_user02(db: Session = Depends(get_db), delete: bool = False):
     # 필수 테이블 이름들 (존재하지 않을 수도 있으니 예외 무시)
     delete_counts = {"actions": 0, "rewards": 0, "sessions": 0}
     action = "reset"
-    if delete:
-        user = db.query(User).filter(User.id == 2).first()
-        if user:
-            # 연관 삭제 재사용
-            try:
-                for model_name, key in [
-                    ("UserAction", "actions"),
-                    ("UserReward", "rewards"),
-                    ("UserSession", "sessions"),
-                ]:
-                    model = getattr(__import__("app.models.game_models", fromlist=[model_name]), model_name, None)
-                    if not model and model_name == "UserSession":
-                        from app.models.auth_models import UserSession as US
-                        model = US
-                    if not model:
-                        continue
-                    try:
-                        cnt = db.query(model).filter(getattr(model, 'user_id') == user.id).delete(synchronize_session=False)
-                        delete_counts[key] = cnt
-                    except Exception:
-                        pass
-                db.delete(user)
-                db.commit()
-                return {"success": True, "action": "deleted", "deleted": delete_counts}
-            except Exception as e:
-                db.rollback()
-                raise HTTPException(status_code=500, detail=f"delete failed: {e}")
-        # already absent
-        return {"success": True, "action": "deleted", "deleted": delete_counts}
     user = db.query(User).filter(User.id == 2).first()
     if not user:
         # user02 생성

@@ -73,7 +73,7 @@ def _build_user_response(user: User) -> UserResponse:
         is_admin=getattr(user, "is_admin", False),
         is_active=getattr(user, "is_active", True),
         gold_balance=getattr(user, "gold_balance", 0),
-        vip_points=getattr(user, "vip_points", 0),
+    vip_points=getattr(user, "vip_points", 0),
         battlepass_level=level,
         experience=int(total_exp) if isinstance(total_exp, (int, float)) else 0,
         max_experience=int(max_exp),

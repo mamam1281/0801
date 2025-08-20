@@ -101,6 +101,35 @@ frontend:
 - **원인**: `start_period: 45s` 설정
 - **정상**: 시간이 지나면 `healthy`로 변경됨
 
+### 5. 프론트 404 `Failed to load resource: the server responded with a status of 404 (Not Found)`
+- **현상**: 브라우저 콘솔에 정적 리소스(JS, CSS, 이미지 또는 API 프리패치) 로드 실패 404 로그 다수 출력
+- **주요 패턴 분류**:
+   1. 잘못된 절대 경로(`/api/...` vs `/backend/...`) 호출
+   2. Next.js `app/` 라우트 segment 이동 후 남은 구버전 경로 Prefetch 링크
+   3. 빌드 산출물 캐시(`.next/cache`) 불일치로 stale manifest 참조
+   4. 이미지/아이콘 public 경로 누락 (`/public/*` 파일 미존재)
+   5. 개발 중 API 스키마 변경 후 클라이언트 fetch 경로 미동기화
+- **즉시 점검 체크리스트**:
+   - [ ] 콘솔 404 URL 전체 복사 → 실제 브라우저 직접 GET 시도 (진짜 미존재 vs CORS/리다이렉트 문제 구분)
+   - [ ] `cc-webapp/frontend/public` 에 해당 파일 존재 여부 확인
+   - [ ] `next.config.js` / `basePath` / `assetPrefix` 설정 변동 여부
+   - [ ] `app/` 디렉토리 내 라우트 구조와 요청 경로(slug, dynamic segment) 일치 여부
+   - [ ] 서버 사이드 API 404 인 경우 백엔드 `@router.get()` 경로 맞는지 / prefix(`/api`) 중복 여부 확인
+   - [ ] 브라우저 캐시/Service Worker 제거 (`Application > Clear storage`) 후 재현
+- **권장 대응 순서**:
+   1. 404 URL 모아서 공통 prefix 분류 (예: `/api/v1/` 만 404 → 라우터 prefix mismatch)
+   2. Next.js 개발 서버 재기동 전 `.next` 제거: `rm -rf .next` (윈도우: PowerShell `Remove-Item -Recurse -Force .next`)
+   3. 필요 시 Docker 프론트 이미지 재빌드 (의존성/manifest mismatch 제거)
+   4. 지속 재현되는 public asset 404 는 자산 누락 → 디자이너/리소스 경로 정리 후 commit
+   5. Prefetch 404 인 경우: 레이아웃/네비게이션 링크 경로 수정(`Link href`), 불필요한 legacy 경로 제거
+- **추가 예방 조치**:
+   - Git hook 또는 CI에서: `node scripts/check-static-refs.mjs` (빌드된 `.next/static` referenced asset 존재 검증) 도입 제안
+   - OpenAPI 경로 변경 시 `frontend/services/api.ts` 자동 재생성 스크립트 연결
+   - 이미지/사운드 파일명 규칙 문서화 (snake_case / 확장자 whitelist)
+   - 404 발생 상위 10개 경로 주간 리포트 (nginx or Next.js middleware 로깅) → 문서에 Append
+
+> NOTE: 현재 단일 케이스 문구만 제공되었으므로 실제 404 URL 수집 후 `final.md` 하단 *부록: 404 URL 샘플* 섹션 추가 권장.
+
 ## 🔍 트러블슈팅 가이드
 
 ### 포트 접속 불가 시

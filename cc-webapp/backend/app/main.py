@@ -112,6 +112,8 @@ if sentry_sdk and settings.SENTRY_DSN:
     except Exception as e:
         print(f"⚠️ Sentry init failed: {e}")
 
+from app.utils.schema_drift_guard import check_schema_drift
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
@@ -121,10 +123,18 @@ async def lifespan(app: FastAPI):
         print("📋 Logging initialized")
     except Exception as e:
         print(f"⚠️ Logging setup failed: {e}")
+
+    # Schema drift guard (skip only if explicitly disabled)
+    if os.getenv("DISABLE_SCHEMA_DRIFT_GUARD", "0") != "1":
+        drift = check_schema_drift()
+        if drift:
+            # In production we may want to abort startup; for now only log.
+            print("🚨 Critical schema drift detected (see logs). Continuing startup in DEV mode.")
+
     # If running in a test/dev environment, ensure a default test user exists so
     # legacy tests that POST /api/auth/login with site_id='testuser' succeed.
     try:
-        import os
+        # Use already imported top-level os (avoid shadowing leading to UnboundLocalError)
         is_test_db = "test" in os.getenv("DATABASE_URL", "") or os.getenv("PYTEST_CURRENT_TEST")
         if is_test_db:
             # import lazily to avoid heavy dependencies when not needed
