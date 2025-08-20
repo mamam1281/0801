@@ -1,4 +1,29 @@
+"""보상 관련 공용 유틸/service 모듈.
+
+현재 streak 일일 보상에 사용되는 지수 감쇠 산식을 중앙화하여
+백엔드/프론트 간 일관성 유지. 추후 배틀패스/가챠/이벤트 보상 산식도
+여기에 집약 가능.
+"""
+from __future__ import annotations
+from math import exp
 from datetime import datetime, timezone
+
+def calculate_streak_daily_reward(streak_count: int) -> tuple[int, int]:
+    """지수 감쇠(C안) 기반 골드/XP 산출.
+
+    Gold = 1000 + 800 * (1 - e^{-streak/6})  (≈ 1800 수렴)
+    XP   = 50   + 40  * (1 - e^{-streak/8})  (≈ 90 수렴)
+
+    Args:
+        streak_count: 현재 유지 중인 연속 출석 일수(>=0)
+    Returns:
+        (gold:int, xp:int)
+    """
+    g = int(round(1000 + 800 * (1 - exp(-streak_count / 6))))
+    xp = int(round(50 + 40 * (1 - exp(-streak_count / 8))))
+    return g, xp
+
+__all__ = ["calculate_streak_daily_reward"]
 import json
 import asyncio
 from typing import Optional, Dict, Any

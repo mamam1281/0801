@@ -163,27 +163,37 @@ export function HomeDashboard({
   const experiencePercentage = calculateExperiencePercentage(user);
   const winRate = calculateWinRate(user);
 
-  const claimDailyReward = () => {
-    const rewardGold = 1000 + user.dailyStreak * 500;
-    const bonusExp = 50 + user.dailyStreak * 25;
-
-    const updatedUser = {
-      ...user,
-      goldBalance: user.goldBalance + rewardGold,
-      experience: user.experience + bonusExp,
-      dailyStreak: user.dailyStreak + 1,
-    };
-
-    const { updatedUser: finalUser, leveledUp } = checkLevelUp(updatedUser);
-
-    if (leveledUp) {
-      setShowLevelUpModal(true);
-      onAddNotification(`🆙 레벨업! ${finalUser.level}레벨 달성!`);
+  const claimDailyReward = async () => {
+    try {
+      const res = await fetch('/api/streak/claim', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        onAddNotification(`⚠️ 수령 실패: ${err.detail || res.status}`);
+        return;
+      }
+      const data = await res.json();
+      // data: { awarded_gold, awarded_xp, new_gold_balance, streak_count }
+      const updatedUser = {
+        ...user,
+        goldBalance: data.new_gold_balance ?? user.goldBalance + (data.awarded_gold || 0),
+        experience: (user.experience || 0) + (data.awarded_xp || 0),
+        dailyStreak: data.streak_count ?? user.dailyStreak + 1,
+      };
+      const { updatedUser: finalUser, leveledUp } = checkLevelUp(updatedUser);
+      if (leveledUp) {
+        setShowLevelUpModal(true);
+        onAddNotification(`🆙 레벨업! ${finalUser.level}레벨 달성!`);
+      }
+      onUpdateUser(finalUser);
+      onAddNotification(`🎁 일일 보상: ${(data.awarded_gold||0).toLocaleString()}G + ${(data.awarded_xp||0)}XP`);
+      setShowDailyReward(false);
+    } catch (e:any) {
+      onAddNotification('⚠️ 네트워크 오류: 보상 수령 실패');
     }
-
-    onUpdateUser(finalUser);
-    onAddNotification(`🎁 일일 보상: ${rewardGold.toLocaleString()}G + ${bonusExp}XP`);
-    setShowDailyReward(false);
   };
 
   const handleSettings = () => {
@@ -551,7 +561,7 @@ export function HomeDashboard({
                 </div>
                 {attendanceDays && attendanceDays.length > 0 && (
                   <div className="text-[11px] text-muted-foreground/80">
-                    이번달 출석: {attendanceDays.length}일
+                    (월간 누적 {attendanceDays.length}일)
                   </div>
                 )}
               </div>
@@ -560,35 +570,41 @@ export function HomeDashboard({
               {attendanceDays && (
                 <div className="mt-2 border border-border-secondary/40 rounded-lg p-2">
                   {(() => {
+                    // 주간(일~토) 7일 캘린더로 전환
                     const now = new Date();
-                    const y = now.getUTCFullYear();
-                    const m = now.getUTCMonth(); // 0-based
-                    const first = new Date(Date.UTC(y, m, 1));
-                    const last = new Date(Date.UTC(y, m + 1, 0));
-                    const daysInMonth = last.getUTCDate();
-                    const startWeekday = first.getUTCDay(); // 0=Sun
-                    const cells: Array<{ label: string; dateStr?: string; active?: boolean }[]> =
-                      [];
-                    const week: Array<{ label: string; dateStr?: string; active?: boolean }> = [];
-                    // push empty cells before first day
-                    for (let i = 0; i < (startWeekday === 0 ? 0 : startWeekday); i++) {
-                      week.push({ label: '' });
-                    }
-                    for (let d = 1; d <= daysInMonth; d++) {
-                      const iso = new Date(Date.UTC(y, m, d)).toISOString().slice(0, 10);
-                      const active = attendanceDays.includes(iso);
-                      week.push({ label: String(d), dateStr: iso, active });
-                      if (week.length === 7) {
-                        cells.push([...week]);
-                        week.length = 0;
-                      }
-                    }
-                    if (week.length) {
-                      while (week.length < 7) week.push({ label: '' });
-                      cells.push([...week]);
+                    const todayUTC = new Date(
+                      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
+                    );
+                    const weekday = todayUTC.getUTCDay(); // 0=Sun
+                    const weekStart = new Date(todayUTC);
+                    weekStart.setUTCDate(todayUTC.getUTCDate() - weekday); // 일요일로 이동
+                    const days: Array<{
+                      label: string;
+                      dateStr: string;
+                      active: boolean;
+                      isToday: boolean;
+                    }> = [];
+                    for (let i = 0; i < 7; i++) {
+                      const d = new Date(
+                        Date.UTC(
+                          weekStart.getUTCFullYear(),
+                          weekStart.getUTCMonth(),
+                          weekStart.getUTCDate() + i
+                        )
+                      );
+                      const iso = d.toISOString().slice(0, 10);
+                      days.push({
+                        label: String(d.getUTCDate()),
+                        dateStr: iso,
+                        active: attendanceDays.includes(iso),
+                        isToday: iso === todayUTC.toISOString().slice(0, 10),
+                      });
                     }
                     return (
                       <div>
+                        <div className="text-[11px] text-muted-foreground/80 mb-1">
+                          이번 주 출석: {days.filter((d) => d.active).length}일
+                        </div>
                         <div className="grid grid-cols-7 gap-1 text-[10px] text-muted-foreground/70 mb-1">
                           {['일', '월', '화', '수', '목', '금', '토'].map((d) => (
                             <div key={d} className="text-center">
@@ -600,16 +616,20 @@ export function HomeDashboard({
                           className="grid gap-1"
                           style={{ gridTemplateColumns: 'repeat(7, minmax(0, 1fr))' }}
                         >
-                          {cells.flat().map((c, idx) => (
+                          {days.map((c, idx) => (
                             <div
                               key={idx}
-                              className={`h-6 rounded flex items-center justify-center text-[11px] ${
-                                c.active
-                                  ? 'bg-primary/30 text-foreground'
-                                  : 'bg-secondary/30 text-muted-foreground'
-                              }`}
+                              className={`h-6 rounded flex items-center justify-center text-[11px] relative select-none transition-colors duration-200
+                                ${c.active ? 'bg-primary/30 text-foreground' : 'bg-secondary/30 text-muted-foreground'}
+                                ${c.isToday ? 'ring-1 ring-primary/70 font-bold' : ''}`}
+                              title={c.dateStr}
                             >
                               {c.label}
+                              {c.isToday && (
+                                <span className="absolute -bottom-3 text-[9px] text-primary font-semibold">
+                                  오늘
+                                </span>
+                              )}
                             </div>
                           ))}
                         </div>

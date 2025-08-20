@@ -6,6 +6,10 @@ from pydantic import BaseModel
 
 from ..dependencies import get_current_user
 from ..models.auth_models import User
+from ..models.game_models import UserReward
+from ..database import get_db
+from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 from ..utils.redis import (
     update_streak_counter,
     get_streak_counter,
@@ -26,6 +30,15 @@ class StreakStatus(BaseModel):
     count: int
     ttl_seconds: Optional[int] = None
     next_reward: Optional[str] = None
+
+
+class StreakClaimResponse(BaseModel):
+    action_type: str
+    streak_count: int
+    awarded_gold: int
+    awarded_xp: int
+    new_gold_balance: int
+    claimed_at: datetime
 
 
 @router.get("/status", response_model=StreakStatus)
@@ -131,6 +144,96 @@ async def protection_status(
 ):
     enabled = get_streak_protection(str(current_user.id), action_type)
     return ProtectionStatus(action_type=action_type, enabled=enabled)
+
+
+# ----------------------
+# Claim (일일 보상 지급)
+# ----------------------
+class ClaimRequest(BaseModel):
+    action_type: Optional[str] = None
+
+from app.services.reward_service import calculate_streak_daily_reward
+
+
+@router.post("/claim", response_model=StreakClaimResponse)
+async def claim(
+    body: ClaimRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    action_type = body.action_type or DEFAULT_ACTION
+    # 현재 streak 읽기 (증가 없이)
+    streak_count = get_streak_counter(str(current_user.id), action_type)
+    if streak_count <= 0:
+        raise HTTPException(status_code=400, detail="No active streak to claim")
+
+    # 멱등키: user_id + action_type + UTC date
+    claim_day = datetime.utcnow().date().isoformat()
+    idempotency_key = f"streak:{current_user.id}:{action_type}:{claim_day}"
+
+    # 이미 동일 날 보상 지급된 경우 user_rewards 조회
+    existing = (
+        db.query(UserReward)
+        .filter(UserReward.user_id == current_user.id, UserReward.idempotency_key == idempotency_key)
+        .first()
+    )
+    if existing:
+        return StreakClaimResponse(
+            action_type=action_type,
+            streak_count=streak_count,
+            awarded_gold=existing.gold_amount or 0,
+            awarded_xp=existing.xp_amount or 0,
+            new_gold_balance=current_user.gold_balance,
+            claimed_at=existing.created_at,
+        )
+
+    gold, xp = calculate_streak_daily_reward(streak_count)
+
+    # 트랜잭션 처리
+    try:
+        # 유저 골드/XP 업데이트 (모델 필드 명세에 따라 조정 필요)
+        current_user.gold_balance = (current_user.gold_balance or 0) + gold
+        if hasattr(current_user, 'experience'):
+            current_user.experience = (current_user.experience or 0) + xp
+
+        reward = UserReward(
+            user_id=current_user.id,
+            reward_type="STREAK_DAILY",
+            gold_amount=gold,
+            xp_amount=xp,
+            reward_metadata={
+                "action_type": action_type,
+                "streak_count": streak_count,
+                "formula": "C_exp_decay_v1",
+            },
+            idempotency_key=idempotency_key,
+        )
+        db.add(reward)
+        db.add(current_user)
+        db.commit()
+        db.refresh(reward)
+    except IntegrityError:
+        db.rollback()
+        # 재경합 시 재조회 (멱등)
+        reward = (
+            db.query(UserReward)
+            .filter(UserReward.user_id == current_user.id, UserReward.idempotency_key == idempotency_key)
+            .first()
+        )
+        if not reward:
+            raise HTTPException(status_code=500, detail="Failed to finalize claim")
+    except Exception:
+        db.rollback()
+        raise
+
+    return StreakClaimResponse(
+        action_type=action_type,
+        streak_count=streak_count,
+        awarded_gold=gold,
+        awarded_xp=xp,
+        new_gold_balance=current_user.gold_balance,
+        claimed_at=reward.created_at,
+    )
 
 
 class ProtectionRequest(BaseModel):

@@ -51,10 +51,17 @@ class UserReward(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    reward_id = Column(Integer, ForeignKey("rewards.id"), nullable=False)
-    claimed_at = Column(DateTime, default=datetime.utcnow)
+    # 기존 reward_id 기반 레거시 관계 (선택적) - 일부 경로는 직접 reward 객체 참조
+    reward_id = Column(Integer, ForeignKey("rewards.id"), nullable=True)
+    claimed_at = Column(DateTime, default=datetime.utcnow, index=True)
     is_used = Column(Boolean, default=False)
     used_at = Column(DateTime, nullable=True)
+    # 확장 필드 (streak / economy 멱등 처리용)
+    reward_type = Column(String(50), nullable=True, index=True)  # 예: STREAK_DAILY, GACHA_PULL 등
+    gold_amount = Column(Integer, nullable=True)
+    xp_amount = Column(Integer, nullable=True)
+    reward_metadata = Column(JSON, nullable=True)
+    idempotency_key = Column(String(120), nullable=True, unique=True, index=True)
     
     # 관계
     user = relationship("User", back_populates="rewards")

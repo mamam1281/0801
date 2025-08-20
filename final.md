@@ -208,3 +208,55 @@ docker-compose restart backend
    4. 빌드 타입 오류(제네릭 useState 경고) 임시 해결: non-generic useState + assertion
 - 결과: 로그인/프로필 조회 시 UI가 실데이터와 동기화될 수 있는 필드 세트 확보 (추가 검증 필요: 실제 DB에 `total_experience` 저장 로직 후속 구현)
 - 추후 권장: 경험치 증가 트랜잭션 표준화 및 `UserService` 내 level-up 공식 단일화, OpenAPI 재생성 후 프론트 타입 sync
+
+### 2025-08-20 게임 안정화 & 출석 UI 전환
+- 크래시 베팅 원자성 개선: `backend/app/routers/games.py` 크래시 베팅 처리 구간을 단일 DB 트랜잭션 + 행 잠금(row-level lock) 적용하여 중복 결과/골드 미반영 위험 감소. 응답 스키마(`CrashBetResponse`)에 `status`, `simulated_max_win` 필드 추가하여 클라이언트 측 후행 UI/리스크 계산 근거 제공.
+- 출석(Attendance) 월간 달력 → 주간 전환: `HomeDashboard.tsx` 기존 월 단위 격자 생성 로직 제거, 현재 주(일~토) 7일만 표시. 오늘 강조 및 이번 주 출석 카운트 단순화로 가시성 향상. 문구: "이번 주 출석".
+- 슬롯 당첨금 역표시 이슈 조사: 슬롯 컴포넌트 내 금액 표기(`+{winAmount.toLocaleString()}G`) 방향 전환/역정렬/transform 없음 확인. 현 단계 재현 불가 → 추가 스크린샷/DOM 캡처 필요.
+- 스트릭 보상(예: 8000G) 수령 후 실제 골드/로그 미반영 문제 식별: 프론트 단 로컬 상태 갱신만 이뤄지고 서버 확정/잔액 반영 endpoint 없음 또는 미호출 추정 → 서버 Claim 엔드포인트/로그 테이블/트랜잭션 필요.
+- 특별보상 금액 축소 요구 수집: 구체 금액/스케일 정책 미정(예: 상한/구간 비율) → 정책 합의 후 산식/프론트·백엔드 동기화 예정.
+- Seed User 02 데이터 초기화 예정: 관련 테이블(사용자, 잔액, streak, 게임 로그) 안전 삭제/리셋 스크립트 설계 필요.
+
+#### Pending / 다음 단계 초안
+1. 스트릭 보상 Claim 서버 구현: (요청 → 멱등 처리 → 잔액 증가 → reward 로그 기록) + 테스트 추가
+2. 특별보상 축소 산식 정의(기준: 현재 최대치, 경제 인플레이션 지표) 후 코드 반영 및 문서화
+3. User 02 초기화 안전 스크립트/관리 라우트(Guard: ENV=dev + 특정 user_id 화이트리스트) 작성
+4. 슬롯 역표시 추가 자료 수집 → 재현 시 DOM/CSS 레이어 검사
+
+#### 검증 로그 (부분)
+- 크래시 베팅: 변경 후 단일 응답 필드 확장 (OpenAPI 재수출 필요 여부 점검 예정)
+- 출석 UI: 빌드 후 대시보드에서 7일 표시 정상 (월간 격자 제거)
+- 나머지 Pending 항목: 구현 전 상태 기록
+
+#### 문서 작업
+- 본 섹션 추가로 2025-08-20 변경/이슈/다음 단계 기록 완료. 구현 후 각 항목 세부 검증 결과 추가 예정.
+
+### 2025-08-20 (추가) Streak Claim API & 경제 산식 개편 계획
+- 선택된 스트릭 일일 보상 산식: 지수 감쇠(C 안)
+   - Gold = 1000 + 800*(1 - e^{-streak/6})  (상한 ~1800 근사)
+   - XP   = 50 + 40*(1 - e^{-streak/8})   (상한 ~90 근사)
+- 공용 util: `_calculate_streak_rewards(streak)` 백엔드 `streak.py` 내 임시 구현 → 후속 `app/services/reward_service.py` 이동 및 프론트 util 동기화 예정.
+- 신규 엔드포인트: `POST /api/streak/claim`
+   - 멱등키: `streak:{user_id}:{action_type}:{UTC_YYYY-MM-DD}` → `user_rewards.idempotency_key` UNIQUE 전제
+   - 트랜잭션: User.gold_balance(+gold), User.experience(+xp), UserReward insert(metadata: formula=C_exp_decay_v1)
+   - 재호출 시 기존 레코드 반환
+   - 검증 로직 미구현 항목(TTL/중복 tick 보호) → 후속 보강
+- 프론트 `HomeDashboard.tsx` 기존 클라이언트-only `claimDailyReward` → 서버 API 호출 방식 리팩터 필요 (미적용 상태).
+
+#### User 02 초기화 (익명화 전략)
+- 삭제 대신 회계/통계 보존을 위해 익명화 선택:
+   - UPDATE users SET nickname='user02_reset', email=NULL, gold_balance=0, experience=0 WHERE id=2;
+   - 민감 로그/팔로우/채팅 등은 유지, 필요시 별도 purge 옵션.
+   - Redis streak 키: `DEL user:2:streak:* user:2:streak_protection:*`
+- 후속: 익명화 스크립트 `/scripts/reset_user_02.sql` 또는 관리 라우터로 추가 예정.
+
+#### 캘린더 UI 보정
+- 월간 문구 잔재 제거: HomeDashboard.tsx '이번달 출석' → '(월간 누적 X일)' 표시로 축소, 메인은 주간 7일 표시 유지.
+
+#### 다음 후속 처리
+1. (완료) 프론트 streak claim 서버 호출 리팩터 (`HomeDashboard.tsx` fetch POST /api/streak/claim)
+2. (진행) 보상 산식 util 표준화: `app/services/reward_service.py` 추가, 경계 테스트 작성 예정 (streak 0,1,3,7,14)
+3. (완료) `user_rewards` 확장: `reward_type`, `gold_amount`, `xp_amount`, `reward_metadata`, `idempotency_key` + UNIQUE index (`ix_user_rewards_idempotency_key`)
+4. (완료) OpenAPI 재생성: `backend/app/current_openapi.json` 및 timestamped 스냅샷 생성
+5. (완료) User02 익명화 스크립트 `scripts/reset_user_02.sql` 추가
+6. (예정) Admin DEV 전용 라우터에 User02 reset endpoint 추가 / 보상 경계 테스트(pytest)

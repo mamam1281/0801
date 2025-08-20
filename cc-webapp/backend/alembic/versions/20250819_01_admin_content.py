@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy import inspect
 
 # revision identifiers, used by Alembic.
 revision = "20250819_01_admin_content"
@@ -19,7 +20,10 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.create_table(
+    bind = op.get_bind()
+    insp = inspect(bind)
+    if not insp.has_table("admin_events"):
+        op.create_table(
         "admin_events",
         sa.Column("id", sa.Integer(), primary_key=True),
         sa.Column("name", sa.String(120), nullable=False),
@@ -31,9 +35,9 @@ def upgrade() -> None:
         sa.Column("updated_at", sa.DateTime(), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP")),
         sa.UniqueConstraint("name", name="uq_admin_events_name"),
     )
-    op.create_index("ix_admin_events_active_window", "admin_events", ["is_active", "start_at", "end_at"])  # composite
-
-    op.create_table(
+        op.create_index("ix_admin_events_active_window", "admin_events", ["is_active", "start_at", "end_at"])  # composite
+    if not insp.has_table("mission_templates"):
+        op.create_table(
         "mission_templates",
         sa.Column("id", sa.Integer(), primary_key=True),
         sa.Column("title", sa.String(150), nullable=False),
@@ -44,9 +48,9 @@ def upgrade() -> None:
         sa.Column("created_at", sa.DateTime(), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP")),
         sa.Column("updated_at", sa.DateTime(), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP")),
     )
-    op.create_index("ix_mission_templates_active_type", "mission_templates", ["is_active", "mission_type"])  # composite
-
-    op.create_table(
+        op.create_index("ix_mission_templates_active_type", "mission_templates", ["is_active", "mission_type"])  # composite
+    if not insp.has_table("event_mission_links"):
+        op.create_table(
         "event_mission_links",
         sa.Column("id", sa.Integer(), primary_key=True),
         sa.Column("event_id", sa.Integer(), sa.ForeignKey("admin_events.id", ondelete="CASCADE"), nullable=False),
@@ -54,8 +58,8 @@ def upgrade() -> None:
         sa.Column("created_at", sa.DateTime(), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP")),
         sa.UniqueConstraint("event_id", "mission_template_id", name="uq_event_mission_pair"),
     )
-
-    op.create_table(
+    if not insp.has_table("reward_catalog"):
+        op.create_table(
         "reward_catalog",
         sa.Column("id", sa.Integer(), primary_key=True),
         sa.Column("code", sa.String(80), nullable=False),
@@ -68,9 +72,9 @@ def upgrade() -> None:
         sa.Column("updated_at", sa.DateTime(), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP")),
         sa.UniqueConstraint("code", name="uq_reward_catalog_code"),
     )
-    op.create_index("ix_reward_catalog_active_type", "reward_catalog", ["active", "reward_type"])  # composite
-
-    op.create_table(
+        op.create_index("ix_reward_catalog_active_type", "reward_catalog", ["active", "reward_type"])  # composite
+    if not insp.has_table("reward_audit"):
+        op.create_table(
         "reward_audit",
         sa.Column("id", sa.Integer(), primary_key=True),
         sa.Column("user_id", sa.Integer(), sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True),
@@ -80,8 +84,8 @@ def upgrade() -> None:
         sa.Column("event_id", sa.Integer(), sa.ForeignKey("admin_events.id", ondelete="SET NULL"), nullable=True),
         sa.Column("created_at", sa.DateTime(), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP")),
     )
-    op.create_index("ix_reward_audit_user_created", "reward_audit", ["user_id", "created_at"])  # composite
-    op.create_index("ix_reward_audit_event_created", "reward_audit", ["event_id", "created_at"])  # composite
+        op.create_index("ix_reward_audit_user_created", "reward_audit", ["user_id", "created_at"])  # composite
+        op.create_index("ix_reward_audit_event_created", "reward_audit", ["event_id", "created_at"])  # composite
 
 
 def downgrade() -> None:
