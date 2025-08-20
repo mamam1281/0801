@@ -732,15 +732,7 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
                 >
                   {winAmount >= betAmount * 10 ? '🔥 BIG WIN! 🔥' : '🎉 WIN! 🎉'}
                 </motion.div>
-                <motion.div
-                  animate={{
-                    scale: [0.9, 1.05, 1],
-                  }}
-                  transition={{ duration: 0.4, repeat: 2 }}
-                  className="text-3xl lg:text-4xl font-bold text-gold coin-drop"
-                >
-                  +{winAmount.toLocaleString()}G
-                </motion.div>
+                {/* 금액 애니메이션(뒤집힘 이슈) 임시 제거 */}
                 {multiplier > 1 && (
                   <div className="text-lg text-primary font-bold">{multiplier}x 멀티플라이어!</div>
                 )}
