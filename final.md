@@ -635,3 +635,85 @@ consume_protection(user_id:int) -> bool
 GameStatsService: increment vs recalc 동등성
 StreakManager: midnight duplicate suppression
 WebhookVerifier: nonce reuse & key rotation acceptance
+
+
+
+
+요청 정리 및 설계 방향 초안:
+
+요구사항 체크리스트:
+
+메인 페이지 목업(하드코딩) 이벤트 제거
+실제 서버 이벤트(/api/events) 목록을 메인에 표시
+신규 “모델 지수 이벤트” 추가 (이벤트 데이터/모델 정의 & 시드)
+이벤트 참여 로직 서버 저장 (이미 기본 join/progress/claim 존재하므로 활용/확장)
+어드민에서 이벤트 생성/수정/비활성/보상(강제 지급 포함) 관리 가능
+어드민에서 특정 유저 참여 현황 / 전체 참여자 조회
+전체 풀스택 구현 (백엔드 admin API + Frontend Admin UI + Main UI 연동)
+테스트 및 간단 문서 업데이트
+현재 상태 갭 분석:
+
+Public 이벤트 API (목록/상세/참여/progress/claim) 이미 구현됨.
+Mission 관련 admin 비어있고 admin_events.py 비어있음 → 어드민 CRUD/강제 지급 엔드포인트 없음.
+Participation 조회용 admin 전용 endpoint 없음 (전체 리스팅/특정 이벤트 참여자).
+Frontend 메인에서 실제 events 호출 코드 미확인 (추가 필요); mock 요소 제거 필요.
+“모델 지수 이벤트” 도메인 정의 필요: requirements/progress 키 설계 (예: model_index >= X or 누적 모델 사용 횟수 등) → progress 키/requirements 매칭 구조 그대로 사용 가능.
+EventService에 어드민용 create/update/deactivate, participation list, 강제 reward claim 메서드 추가 필요.
+권한 체크: admin 전용 Depends (아마 기존 get_current_user + is_admin 검사) 사용.
+시드: start_date <= now <= end_date 구간 들어오게 UTC 기준 날짜 생성.
+제안 구현 세부 (백엔드):
+
+admin_events.py 라우터 추가:
+POST /api/admin/events (EventCreate)
+PUT /api/admin/events/{event_id} (EventUpdate)
+POST /api/admin/events/{event_id}/deactivate (is_active False)
+GET /api/admin/events/{event_id}/participations (필터: completed/claimed 등 Query)
+POST /api/admin/events/{event_id}/force-claim/{user_id} (관리자 강제 보상 지급; 비정상 상태시 400)
+(선택) POST /api/admin/events/seed/model-index -> “모델 지수 이벤트” 시드
+서비스 계층 EventService:
+create_event, update_event, deactivate_event
+list_participations(event_id, filters)
+force_claim_rewards(event_id, user_id)
+seed_model_index_event(db) (존재 여부 체크 후 생성)
+프론트 (메인):
+
+useEvents 훅 신설: fetch /api/events, 캐시/로딩/에러 관리
+Main/Home 컴포넌트(또는 이벤트 패널)에서 목업 리스트 제거 → 실제 fetch 결과 표시
+참여 버튼: /api/events/join, 진행도 업데이트는 progress 엔드포인트 (진행 예시: model_index_increment 등)
+완료시 보상 수령 버튼 → /api/events/claim/{id}
+프론트 (어드민):
+
+/admin/events 페이지:
+목록(검색/활성여부 필터)
+신규 생성 폼
+상세 패널 (기본정보 수정, 비활성화)
+참여자 탭 (필터: completed, claimed)
+참여자 행 단위 강제 보상 버튼
+시드 “모델 지수 이벤트” 실행 버튼 (이미 존재하면 비활성)
+테스트:
+
+backend tests:
+test_admin_create_event_requires_admin
+test_admin_create_and_list_event
+test_join_and_progress_and_claim_event
+test_force_claim (조건 검증)
+test_seed_model_index_idempotent
+(선택) 프론트 통합은 e2e 추후; 최소 fetch mocking unit.
+다음 단계 제안 (실행 순서):
+
+백엔드: EventService 확장 + admin_events 라우터 구현
+백엔드: 모델 지수 이벤트 시드 함수 및 엔드포인트
+백엔드: pytest 케이스 추가
+프론트: useEvents 훅 + 메인 UI 연결
+프론트: admin events 페이지/컴포넌트 생성
+문서/API_MAPPING 갱신, 요약
+진행해도 될지 여부만 알려주시면 바로 1단계(백엔드 구현) 착수합니다. 필요하면 “모델 지수 이벤트” 요구 지표(예: target model_index 100? 기간? 보상?) 구체값 주셔도 반영합니다. 기본 임시값 제안:
+
+title: “모델 지수 도전 이벤트”
+event_type: “special”
+기간: 오늘 ~ +14일
+requirements: {"model_index_points": 1000}
+rewards: {"gold": 5000, "exp": 1000}
+priority: 50
+수정 원하시면 말씀 주세요. 진행 승인될 경우 바로 구현 들어갑니다. 계속할까요?
+
