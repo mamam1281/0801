@@ -398,6 +398,65 @@ docker-compose restart backend
 - 추후 권장: 경험치 증가 트랜잭션 표준화 및 `UserService` 내 level-up 공식 단일화, OpenAPI 재생성 후 프론트 타입 sync
 
 ### 2025-08-20 게임 안정화 & 출석 UI 전환
+### 2025-08-21 (추가) 업적 평가 로직 전략 패턴 리팩터
+**변경 요약**
+- `AchievementService` if/elif 분기(CUMULATIVE_BET / TOTAL_WIN_AMOUNT / WIN_STREAK)를 신규 모듈 `app/services/achievement_evaluator.py` 로 분리.
+- 레지스트리(`AchievementEvaluatorRegistry`) + 컨텍스트(`EvalContext`) + 결과(`EvalResult`) 구조. 서비스는 계산 결과를 DB/브로드캐스트에 반영만 수행.
+
+**도입 이유**
+1. 업적 타입 증가 시 서비스 파일 비대화 방지 및 충돌 감소.
+2. 순수 계산과 사이드이펙트(Notification, hub.broadcast, realtime broadcast) 분리 → 단위 테스트 용이.
+3. 동일 패턴을 미션/이벤트 평가로 재사용 가능한 기반.
+
+**세부 구현**
+- 지원 타입: CUMULATIVE_BET, TOTAL_WIN_AMOUNT, WIN_STREAK (결과 동등성 유지)
+- 공통 합산 유틸 `_cumulative_amount` (BET / WIN 구분) 추출
+- Win Streak: 최근 100개 기록 역순 스캔 (이전 로직 동일)
+- 서비스 내 helper 메서드 `_aggregate_user_bet/_aggregate_user_win/_current_win_streak` 제거
+
+**영향/호환성**
+- OpenAPI / 응답 스키마 변경 없음
+- 실시간 브로드캐스트 payload 동일 (achievement_unlock, achievement_progress)
+- Alembic 변동 없음(head 유지)
+- UserAchievement 기존 진행값 재사용 (마이그레이션 불필요)
+
+**검증**
+- 새 파일 및 수정 파일 구문 오류 없음
+- is_user_action=False 조기 반환 로직 유지
+- 누적/승리/연속승 조건 동일 threshold 에서 unlock 동작 확인(논리 대비)
+
+**확장 가이드**
+```python
+def eval_daily_win(ctx: EvalContext, cond: dict) -> EvalResult:
+   # 예: 오늘 00:00~현재 WIN 합산 후 threshold 비교
+   ...
+AchievementEvaluatorRegistry.register("DAILY_WIN", eval_daily_win)
+```
+
+**다음 단계 제안**
+1. evaluator 단위 테스트 작성 (progress/unlocked 케이스)
+2. mission_evaluator.py 도입으로 이벤트/미션 조건 통합
+3. 누적 합산 Redis 10s 캐시 적용(고빈도 액션 부하 감소)
+
+### 2025-08-21 (추가) GameDashboard 색상 팔레트 톤다운
+**변경 요약**
+- 기존 과포화 네온 배경/카드(`from-purple-900 via-black to-pink-900`, 진한 border-purple-500/30, text 그라디언트 from-purple-400/to-pink-400) → 홈/상점/프로필 페이지의 더 차분한 다크 글래스 톤과 정렬.
+- 배경: `from-[#0e0a17] via-black to-[#1a0f1f]` 로 채도 감소 및 색 온도 균형.
+- 카드: `bg-black/50` 대신 `bg-[#14121a]/70` + border 투명도 30%→20% 로 대비 완화.
+- 헤더/섹션 타이틀 그라디언트: purple/pink 400 → 300 단계로 다운.
+- 버튼 아웃라인/호버 색상 투명도 축소(`border-purple-500/50 -> /30`, hover 배경 /20 → /10).
+
+**영향**
+- 시각적 피로도 감소, 정보 hierarchy 강조(콘텐츠 > 크롬).
+- 다크 배경 위 텍스트 대비 유지(AA 이상) — 300 단계 그라디언트도 `bg-clip-text` 로 충분한 명도 확보.
+- 다른 주요 화면(Home/Shop/Profile)과 톤 통일 → 브랜드 일관성 개선.
+
+**추가 제안**
+1. Tailwind theme 확장으로 semantic token (e.g. `bg-surface-alt`, `text-accent-faint`) 정의 후 하드코드 색상 축소.
+2. Light 모드 대비 필요 시 동일 계층 변수화(`data-theme` 스위치) 준비.
+3. 과포화 포인트 컬러(금색, 승리 강조 등)는 의도된 강조 요소에만 국소 사용.
+
+
 ### 2025-08-20 (추가) 이벤트 시스템 통합 & Admin 관리 UI 1차 구현
 **변경 요약**
 - 프론트 `EventMissionPanel` 이 기존 개별 fetch → 중앙 `useEvents` 훅으로 통합 (중복 제거, 캐시 활용).

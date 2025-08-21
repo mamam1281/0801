@@ -139,7 +139,7 @@ export function GameDashboard({
   }, []);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-black to-pink-900 relative">
+    <div className="min-h-screen bg-gradient-to-br from-[#0e0a17] via-black to-[#1a0f1f] relative">
       <GameBackground />
 
       <div className="relative z-10">
@@ -170,7 +170,7 @@ export function GameDashboard({
                   <span className="hidden sm:inline">홈으로</span>
                 </Button>
 
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent hidden md:block">
+                <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-300 to-pink-300 bg-clip-text text-transparent hidden md:block">
                   게임 센터
                 </h1>
               </div>
@@ -202,9 +202,9 @@ export function GameDashboard({
             className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8"
           >
             {/* Popularity Index */}
-            <div className="bg-black/50 backdrop-blur-sm rounded-2xl p-6 border border-purple-500/30">
+            <div className="bg-[#14121a]/70 backdrop-blur-sm rounded-2xl p-6 border border-purple-500/20">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+                <h3 className="text-lg font-semibold bg-gradient-to-r from-purple-300 to-pink-300 bg-clip-text text-transparent">
                   인기도 지민
                 </h3>
                 <TrendingUp className="w-5 h-5 text-purple-400" />
@@ -219,9 +219,9 @@ export function GameDashboard({
             </div>
 
             {/* Total Play Time */}
-            <div className="bg-black/50 backdrop-blur-sm rounded-2xl p-6 border border-purple-500/30">
+            <div className="bg-[#14121a]/70 backdrop-blur-sm rounded-2xl p-6 border border-purple-500/20">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+                <h3 className="text-lg font-semibold bg-gradient-to-r from-purple-300 to-pink-300 bg-clip-text text-transparent">
                   오늘 플레이
                 </h3>
                 <Heart className="w-5 h-5 text-pink-400" />
@@ -236,9 +236,9 @@ export function GameDashboard({
             </div>
 
             {/* VIP Status */}
-            <div className="bg-black/50 backdrop-blur-sm rounded-2xl p-6 border border-purple-500/30">
+            <div className="bg-[#14121a]/70 backdrop-blur-sm rounded-2xl p-6 border border-purple-500/20">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+                <h3 className="text-lg font-semibold bg-gradient-to-r from-purple-300 to-pink-300 bg-clip-text text-transparent">
                   VIP 등급
                 </h3>
                 <Crown className="w-5 h-5 text-yellow-400" />
@@ -287,7 +287,7 @@ export function GameDashboard({
               <Button
                 variant="outline"
                 size="sm"
-                className="flex items-center gap-2 border-purple-500/50 text-purple-400 hover:bg-purple-500/20"
+                className="flex items-center gap-2 border-purple-500/30 text-purple-300 hover:bg-purple-500/10"
               >
                 <ExternalLink className="w-4 h-4" />
                 전체 순위
