@@ -1,7 +1,7 @@
 """
 이벤트 라우터 수정
 """
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Body
 import logging
 from sqlalchemy.orm import Session
 from typing import List, Optional, Dict
@@ -10,6 +10,7 @@ from ..dependencies import get_current_user
 from ..models.auth_models import User
 from ..models.event_models import Event, EventParticipation
 from ..services.event_service import EventService, MissionService
+from sqlalchemy import or_
 from ..schemas.event_schemas import *
 
 router = APIRouter(prefix="/api/events", tags=["Events & Missions"])
@@ -62,10 +63,93 @@ async def get_active_events(
     except HTTPException:
         _metric("events", "list", "error", auth)
         raise
-    except Exception as e:
-        logger.exception("events list 실패")
-        _metric("events", "list", "error", auth)
-        raise
+
+# -----------------
+# Admin / CRUD (soft delete aware)
+# -----------------
+
+class EventAdminCreate(EventCreate):
+    pass
+
+class EventAdminUpdate(EventUpdate):
+    pass
+
+@router.post("/admin", response_model=EventResponse)
+async def admin_create_event(
+    data: EventAdminCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="권한 없음")
+    ev = Event(**data.model_dump())
+    db.add(ev)
+    db.commit()
+    db.refresh(ev)
+    return ev
+
+@router.get("/admin/list", response_model=List[EventResponse])
+async def admin_list_events(
+    include_deleted: bool = Query(False),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="권한 없음")
+    q = db.query(Event)
+    if not include_deleted:
+        q = q.filter(Event.deleted_at.is_(None))
+    return q.order_by(Event.id.desc()).all()
+
+@router.put("/admin/{event_id}", response_model=EventResponse)
+async def admin_update_event(
+    event_id: int,
+    data: EventAdminUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="권한 없음")
+    ev = db.query(Event).filter(Event.id == event_id).first()
+    if not ev:
+        raise HTTPException(status_code=404, detail="이벤트 없음")
+    for k, v in data.model_dump(exclude_unset=True).items():
+        setattr(ev, k, v)
+    db.commit()
+    db.refresh(ev)
+    return ev
+
+@router.delete("/admin/{event_id}")
+async def admin_soft_delete_event(
+    event_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="권한 없음")
+    ev = db.query(Event).filter(Event.id == event_id).first()
+    if not ev:
+        raise HTTPException(status_code=404, detail="이벤트 없음")
+    if ev.deleted_at is None:
+        from datetime import datetime as _dt
+        ev.deleted_at = _dt.utcnow()
+        db.commit()
+    return {"deleted": True, "deleted_at": ev.deleted_at}
+
+@router.post("/admin/{event_id}/restore")
+async def admin_restore_event(
+    event_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="권한 없음")
+    ev = db.query(Event).filter(Event.id == event_id).first()
+    if not ev:
+        raise HTTPException(status_code=404, detail="이벤트 없음")
+    ev.deleted_at = None
+    db.commit()
+    return {"restored": True}
 
 @router.get("/{event_id}", response_model=EventResponse)
 async def get_event_detail(

@@ -28,6 +28,18 @@ class AdminMixin:
     """관리자 기능을 위한 Mixin"""
     is_active = Column("is_active", nullable=False, default=True)
     created_by = Column(Integer, nullable=True)  # 관리자 ID
+
+class SoftDeleteMixin:
+    """Soft delete 지원 Mixin (행 물리 삭제 대신 deleted_at 타임스탬프 기록)"""
+    deleted_at = Column(DateTime, nullable=True, index=True)
+
+    def soft_delete(self):  # runtime helper
+        if not getattr(self, 'deleted_at', None):  # idempotent
+            from datetime import datetime as _dt
+            self.deleted_at = _dt.utcnow()
+
+    def restore(self):  # runtime helper
+        self.deleted_at = None
     
 # 공통 인덱스 헬퍼
 def create_compound_index(table_name: str, *columns):
@@ -52,6 +64,7 @@ __all__ = [
     'TimestampMixin', 
     'UserRelatedMixin',
     'AdminMixin',
+    'SoftDeleteMixin',
     'TableNameMixin',
     'create_compound_index'
 ]

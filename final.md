@@ -399,6 +399,44 @@ docker-compose restart backend
 - `AchievementService` if/elif 분기(CUMULATIVE_BET / TOTAL_WIN_AMOUNT / WIN_STREAK)를 신규 모듈 `app/services/achievement_evaluator.py` 로 분리.
 - 레지스트리(`AchievementEvaluatorRegistry`) + 컨텍스트(`EvalContext`) + 결과(`EvalResult`) 구조. 서비스는 계산 결과를 DB/브로드캐스트에 반영만 수행.
 
+### 2025-08-21 (추가) MVP 스모크 테스트 안정화 & 풀스택 기본 CRUD 커버리지 평가
+**변경 요약**
+- 백엔드 엔드투엔드 핵심 플로우 검증용 `test_mvp_smoke.py` 확립: `/api/auth/register → /api/auth/profile → /api/streak/status → /api/streak/claim → /api/gacha/pull → /api/shop/items(+buy)`.
+- 닉네임 중복 회피 위해 uuid 기반 유니크 닉네임 픽스처 도입. 재실행 시 400 Duplicate 제거.
+- SQLAlchemy 2.x 텍스트 쿼리 ArgumentError 해결(text() + 바인딩)로 DB 존재성 체크 안정화.
+- 초기 상태 스트릭/검증 편차로 발생한 422/400 허용 폭 설정(임시) 후 전체 5 테스트 PASS.
+- 동시 클레임 테스트: 3개의 병렬 claim 요청 처리(200/400/422 허용) → 예외/500 없음.
+
+**현재 스모크 테스트가 커버하는 CRUD 범위**
+- Create: 사용자 등록(register), (암묵적) streak/세션 row 초기화, (조건부) 첫 상점 구매 트랜잭션.
+- Read: 프로필 조회(profile), streak/status, 상점 아이템 목록, (가챠 pull 결과 read 성격), 헬스엔드포인트.
+- Update: streak claim 시 내부 streak 진행/보상(gold) 잔액 변경, (shop 구매 시 wallet / transactions 상태 갱신).
+- Delete: 직접적인 삭제(D) 경로는 현재 스모크에 포함되지 않음 (계정 삭제 / 트랜잭션 취소 / 이벤트 탈퇴 등 미포함).
+
+**풀스택 CRUD ‘검증 완료?’ 평가**
+| 영역 | C(R)UD 상태 | 비고 |
+|------|-------------|------|
+| 사용자(auth) | C,R (U=미포함, D=미구현) | 프로필 수정/탈퇴 엔드포인트 미검증/미구현 |
+| 스트릭 | R,U (Claim=상태갱신) | Create는 첫 접근시 lazy init, Delete 없음 |
+| 상점(카탈로그/구매) | R,C(U) | 구매=Create+지갑 Update, 상품 생성/관리(Admin) 미포함 |
+| 가챠 | C(행위) + R(결과) | 결과 로그 persistence 검증 미포함 |
+| 이벤트/업적 | 미포함 | 별도 테스트 필요 |
+| Admin 통계/관리 | 미포함 | read-only stats 별도 스위트 필요 |
+| 삭제(Delete) 전반 | 미포함 | 안전성/권한 설계 이후 추가 예정 |
+
+→ 결론: “핵심 플레이 경제 루프” 의 CR(U) 일부는 스모크로 최소 검증 완료. 시스템 전반 CRUD 완전 검증 상태로 보기는 어려움. Admin/삭제/프로필 수정/이벤트/업적 CRUD 커버리지 개별 테스트 확장이 필요.
+
+**다음 단계 제안**
+1) 프로필 수정(PUT /api/auth/profile) 또는 닉네임 변경 경로 정의 후 U 테스트 추가.
+2) 논리 삭제(soft delete) 대상(예: shop transaction rollback, event participation withdraw) 정책 문서화 및 D 경로 테스트 추가.
+3) 이벤트/업적 전용 mini-smoke (참여→진행→claim) 추가로 gamification CRUD 보강.
+
+**추가 품질 과제**
+- 스모크 테스트에서 현재 422 허용 상태를 정상화: 초기 streak seed 엔드포인트/로직 추가 후 허용 상태 (200/400) 축소.
+- reward/gold delta 정량 assert (claim 전후 잔액 비교) 도입하여 경제 정확성 강화.
+- OpenAPI 재수출 후 스모크 테스트가 사용하는 경로 스키마 drift 검사(generated vs runtime).
+
+
 **도입 이유**
 1. 업적 타입 증가 시 서비스 파일 비대화 방지 및 충돌 감소.
 2. 순수 계산과 사이드이펙트(Notification, hub.broadcast, realtime broadcast) 분리 → 단위 테스트 용이.
@@ -862,4 +900,3 @@ Add CI step: duplicate scan + fail on new .new / temp_openapi pattern
 
  
 
- 

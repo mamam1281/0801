@@ -319,18 +319,18 @@ app.include_router(rewards.router, tags=["Rewards"])
 app.include_router(shop.router, tags=["Shop"])
 app.include_router(missions.router)  # 태그 오버라이드 제거 - 이미 missions.py에서 "Events & Missions" 태그를 지정함
 
-# Interactive Features (no prefix - routers have their own)
-app.include_router(quiz.router)  # 태그 오버라이드 제거 - 이미 quiz_router.py에서 "Quiz" 태그를 지정함
-app.include_router(chat.router)  # 태그 오버라이드 제거 - 이미 chat_router.py에서 "Chat" 태그를 지정함
-app.include_router(ai_router.router, tags=["AI Recommendation"])
+# Interactive Features (PARTIALLY DISABLED FOR MVP)
+# app.include_router(quiz.router)  # DISABLED - non-MVP complexity
+# app.include_router(chat.router)  # DISABLED - non-MVP WebSocket risk  
+# app.include_router(ai_router.router, tags=["AI Recommendation"])  # DISABLED - non-MVP
 
-# Management & Monitoring (no prefix - routers have their own)
-app.include_router(dashboard.router)  # 태그 오버라이드 제거 - 이미 dashboard.py에서 "Dashboard" 태그를 지정함
-app.include_router(notifications.router, tags=["Real-time Notifications"])
-app.include_router(notifications_sse_router)
-app.include_router(notifications_api_router)
-app.include_router(notification_center.router)
-app.include_router(email_router.router)
+# Management & Monitoring (MINIMAL FOR MVP)
+# app.include_router(dashboard.router)  # DISABLED - dashboard complexity
+# app.include_router(notifications.router, tags=["Real-time Notifications"])  # DISABLED - WebSocket risk
+# app.include_router(notifications_sse_router)  # DISABLED - SSE complexity
+# app.include_router(notifications_api_router)  # DISABLED - notification complexity
+# app.include_router(notification_center.router)  # DISABLED - non-MVP
+# app.include_router(email_router.router)  # DISABLED - email system non-MVP
 app.include_router(streak.router)
 app.include_router(vip.router)  # Include VIP router
 app.include_router(notification.router, tags=["Notification Center"])  # lightweight stub router
@@ -374,25 +374,26 @@ app.include_router(invite_router.router)  # 태그 오버라이드 제거 - 이�
 app.include_router(rbac_demo.router)  # New RBAC demo router included
 app.include_router(metrics.router)  # Global metrics endpoint
 
-# Phase 6: Analytics (no prefix - routers have their own)
-app.include_router(analyze.router)
+# ===== NON-MVP ROUTERS DISABLED FOR DEPLOYMENT STABILITY =====
+# Phase 6: Analytics (DISABLED - non-MVP)
+# app.include_router(analyze.router)
 
-# Phase 8: User Segmentation (no prefix - routers have their own)  
-app.include_router(segments.router)  # 태그 오버라이드 제거 - 이미 segments.py에서 "Segments" 태그를 지정함
+# Phase 8: User Segmentation (DISABLED - non-MVP)  
+# app.include_router(segments.router)
 
-# Phase 9: User Tracking (no prefix - routers have their own)
-app.include_router(tracking.router)
+# Phase 9: User Tracking (DISABLED - non-MVP)
+# app.include_router(tracking.router)
 
-# Phase 10: Unlock System (no prefix - routers have their own)
-app.include_router(unlock.router)
-app.include_router(abtest.router, tags=["ABTest"])
+# Phase 10: Unlock System (DISABLED - non-MVP)
+# app.include_router(unlock.router)
+# app.include_router(abtest.router, tags=["ABTest"])
 
-# 이벤트/미션 라우터 추가
-app.include_router(events.router)  # 태그 오버라이드 제거 - 이미 events.py에서 "Events & Missions" 태그를 지정함
-app.include_router(kafka_api.router)
+# Events/Missions (DISABLED - non-MVP, causes complexity)
+# app.include_router(events.router)
+# app.include_router(kafka_api.router)
 
-# 실시간 동기화 라우터 추가
-app.include_router(realtime.router)
+# Realtime sync (DISABLED - WebSocket stability risk)
+# app.include_router(realtime.router)
 
 print("✅ Core API endpoints registered")
 print("✅ Progressive Expansion features registered") 

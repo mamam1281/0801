@@ -33,6 +33,7 @@ class ShopService:
         rows = (
             self.db.query(models.ShopProduct)
             .filter(models.ShopProduct.is_active == True)  # noqa: E712
+            .filter(models.ShopProduct.deleted_at.is_(None))
             .all()
         )
         return [

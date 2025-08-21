@@ -10,7 +10,7 @@ import logging
 
 from ..database import get_db
 from ..models.auth_models import User
-from ..config import settings
+from ..core.config import settings
 
 # 로깅 설정
 logger = logging.getLogger(__name__)

@@ -12,7 +12,7 @@ from ..database import get_db
 from ..schemas.auth import UserCreate, UserLogin, AdminLogin, UserResponse, Token
 from ..services.auth_service import AuthService, security
 from ..models.auth_models import User, InviteCode
-from ..config import settings
+from ..core.config import settings
 
 # Logger setup
 logger = logging.getLogger(__name__)

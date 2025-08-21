@@ -6,12 +6,12 @@ from sqlalchemy import func
 from datetime import datetime, timedelta
 
 from .. import models
-from ..config import get_settings
+from ..core.config import settings
 
 logger = logging.getLogger(__name__)
 
 # Settings 인스턴스 가져오기
-settings = get_settings()
+# settings is imported from core.config
 
 class GameRepository:
     """Data access layer for game state using DB.

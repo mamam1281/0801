@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field, field_validator
 from typing import Optional, Literal, List
 from datetime import datetime
@@ -72,6 +72,11 @@ class BuyReceipt(BaseModel):
 
 from ..services.shop_service import ShopService
 from ..services.catalog_service import CatalogService
+from sqlalchemy.orm import Session
+from ..database import get_db
+from ..models.shop_models import ShopProduct
+from ..models.auth_models import User
+from ..dependencies import get_current_user
 from ..services.payment_gateway import PaymentGatewayService, PaymentGateway
 from ..services.token_service import TokenService
 from ..dependencies import get_current_user
@@ -137,6 +142,89 @@ def list_catalog():
             min_rank=p.min_rank,
         ))
     return items
+
+# -----------------
+# Admin ShopProduct CRUD (soft delete)
+# -----------------
+
+class ShopProductCreate(BaseModel):
+    product_id: str
+    name: str
+    price: int
+    description: Optional[str] = None
+    extra: Optional[dict] = None
+
+class ShopProductUpdate(BaseModel):
+    name: Optional[str] = None
+    price: Optional[int] = None
+    description: Optional[str] = None
+    is_active: Optional[bool] = None
+    extra: Optional[dict] = None
+
+@router.post("/admin/products", response_model=ShopProductCreate)
+def admin_create_product(data: ShopProductCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="권한 없음")
+    exists = db.query(ShopProduct).filter(ShopProduct.product_id == data.product_id).first()
+    if exists:
+        raise HTTPException(status_code=400, detail="이미 존재하는 product_id")
+    p = ShopProduct(product_id=data.product_id, name=data.name, price=data.price, description=data.description, extra=data.extra)
+    db.add(p)
+    db.commit()
+    return data
+
+@router.get("/admin/products", summary="List products (soft delete aware)")
+def admin_list_products(include_deleted: bool = Query(False), db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="권한 없음")
+    q = db.query(ShopProduct)
+    if not include_deleted:
+        q = q.filter(ShopProduct.deleted_at.is_(None))
+    return [
+        {
+            "product_id": r.product_id,
+            "name": r.name,
+            "price": r.price,
+            "deleted_at": r.deleted_at.isoformat() if r.deleted_at else None,
+            "is_active": r.is_active,
+        } for r in q.order_by(ShopProduct.id.desc()).all()
+    ]
+
+@router.put("/admin/products/{product_id}")
+def admin_update_product(product_id: str, data: ShopProductUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="권한 없음")
+    p = db.query(ShopProduct).filter(ShopProduct.product_id == product_id).first()
+    if not p:
+        raise HTTPException(status_code=404, detail="상품 없음")
+    for k, v in data.model_dump(exclude_unset=True).items():
+        setattr(p, k, v)
+    db.commit()
+    return {"updated": True}
+
+@router.delete("/admin/products/{product_id}")
+def admin_soft_delete_product(product_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="권한 없음")
+    p = db.query(ShopProduct).filter(ShopProduct.product_id == product_id).first()
+    if not p:
+        raise HTTPException(status_code=404, detail="상품 없음")
+    if p.deleted_at is None:
+        from datetime import datetime as _dt
+        p.deleted_at = _dt.utcnow()
+        db.commit()
+    return {"deleted": True, "deleted_at": p.deleted_at.isoformat() if p.deleted_at else None}
+
+@router.post("/admin/products/{product_id}/restore")
+def admin_restore_product(product_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="권한 없음")
+    p = db.query(ShopProduct).filter(ShopProduct.product_id == product_id).first()
+    if not p:
+        raise HTTPException(status_code=404, detail="상품 없음")
+    p.deleted_at = None
+    db.commit()
+    return {"restored": True}
 
 
 @router.get("/limited-packages", response_model=List[LimitedPackageOut], summary="List active limited packages (gold)")

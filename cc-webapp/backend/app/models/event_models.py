@@ -2,8 +2,9 @@ from sqlalchemy import Column, Integer, String, DateTime, Boolean, JSON, Foreign
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from ..database import Base
+from .base import SoftDeleteMixin
 
-class Event(Base):
+class Event(Base, SoftDeleteMixin):
     __tablename__ = "events"
     
     id = Column(Integer, primary_key=True, index=True)

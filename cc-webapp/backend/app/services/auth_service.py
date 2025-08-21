@@ -526,3 +526,35 @@ class AuthService:
         if cnt:
             db.commit()
         return cnt
+
+    # ===== Minimal helper for interim /api/auth/register =====
+    @staticmethod
+    def register_with_invite_code(invite_code: str, nickname: str, db: Session) -> User:
+        """Temporary minimal registration helper.
+
+        Generates a synthetic site_id and password (not returned) to satisfy existing
+        create_user flow which expects full UserCreate schema, while only requiring
+        invite_code + nickname for the MVP smoke test.
+
+        Security: This path is intended only for local/test environments. If ENVIRONMENT
+        indicates production, we reject usage to avoid creating weak accounts.
+        """
+        env = os.getenv("ENVIRONMENT", "development").lower()
+        if env not in {"dev", "development", "local", "test"}:
+            raise HTTPException(status_code=403, detail="Registration helper disabled in this environment")
+        from ..schemas.auth import UserCreate
+        import re, random, string
+        # Derive a simple site_id from nickname (alnum, lower) plus 4 random chars to avoid collisions
+        base = re.sub(r"[^a-zA-Z0-9]", "", nickname)[:12].lower() or "user"
+        suffix = ''.join(random.choices(string.ascii_lowercase + string.digits, k=4))
+        site_id = f"{base}{suffix}"
+        phone_stub = ''.join(random.choices(string.digits, k=11))  # placeholder phone number
+        password = ''.join(random.choices(string.ascii_letters + string.digits, k=8))
+        uc = UserCreate(
+            site_id=site_id,
+            nickname=nickname,
+            phone_number=phone_stub,
+            invite_code=invite_code,
+            password=password,
+        )
+        return AuthService.create_user(db, uc)

@@ -213,13 +213,17 @@ def auth_token(client):
 	import uuid
 
 	def _get(role: str = 'standard'):
-		# Try signup endpoint first
-		nickname = f"test-{role}-{uuid.uuid4().hex[:6]}"
+		# Unique site_id & phone_number per call to avoid duplicate constraints
+		uid = uuid.uuid4().hex[:8]
+		site_id = f"{role}-{uid}"
+		nickname = f"nick-{site_id}"
+		phone = "010" + uid.ljust(8, '0')  # simple deterministic 11-digit
 		payload = {
-			"site_id": "testsite",
+			"site_id": site_id,
 			"nickname": nickname,
 			"invite_code": "5858",
-			"password": "TestPass123!"
+			"password": "TestPass123!",
+			"phone_number": phone,
 		}
 		try:
 			resp = client.post("/api/auth/signup", json=payload)

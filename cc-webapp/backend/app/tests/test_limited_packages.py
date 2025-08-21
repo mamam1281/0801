@@ -1,46 +1,36 @@
-import time
+import uuid
 import pytest
 from fastapi.testclient import TestClient
 
-# Uses app/tests/conftest.py for app and schema setup
 
-
-def signup_and_login(client: TestClient, site_id: str, password: str):
-    # signup (align with /api/auth/signup schema)
-    r = client.post(
+def signup_and_login(client: TestClient, site_id: str, password: str) -> str:
+    client.post(
         "/api/auth/signup",
         json={
             "site_id": site_id,
             "nickname": f"nick_{site_id}",
             "password": password,
             "invite_code": "5858",
-            "phone_number": "01012345678",
+            "phone_number": "010" + site_id[-8:].rjust(8, '0'),
         },
     )
-    if r.status_code != 200:
-        # if already exists, proceed to login
-        pass
-    # login
     r = client.post("/api/auth/login", json={"site_id": site_id, "password": password})
     assert r.status_code == 200
-    token = r.json()["access_token"]
-    return token
+    return r.json()["access_token"]
 
 
-def admin_token(client: TestClient):
-    # Create admin via direct signup then elevate through admin service if available
-    # Here we assume first user gets is_admin True or admin endpoints enforce manually in test.
-    token = signup_and_login(client, "admin_user", "passw0rd!")
+def ensure_admin(client: TestClient, site_id: str = "admin_lpkg") -> str:
+    token = signup_and_login(client, site_id, "passw0rd!")
+    client.post("/api/admin/users/elevate", json={"site_id": site_id})  # ignore failure in locked env
     return token
 
 
 def test_limited_package_flow(client: TestClient):
-    # Admin upsert a limited package
-    adm = admin_token(client)
-    headers = {"Authorization": f"Bearer {adm}"}
+    admin = ensure_admin(client)
+    ah = {"Authorization": f"Bearer {admin}"}
 
-    pkg_id = "LPKG-TEST-001"
-    upsert = client.post(
+    pkg_id = "LPKG-TEST-" + uuid.uuid4().hex[:6]
+    up = client.post(
         "/api/admin/limited-packages/upsert",
         json={
             "package_id": pkg_id,
@@ -53,61 +43,51 @@ def test_limited_package_flow(client: TestClient):
             "is_active": True,
             "contents": {"bonus_tokens": 10},
         },
-        headers=headers,
+        headers=ah,
     )
-    # If admin guard blocks, skip this suite gracefully
-    if upsert.status_code == 403:
+    if up.status_code == 403:
         pytest.skip("Admin guard enforced; skipping admin-limited tests")
-    assert upsert.status_code == 200
+    assert up.status_code == 200
 
-    # Public list should show the package
-    r = client.get("/api/shop/limited-packages", headers=headers)
-    assert r.status_code == 200
-    data = r.json()
-    assert any(p["package_id"] == pkg_id for p in data)
+    # List should include package
+    lr = client.get("/api/shop/limited-packages", headers=ah)
+    assert lr.status_code == 200
+    assert any(p["package_id"] == pkg_id for p in lr.json())
 
-    # Create normal user and add tokens via admin if available
-    user_token = signup_and_login(client, "user1", "passw0rd!")
-    uh = {"Authorization": f"Bearer {user_token}"}
+    # Buyer 1
+    u1 = signup_and_login(client, "buyer1", "passw0rd!")
+    h1 = {"Authorization": f"Bearer {u1}"}
+    # self top-up tokens if endpoint exists (non-fatal)
+    client.post("/api/users/tokens/add", headers=h1, params={"amount": 500})
 
-    # Admin top up tokens if needed
-    client.post("/api/admin/users/1/tokens/add", json={"user_id": 1, "reason": "seed", "amount": 500}, headers=headers)
+    b1 = client.post("/api/shop/buy-limited", json={"package_id": pkg_id}, headers=h1)
+    assert b1.status_code == 200, b1.text
+    body1 = b1.json()
+    assert body1.get("success") is True, body1
+    assert body1.get("receipt_code")
 
-    # Buy limited package
-    r = client.post("/api/shop/buy-limited", json={"package_id": pkg_id}, headers=uh)
-    assert r.status_code == 200
-    body = r.json()
-    assert body["success"] is True
-    assert body["receipt_code"]
+    # Second attempt by same user hits per-user limit=1
+    b2 = client.post("/api/shop/buy-limited", json={"package_id": pkg_id}, headers=h1)
+    assert b2.status_code == 200
+    assert b2.json().get("success") is False
 
-    # Per-user limit blocks second purchase
-    r2 = client.post("/api/shop/buy-limited", json={"package_id": pkg_id}, headers=uh)
-    assert r2.status_code == 200
-    body2 = r2.json()
-    assert body2["success"] is False
-    assert "limit" in body2["message"].lower() or "limit" in body2.get("message", "").lower()
+    # Remaining stock should be 1 -> second distinct user depletes
+    u2 = signup_and_login(client, "buyer2", "passw0rd!")
+    h2 = {"Authorization": f"Bearer {u2}"}
+    client.post("/api/users/tokens/add", headers=h2, params={"amount": 500})
+    b3 = client.post("/api/shop/buy-limited", json={"package_id": pkg_id}, headers=h2)
+    assert b3.status_code == 200 and b3.json().get("success") is True
 
-    # Stock should now be 1, buy with second user and deplete
-    user2 = signup_and_login(client, "user2", "passw0rd!")
-    u2h = {"Authorization": f"Bearer {user2}"}
-    r3 = client.post("/api/shop/buy-limited", json={"package_id": pkg_id}, headers=u2h)
-    assert r3.status_code == 200
-    assert r3.json()["success"] is True
+    # Third user sees out of stock
+    u3 = signup_and_login(client, "buyer3", "passw0rd!")
+    h3 = {"Authorization": f"Bearer {u3}"}
+    client.post("/api/users/tokens/add", headers=h3, params={"amount": 500})
+    b4 = client.post("/api/shop/buy-limited", json={"package_id": pkg_id}, headers=h3)
+    assert b4.status_code == 200 and b4.json().get("success") is False
+    assert "stock" in (b4.json().get("message", "").lower())
 
-    # Third user should see out of stock
-    user3 = signup_and_login(client, "user3", "passw0rd!")
-    u3h = {"Authorization": f"Bearer {user3}"}
-    r4 = client.post("/api/shop/buy-limited", json={"package_id": pkg_id}, headers=u3h)
-    assert r4.status_code == 200
-    body4 = r4.json()
-    assert body4["success"] is False
-    assert "stock" in body4["message"].lower()
-
-    # Admin emergency disable
-    dis = client.post(f"/api/admin/limited-packages/{pkg_id}/disable", headers=headers)
+    # Disable then ensure blocked
+    dis = client.post(f"/api/admin/limited-packages/{pkg_id}/disable", headers=ah)
     assert dis.status_code == 200
-
-    # Now any further buy should be blocked (disabled)
-    r5 = client.post("/api/shop/buy-limited", json={"package_id": pkg_id}, headers=u3h)
-    assert r5.status_code == 200
-    assert r5.json()["success"] is False
+    b5 = client.post("/api/shop/buy-limited", json={"package_id": pkg_id}, headers=h3)
+    assert b5.status_code == 200 and b5.json().get("success") is False

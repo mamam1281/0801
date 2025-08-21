@@ -3,9 +3,10 @@ from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, J
 from sqlalchemy.orm import relationship
 
 from ..database import Base
+from .base import SoftDeleteMixin
 
 
-class ShopProduct(Base):
+class ShopProduct(Base, SoftDeleteMixin):
     __tablename__ = "shop_products"
 
     id = Column(Integer, primary_key=True)
