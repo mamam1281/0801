@@ -1,4 +1,6 @@
 import uuid
+import base64
+import json
 import pytest
 from fastapi.testclient import TestClient
 from app.services.limited_package_service import LimitedPackageService
@@ -132,7 +134,27 @@ def test_limited_package_flow(client: TestClient):
     assert me2.status_code == 200, f"/api/auth/me failed for buyer2: {me2.status_code} {me2.text}"
     uid2 = me2.json().get("id")
     assert uid2 is not None, "buyer2 user id missing"
-    assert uid1 != uid2, f"user_id collision detected uid={uid1}; sequence reset 또는 테스트 데이터 누수 가능성"
+    if uid1 == uid2:
+        # JWT sub / site_id 디코드 추가 정보 출력 (테스트 디버그 전용)
+        try:
+            header_payload_1 = u1.split(".")[:2]
+            header_payload_2 = u2.split(".")[:2]
+            def _b64d(part: str):
+                padding = '=' * (-len(part) % 4)
+                return json.loads(base64.urlsafe_b64decode(part + padding).decode())
+            h1_j, p1_j = map(_b64d, header_payload_1)
+            h2_j, p2_j = map(_b64d, header_payload_2)
+            debug_ctx = {
+                "collision_uid": uid1,
+                "buyer1_jwt_sub": p1_j.get("sub"),
+                "buyer2_jwt_sub": p2_j.get("sub"),
+                "buyer1_site_id": p1_j.get("site_id"),
+                "buyer2_site_id": p2_j.get("site_id"),
+                "note": "sequence reset or improper identity restart suspected",
+            }
+        except Exception as e:  # noqa: BLE001
+            debug_ctx = {"decode_error": str(e), "raw_tokens_len": (len(u1), len(u2))}
+        raise AssertionError(f"user_id collision detected uid={uid1}; details={debug_ctx}")
     b3 = client.post("/api/shop/buy-limited", json={"package_id": pkg_id}, headers=h2)
     assert b3.status_code == 200 and b3.json().get("success") is True
 
@@ -144,7 +166,20 @@ def test_limited_package_flow(client: TestClient):
     assert me3.status_code == 200, f"/api/auth/me failed for buyer3: {me3.status_code} {me3.text}"
     uid3 = me3.json().get("id")
     assert uid3 is not None, "buyer3 user id missing"
-    assert uid3 not in {uid1, uid2}, f"user_id collision detected uid={uid3}; sequence reset 또는 테스트 데이터 누수 가능성"
+    if uid3 in {uid1, uid2}:
+        try:
+            header_payloads = [tok.split(".")[:2] for tok in (u1, u2, u3)]
+            decoded = []
+            for hp in header_payloads:
+                padding0 = '=' * (-len(hp[0]) % 4)
+                padding1 = '=' * (-len(hp[1]) % 4)
+                h_j = json.loads(base64.urlsafe_b64decode(hp[0] + padding0).decode())
+                p_j = json.loads(base64.urlsafe_b64decode(hp[1] + padding1).decode())
+                decoded.append({"sub": p_j.get("sub"), "site_id": p_j.get("site_id")})
+            debug_ctx = {"collision_uid": uid3, "tokens": decoded}
+        except Exception as e:  # noqa: BLE001
+            debug_ctx = {"decode_error": str(e)}
+        raise AssertionError(f"user_id collision detected uid={uid3}; details={debug_ctx}")
     b4 = client.post("/api/shop/buy-limited", json={"package_id": pkg_id}, headers=h3)
     assert b4.status_code == 200 and b4.json().get("success") is False
     assert "stock" in (b4.json().get("message", "").lower())
