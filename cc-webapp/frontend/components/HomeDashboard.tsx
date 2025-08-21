@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { rewardMessages } from '@/lib/rewardMessages';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Crown,
@@ -83,7 +84,8 @@ export function HomeDashboard({
     ttl_seconds: null as number | null,
     next_reward: null as string | null,
   });
-  const [streakProtection, setStreakProtection] = useState(null as boolean | null);
+  // streakProtection 토글 기능 제거(요구사항: 보호 토글/표시 제거) → 관련 상태/호출 삭제
+  // const [streakProtection, setStreakProtection] = useState(null as boolean | null);
   const [attendanceDays, setAttendanceDays] = useState(null as string[] | null);
   // 매 렌더마다 Math.random() 호출 → 1초마다 interval 재렌더 시 수십개의 motion div 재마운트 → passive effect stack 증가
   // 1회만 좌표를 생성하여 렌더 루프/마운트 폭증을 방지
@@ -119,7 +121,8 @@ export function HomeDashboard({
     if (!activeEvents || activeEvents.length === 0) return null;
     // priority desc, start_date desc 정렬 시도
     const sorted = [...(activeEvents as any[])].sort((a, b) => {
-      const pa = a.priority ?? 0; const pb = b.priority ?? 0;
+      const pa = a.priority ?? 0;
+      const pb = b.priority ?? 0;
       if (pb !== pa) return pb - pa;
       const sa = new Date(a.start_date || a.start || 0).getTime();
       const sb = new Date(b.start_date || b.start || 0).getTime();
@@ -201,11 +204,7 @@ export function HomeDashboard({
           }
           // 그 외 네트워크 오류는 무시
         }
-        // Load protection & this month attendance (UTC now)
-        try {
-          const prot = await streakApi.protectionGet('DAILY_LOGIN');
-          if (mounted) setStreakProtection(!!prot?.enabled);
-        } catch {}
+        // Load this month attendance (UTC now) (보호 토글 로딩 제거됨)
         try {
           const now = new Date();
           const hist = await streakApi.history(
@@ -253,18 +252,31 @@ export function HomeDashboard({
   );
 
   const claimDailyReward = async () => {
+    // 기존 프로필 스냅샷(검증용)
+    const prevGold = user.goldBalance;
+    const prevXP = user.experience;
+    const prevStreak = user.dailyStreak;
     const tokens = getTokens();
     if (!tokens?.access_token) {
-      onAddNotification('🔐 로그인 후 이용 가능한 보상입니다. 먼저 로그인해주세요.');
+      onAddNotification(rewardMessages.loginRequired);
       return;
     }
     if (dailyClaimed) {
-      onAddNotification('🌞 오늘 일일 보상은 이미 수령 완료! 내일 다시 도전해주세요.');
+      onAddNotification(rewardMessages.alreadyClaimed);
+      // 이미 프론트 상태상 claimed → 정보 로그
+      // eslint-disable-next-line no-console
+      console.info('[streak.claim] skip (already claimed state=true)', {
+        prevGold,
+        prevXP,
+        prevStreak,
+      });
       return;
     }
 
     try {
       const data = await streakApi.claim('DAILY_LOGIN');
+      // eslint-disable-next-line no-console
+      console.info('[streak.claim] success raw', data);
       // data: { awarded_gold, awarded_xp, new_gold_balance, streak_count }
       // 서버 authoritative 값 사용. fallback 로컬 계산 제거 (중복 증가 방지)
       // 프로필 재조회 (실시간 동기화) - 서버 최종 상태 반영
@@ -287,6 +299,31 @@ export function HomeDashboard({
               (fresh as any).vip_points ?? (fresh as any).vipPoints ?? (user as any).vipPoints,
           };
           const { updatedUser: finalUser, leveledUp } = checkLevelUp(mapped);
+          // delta 검증
+          const deltaGold = finalUser.goldBalance - prevGold;
+          const deltaXP = finalUser.experience - prevXP;
+          const expectedGold = data.awarded_gold || 0;
+          const expectedXP = data.awarded_xp || 0;
+          if (deltaGold !== expectedGold || deltaXP !== expectedXP) {
+            // eslint-disable-next-line no-console
+            console.error('[streak.claim][mismatch]', {
+              prevGold,
+              prevXP,
+              newGold: finalUser.goldBalance,
+              newXP: finalUser.experience,
+              deltaGold,
+              deltaXP,
+              expectedGold,
+              expectedXP,
+            });
+          } else {
+            // eslint-disable-next-line no-console
+            console.info('[streak.claim][verified]', {
+              awarded_gold: expectedGold,
+              awarded_xp: expectedXP,
+              streak_count: finalUser.dailyStreak,
+            });
+          }
           if (leveledUp) {
             setShowLevelUpModal(true);
             onAddNotification(`🆙 레벨업! ${finalUser.level}레벨 달성!`);
@@ -302,6 +339,16 @@ export function HomeDashboard({
           dailyStreak: data.streak_count ?? user.dailyStreak,
         };
         const { updatedUser: finalUser, leveledUp } = checkLevelUp(fallback);
+        // 프로필 실패 케이스도 delta 로그
+        const deltaGold = finalUser.goldBalance - prevGold;
+        const deltaXP = finalUser.experience - prevXP;
+        // eslint-disable-next-line no-console
+        console.warn('[streak.claim][profile_fallback]', {
+          deltaGold,
+          deltaXP,
+          expectedGold: data.awarded_gold || 0,
+          expectedXP: data.awarded_xp || 0,
+        });
         if (leveledUp) {
           setShowLevelUpModal(true);
           onAddNotification(`🆙 레벨업! ${finalUser.level}레벨 달성!`);
@@ -309,26 +356,44 @@ export function HomeDashboard({
         onUpdateUser(finalUser);
       }
       onAddNotification(
-        `🎁 오늘 보상 획득! +${(data.awarded_gold || 0).toLocaleString()}G / +${data.awarded_xp || 0}XP`
+        rewardMessages.success(
+          data.awarded_gold || 0,
+          data.awarded_xp || 0,
+          (streak.count || user.dailyStreak || 0) + 0
+        )
       );
       setShowDailyReward(false);
       setDailyClaimed(true);
       // 최신 프로필 재조회 대신 VIP 포인트는 streak 보상과 별개이므로 그대로 유지
     } catch (e: any) {
+      // 상태코드/메시지 기반 분류 로깅 지원 (apiRequest는 status를 직접 던지지 않으므로 message 패턴 사용)
       if (e?.message === 'Failed to fetch') {
-        onAddNotification(
-          '🌐 네트워크 문제로 보상 수령에 실패했습니다. 연결을 확인 후 다시 시도해주세요.'
-        );
+        onAddNotification(rewardMessages.networkFail);
+        // eslint-disable-next-line no-console
+        console.warn('[streak.claim] network_fail', e);
         return;
       }
       if (
         e?.message?.includes('한 회원당 하루에 1번만') ||
         e?.message?.includes('already claimed')
       ) {
-        onAddNotification('🌞 오늘 보상은 이미 받으셨어요. 내일 접속하면 또 드릴게요!');
+        // 요구사항: 이미 수령 케이스 문구 통일
+        onAddNotification(rewardMessages.alreadyClaimed);
         setDailyClaimed(true);
+        // eslint-disable-next-line no-console
+        console.info('[streak.claim] already_claimed (exception path)', {
+          message: e?.message,
+          prevGold,
+          prevXP,
+        });
       } else {
-        onAddNotification(`⚠️ 보상 수령 실패: ${e?.message || '네트워크 오류'}`);
+        onAddNotification(rewardMessages.genericFail(e?.message || '네트워크 오류'));
+        // eslint-disable-next-line no-console
+        console.error('[streak.claim] failure', {
+          message: e?.message,
+          prevGold,
+          prevXP,
+        });
       }
     }
   };
@@ -734,17 +799,7 @@ export function HomeDashboard({
                   </Button>
                 </div>
               </div>
-              {/* Mini benefits + protection CTA + attendance sketch */}
-              <div className="mt-3 grid grid-cols-1 gap-2 text-xs text-muted-foreground">
-                <div className="flex items-center justify-between">
-                  <div>혜택 패턴: 3일 Rare, 7일 Epic</div>
-                </div>
-                {attendanceDays && attendanceDays.length > 0 && (
-                  <div className="text-[11px] text-muted-foreground/80">
-                    (월간 누적 {attendanceDays.length}일)
-                  </div>
-                )}
-              </div>
+              {/* 혜택 패턴 & 월간 누적 텍스트 제거 (요구사항) */}
 
               {/* Minimal monthly attendance calendar (current month) */}
               {attendanceDays && (
@@ -800,7 +855,11 @@ export function HomeDashboard({
                             <div
                               key={idx}
                               className={`h-6 rounded flex items-center justify-center text-[11px] relative select-none transition-colors duration-200
-                                ${c.active ? 'bg-primary/30 text-foreground' : 'bg-secondary/30 text-muted-foreground'}
+                                ${
+                                  c.active
+                                    ? 'bg-primary/30 text-foreground'
+                                    : 'bg-secondary/30 text-muted-foreground'
+                                }
                                 ${c.isToday ? 'ring-1 ring-primary/70 font-bold' : ''}`}
                               title={c.dateStr}
                             >

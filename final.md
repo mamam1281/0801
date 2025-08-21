@@ -840,3 +840,26 @@ priority: 50
 - `useCrashGame` 훅으로 상태/애니메이션/재시도 캡슐화.
 - 엔드포인트별 재시도/타임아웃 정책 세분화.
 
+
+
+### 추후정리 ## 
+추후 정리(배포 전)
+
+Remove: openapi_temp.json, temp_openapi.json, temp_openapi_live.json (스펙 단일화 완료 후 잔여)
+Remove: auth.py.new, auth_service.py.new, dependencies.py.new (중복/낡은 백업)
+Sanitize or remove: token.json (토큰/비밀 포함 시 보안 위험)
+Move to data_export/dev-local or delete: temp_invite_usage_5858.csv, tmp_backend_logs.txt, test_signup.json
+Decide: sqlite test files (auth.db, test_game.db, test_notification.db) → pytest fixture 자동생성으로 전환 후 삭제
+Add CI step: duplicate scan + fail on new .new / temp_openapi pattern
+
+
+
+ 새로운 보상 메시지 추가 시 반드시 rewardMessages.ts만 수정
+ 커밋 전에 grep -R \"보상 수령 실패\" frontend = 0 확인
+ dev 기동 시 BUILD_ID 갱신 스크립트 실행 로그 확인
+ 브라우저 배너 BUILD_ID 변경 안 되면 강력 새로고침 & SW unregister
+ 의심 시 .next 제거 후 재시작
+
+ 
+
+ 

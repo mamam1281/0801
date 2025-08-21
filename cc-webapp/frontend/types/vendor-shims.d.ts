@@ -116,3 +116,10 @@ declare module "recharts" {
   const Recharts: any;
   export = Recharts;
 }
+
+// next/navigation 간단 shim (로컬 타입 인식 실패 시 임시 완화)
+declare module 'next/navigation' {
+  export function useRouter(): { push: (path: string) => void; replace: (path: string) => void; back: () => void; prefetch?: (path: string) => Promise<void>; };
+  export function useSearchParams(): any;
+  export function usePathname(): string;
+}
