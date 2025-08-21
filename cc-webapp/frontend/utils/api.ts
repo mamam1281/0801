@@ -8,7 +8,14 @@ const API_BASE_URL = 'http://127.0.0.1:8000'; // 백엔드 API 주소 (필요에
 
 // 개발 모드 여부 확인
 const IS_DEV = process.env.NODE_ENV === 'development';
-
+ 'use client';
+ /**
+  * DEPRECATION NOTICE (통합 예정)
+  * 이 파일은 unifiedApi(../lib/unifiedApi.ts) 도입으로 단계적 제거 예정입니다.
+  * - /api prefix 자동 처리 없음 → 신규 코드에서는 사용 금지
+  * - 토큰 스토리지 중복 발생 → tokenStorage + unifiedApi 사용
+  * 제거 목표: 2025-09-15
+  */
 /**
  * API 로깅 유틸리티
  * 개발 단계에서만 동작하며, 프로덕션 빌드에서는 자동으로 제거됨

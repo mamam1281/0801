@@ -1,3 +1,4 @@
+// DEPRECATION: unifiedApi.ts 로 대체 예정. 신규 코드에서는 useApiClient 사용 지양.
 import { useCallback } from 'react';
 import useAuthToken from '../useAuthToken';
 

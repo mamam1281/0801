@@ -1,4 +1,5 @@
 // 단순 API 헬퍼: 최소 기능 (base URL 결합 + JSON 직렬화 + 토큰 헤더)
+// DEPRECATION: unifiedApi.ts 도입으로 신규 코드 사용 지양. 2025-09-15 제거 예정.
 // 복잡한 401 refresh / 재시도 / 에러 타입 계층 생략
 // 사용 패턴:
 //   import { apiGet, apiPost } from '@/lib/simpleApi';

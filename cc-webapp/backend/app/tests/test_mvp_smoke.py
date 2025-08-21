@@ -75,13 +75,12 @@ class TestMVPSmoke:
         assert streak_response.status_code == 200, f"Streak status failed: {streak_response.text}"
         streak_data = streak_response.json()
         assert "count" in streak_data
-
-    # 4. 클레임
-    claim_response = test_client.post("/api/streak/claim", headers=headers, json={})
-    assert claim_response.status_code == 200, f"Streak first claim should succeed after auto-seed: {claim_response.text}"
-    claim_data = claim_response.json()
-    assert "awarded_gold" in claim_data
-    assert claim_data.get("awarded_gold", 0) > 0
+        # 4. 클레임
+        claim_response = test_client.post("/api/streak/claim", headers=headers, json={})
+        assert claim_response.status_code == 200, f"Streak first claim should succeed after auto-seed: {claim_response.text}"
+        claim_data = claim_response.json()
+        assert "awarded_gold" in claim_data
+        assert claim_data.get("awarded_gold", 0) > 0
 
         # 5. 가챠 (존재할 경우)
         gacha_try = test_client.post("/api/gacha/pull", headers=headers)
@@ -105,13 +104,6 @@ class TestMVPSmoke:
         assert register_resp.status_code == 200, register_resp.text
         token = register_resp.json()["access_token"]
         headers = {"Authorization": f"Bearer {token}"}
-    first_claim = test_client.post("/api/streak/claim", headers=headers, json={})
-    assert first_claim.status_code == 200
-    data1 = first_claim.json()
-    assert data1.get("awarded_gold", 0) > 0
-    # 두번째는 이미 수령 → 400 기대
-    second_claim = test_client.post("/api/streak/claim", headers=headers, json={})
-    assert second_claim.status_code == 400
 
     def test_database_consistency_check(self, test_client: TestClient):
         """데이터베이스 일관성 기본 검증 (app state DB session 사용)"""

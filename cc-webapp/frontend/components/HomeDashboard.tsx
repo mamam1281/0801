@@ -36,6 +36,7 @@ import { useEvents } from '../hooks/useEvents';
 // 경로 해석 문제로 상대경로 대신 tsconfig paths alias 사용
 import useAuthGate from '@/hooks/useAuthGate';
 import { apiGet, BUILD_ID } from '@/lib/simpleApi';
+import useDashboard from '@/hooks/useDashboard';
 
 interface HomeDashboardProps {
   user: User;
@@ -63,6 +64,8 @@ export function HomeDashboard({
   onToggleSideMenu,
 }: HomeDashboardProps) {
   const router = useRouter();
+  // 통합 대시보드 데이터 (profile + events summary 등) - streak, vip/status 등 개별 일부 호출 단계적 병합 예정
+  const { data: unifiedDash, loading: dashLoading, error: dashError, reload: reloadDash } = useDashboard(true);
   // Auth Gate (클라이언트 마운트 후 토큰 판정)
   const { isReady: authReady, authenticated } = useAuthGate();
   // 이벤트: 비로그인 시 자동 로드 skip
@@ -162,6 +165,10 @@ export function HomeDashboard({
         return;
       }
       try {
+        // 통합 dashboard 응답에서 profile/이벤트 요약 등을 먼저 반영 (존재 시)
+        if (unifiedDash && typeof unifiedDash === 'object') {
+          // TODO: unifiedDash.profile, unifiedDash.active_events 등 매핑 (현재 shape 확정 후 구현)
+        }
         // Get status first
         const status = await streakApi.status('DAILY_LOGIN');
         if (mounted && status && typeof status === 'object') {
