@@ -21,7 +21,7 @@ from sqlalchemy import text
 # (app.core.db 혹은 세션 팩토리 위치 프로젝트 구조에 맞춰 조정 필요)
 try:
     from app.db.session import SessionLocal  # 표준 세션 팩토리 추정
-except Exception as e:  # pragma: no cover
+except (ImportError, ModuleNotFoundError) as e:  # pragma: no cover
     print("[scan_duplicates] 세션 임포트 실패", e, file=sys.stderr)
     sys.exit(1)
 
