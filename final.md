@@ -57,8 +57,6 @@
 - **Backend**: FastAPI, Python, JWT 인증
 - **Database**: PostgreSQL 14, Redis 7
 - **Messaging**: Kafka, Zookeeper
-- **Analytics**: ClickHouse, OLAP Worker
-- **Development**: Docker Compose, Playwright E2E
 
 ## 🔧 현재 서비스 상태
 
@@ -67,8 +65,6 @@
 NAME             STATUS                         PORTS
 cc_backend       Up 40 minutes (healthy)       0.0.0.0:8000->8000/tcp
 cc_frontend      Up 36 seconds (health: starting) 0.0.0.0:3000->3000/tcp  
-cc_postgres      Up 40 minutes (healthy)       0.0.0.0:5432->5432/tcp
-cc_redis         Up 40 minutes (healthy)       6379/tcp
 cc_kafka         Up 40 minutes (healthy)       0.0.0.0:9092->9092/tcp
 cc_clickhouse    Up 40 minutes (healthy)       0.0.0.0:8123->8123/tcp
 cc_mailpit       Up 40 minutes (healthy)       0.0.0.0:1025->1025/tcp, 0.0.0.0:8025->8025/tcp
@@ -822,4 +818,25 @@ requirements: {"model_index_points": 1000}
 rewards: {"gold": 5000, "exp": 1000}
 priority: 50
 수정 원하시면 말씀 주세요. 진행 승인될 경우 바로 구현 들어갑니다. 계속할까요?
+
+### 프론트 중복/유령 빌드 정리 및 안정화 (최신)
+문제: 서로 다른 UI(구/신)가 번갈아 노출. 실험 잔존 파일로 별도 Next dev 서버 실행 + 캐시 혼재 가능성.
+
+조치:
+- 잔존 파일 제거: `frontend-package.json`, `next.config.tailwind4.js` 삭제.
+- 단일 소스 보증: docker-compose `frontend` context = `./cc-webapp/frontend`.
+- 네트워크 안정화: `lib/simpleApi.ts` 지수 백오프 재시도 (기본 재시도 코드: 502/503/504/408/429 & 네트워크 오류).
+- BUILD 식별: `NEXT_PUBLIC_BUILD_ID` + `HomeDashboard` 상단 배너.
+- Crash 개선 1단계: 공용 재시도 활용 (전용 훅 후속).
+
+검증:
+1. `docker compose down -v` → `.next` (및 선택적 `node_modules`) 제거 후 `docker compose up -d --build frontend`.
+2. http://localhost:3000 접속 → BUILD 배너 확인.
+3. DevTools Network → 포트 3000 단일 자산 로드.
+4. 오프라인 토글 후 API 호출 → `[simpleApi][retry]` 로그 확인.
+5. Crash 게임 베팅/Stats 404 미발생.
+
+후속 계획:
+- `useCrashGame` 훅으로 상태/애니메이션/재시도 캡슐화.
+- 엔드포인트별 재시도/타임아웃 정책 세분화.
 

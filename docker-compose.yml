@@ -58,6 +58,8 @@ services:
       # 개발 편의 설정
       NEXT_DISABLE_WEBPACK_CACHE: "1"        # persistent cache 비활성화 (메모리 사용량 감소)
       NEXT_TELEMETRY_DISABLED: "1"          # Next.js telemetry 비활성화
+  # 빌드 식별자 (없으면 docker compose up 시점 timestamp 주입 권장)
+  NEXT_PUBLIC_BUILD_ID: "${NEXT_PUBLIC_BUILD_ID:-dev}"
     volumes:
       - ./cc-webapp/frontend:/app
       - ./logs/frontend:/app/logs:rw

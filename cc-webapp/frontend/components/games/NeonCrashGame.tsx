@@ -86,7 +86,8 @@ export function NeonCrashGame({
   );
   const fetchAuthoritativeStats = useCallback(async () => {
     try {
-      const res = await apiGet('/games/stats/me');
+      // 경로 교정: 백엔드 라우터는 /api/games prefix 이므로 /api 추가
+      const res = await apiGet('/api/games/stats/me');
       if (res?.success && res.stats) {
         setAuthoritativeStats({
           total_bets: res.stats.total_bets ?? 0,
@@ -118,7 +119,8 @@ export function NeonCrashGame({
 
     try {
       // 서버에 크래시 베팅 요청
-      const gameResult = await apiPost('/games/crash/bet', {
+  // 경로 교정: /games/crash/bet -> /api/games/crash/bet
+  const gameResult = await apiPost('/api/games/crash/bet', {
         bet_amount: betAmount,
         auto_cashout_multiplier:
           showAdvancedSettings && manualAutoCashout > 0 ? manualAutoCashout : null,

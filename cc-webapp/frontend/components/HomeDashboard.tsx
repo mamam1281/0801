@@ -34,7 +34,7 @@ import { useEvents } from '../hooks/useEvents';
 // useAuthGate 훅: default + named export 모두 지원. 경로/타입 오류 해결 위해 명시적 import
 // 경로 해석 문제로 상대경로 대신 tsconfig paths alias 사용
 import useAuthGate from '@/hooks/useAuthGate';
-import { apiGet } from '@/lib/simpleApi';
+import { apiGet, BUILD_ID } from '@/lib/simpleApi';
 
 interface HomeDashboardProps {
   user: User;
@@ -395,6 +395,11 @@ export function HomeDashboard({
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-black to-primary-soft relative overflow-hidden pb-20">
+      {process.env.NODE_ENV !== 'production' && (
+        <div className="fixed top-0 left-0 right-0 z-50 text-[10px] font-mono tracking-wider bg-black/60 backdrop-blur-sm text-muted-foreground py-1 text-center border-b border-border/40">
+          BUILD: {BUILD_ID}
+        </div>
+      )}
       {/* Animated Background */}
       <div className="absolute inset-0">
         {backgroundPoints.map((p: { id: number; x: number; y: number; delay: number }) => (

@@ -34,10 +34,19 @@ interface ReqOpts {
   // JSON 아닐 때 (예: FormData) 자동 처리 막기
   rawBody?: boolean;
   method?: string;
+  retry?: {
+    retries?: number;        // 최대 재시도 횟수
+    baseDelayMs?: number;    // 초기 딜레이
+    maxDelayMs?: number;     // 최대 딜레이
+    retryOn?: number[];      // 재시도 허용 HTTP 코드
+  };
 }
 
+const DEFAULT_RETRY_ON = [502,503,504,408,429];
+function sleep(ms: number){ return new Promise(r=>setTimeout(r,ms)); }
+
 async function request<T=any>(path: string, opts: ReqOpts = {}): Promise<T> {
-  const { params, body, token, headers = {}, signal, rawBody, method } = opts;
+  const { params, body, token, headers = {}, signal, rawBody, method, retry } = opts;
   let url = BASE + path;
   if (params && Object.keys(params).length) {
     const q = new URLSearchParams();
@@ -53,13 +62,44 @@ async function request<T=any>(path: string, opts: ReqOpts = {}): Promise<T> {
   }
   if (token) finalHeaders['Authorization'] = `Bearer ${token}`;
 
-  const res = await fetch(url, {
-    method: method || (body ? 'POST' : 'GET'),
-    headers: finalHeaders,
-    body: body === undefined ? undefined : (rawBody ? body : JSON.stringify(body)),
-    signal,
-    credentials: 'include', // 세션 쿠키 사용 가능성 대비
-  });
+  const rConf = retry || {};
+  const max = rConf.retries ?? 0;
+  const baseDelay = rConf.baseDelayMs ?? 250;
+  const maxDelay = rConf.maxDelayMs ?? 2500;
+  const retryOn = rConf.retryOn ?? DEFAULT_RETRY_ON;
+  let attempt = 0;
+  let res: Response | null = null;
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    try {
+      res = await fetch(url, {
+        method: method || (body ? 'POST' : 'GET'),
+        headers: finalHeaders,
+        body: body === undefined ? undefined : (rawBody ? body : JSON.stringify(body)),
+        signal,
+        credentials: 'include',
+      });
+      if (!res.ok && retryOn.includes(res.status) && attempt < max) {
+        attempt += 1;
+        const delay = Math.min(maxDelay, baseDelay * Math.pow(2, attempt - 1));
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn(`[simpleApi][retry] attempt=${attempt} status=${res.status} delay=${delay}ms url=${path}`);
+        }
+        await sleep(delay);
+        continue;
+      }
+      break;
+    } catch (e) {
+      if (attempt >= max) throw e;
+      attempt += 1;
+      const delay = Math.min(maxDelay, baseDelay * Math.pow(2, attempt - 1));
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn(`[simpleApi][retry] network-error attempt=${attempt} delay=${delay}ms url=${path}`);
+      }
+      await sleep(delay);
+    }
+  }
+  if (!res) throw new Error('No response');
 
   if (!res.ok) {
     let detail: any = null;
@@ -80,3 +120,6 @@ async function request<T=any>(path: string, opts: ReqOpts = {}): Promise<T> {
 export const apiGet = <T=any>(path: string, opts: Omit<ReqOpts,'body'|'method'> = {}) => request<T>(path, { ...opts, method: 'GET' });
 export const apiPost = <T=any>(path: string, body?: any, opts: Omit<ReqOpts,'body'|'method'> = {}) => request<T>(path, { ...opts, body, method: 'POST' });
 export const apiReq = request;
+
+// 빌드 식별자 (주입된 환경변수 없으면 dev-local)
+export const BUILD_ID = (typeof process !== 'undefined' && (process as any).env?.NEXT_PUBLIC_BUILD_ID) || 'dev-local';
