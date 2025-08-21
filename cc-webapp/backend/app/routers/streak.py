@@ -21,6 +21,7 @@ from ..utils.redis import (
     set_streak_protection,
 )
 from app.utils.redis import get_redis  # 일일 중복 가드용 직접 Redis 접근
+from app.utils.streak_utils import calc_next_streak_reward
 
 router = APIRouter(prefix="/api/streak", tags=["Streaks"])
 
@@ -50,7 +51,7 @@ async def status(
 ):
     cnt = get_streak_counter(str(current_user.id), action_type)
     ttl = get_streak_ttl(str(current_user.id), action_type)
-    next_reward = _calc_next_reward(cnt + 1)
+    next_reward = calc_next_streak_reward(cnt + 1)
     return StreakStatus(action_type=action_type, count=cnt, ttl_seconds=ttl, next_reward=next_reward)
 
 
@@ -91,7 +92,7 @@ async def tick(
         cnt = get_streak_counter(str(current_user.id), action_type)
 
     ttl = get_streak_ttl(str(current_user.id), action_type)
-    next_reward = _calc_next_reward(cnt + 1)
+    next_reward = calc_next_streak_reward(cnt + 1)
 
     # 출석 기록 (증가 여부와 무관하게 하루 한 번 기록 시도 – SADD idempotent)
     try:
@@ -138,16 +139,10 @@ async def next_reward(
     current_user: User = Depends(get_current_user),
 ):
     cnt = get_streak_counter(str(current_user.id), action_type)
-    return {"next_reward": _calc_next_reward(cnt + 1)}
+    return {"next_reward": calc_next_streak_reward(cnt + 1)}
 
 
-def _calc_next_reward(next_count: int) -> str:
-    # Simple tiering example; adjust to product needs
-    if next_count % 7 == 0:
-        return "Epic Chest"
-    if next_count % 3 == 0:
-        return "Rare Chest"
-    return "Coins + XP"
+# _calc_next_reward: calc_next_streak_reward (공통 util) 사용으로 제거
 
 
 # -----------------

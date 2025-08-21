@@ -65,7 +65,12 @@ export function HomeDashboard({
 }: HomeDashboardProps) {
   const router = useRouter();
   // 통합 대시보드 데이터 (profile + events summary 등) - streak, vip/status 등 개별 일부 호출 단계적 병합 예정
-  const { data: unifiedDash, loading: dashLoading, error: dashError, reload: reloadDash } = useDashboard(true);
+  const {
+    data: unifiedDash,
+    loading: dashLoading,
+    error: dashError,
+    reload: reloadDash,
+  } = useDashboard(true);
   // Auth Gate (클라이언트 마운트 후 토큰 판정)
   const { isReady: authReady, authenticated } = useAuthGate();
   // 이벤트: 비로그인 시 자동 로드 skip
@@ -155,82 +160,44 @@ export function HomeDashboard({
   }, [hotEvent?.end_date]);
 
   // Fetch & tick with client once-per-day guard (auth gate 의존)
+  // 1) 통합 대시보드(unifiedDash)로부터 streak / vip 매핑 (백엔드 확장 시 자동 적용)
   useEffect(() => {
-    let mounted = true;
-    const load = async () => {
-      if (!authReady) return; // 아직 판정 전
-      if (!authenticated) {
-        // eslint-disable-next-line no-console
-        console.debug('[HomeDashboard] 비로그인 → streak 관련 API skip');
-        return;
+    if (!unifiedDash) return;
+    // 예상 unified 응답 확장 형태 예:
+    // {
+    //   streak: { count, ttl_seconds, next_reward },
+    //   vip: { vip_points, claimed_today },
+    //   ...기존 main/games/social_proof
+    // }
+    try {
+      const us: any = unifiedDash as any;
+      if (us.streak && typeof us.streak === 'object') {
+        const s = us.streak;
+        safeSetStreak({
+          count: s.count ?? 0,
+          ttl_seconds: s.ttl_seconds ?? null,
+          next_reward: s.next_reward ?? null,
+        });
       }
-      try {
-        // 통합 dashboard 응답에서 profile/이벤트 요약 등을 먼저 반영 (존재 시)
-        if (unifiedDash && typeof unifiedDash === 'object') {
-          // TODO: unifiedDash.profile, unifiedDash.active_events 등 매핑 (현재 shape 확정 후 구현)
-        }
-        // Get status first
-        const status = await streakApi.status('DAILY_LOGIN');
-        if (mounted && status && typeof status === 'object') {
-          safeSetStreak({
-            count: status.count ?? 0,
-            ttl_seconds: status.ttl_seconds ?? null,
-            next_reward: status.next_reward ?? null,
-          });
-        }
-        const LS_KEY = 'streak.daily_login.lastTickUTCDate';
-        const todayUTC = new Date().toISOString().slice(0, 10);
-        let shouldTick = false;
-        try {
-          const last = localStorage.getItem(LS_KEY);
-          if (last !== todayUTC) shouldTick = true;
-        } catch {}
-        if (shouldTick) {
-          const after = await streakApi.tick('DAILY_LOGIN');
-          try {
-            localStorage.setItem(LS_KEY, todayUTC);
-          } catch {}
-          if (mounted && after && typeof after === 'object') {
-            safeSetStreak({
-              count: after.count ?? 0,
-              ttl_seconds: after.ttl_seconds ?? null,
-              next_reward: after.next_reward ?? null,
-            });
-          }
-        }
-        // VIP / streak claim status (daily claimed?)
-        try {
-          const vs = await apiGet('/api/vip/status');
-          if (mounted && vs && typeof vs === 'object') {
-            setDailyClaimed(!!vs.claimed_today);
-            if (typeof (vs as any).vip_points === 'number') setVipPoints((vs as any).vip_points);
-          }
-        } catch (e: any) {
-          if (e?.status === 404) {
-            if (mounted) setDailyClaimed(false);
-          }
-          // 그 외 네트워크 오류는 무시
-        }
-        // Load this month attendance (UTC now) (보호 토글 로딩 제거됨)
-        try {
-          const now = new Date();
-          const hist = await streakApi.history(
-            now.getUTCFullYear(),
-            now.getUTCMonth() + 1,
-            'DAILY_LOGIN'
-          );
-          if (mounted) setAttendanceDays(Array.isArray(hist?.days) ? hist.days : []);
-        } catch {}
-      } catch (e) {
-        // Non-fatal; keep UI fallback
-        console.warn('streak load failed', e);
+      if (us.vip && typeof us.vip === 'object') {
+        if (typeof us.vip.vip_points === 'number') setVipPoints(us.vip.vip_points);
+        if (typeof us.vip.claimed_today !== 'undefined') setDailyClaimed(!!us.vip.claimed_today);
       }
-    };
-    load();
-    return () => {
-      mounted = false;
-    };
-  }, [authReady, authenticated]);
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.warn('[HomeDashboard] unifiedDash mapping failed', e);
+    }
+  }, [unifiedDash]);
+
+  // attendanceDays 는 unifiedDash.streak.attendance_week 기반으로 표시 (주간)
+  useEffect(() => {
+    if (!unifiedDash) return;
+    try {
+      const us: any = unifiedDash;
+      const week = us?.streak?.attendance_week;
+      if (Array.isArray(week)) setAttendanceDays(week);
+    } catch {}
+  }, [unifiedDash]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -371,6 +338,10 @@ export function HomeDashboard({
       );
       setShowDailyReward(false);
       setDailyClaimed(true);
+      // streak / vip 등 통합 스냅샷 재로딩 (TTL 무시 후 최신 반영)
+      try {
+        reloadDash();
+      } catch {}
       // 최신 프로필 재조회 대신 VIP 포인트는 streak 보상과 별개이므로 그대로 유지
     } catch (e: any) {
       // 상태코드/메시지 기반 분류 로깅 지원 (apiRequest는 status를 직접 던지지 않으므로 message 패턴 사용)

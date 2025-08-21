@@ -399,6 +399,33 @@ docker-compose restart backend
 - `AchievementService` if/elif 분기(CUMULATIVE_BET / TOTAL_WIN_AMOUNT / WIN_STREAK)를 신규 모듈 `app/services/achievement_evaluator.py` 로 분리.
 - 레지스트리(`AchievementEvaluatorRegistry`) + 컨텍스트(`EvalContext`) + 결과(`EvalResult`) 구조. 서비스는 계산 결과를 DB/브로드캐스트에 반영만 수행.
 
+### 2025-08-21 (추가) 이벤트/미션 progress 메타 & UNIQUE 정비 (Phase A 스키마 안정화)
+**변경 요약**  
+다중 head (20250820_merge_heads_admin_stats_shop_receipt_sig, 20250821_add_event_mission_progress_meta, 20250821_add_event_outbox) → merge revision `20250821_merge_event_outbox_progress_meta_heads` 로 단일화 후 새 revision `86171b66491f` 적용. `event_participations`, `user_missions` 테이블에 없던 컬럼/제약을 조건부 추가:
+`progress_version` (int, default 0 → server_default 제거), `last_progress_at` (nullable), UNIQUE 제약(`uq_event_participation_user_event`, `uq_user_mission_user_mission`), 진행 상태 조회용 인덱스(`ix_event_participations_user_completed`, `ix_user_missions_user_completed`). NULL row 백필(0) 완료.
+
+**검증 결과**  
+- alembic heads: 단일 (86171b66491f)  
+- UNIQUE 존재: `SELECT conname ...` → 두 제약 확인  
+- progress_version NULL count: 두 테이블 0  
+- Downgrade 안전성: best-effort (컬럼/제약/인덱스 제거) 구현  
+
+**다음 단계 (Phase A → B 전환)**  
+1. HomeDashboard 리팩터: streak/vip/status 개별 fetch 제거, `useDashboard` 통합 매핑  
+2. Claim idempotency & concurrency 테스트 (중복 보상 방지 + progress_version 단조 증가 검증)  
+3. RewardService 통합(보상 계산/멱등 키 규칙 중앙화) 및 Outbox 이벤트 발행 초안 준비  
+4. 문서(`api docs/20250808.md`) 동일 요약/검증/다음 단계 섹션 동기화 (추가 OpenAPI 필요 시 재수출)  
+
+**리스크 & 대응**  
+- 과거 중복 레코드 재발 방지: UNIQUE 위반 발생 즉시 로그+알림(추가 예정)  
+- progress_version 경쟁 업데이트: 후속 Claim 테스트에서 race 발생 시 서비스 계층 조건부 UPDATE 또는 SELECT FOR UPDATE 적용 고려  
+- 다중 head 재발 방지: 새 작업 전 `alembic heads` 체크 개발 프로세스 문서화  
+
+**추가 메트릭 권장**  
+- `event_claim_conflict_total` (UNIQUE 위반 캐치)  
+- `mission_progress_race_retry_total` (낙관적 잠금 재시도 카운트)  
+
+
 ### 2025-08-21 (추가) MVP 스모크 테스트 안정화 & 풀스택 기본 CRUD 커버리지 평가
 **변경 요약**
 - 백엔드 엔드투엔드 핵심 플로우 검증용 `test_mvp_smoke.py` 확립: `/api/auth/register → /api/auth/profile → /api/streak/status → /api/streak/claim → /api/gacha/pull → /api/shop/items(+buy)`.
@@ -920,3 +947,138 @@ Add CI step: duplicate scan + fail on new .new / temp_openapi pattern
 
 
 
+작업 고도화 전략 개요: 안정성(데이터 정합/멱등/관측) → 성능/확장(Kafka/ClickHouse/캐시) → 개발 생산성(통합 Fetch/자동 체크) 순으로 단계화. 아래는 각 영역별 구체 실행 가이드와 우선 적용 순서(위 ToDo 매핑 포함)입니다.
+
+즉시(Phase A 마무리) – 안전한 전환 기반
+(1) Phase A 잔여 정리: 프론트 useDashboard 완전 교체 후 기존 다중 호출 제거 → /api/dashboard 응답 필드 스냅샷을 테스트 픽스처로 캡쳐(스키마 드리프트 감지).
+(2)+(3) 유니크/마이그레이션: UNIQUE 추가 전 사전 스캔 쿼리 SELECT user_id,event_id,COUNT() c FROM event_participations GROUP BY 1,2 HAVING COUNT()>1; 중복 있으면 가장 최신(progress 최대 혹은 created_at 최신) 1건 남기고 나머지 삭제 스크립트 → 로그 파일 남김. Alembic 적용 직후 heads 단일성 검사 → api docs/20250808.md “변경 요약/검증/다음 단계” 블록 추가.
+(5) Claim 통합 테스트: pytest에서
+participate → progress → claim
+동일 claim 재시도 (Idempotent) → reward_items 동일 / progress_version 불변
+race: 두 번 거의 동시에 claim → 한쪽만 성공 assert (HTTP 200 / 409 or 동일 payload)
+(6) Fetch/토큰 통합: unifiedApi.ts + tokenStorage.ts 추가, legacy 래퍼 첫 줄 console.warn(‘DEPRECATED…’). 점진 교체: auth → dashboard → claim → shop 순.
+데이터 정합 & 보상 멱등 (Phase B Core)
+(4) RewardService 통합: Contract: grant_reward(user_id, reason, bundle, idempotency_key) → {applied: bool, new_balances, reward_items} 인덱스: user_rewards(idempotency_key) UNIQUE 이미 활용. 이벤트/미션/상점 모두 이 경로 호출. 실패 케이스: Duplicate → applied=false, HTTP 200 + idempotent.
+(7) 게임 세션 Hook: session_end → 내부 트랜잭션: update progress tables, enqueue_outbox(event_type='game.session.end', payload{...}, trace_id) 주의: 실패 시 세션 종료 롤백 → 재시도 가능성 대비 idempotency (session_id unique).
+(8) Outbox Processor: 스케줄러(매 2초) SELECT * FROM outbox WHERE status='pending' AND next_attempt_at <= now() ORDER BY id LIMIT 100 FOR UPDATE SKIP LOCKED Kafka publish 성공 → status='sent', sent_at 실패 → attempt_count++, backoff (min(2^attempt, 300s)), dead-letter 기준 attempt>=10 Dead-letter 테이블 outbox_dead_letters (원문 payload + last_error)
+(10) 관측 지표: Metrics 노출 (Prometheus endpoint): dashboard_response_ms (histogram) reward_claim_duration_ms outbox_pending_count / outbox_lag_seconds (now - created_at 평균) kafka_publish_failures_total Alert 기준 초안: outbox_lag_seconds p95 > 30s 5분 지속 → 경고.
+성능 & 확장 (Phase B 후반 → C 초입)
+(14) 대시보드 캐시: 서버: Redis key dashboard:{user_id} JSON + ttl 5s ETag: hash(json) → If-None-Match 처리 304 Invalidation: reward claim / purchase / mission progress completion에서 delete key 테스트: 첫 요청 200 ms 측정, 연속 요청 304 혹은 캐시 15–30ms 이하 목표.
+(15) 프론트 Store: 슬라이스별 invalidate 규칙 명시(예: claim 성공 → dashboard & events & rewards pending invalidate). Store 도입 전 커스텀 훅 레벨에서 TTL + SWR 패턴 유지 가능.
+(9) ClickHouse 초기 적재:
+Outbox → Kafka → Connector(or lightweight consumer) → ClickHouse INSERT (batch 1s/5k rows)
+헬스 스크립트: 최근 5분 이벤트 count, ingestion delay (max(ts_ingested - ts_event)) 목표: ingestion delay < 3s p95.
+품질/안전 자동화
+(11) 부하 테스트: k6 script: signup→login→dashboard→participate→(loop progress)→claim→purchase 95th latency 목표: dashboard <150ms, claim <200ms, purchase <250ms 임계 초과 시 flamegraph(py-spy) + SQL EXPLAIN 분석.
+(12) 보안 하드닝: 로그인 rate limit Redis (key ip:login per 5m) claim rate limit (user:claim per 10s) → HTTP 429 or graceful 200 {accepted:false} 관리자 감사 로그: 모든 reward_grant(applied) & UNIQUE 충돌 처리 기록.
+(13) 무결성 감사 크론:
+음수 잔액 SELECT id FROM users WHERE gold_balance < 0
+중복 reward idempotency SELECT idempotency_key, COUNT(*)>1
+비정상 gold ( > 기본*100 ) outlier 결과 json 저장 + Slack/Webhook (추후)
+회귀/문서/릴리즈
+(16) 핵심 사이클 End-to-End pytest + (선택) Playwright front smoke
+(18) release_check.ps1: Steps: pytest -q → alembic heads (1) → curl /health → export openapi → diff 이전 스냅샷 → summarize risks
+(19) 플레이북: UNIQUE 충돌 롤백: alembic downgrade + 중복정리 재시도 Kafka 다운: outbox processor skip publish, lag 증가 모니터링, 재기동 후 catch-up ClickHouse 지연: fallback 분석(직접 Postgres events table 임시 조회)
+(20) Phase B 종료 KPI 수집 스크립트 (Prometheus API → json → report)
+실행 순서 제안(배치) Batch 1 (안전 기반): 2→ 중복 스캔, 3→ 마이그레이션 적용, 1→ 프론트 훅 교체, 5→ claim 테스트 Batch 2 (보상/멱등): 4→ RewardService 통합, 6→ Fetch 통합, 14→ 캐시 Batch 3 (게임/이벤트/스트림): 7→ 세션 Hook, 8→ Outbox Processor, 10→ Metrics Batch 4 (확장/분석): 9→ ClickHouse, 11→ 부하, 13→ 무결성, 12→ 보안 Batch 5 (자동화/평가): 15→ Store, 16→ 회귀, 18→ 릴리즈 스크립트, 19→ 플레이북, 20→ KPI 평가, 17→ Deprecated 정리
+
+리스크 및 완화 요약
+
+UNIQUE 적용 중 중복 → 사전 스캔/정리 스크립트로 제로 다운 적용.
+Outbox 폭주 → SELECT ... SKIP LOCKED + 배치 크기 제한 + dead-letter.
+캐시 일관성 → invalidate 트리거 집중(Reward, Purchase, Progress complete).
+재시도 루프(토큰/claim) → idempotency_key + attempt cap.
+Kafka 불가 → fallback 로그(파일/DB) + 재전송 태스크.
+측정 기준(관측 목표)
+
+outbox_pending_count < 500 지속
+outbox_lag_seconds p95 < 30
+dashboard_response_ms p95 < 150
+reward_claim_duration_ms p95 < 200
+claim idempotent 재시도 성공률 100% (중복 지급 0)
+UNIQUE 위반 런타임 에러 0 (사전 정리 후)
+필요 산출물(차후 생성 권장)
+
+scripts/scan_duplicates.py (이벤트/미션 중복 리포트)
+scripts/release_check.ps1
+backend/app/services/reward_service.py (단일 진입)
+backend/app/workers/outbox_processor.py (주기 실행)
+prometheus_metrics.py (등록 함수)
+tests/test_claim_idempotency.py, tests/test_dashboard_cache.py, tests/test_outbox_processor.py
+docs/OUTBOX_PIPELINE.md, docs/DASHBOARD_CACHE.md, docs/RELEASE_CHECKLIST.md
+다음 바로 수행할 1개 선택 지시 주세요: A) 중복 스캔 쿼리/스크립트부터 B) RewardService 통합 코드 초안 C) 대시보드 훅 프론트 교체 패치 D) Outbox Processor 기본 뼈대 E) 릴리즈 체크 스크립트 초안
+
+원하는 항목 문자(또는 번호)로 답 주세요. 준비되면 해당 ToDo in-progress로 진행합니다.
+
+
+
+남은 배포 관문(Release Gate) 요약 (현재 작업(통합 대시보드/멱등 스키마 정렬) 완료 직후 기준)
+
+데이터/스키마 정합
+Alembic 마이그레이션 실제 적용 + 단일 head 확인 (중복 레코드 사전 정리 포함)
+UNIQUE/멱등 키 적용 후 중복 보상/이벤트 참여 재현 테스트 (0 건 보장)
+프로덕션과 동일 파라미터(.env.prod)로 마이그레이션 드라이런(비파괴 리허설 혹은 스냅샷 DB)
+보상/진행 로직 일관성
+RewardService 단일 진입점 전환(Shop / Event / Mission / Streak 모두 동일 경로)
+claim/participate/progress 응답 스키마 표준( progress_version, reward_items ) 전 구 호출부 교체
+게임 세션 종료 → progress hook + outbox enqueue 정상 레이스 테스트
+관측/모니터링 & 알람
+Prometheus 지표 추가(dashboard_response_ms, reward_claim_duration_ms, outbox_lag_seconds, kafka_publish_failures_total)
+기본 Alert Rule: outbox_lag_seconds p95 > 30s (5분), claim 실패율 >0.5%, 5xx 비율 >1%
+Grafana 대시보드 패널(코어 KPI + 에러율 + 지연) 저장/Export 버전 관리
+이벤트 스트림 / 분석 파이프
+Outbox Processor 안정 동작(재시도/백오프/Dead-letter)
+Kafka 토픽 존재/권한/retention 설정 검증
+ClickHouse 적재 파이프(최소 raw events_log) 지연 p95 < 3s
+재기동 시 미전송 outbox 잔량 정상 소비 확인(Cold start 회복 테스트)
+성능/부하 검증
+k6 또는 Locust 핵심 시나리오 (signup→login→dashboard→participate→progress 루프→claim→purchase) 500~1k 동시
+SLA 기준: /api/dashboard p95 <150ms, claim p95 <200ms, purchase p95 <250ms, 에러율 <1%
+병목(SQL slow query / N+1) 프로파일 보고서 1회 작성
+캐시 & 무효화
+/api/dashboard Redis 캐시 + ETag 304 경로 검증 (invalidate 트리거: claim, purchase, mission complete)
+캐시 TTL 동적 조정 실험(5s vs 10s) → 히트율/신선도 비교 로그
+캐시 미스 fallback 경로(예외 시 즉시 DB 조회) 예외 처리
+보안/안전
+토큰 저장/회전 정책 단일화(프론트 unifiedApi + tokenStorage)
+Rate Limit(로그인, claim, purchase) 활성 + 우회 테스트
+관리자 행위 감사 로그(보상 수동 지급, 재고 조작) 기록 검증
+시크릿 관리: JWT / DB / Kafka / ClickHouse / HMAC 키 .env.production 분리 & 스캔(노출 여부 툴)
+프론트 안정화
+HomeDashboard 기존 개별 호출 완전 제거(단일 훅)
+레거시 fetch 래퍼 Deprecation 콘솔 제거 시점 명시(2주 후)
+빌드 아티팩트(Next.js) 프로덕션 모드 이미지 최적화, 번들 분석(중복 의존 삭제)
+테스트 커버리지 & 회귀
+새 통합 claim / idempotency / outbox processor / dashboard cache 테스트 추가
+End-to-End 핵심 사이클 테스트 100% Green (재실행 3회)
+OpenAPI 스냅샷 변경 diff 자동 검증(허용 리스트 외 변경 Fail)
+릴리즈 자동 체크 파이프라인
+스크립트: pytest → alembic heads → /health → /docs → openapi export diff → risk summary
+실패 시 빌드 중단 & 원인 출력
+아티팩트 태깅(Build ID + Git SHA) → 프론트/백엔드 /health 노출
+롤백 전략 & 플레이북
+DB 마이그레이션 롤백 경로(alembic downgrade 단일 단계) 문서화
+Outbox 장애 시 플래그(KAFKA_PUBLISH_ENABLED=false) 전환 절차
+ClickHouse 지연 시 임시 대체: Postgres direct 쿼리 대시보드 패널 스위치
+Deprecated 정리 (지연 제거 관리)
+한정 패키지 구 엔드포인트 Deprecation 헤더 추가 + 접근 로그 계수(낮을 시 제거)
+중복 profile/users_enhanced 라우터 접근 량 측정 → 0 확인 후 제거
+문서 & 운영 핸드북
+api docs/20250808.md 업데이트(“변경 요약 / 검증 / 다음 단계” 최신화)
+OUTBOX_PIPELINE.md, DASHBOARD_CACHE.md, RELEASE_CHECKLIST.md, ROLLBACK_PLAYBOOK.md 최종 확정
+KPI 정의 문서(응답지연, 실패율, lag) + 목표치 명시
+최종 Go/No-Go 체크리스트 (요약)
+ 테스트 전부 Green
+ Alembic head=1
+ OpenAPI diff 승인
+ 성능 SLA 충족 리포트 첨부
+ 보안/시크릿 점검 로그
+ 모니터링 패널 URL & Alert Rule 활성
+ 롤백 스텝 재현 로그(스크린샷/명령)
+추천 실행 순서(남은) 압축
+
+데이터 중복 스캔 & 마이그레이션 적용 → RewardService 통합 → claim/idempotency 테스트
+Outbox + Kafka + Metrics → Dashboard 캐시/ETag → 부하 테스트
+ClickHouse 적재 검증 → Rate Limit/보안 → 릴리즈 자동 체크 스크립트
+문서/플레이북 정리 → Deprecated 관찰 기간 → 최종 Go/No-Go
+필요하면 위 단계 중 첫 작업을 바로 진행할 수 있으니 “중복 스캔 시작” / “RewardService 통합” 등 한 문장으로 지시 주세요.

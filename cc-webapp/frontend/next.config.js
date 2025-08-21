@@ -23,6 +23,16 @@ const nextConfig = {
       ...(config.resolve.alias || {}),
       'next-themes': require('path').resolve(__dirname, 'types/shims/next-themes.ts'),
     };
+    // 과도한 디렉토리 워치로 인한 메모리 사용 감소 목적 ignore
+    config.watchOptions = {
+      ...(config.watchOptions || {}),
+      ignored: [
+        '**/logs/**',
+        '**/data/**',
+        '**/test-results/**',
+        '**/node_modules/**/.cache/**'
+      ],
+    };
     return config;
   },
 };
