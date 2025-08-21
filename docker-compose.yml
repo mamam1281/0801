@@ -51,15 +51,12 @@ services:
       dockerfile: Dockerfile.dev
     container_name: cc_frontend
     environment:
-      # 브라우저에서 직접 호출되는 외부 API 베이스 URL
       NEXT_PUBLIC_API_URL: "${NEXT_PUBLIC_API_URL:-http://localhost:8000}"
-      # SSR (Next 서버) 내부에서 backend 컨테이너로 접근 시 사용
       NEXT_PUBLIC_API_URL_INTERNAL: "${NEXT_PUBLIC_API_URL_INTERNAL:-http://backend:8000}"
-      # 개발 편의 설정
-      NEXT_DISABLE_WEBPACK_CACHE: "1"        # persistent cache 비활성화 (메모리 사용량 감소)
-      NEXT_TELEMETRY_DISABLED: "1"          # Next.js telemetry 비활성화
-      # 빌드 식별자 (없으면 docker compose up 시점 timestamp 주입 권장)
+      NEXT_DISABLE_WEBPACK_CACHE: "1"
+      NEXT_TELEMETRY_DISABLED: "1"
       NEXT_PUBLIC_BUILD_ID: "${NEXT_PUBLIC_BUILD_ID:-dev}"
+      NODE_OPTIONS: "--max_old_space_size=3072"
     volumes:
       - ./cc-webapp/frontend:/app
       - ./logs/frontend:/app/logs:rw
