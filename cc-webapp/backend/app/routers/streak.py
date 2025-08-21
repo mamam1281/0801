@@ -259,9 +259,18 @@ async def claim(
     db: Session = Depends(get_db),
 ):
     action_type = body.action_type or DEFAULT_ACTION
+    # 진단 로깅: 요청 시작
+    try:
+        import logging
+        logger = logging.getLogger("streak")
+        logger.info("[streak.claim] start", extra={"user_id": current_user.id, "action_type": action_type})
+    except Exception:
+        logger = None
     # 현재 streak 읽기 (증가 없이)
     streak_count = get_streak_counter(str(current_user.id), action_type)
     if streak_count <= 0:
+        if logger:
+            logger.info("[streak.claim] no_active_streak", extra={"user_id": current_user.id, "action_type": action_type})
         raise HTTPException(status_code=400, detail="No active streak to claim")
         
     # 오늘 이미 보상을 받았는지 확인
@@ -278,6 +287,8 @@ async def claim(
         .first()
     )
     if existing_today:
+        if logger:
+            logger.info("[streak.claim] already_claimed_today", extra={"user_id": current_user.id, "reward_id": existing_today.id})
         raise HTTPException(status_code=400, detail="한 회원당 하루에 1번만 연속 보상을 받을 수 있습니다")
 
     # 멱등키: user_id + action_type + UTC date
@@ -359,6 +370,8 @@ async def claim(
         db.refresh(reward)
     except IntegrityError:
         db.rollback()
+        if logger:
+            logger.warning("[streak.claim] integrity_error_retry", extra={"user_id": current_user.id, "idempotency_key": idempotency_key})
         # 재경합 시 재조회 (멱등)
         reward = (
             db.query(UserReward)
@@ -366,9 +379,13 @@ async def claim(
             .first()
         )
         if not reward:
+            if logger:
+                logger.error("[streak.claim] integrity_error_missing_reward", extra={"user_id": current_user.id, "idempotency_key": idempotency_key})
             raise HTTPException(status_code=500, detail="Failed to finalize claim")
     except Exception as e:
         db.rollback()
+        if logger:
+            logger.exception("[streak.claim] unexpected_error", extra={"user_id": current_user.id, "idempotency_key": idempotency_key})
         # 내부 오류 디버깅을 위해 메시지 포함 (테스트 환경)
         raise HTTPException(status_code=500, detail=f"streak claim failed: {type(e).__name__}")
 
@@ -406,6 +423,22 @@ async def claim(
     except Exception as e:
         # 브로드캐스트 실패해도 메인 기능에 영향 없음
         pass
+
+    if logger:
+        try:
+            logger.info(
+                "[streak.claim] success",
+                extra={
+                    "user_id": current_user.id,
+                    "action_type": action_type,
+                    "streak_count": streak_count,
+                    "gold": gold,
+                    "xp": xp,
+                    "new_gold_balance": getattr(current_user, 'gold_balance', None),
+                },
+            )
+        except Exception:
+            pass
 
     return StreakClaimResponse(
         action_type=action_type,
