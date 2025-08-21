@@ -504,7 +504,7 @@ export function HomeDashboard({
           </div>
 
           <div className="flex items-center gap-3">
-            { (user as any)?.is_admin || (user as any)?.isAdmin ? (
+            {(user as any)?.is_admin || (user as any)?.isAdmin ? (
               <Button
                 variant="outline"
                 onClick={() => router.push('/admin')}
@@ -512,7 +512,7 @@ export function HomeDashboard({
               >
                 Admin
               </Button>
-            ) : null }
+            ) : null}
             <motion.div
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
@@ -738,21 +738,6 @@ export function HomeDashboard({
               <div className="mt-3 grid grid-cols-1 gap-2 text-xs text-muted-foreground">
                 <div className="flex items-center justify-between">
                   <div>혜택 패턴: 3일 Rare, 7일 Epic</div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={async () => {
-                      try {
-                        const next = !(streakProtection ?? false);
-                        const res = await streakApi.protectionSet(next, 'DAILY_LOGIN');
-                        setStreakProtection(!!res?.enabled);
-                      } catch (e) {
-                        console.warn('protection toggle failed', e);
-                      }
-                    }}
-                  >
-                    보호 {streakProtection ? 'ON' : 'OFF'}
-                  </Button>
                 </div>
                 {attendanceDays && attendanceDays.length > 0 && (
                   <div className="text-[11px] text-muted-foreground/80">
@@ -837,87 +822,6 @@ export function HomeDashboard({
             <motion.div
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.5 }}
-            >
-              <motion.div
-                onClick={() => setIsAchievementsExpanded(!isAchievementsExpanded)}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                className="glass-effect rounded-xl p-4 cursor-pointer mb-4 card-hover-float"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Trophy className="w-5 h-5 text-gold" />
-                    <h2 className="text-xl font-bold text-foreground">
-                      업적 ({unlockedAchievements}/{achievements.length})
-                    </h2>
-                  </div>
-                  <motion.div
-                    animate={{ rotate: isAchievementsExpanded ? 180 : 0 }}
-                    transition={{ duration: 0.2 }}
-                  >
-                    <ChevronDown className="w-5 h-5 text-muted-foreground" />
-                  </motion.div>
-                </div>
-
-                {/* 간단한 진행률 표시 */}
-                <div className="mt-3">
-                  <div className="w-full bg-secondary/50 rounded-full h-2">
-                    <motion.div
-                      initial={{ width: 0 }}
-                      animate={{ width: `${(unlockedAchievements / achievements.length) * 100}%` }}
-                      className="bg-gradient-to-r from-gold to-primary h-full rounded-full"
-                      transition={{ duration: 1, delay: 0.5 }}
-                    />
-                  </div>
-                  <div className="text-xs text-muted-foreground mt-1 text-center">
-                    {Math.round((unlockedAchievements / achievements.length) * 100)}% 완료
-                  </div>
-                </div>
-              </motion.div>
-
-              <AnimatePresence>
-                {isAchievementsExpanded && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    transition={{ duration: 0.3 }}
-                    className="glass-effect rounded-xl p-4 space-y-3 overflow-hidden"
-                  >
-                    {achievements.map((achievement, index) => (
-                      <motion.div
-                        key={achievement.id}
-                        initial={{ opacity: 0, x: 20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: index * 0.1 }}
-                        className={`flex items-center gap-3 p-3 rounded-lg transition-all card-hover-float ${
-                          achievement.unlocked
-                            ? 'bg-success-soft border border-success/30'
-                            : 'bg-secondary/50 opacity-60'
-                        }`}
-                      >
-                        <div className="text-2xl">{achievement.icon}</div>
-                        <div className="flex-1">
-                          <div
-                            className={`font-medium ${
-                              achievement.unlocked ? 'text-success' : 'text-muted-foreground'
-                            }`}
-                          >
-                            {achievement.name}
-                          </div>
-                        </div>
-                        {achievement.unlocked && <Award className="w-4 h-4 text-gold" />}
-                      </motion.div>
-                    ))}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.7 }}
             >
               <h2 className="text-xl font-bold text-foreground mb-4 flex items-center gap-2">
@@ -926,16 +830,32 @@ export function HomeDashboard({
               <div className="space-y-3">
                 {hotEvent ? (
                   <motion.div
-                    whileHover={{ scale: 1.05, y: -5, boxShadow: '0 10px 25px rgba(230, 51, 107, 0.3)' }}
+                    whileHover={{
+                      scale: 1.05,
+                      y: -5,
+                      boxShadow: '0 10px 25px rgba(230, 51, 107, 0.3)',
+                    }}
                     whileTap={{ scale: 0.98 }}
                     transition={{ duration: 0.2, ease: 'easeOut' }}
                     className="glass-effect rounded-xl p-4 border-2 border-error/30 soft-glow cursor-pointer card-hover-float relative overflow-hidden group"
                   >
-                    <motion.div initial={{ opacity: 0 }} whileHover={{ opacity: 1 }} className="absolute inset-0 bg-gradient-to-r from-error/10 to-warning/10 rounded-xl" />
-                    <motion.div animate={{ scale: [1,1.02,1], opacity: [0.3,0.6,0.3] }} transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }} className="absolute inset-0 bg-error/20 rounded-xl group-hover:bg-error/30" />
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      whileHover={{ opacity: 1 }}
+                      className="absolute inset-0 bg-gradient-to-r from-error/10 to-warning/10 rounded-xl"
+                    />
+                    <motion.div
+                      animate={{ scale: [1, 1.02, 1], opacity: [0.3, 0.6, 0.3] }}
+                      transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+                      className="absolute inset-0 bg-error/20 rounded-xl group-hover:bg-error/30"
+                    />
                     <div className="relative z-10">
                       <div className="flex items-center gap-3">
-                        <motion.div whileHover={{ rotate: [0,-10,10,-10,0], scale: 1.1 }} transition={{ duration: 0.5, type: 'tween' }} className="w-12 h-12 bg-gradient-to-r from-error to-warning rounded-lg flex items-center justify-center">
+                        <motion.div
+                          whileHover={{ rotate: [0, -10, 10, -10, 0], scale: 1.1 }}
+                          transition={{ duration: 0.5, type: 'tween' }}
+                          className="w-12 h-12 bg-gradient-to-r from-error to-warning rounded-lg flex items-center justify-center"
+                        >
                           <Gift className="w-6 h-6 text-white" />
                         </motion.div>
                         <div className="flex-1">
@@ -947,68 +867,23 @@ export function HomeDashboard({
                           </div>
                         </div>
                       </div>
-                      <motion.div whileHover={{ scale: 1.02 }} className="mt-3 bg-error-soft rounded-lg p-2 text-center">
-                        <motion.div animate={{ color: ['#e6336b','#ff4d9a','#e6336b'] }} transition={{ duration: 1.5, repeat: Infinity, type: 'tween' }} className="text-error text-sm font-medium">
-                          {String(timeLeft.hours).padStart(2,'0')}:{String(timeLeft.minutes).padStart(2,'0')}:{String(timeLeft.seconds).padStart(2,'0')} 남음
+                      <motion.div
+                        whileHover={{ scale: 1.02 }}
+                        className="mt-3 bg-error-soft rounded-lg p-2 text-center"
+                      >
+                        <motion.div
+                          animate={{ color: ['#e6336b', '#ff4d9a', '#e6336b'] }}
+                          transition={{ duration: 1.5, repeat: Infinity, type: 'tween' }}
+                          className="text-error text-sm font-medium"
+                        >
+                          {String(timeLeft.hours).padStart(2, '0')}:
+                          {String(timeLeft.minutes).padStart(2, '0')}:
+                          {String(timeLeft.seconds).padStart(2, '0')} 남음
                         </motion.div>
                       </motion.div>
                     </div>
                   </motion.div>
-                ) : (
-                  <div className="glass-effect rounded-xl p-4 text-sm text-muted-foreground border border-dashed border-border-secondary">
-                    현재 진행중인 이벤트가 없습니다.
-                  </div>
-                )}
-
-                <motion.div
-                  whileHover={{
-                    scale: 1.03,
-                    y: -3,
-                    boxShadow: '0 8px 20px rgba(230, 194, 0, 0.25)',
-                  }}
-                  whileTap={{ scale: 0.98 }}
-                  transition={{ duration: 0.2, ease: 'easeOut' }}
-                  className="glass-effect rounded-xl p-4 card-hover-float cursor-pointer relative overflow-hidden group"
-                >
-                  {/* 호버시 골드 그라데이션 효과 */}
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    whileHover={{ opacity: 1 }}
-                    className="absolute inset-0 bg-gradient-to-r from-gold/5 to-warning/5 rounded-xl"
-                  />
-
-                  <div className="relative z-10">
-                    <div className="flex items-center gap-3">
-                      <motion.div
-                        whileHover={{
-                          rotate: 360,
-                          scale: 1.1,
-                        }}
-                        transition={{ duration: 0.8 }}
-                        className="w-12 h-12 bg-gradient-to-r from-gold to-gold-light rounded-lg flex items-center justify-center"
-                      >
-                        <Trophy className="w-6 h-6 text-black" />
-                      </motion.div>
-                      <div className="flex-1">
-                        <motion.div whileHover={{ x: 5 }} className="font-bold text-gold">
-                          주간 챌린지
-                        </motion.div>
-                        <div className="text-sm text-muted-foreground">100승 달성시 특별 보상</div>
-                      </div>
-                    </div>
-                    <div className="mt-3">
-                      <motion.div whileHover={{ scale: 1.02 }}>
-                        <Progress value={user.stats.gamesWon % 100} className="h-2" />
-                      </motion.div>
-                      <motion.div
-                        whileHover={{ scale: 1.05 }}
-                        className="text-xs text-muted-foreground mt-1 text-center"
-                      >
-                        {user.stats.gamesWon % 100}/100 승리
-                      </motion.div>
-                    </div>
-                  </div>
-                </motion.div>
+                ) : null}
               </div>
             </motion.div>
           </div>
