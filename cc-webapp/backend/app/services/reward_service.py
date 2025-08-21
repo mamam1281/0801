@@ -10,7 +10,7 @@ from math import exp
 from datetime import datetime, timezone
 
 def calculate_streak_daily_reward(streak_count: int) -> tuple[int, int]:
-    """지수 감쇠(C안) 기반 골드/XP 산출.
+    """지민 감쇠(C안) 기반 골드/XP 산출.
 
     Gold = 1000 + 800 * (1 - e^{-streak/6})  (≈ 1800 수렴)
     XP   = 50   + 40  * (1 - e^{-streak/8})  (≈ 90 수렴)

@@ -124,14 +124,14 @@ def force_claim(event_id: int, user_id: int, db: Session = Depends(get_db), _: U
 @router.post("/seed/model-index", response_model=EventResponse)
 def seed_model_index_event(db: Session = Depends(get_db), _: User = Depends(require_admin)):
 	# 이미 존재하는지(타이틀 + active 기간 겹침) 확인
-	title = "모델 지수 도전 이벤트"
+	title = "모델 지민 도전 이벤트"
 	existing = db.query(Event).filter(Event.title == title).first()
 	if existing:
 		return existing
 	now = datetime.utcnow()
 	payload = EventCreate(
 		title=title,
-		description="모델 지수 포인트를 모아 보상을 획득하세요!",
+		description="모델 지민 포인트를 모아 보상을 획득하세요!",
 		event_type="special",
 		start_date=now - timedelta(minutes=1),
 		end_date=now + timedelta(days=14),

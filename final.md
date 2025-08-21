@@ -377,7 +377,7 @@ docker-compose restart backend
 향후 권장:
 1. Claim / VIP / 다른 경제 이벤트 후 공통 `invalidateProfile()` 훅 도입 (SWR 캐시 통합 가능).
 2. 모달 컴포넌트화 (`<FeatureComingSoonModal feature="ranking" />`).
-3. 네트워크 오류 재시도(지수 백오프 1~2회) 및 offline 감지(`navigator.onLine`).
+3. 네트워크 오류 재시도(지민 백오프 1~2회) 및 offline 감지(`navigator.onLine`).
 4. 프로필 자동 새로고침 간격 사용자 환경(모바일/데스크톱) 차등 조정.
 
 ### 2025-08-20 (추가) useAuthGate 경로 오류 수정
@@ -401,23 +401,23 @@ docker-compose restart backend
 ### 2025-08-20 (추가) 이벤트 시스템 통합 & Admin 관리 UI 1차 구현
 **변경 요약**
 - 프론트 `EventMissionPanel` 이 기존 개별 fetch → 중앙 `useEvents` 훅으로 통합 (중복 제거, 캐시 활용).
-- 이벤트 참여(join), 진행(progress), 보상 수령(claim) 모두 훅 액션 사용. 진행 증가 임시 버튼(모델 지수 포인트 수동 +Δ) 추가.
+- 이벤트 참여(join), 진행(progress), 보상 수령(claim) 모두 훅 액션 사용. 진행 증가 임시 버튼(모델 지민 포인트 수동 +Δ) 추가.
 - 백엔드 Admin 전용 라우터(`/api/admin/events`) 활용 위한 프론트 관리 페이지 `/admin/events` 신규:
-   - 목록 조회 / 생성 / 비활성화 / 참여자 조회 / 강제 보상(force-claim) / 모델 지수 seed 버튼.
+   - 목록 조회 / 생성 / 비활성화 / 참여자 조회 / 강제 보상(force-claim) / 모델 지민 seed 버튼.
    - JSON 요구치/보상 편집 폼(검증은 추후 개선 예정). 
 - Admin 이벤트 API 유틸(`frontend/utils/adminEventsApi.ts`) 추가로 클라이언트 코드 단순화.
 
 **주요 파일**
-- `frontend/components/EventMissionPanel.tsx`: useEvents 연동, 모델 지수 progress 증가 핸들러.
+- `frontend/components/EventMissionPanel.tsx`: useEvents 연동, 모델 지민 progress 증가 핸들러.
 - `frontend/hooks/useEvents.ts`: 이벤트 캐시/조작 훅 (join/claim/updateProgress/refresh).
 - `frontend/utils/adminEventsApi.ts`: Admin 이벤트 CRUD/보조 액션 클라이언트.
 - `frontend/app/admin/events/page.tsx`: Admin UI 페이지(1차 프로토타입).
 
 **스모크 테스트 시나리오 (수동)**
-1. (관리자) `/admin/events` 접속 → "모델지수 Seed" 실행 → 목록에 모델 지수 이벤트(id 기록) 존재 확인.
+1. (관리자) `/admin/events` 접속 → "모델지민 Seed" 실행 → 목록에 모델 지민 이벤트(id 기록) 존재 확인.
 2. (일반 사용자) 메인 패널 로드 → 해당 이벤트 표시, 참여 전 상태(join 버튼 표시) 확인.
 3. 참여(join) 클릭 → 참여자 수 증가(또는 새 refetch 후 반영) & 상태 joined.
-4. 모델 지수 +10 두세 번 실행 → progress 누적 확인(임시 로직: 현재 progress + delta → PUT).
+4. 모델 지민 +10 두세 번 실행 → progress 누적 확인(임시 로직: 현재 progress + delta → PUT).
 5. 요구치 도달 후 claim 버튼 → 보상 수령 → claimed=true 반영.
 6. 관리자 페이지에서 해당 이벤트 비활성화 → 사용자 측 상태 refresh 후 inactive UI 처리 (또는 사라짐).
 7. 관리자 force-claim (다른 user id) 수행 → 참여자 목록에서 claimed=true 확인.
@@ -432,7 +432,7 @@ docker-compose restart backend
 2. Admin 이벤트 폼 유효성 검증 / JSON Schema 적용 & 에러 메시지 개선.
 3. Cypress/Playwright E2E: seed→join→progress→claim→deactivate 자동화.
 4. 퍼블릭 프리뷰 이벤트 API (`/api/public/events`) 통합 후 비로그인 노출 전략.
-5. 모델 지수 자동 증가(실제 모델/게임 연계) 로직 연결 및 수동 버튼 제거.
+5. 모델 지민 자동 증가(실제 모델/게임 연계) 로직 연결 및 수동 버튼 제거.
 6. progress 덮어쓰기 레이스 방지: 서버 atomic increment endpoint 또는 SELECT ... FOR UPDATE 로직 도입.
 7. force-claim 멱등 표준화: already_claimed 상태 코드/에러 바디 명확화 및 문서화.
 
@@ -467,7 +467,7 @@ docker-compose restart backend
 - 본 섹션 추가로 2025-08-20 변경/이슈/다음 단계 기록 완료. 구현 후 각 항목 세부 검증 결과 추가 예정.
 
 ### 2025-08-20 (추가) Streak Claim API & 경제 산식 개편 계획
-- 선택된 스트릭 일일 보상 산식: 지수 감쇠(C 안)
+- 선택된 스트릭 일일 보상 산식: 지민 감쇠(C 안)
    - Gold = 1000 + 800*(1 - e^{-streak/6})  (상한 ~1800 근사)
    - XP   = 50 + 40*(1 - e^{-streak/8})   (상한 ~90 근사)
 - 공용 util: `_calculate_streak_rewards(streak)` 백엔드 `streak.py` 내 임시 구현 → 후속 `app/services/reward_service.py` 이동 및 프론트 util 동기화 예정.
@@ -580,7 +580,7 @@ key versioning(KID), 재생 큐(Dead-letter / 재시도), 상태 추적(ACK/FAIL
 서명 헤더: X-Webhook-Signature (algo=HMAC-SHA256, kid=Kyyyy, ts=unix, nonce, sig=base64).
 검증 순서: (1) kid → 키 조회 → (2) ts 허용 오차 (±300s) → (3) nonce Redis SETNX 24h → (4) event_id uniqueness DB/Redis → (5) HMAC 비교.
 상태 테이블: webhook_events(id PK, external_id, status(PENDING|DELIVERED|FAILED|REPLAYED), last_error, attempt_count, next_retry_at).
-재시도 알고리즘: 지수 백오프 최대 N (예: 6).
+재시도 알고리즘: 지민 백오프 최대 N (예: 6).
 수동 재생: POST /api/admin/webhooks/replay/{id}.
 Key rotation: active + next; 발신 시 active kid, 수신 검증 시 {active,next} 두 개 허용 기간. 최소 단계
 이벤트 저장 → 보내기 → 결과 업데이트 구조 (producer-consumer or Celery).
@@ -692,7 +692,7 @@ WebhookVerifier: nonce reuse & key rotation acceptance
 
 메인 페이지 목업(하드코딩) 이벤트 제거
 실제 서버 이벤트(/api/events) 목록을 메인에 표시
-신규 “모델 지수 이벤트” 추가 (이벤트 데이터/모델 정의 & 시드)
+신규 “모델 지민 이벤트” 추가 (이벤트 데이터/모델 정의 & 시드)
 이벤트 참여 로직 서버 저장 (이미 기본 join/progress/claim 존재하므로 활용/확장)
 어드민에서 이벤트 생성/수정/비활성/보상(강제 지급 포함) 관리 가능
 어드민에서 특정 유저 참여 현황 / 전체 참여자 조회
@@ -704,7 +704,7 @@ Public 이벤트 API (목록/상세/참여/progress/claim) 이미 구현됨.
 Mission 관련 admin 비어있고 admin_events.py 비어있음 → 어드민 CRUD/강제 지급 엔드포인트 없음.
 Participation 조회용 admin 전용 endpoint 없음 (전체 리스팅/특정 이벤트 참여자).
 Frontend 메인에서 실제 events 호출 코드 미확인 (추가 필요); mock 요소 제거 필요.
-“모델 지수 이벤트” 도메인 정의 필요: requirements/progress 키 설계 (예: model_index >= X or 누적 모델 사용 횟수 등) → progress 키/requirements 매칭 구조 그대로 사용 가능.
+“모델 지민 이벤트” 도메인 정의 필요: requirements/progress 키 설계 (예: model_index >= X or 누적 모델 사용 횟수 등) → progress 키/requirements 매칭 구조 그대로 사용 가능.
 EventService에 어드민용 create/update/deactivate, participation list, 강제 reward claim 메서드 추가 필요.
 권한 체크: admin 전용 Depends (아마 기존 get_current_user + is_admin 검사) 사용.
 시드: start_date <= now <= end_date 구간 들어오게 UTC 기준 날짜 생성.
@@ -716,8 +716,8 @@ PUT /api/admin/events/{event_id} (EventUpdate)
 POST /api/admin/events/{event_id}/deactivate (is_active False)
 GET /api/admin/events/{event_id}/participations (필터: completed/claimed 등 Query)
 POST /api/admin/events/{event_id}/force-claim/{user_id} (관리자 강제 보상 지급; 비정상 상태시 400)
-(선택) POST /api/admin/events/seed/model-index -> “모델 지수 이벤트” 시드
-서비스 계층 EventService:
+(선택) POST /api/admin/events/seed/model-index -> “모델 지민 이벤트” 시드
+\서비스 계층 EventService:
 create_event, update_event, deactivate_event
 list_participations(event_id, filters)
 force_claim_rewards(event_id, user_id)
@@ -736,7 +736,7 @@ Main/Home 컴포넌트(또는 이벤트 패널)에서 목업 리스트 제거 �
 상세 패널 (기본정보 수정, 비활성화)
 참여자 탭 (필터: completed, claimed)
 참여자 행 단위 강제 보상 버튼
-시드 “모델 지수 이벤트” 실행 버튼 (이미 존재하면 비활성)
+시드 “모델 지민 이벤트” 실행 버튼 (이미 존재하면 비활성)
 테스트:
 
 backend tests:
@@ -749,14 +749,14 @@ test_seed_model_index_idempotent
 다음 단계 제안 (실행 순서):
 
 백엔드: EventService 확장 + admin_events 라우터 구현
-백엔드: 모델 지수 이벤트 시드 함수 및 엔드포인트
+백엔드: 모델 지민 이벤트 시드 함수 및 엔드포인트
 백엔드: pytest 케이스 추가
 프론트: useEvents 훅 + 메인 UI 연결
 프론트: admin events 페이지/컴포넌트 생성
 문서/API_MAPPING 갱신, 요약
-진행해도 될지 여부만 알려주시면 바로 1단계(백엔드 구현) 착수합니다. 필요하면 “모델 지수 이벤트” 요구 지표(예: target model_index 100? 기간? 보상?) 구체값 주셔도 반영합니다. 기본 임시값 제안:
+진행해도 될지 여부만 알려주시면 바로 1단계(백엔드 구현) 착수합니다. 필요하면 “모델 지민 이벤트” 요구 지표(예: target model_index 100? 기간? 보상?) 구체값 주셔도 반영합니다. 기본 임시값 제안:
 
-title: “모델 지수 도전 이벤트”
+title: “모델 지민 도전 이벤트”
 event_type: “special”
 기간: 오늘 ~ +14일
 requirements: {"model_index_points": 1000}

@@ -78,6 +78,46 @@
 | `missions.py` | `/api/missions` | 미션 시스템 | 활성화 |
 | `events.py` | `/api/events` | 이벤트 관리 | 활성화 |
 | `quiz.py` | `/api/quiz` | 심리 테스트 | 활성화 |
+| `admin_events.py` | `/api/admin/events` | 관리자 이벤트 CRUD/강제보상/시드 | 신규 반영 ✅ |
+
+#### 5.1 관리자 이벤트(Admin Events) 상세
+
+| 기능 | 메소드 | 경로 | 설명 | 인증 |
+|------|--------|------|------|------|
+| 이벤트 생성 | POST | `/api/admin/events/` | 이벤트 신규 생성 | 관리자 |
+| 이벤트 목록 | GET | `/api/admin/events/` | 활성(기본) / 비활성 포함(optional) 조회 | 관리자 |
+| 이벤트 수정 | PUT | `/api/admin/events/{event_id}` | 필드 일부/전체 업데이트 | 관리자 |
+| 이벤트 비활성화 | POST | `/api/admin/events/{event_id}/deactivate` | is_active False 처리 | 관리자 |
+| 참여 목록 | GET | `/api/admin/events/{event_id}/participations` | 완료/보상 필터 조회 | 관리자 |
+| 강제 보상 지급 | POST | `/api/admin/events/{event_id}/force-claim/{user_id}` | 완료 여부 무관 지급(중복 시 "이미 보상 수령") | 관리자 |
+| 모델 지수 이벤트 시드 | POST | `/api/admin/events/seed/model-index` | 없으면 생성, 있으면 기존 반환 (idempotent) | 관리자 |
+
+보상/요구사항 구조 예시
+```json
+{
+   "rewards": { "gold": 5000, "exp": 1000 },
+   "requirements": { "model_index_points": 1000 }
+}
+```
+
+일반 사용자 이벤트 상호작용 (events.py)
+| 기능 | 메소드 | 경로 | 설명 |
+|------|--------|------|------|
+| 참여 | POST | `/api/events/join` | {"event_id": number} 로 참여 (중복 참여 시 기존 participation 반환) |
+| 진행 업데이트 | PUT | `/api/events/progress/{event_id}` | {"progress": {"model_index_points": 1000}} 식 누적/병합 |
+| 보상 수령 | POST | `/api/events/claim/{event_id}` | 완료 & 미수령 조건 충족 시 지급 |
+
+테스트 커버리지 (2025-08-21)
+| 테스트 파일 | 검증 범위 |
+|-------------|-----------|
+| `app/tests/test_admin_events.py` | 생성/목록/시드 멱등/참여-진행-완료-보상/강제보상 멱등 |
+
+설계 노트
+1. force-claim 은 완료 상태가 아니어도 지급 (추후 감사 로그 필요 TODO)
+2. 진행(progress)은 JSON merge 방식 (키 단위 overwrite) → 향후 누적 로직 필요 시 서비스 계층 확장
+3. participation_count 는 EventService.get_active_events 시 집계 후 임시 속성 부여 → 직렬화 스키마 반영
+4. 관리자 시드 이벤트는 title 고정("모델 지수 도전 이벤트") 으로 존재 여부 판단 -> 향후 다국어 시 title+type 조합 키 고려
+
 
 ### 6) 상점 및 결제 (Shop & Payments)
 | 라우터 파일 | 엔드포인트 접두사 | 주요 기능 | 상태 |
@@ -169,3 +209,17 @@ HTTP 상태 코드 가이드
 
 ## 변경 이력
 - 2025-08-12: `API_MAPPING.md`와 `API_MAPPING_UPDATED.md`를 통합하여 이 파일만 유지. 인증 엔드포인트 명세와 문제 해결 내역 반영.
+- 2025-08-21: Admin Events 섹션 및 Streak status 엔드포인트 스펙/테스트 추가 (`/api/streak/status`).
+
+### 부록: Streak API 주요 엔드포인트 요약
+| 기능 | 메소드 | 경로 | 파라미터 | 설명 |
+|------|--------|------|----------|------|
+| 현재 상태 | GET | `/api/streak/status` | `action_type` (query, 기본 SLOT_SPIN) | 현재 카운트/TTL/다음 보상 힌트 |
+| 증가(Tick) | POST | `/api/streak/tick` | `{action_type?}` | 하루 1회 증가(일일 lock), 출석 기록 |
+| 미리보기 | GET | `/api/streak/preview` | `action_type` | 오늘/내일 보상 수치, claimable 플래그 |
+| 보상 수령 | POST | `/api/streak/claim` | `{action_type?}` | 일일 보상(멱등키 기반) |
+| 보호 토글 | POST | `/api/streak/protection` | `{action_type?, enabled}` | 보호 설정 on/off |
+| 보호 상태 | GET | `/api/streak/protection` | `action_type` | 현재 보호 여부 |
+| 출석 히스토리 | GET | `/api/streak/history` | `action_type, year, month` | 월별 출석 일자 목록 |
+
+프론트 404 원인 분석 요약: Next dev에서 BASE 미설정 시 상대 `/api/streak/status` 호출이 Next 자체 라우트로 흘러 404 → simpleApi.js 내 fallback(포트 3000 조건) 이미 존재. 실제 404 발생 시 환경변수(NEXT_PUBLIC_API_BASE) 미설정/토큰 인증 문제 우선 확인.

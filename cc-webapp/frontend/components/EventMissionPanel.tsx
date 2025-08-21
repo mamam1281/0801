@@ -350,7 +350,7 @@ export function EventMissionPanel({
     }
   };
 
-  // 모델 지수 이벤트 진행도 수동 증가 (임시 UI)
+  // 모델 지민 이벤트 진행도 수동 증가 (임시 UI)
   const handleIncrementModelIndex = async (eventId: string, delta: number) => {
     try {
       // 기존 훅은 단일 progress 숫자만 전달 -> 누적 대신 덮어쓰므로 우선 증가 방식: 현재 progress 읽어와 + delta
@@ -361,11 +361,11 @@ export function EventMissionPanel({
           : 0;
       await updateEventProgress(parseInt(eventId), current + delta);
       await refreshEvents();
-      onAddNotification(`모델 지수 +${delta}`);
+      onAddNotification(`모델 지민 +${delta}`);
       t('event_progress_update', { eventId, delta });
     } catch (e) {
-      console.error('모델 지수 증가 실패', e);
-      onAddNotification('모델 지수 증가 실패');
+      console.error('모델 지민 증가 실패', e);
+      onAddNotification('모델 지민 증가 실패');
       t('event_progress_error', { eventId });
     }
   };

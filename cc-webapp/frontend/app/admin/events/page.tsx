@@ -22,26 +22,34 @@ export default function AdminEventsPage() {
   const now = new Date();
   const iso = (d: Date) => d.toISOString().slice(0,16); // YYYY-MM-DDTHH:MM
   const [form, setForm] = useState({
-    title: '모델 지수 이벤트',
-    description: '모델 지수 포인트를 모아 보상을 획득',
+    title: '모델 지민 이벤트',
+    description: '모델 지민 포인트를 모아 보상을 획득',
     event_type: 'model_index',
     requirements_json: JSON.stringify({ model_index_points: 1000 }, null, 2),
     rewards_json: JSON.stringify({ gold: 5000, exp: 1000 }, null, 2),
     start_date: iso(now),
-    end_date: iso(new Date(now.getTime()+ 1000*60*60*24*14)),
+    end_date: iso(new Date(now.getTime() + 1000 * 60 * 60 * 24 * 14)),
   } as AdminEventForm);
 
-  const appendLog = (m: string) => setLog((l: string) => `${new Date().toLocaleTimeString()} ${m}\n` + l);
+  const appendLog = (m: string) =>
+    setLog((l: string) => `${new Date().toLocaleTimeString()} ${m}\n` + l);
 
   const load = async () => {
-    setLoading(true); setError(null);
+    setLoading(true);
+    setError(null);
     try {
       const list = await adminEventsApi.list();
       if (Array.isArray(list)) setEvents(list);
-    } catch (e: any) { setError(e.message); appendLog('목록 로드 실패'); }
-    finally { setLoading(false); }
+    } catch (e: any) {
+      setError(e.message);
+      appendLog('목록 로드 실패');
+    } finally {
+      setLoading(false);
+    }
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+  }, []);
 
   const change = (k: keyof AdminEventForm, v: string) => setForm((f: any) => ({ ...f, [k]: v }));
 
@@ -59,15 +67,51 @@ export default function AdminEventsPage() {
       const res = await adminEventsApi.create(payload);
       appendLog(`생성 완료 id=${res.id}`);
       load();
-    } catch (e: any) { appendLog('생성 실패: '+ e.message); }
+    } catch (e: any) {
+      appendLog('생성 실패: ' + e.message);
+    }
   };
 
-  const deactivate = async (id: number) => { try { await adminEventsApi.deactivate(id); appendLog(`비활성화 id=${id}`); load(); } catch (e:any) { appendLog('비활성화 실패'); }};
-  const seedModelIndex = async () => { try { await adminEventsApi.seedModelIndex(); appendLog('모델 지수 seed 실행'); load(); } catch (e:any) { appendLog('seed 실패'); }};
-  const viewParticipations = async (id: number) => { try { const p = await adminEventsApi.participations(id); setSelectedId(id); setParticipations(p); } catch (e:any) { appendLog('참여자 조회 실패'); } };
+  const deactivate = async (id: number) => {
+    try {
+      await adminEventsApi.deactivate(id);
+      appendLog(`비활성화 id=${id}`);
+      load();
+    } catch (e: any) {
+      appendLog('비활성화 실패');
+    }
+  };
+  const seedModelIndex = async () => {
+    try {
+      await adminEventsApi.seedModelIndex();
+      appendLog('모델 지민 seed 실행');
+      load();
+    } catch (e: any) {
+      appendLog('seed 실패');
+    }
+  };
+  const viewParticipations = async (id: number) => {
+    try {
+      const p = await adminEventsApi.participations(id);
+      setSelectedId(id);
+      setParticipations(p);
+    } catch (e: any) {
+      appendLog('참여자 조회 실패');
+    }
+  };
   const forceClaim = async (id: number, userIdRaw: string) => {
-    const userId = parseInt(userIdRaw, 10); if (isNaN(userId)) { appendLog('user id 숫자 오류'); return; }
-    try { await adminEventsApi.forceClaim(id, userId); appendLog(`강제 보상 event=${id} user=${userId}`); load(); } catch (e:any) { appendLog('강제 보상 실패'); }
+    const userId = parseInt(userIdRaw, 10);
+    if (isNaN(userId)) {
+      appendLog('user id 숫자 오류');
+      return;
+    }
+    try {
+      await adminEventsApi.forceClaim(id, userId);
+      appendLog(`강제 보상 event=${id} user=${userId}`);
+      load();
+    } catch (e: any) {
+      appendLog('강제 보상 실패');
+    }
   };
 
   return (
@@ -76,31 +120,73 @@ export default function AdminEventsPage() {
       <div className="grid md:grid-cols-2 gap-6">
         <div className="space-y-3">
           <h2 className="font-semibold">새 이벤트 생성</h2>
-          <input className="w-full bg-black/30 p-2" value={form.title} onChange={(e:any)=>change('title', e.target.value)} placeholder="제목" />
-          <textarea className="w-full bg-black/30 p-2" rows={2} value={form.description} onChange={(e:any)=>change('description', e.target.value)} placeholder="설명" />
-          <input className="w-full bg-black/30 p-2" value={form.event_type} onChange={(e:any)=>change('event_type', e.target.value)} placeholder="event_type" />
+          <input
+            className="w-full bg-black/30 p-2"
+            value={form.title}
+            onChange={(e: any) => change('title', e.target.value)}
+            placeholder="제목"
+          />
+          <textarea
+            className="w-full bg-black/30 p-2"
+            rows={2}
+            value={form.description}
+            onChange={(e: any) => change('description', e.target.value)}
+            placeholder="설명"
+          />
+          <input
+            className="w-full bg-black/30 p-2"
+            value={form.event_type}
+            onChange={(e: any) => change('event_type', e.target.value)}
+            placeholder="event_type"
+          />
           <div className="grid grid-cols-2 gap-2">
-            <label className="text-xs flex flex-col">시작
-              <input type="datetime-local" className="bg-black/30 p-1" value={form.start_date} onChange={(e:any)=>change('start_date', e.target.value)} />
+            <label className="text-xs flex flex-col">
+              시작
+              <input
+                type="datetime-local"
+                className="bg-black/30 p-1"
+                value={form.start_date}
+                onChange={(e: any) => change('start_date', e.target.value)}
+              />
             </label>
-            <label className="text-xs flex flex-col">종료
-              <input type="datetime-local" className="bg-black/30 p-1" value={form.end_date} onChange={(e:any)=>change('end_date', e.target.value)} />
+            <label className="text-xs flex flex-col">
+              종료
+              <input
+                type="datetime-local"
+                className="bg-black/30 p-1"
+                value={form.end_date}
+                onChange={(e: any) => change('end_date', e.target.value)}
+              />
             </label>
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div>
               <div className="text-xs mb-1">요구치(JSON)</div>
-              <textarea className="w-full bg-black/30 p-2 text-xs h-28" value={form.requirements_json} onChange={(e:any)=>change('requirements_json', e.target.value)} />
+              <textarea
+                className="w-full bg-black/30 p-2 text-xs h-28"
+                value={form.requirements_json}
+                onChange={(e: any) => change('requirements_json', e.target.value)}
+              />
             </div>
             <div>
               <div className="text-xs mb-1">보상(JSON)</div>
-              <textarea className="w-full bg-black/30 p-2 text-xs h-28" value={form.rewards_json} onChange={(e:any)=>change('rewards_json', e.target.value)} />
+              <textarea
+                className="w-full bg-black/30 p-2 text-xs h-28"
+                value={form.rewards_json}
+                onChange={(e: any) => change('rewards_json', e.target.value)}
+              />
             </div>
           </div>
           <div className="flex gap-2">
-            <button onClick={create} className="px-3 py-2 bg-pink-600 rounded">생성</button>
-            <button onClick={seedModelIndex} className="px-3 py-2 bg-indigo-600 rounded">모델지수 Seed</button>
-            <button onClick={load} className="px-3 py-2 bg-gray-700 rounded">새로고침</button>
+            <button onClick={create} className="px-3 py-2 bg-pink-600 rounded">
+              생성
+            </button>
+            <button onClick={seedModelIndex} className="px-3 py-2 bg-indigo-600 rounded">
+              모델지민 Seed
+            </button>
+            <button onClick={load} className="px-3 py-2 bg-gray-700 rounded">
+              새로고침
+            </button>
           </div>
         </div>
         <div className="space-y-3">
@@ -108,11 +194,20 @@ export default function AdminEventsPage() {
           {loading && <div>로딩...</div>}
           {error && <div className="text-red-400">오류: {error}</div>}
           <div className="space-y-2 max-h-[500px] overflow-auto pr-2">
-            {events.map((evt:any) => (
-              <div key={evt.id} className="border border-pink-700/40 rounded p-3 space-y-1 bg-black/30">
+            {events.map((evt: any) => (
+              <div
+                key={evt.id}
+                className="border border-pink-700/40 rounded p-3 space-y-1 bg-black/30"
+              >
                 <div className="flex justify-between items-center">
-                  <div className="font-medium">#{evt.id} {evt.title}</div>
-                  <span className={`text-xs px-2 py-0.5 rounded ${evt.is_active? 'bg-green-700':'bg-gray-600'}`}>{evt.is_active? 'active':'inactive'}</span>
+                  <div className="font-medium">
+                    #{evt.id} {evt.title}
+                  </div>
+                  <span
+                    className={`text-xs px-2 py-0.5 rounded ${evt.is_active ? 'bg-green-700' : 'bg-gray-600'}`}
+                  >
+                    {evt.is_active ? 'active' : 'inactive'}
+                  </span>
                 </div>
                 <div className="text-xs opacity-80">{evt.description}</div>
                 <div className="text-xs flex flex-wrap gap-2">
@@ -121,9 +216,21 @@ export default function AdminEventsPage() {
                   <span>rewards: {JSON.stringify(evt.rewards)}</span>
                 </div>
                 <div className="flex gap-2 flex-wrap mt-1 text-xs">
-                  {evt.is_active && <button onClick={()=>deactivate(evt.id)} className="px-2 py-1 bg-yellow-700 rounded">비활성</button>}
-                  <button onClick={()=>viewParticipations(evt.id)} className="px-2 py-1 bg-blue-700 rounded">참여자</button>
-                  <ForceClaimInline eventId={evt.id} onForce={(uid)=>forceClaim(evt.id, uid)} />
+                  {evt.is_active && (
+                    <button
+                      onClick={() => deactivate(evt.id)}
+                      className="px-2 py-1 bg-yellow-700 rounded"
+                    >
+                      비활성
+                    </button>
+                  )}
+                  <button
+                    onClick={() => viewParticipations(evt.id)}
+                    className="px-2 py-1 bg-blue-700 rounded"
+                  >
+                    참여자
+                  </button>
+                  <ForceClaimInline eventId={evt.id} onForce={(uid) => forceClaim(evt.id, uid)} />
                 </div>
               </div>
             ))}
@@ -134,7 +241,7 @@ export default function AdminEventsPage() {
         <div className="mt-6">
           <h2 className="font-semibold mb-2">참여자 (event {selectedId})</h2>
           <div className="max-h-72 overflow-auto text-xs space-y-1 bg-black/40 p-3 rounded">
-            {participations.map((p:any) => (
+            {participations.map((p: any) => (
               <div key={p.id} className="flex gap-3">
                 <span>user:{p.user_id}</span>
                 <span>progress:{p.progress}</span>

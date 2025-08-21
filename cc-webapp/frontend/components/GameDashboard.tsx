@@ -141,7 +141,7 @@ export function GameDashboard({
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-black to-pink-900 relative">
       <GameBackground />
-      
+
       <div className="relative z-10">
         {/* Header - 네온 스타일 복원 */}
         <motion.header
@@ -160,7 +160,7 @@ export function GameDashboard({
                 >
                   <Menu className="w-5 h-5" />
                 </Button>
-                
+
                 <Button
                   variant="ghost"
                   onClick={onNavigateToHome}
@@ -169,7 +169,7 @@ export function GameDashboard({
                   <ArrowLeft className="w-5 h-5" />
                   <span className="hidden sm:inline">홈으로</span>
                 </Button>
-                
+
                 <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent hidden md:block">
                   게임 센터
                 </h1>
@@ -182,12 +182,10 @@ export function GameDashboard({
                     {user.goldBalance.toLocaleString()}
                   </span>
                 </div>
-                
+
                 <div className="flex items-center gap-2 px-4 py-2 bg-black/50 backdrop-blur-sm rounded-full border border-purple-500/50">
                   <Trophy className="w-5 h-5 text-purple-400" />
-                  <span className="font-semibold text-white">
-                    Lv.{user.level}
-                  </span>
+                  <span className="font-semibold text-white">Lv.{user.level}</span>
                 </div>
               </div>
             </div>
@@ -207,7 +205,7 @@ export function GameDashboard({
             <div className="bg-black/50 backdrop-blur-sm rounded-2xl p-6 border border-purple-500/30">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-                  인기도 지수
+                  인기도 지민
                 </h3>
                 <TrendingUp className="w-5 h-5 text-purple-400" />
               </div>
@@ -216,9 +214,7 @@ export function GameDashboard({
                   {popularityIndex.toFixed(1)}%
                 </div>
                 <Progress value={popularityIndex} className="h-2 bg-purple-900/50" />
-                <p className="text-sm text-gray-400">
-                  현재 서버 활성도
-                </p>
+                <p className="text-sm text-gray-400">현재 서버 활성도</p>
               </div>
             </div>
 
@@ -235,9 +231,7 @@ export function GameDashboard({
                   {Math.floor(totalPlayTime / 60)}시간 {totalPlayTime % 60}분
                 </div>
                 <Progress value={(totalPlayTime / 480) * 100} className="h-2 bg-purple-900/50" />
-                <p className="text-sm text-gray-400">
-                  일일 목표: 8시간
-                </p>
+                <p className="text-sm text-gray-400">일일 목표: 8시간</p>
               </div>
             </div>
 
@@ -251,11 +245,11 @@ export function GameDashboard({
               </div>
               <div className="space-y-3">
                 <div className="text-3xl font-bold text-yellow-400">
-                  {((user.vipTier ?? 0) > 0) ? `VIP ${user.vipTier}` : 'Standard'}
+                  {(user.vipTier ?? 0) > 0 ? `VIP ${user.vipTier}` : 'Standard'}
                 </div>
-                <Progress 
-                  value={(user.vipTier ?? 0) > 0 ? ((user.vipTier ?? 0) / 5) * 100 : 10} 
-                  className="h-2 bg-purple-900/50" 
+                <Progress
+                  value={(user.vipTier ?? 0) > 0 ? ((user.vipTier ?? 0) / 5) * 100 : 10}
+                  className="h-2 bg-purple-900/50"
                 />
                 <p className="text-sm text-gray-400">
                   {(user.vipTier ?? 0) > 0 ? '프리미엄 혜택 활성화' : '더 많은 혜택을 누리세요'}
@@ -309,13 +303,20 @@ export function GameDashboard({
                   transition={{ delay: 0.6 + index * 0.1 }}
                   className="bg-black/50 backdrop-blur-sm rounded-xl p-4 flex items-center gap-4 border border-purple-500/30"
                 >
-                  <div className={`
+                  <div
+                    className={`
                     w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg
-                    ${index === 0 ? 'bg-gradient-to-r from-yellow-400 to-yellow-600 text-black' :
-                      index === 1 ? 'bg-gradient-to-r from-gray-300 to-gray-500 text-black' :
-                      index === 2 ? 'bg-gradient-to-r from-orange-400 to-orange-600 text-black' :
-                      'bg-purple-900/50 text-purple-300'}
-                  `}>
+                    ${
+                      index === 0
+                        ? 'bg-gradient-to-r from-yellow-400 to-yellow-600 text-black'
+                        : index === 1
+                          ? 'bg-gradient-to-r from-gray-300 to-gray-500 text-black'
+                          : index === 2
+                            ? 'bg-gradient-to-r from-orange-400 to-orange-600 text-black'
+                            : 'bg-purple-900/50 text-purple-300'
+                    }
+                  `}
+                  >
                     {entry.rank}
                   </div>
                   <div className="flex-1">
@@ -325,11 +326,15 @@ export function GameDashboard({
                     </div>
                   </div>
                   {index < 3 && (
-                    <Sparkles className={`w-5 h-5 ${
-                      index === 0 ? 'text-yellow-400' :
-                      index === 1 ? 'text-gray-400' :
-                      'text-orange-400'
-                    }`} />
+                    <Sparkles
+                      className={`w-5 h-5 ${
+                        index === 0
+                          ? 'text-yellow-400'
+                          : index === 1
+                            ? 'text-gray-400'
+                            : 'text-orange-400'
+                      }`}
+                    />
                   )}
                 </motion.div>
               ))}

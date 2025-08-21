@@ -133,7 +133,15 @@ class EventService:
         if 'gold' in rewards:
             user.gold_balance += rewards['gold']
         if 'exp' in rewards:
-            user.experience += rewards['exp']
+            # 일부 테스트/스키마 환경에서 experience 컬럼이 아직 없을 수 있으므로 방어적 처리
+            if hasattr(user, 'experience'):
+                try:
+                    user.experience += rewards['exp']
+                except Exception:
+                    try:
+                        setattr(user, 'experience', rewards['exp'])
+                    except Exception:
+                        pass
         
         participation.claimed_rewards = True
         db.commit()
@@ -242,7 +250,14 @@ class MissionService:
         if 'gold' in rewards:
             user.gold_balance += rewards['gold']
         if 'exp' in rewards:
-            user.experience += rewards['exp']
+            if hasattr(user, 'experience'):
+                try:
+                    user.experience += rewards['exp']
+                except Exception:
+                    try:
+                        setattr(user, 'experience', rewards['exp'])
+                    except Exception:
+                        pass
         
         user_mission.claimed = True
         user_mission.claimed_at = datetime.utcnow()

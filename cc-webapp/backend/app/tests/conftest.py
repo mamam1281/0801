@@ -1,6 +1,7 @@
 import os, sys, pytest
 from types import SimpleNamespace
 from fastapi.testclient import TestClient
+from types import SimpleNamespace
 
 # Add backend root to sys.path if missing (when pytest launched from repo root)
 _here = os.path.dirname(__file__)
@@ -156,6 +157,48 @@ def _ensure_schema():
 @pytest.fixture(scope="session")
 def client():
 	from fastapi.testclient import TestClient as _TC
+	# --- 이벤트/어드민 테스트용 get_current_user / require_admin override (테스트 범위 한정) ---
+	try:
+		from app.routers import admin_events as _admin_events_router
+		from app.dependencies import get_current_user as _orig_get_current_user
+		def _test_user():
+			# 기본 사용자 (is_admin True 로 설정하여 admin + user 겸용)
+			return SimpleNamespace(id=12345, is_admin=True, nickname="test-admin-event")
+		fastapi_app.dependency_overrides[_orig_get_current_user] = _test_user
+		# admin_events.require_admin 직접 override (존재 시)
+		if hasattr(_admin_events_router, 'require_admin'):
+			fastapi_app.dependency_overrides[_admin_events_router.require_admin] = _test_user
+	except Exception:
+		pass
+
+	# --- Ensure persistent DB user matching override (FK integrity) ---
+	try:
+		from app.database import SessionLocal as _Sess
+		from app.models.auth_models import User as _User
+		from sqlalchemy import inspect as _insp
+		sess = _Sess()
+		try:
+			# 테이블 존재 시에만 (마이그레이션 레이스 컨디션 방지)
+			if _insp(sess.bind).has_table('users'):
+				u = sess.query(_User).filter(_User.id == 12345).first()
+				if not u:
+					# 필수 고유 컬럼 충족 (site_id / nickname / phone_number)
+					u = _User(
+						id=12345,
+						site_id="admin-events-testuser",
+						nickname="admin-events-testuser",
+						phone_number="000-0000-1234",
+						password_hash="x",  # 해시 불필요 (직접 인증 미사용)
+						invite_code="5858",
+						is_admin=True,
+					)
+					sess.add(u)
+					sess.commit()
+		finally:
+			sess.close()
+	except Exception:
+		# 비치명적 – 사용자 생성 실패 시 테스트 중 FK 에러로 surfaced 됨
+		pass
 	with _TC(fastapi_app) as c:
 		yield c
 
