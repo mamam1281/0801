@@ -2,11 +2,13 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict, model_validator
 
 
 class LimitedPackageOut(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra='ignore')
     code: str
+    package_id: str = Field(..., description="Legacy alias; always equals code")
     name: str
     description: Optional[str] = None
     price_cents: int
@@ -18,6 +20,12 @@ class LimitedPackageOut(BaseModel):
     remaining_stock: Optional[int] = Field(None, description="None means unlimited")
     user_purchased: int = 0
     user_remaining: Optional[int] = None
+
+    @model_validator(mode="after")
+    def _sync_ids(self):  # type: ignore[override]
+        # 강제 동기화
+        object.__setattr__(self, 'package_id', self.code)
+        return self
 
 
 class LimitedBuyRequest(BaseModel):

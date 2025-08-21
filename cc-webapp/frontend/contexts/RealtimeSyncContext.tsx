@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useReducer, useCallback, useRef } from 'react';
+import React, { useContext, useEffect, useReducer, useCallback, useRef, createContext } from 'react';
 import { WSClient, createWSClient, WebSocketMessage, SyncEventData } from '../utils/wsClient';
 import { useAuth } from '../hooks/useAuth';
 import { useAuthToken } from '../hooks/useAuthToken';
@@ -284,7 +284,10 @@ interface RealtimeSyncContextType {
 /**
  * Context 생성
  */
-const RealtimeSyncContext = createContext<RealtimeSyncContextType | null>(null);
+// NOTE: createContext 제네릭 사용 시 빌드 환경 문제로 타입 인식 오류가 발생하므로
+// 초기값 any 후 hook 내부에서 런타임 검증 & 캐스팅
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const RealtimeSyncContext = createContext(null as any);
 
 /**
  * Provider Props
@@ -605,7 +608,7 @@ export function RealtimeSyncProvider({ children, apiBaseUrl }: RealtimeSyncProvi
  * Hook for using realtime sync context
  */
 export function useRealtimeSync(): RealtimeSyncContextType {
-  const context = useContext(RealtimeSyncContext);
+  const context = useContext(RealtimeSyncContext) as RealtimeSyncContextType | null;
   if (!context) {
     throw new Error('useRealtimeSync must be used within a RealtimeSyncProvider');
   }

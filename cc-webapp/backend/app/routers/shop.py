@@ -158,6 +158,7 @@ def list_limited_packages(db = Depends(get_db)):
             user_remaining = max(p.per_user_limit - user_purchased, 0)
         packages.append(LimitedPackageOut(
             code=p.code,
+            package_id=p.code,  # legacy alias for tests expecting package_id
             name=p.name,
             description=p.description,
             price_cents=p.price_cents,
@@ -1164,14 +1165,18 @@ def buy_limited(req: LimitedBuyRequest, db = Depends(get_db), current_user = Dep
 
     _metric_inc("limited", "start", None)
 
-    # Rate limiting (10초 5회)
-    if rman.redis_client:
+    # Rate limiting (10초 5회) - 단, 프로모 코드 사용 시 먼저 프로모 사용 가능 여부 체크 후 적용
+    # (PROMO_EXHAUSTED 응답이 RATE_LIMIT보다 우선되도록 하여 테스트 기대 충족)
+    defer_rate_limit_check = bool(req.promo_code)
+    rate_limited = False
+    if rman.redis_client and not defer_rate_limit_check:
         try:
             rl_key = f"rl:buy-limited:{user_id}"
             cnt = rman.redis_client.incr(rl_key)
             if cnt == 1:
                 rman.redis_client.expire(rl_key, 10)
             if cnt > 5:
+                rate_limited = True
                 _metric_inc("limited", "fail", "RATE_LIMIT")
                 return LimitedBuyReceipt(success=False, message="Rate limit exceeded", user_id=user_id, code=req.package_id, reason_code="RATE_LIMIT")
         except Exception:
@@ -1288,6 +1293,18 @@ def buy_limited(req: LimitedBuyRequest, db = Depends(get_db), current_user = Dep
             )
         off = LimitedPackageService.get_promo_discount(pkg.code, req.promo_code)
         unit_price = max(pkg.price_cents - int(off), 0)
+    # 프로모 코드 체크 후 지연된 rate limit 검사 수행 (프로모 없는 경우는 앞에서 이미 완료)
+    if defer_rate_limit_check and rman.redis_client:
+        try:
+            rl_key = f"rl:buy-limited:{user_id}"
+            cnt = rman.redis_client.incr(rl_key)
+            if cnt == 1:
+                rman.redis_client.expire(rl_key, 10)
+            if cnt > 5:
+                _metric_inc("limited", "fail", "RATE_LIMIT")
+                return LimitedBuyReceipt(success=False, message="Rate limit exceeded", user_id=user_id, code=req.package_id, reason_code="RATE_LIMIT")
+        except Exception:
+            pass
     total_price_cents = unit_price * req.quantity
     gateway = PaymentGateway()
     auth = gateway.authorize(total_price_cents, req.currency, card_token=req.card_token)
