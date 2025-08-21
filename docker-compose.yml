@@ -56,7 +56,7 @@ services:
       NEXT_DISABLE_WEBPACK_CACHE: "1"
       NEXT_TELEMETRY_DISABLED: "1"
       NEXT_PUBLIC_BUILD_ID: "${NEXT_PUBLIC_BUILD_ID:-dev}"
-      NODE_OPTIONS: "--max_old_space_size=3072"
+  NODE_OPTIONS: "--max_old_space_size=3072" # Node 메모리 상향 (ENOMEM scandir 완화)
     volumes:
       - ./cc-webapp/frontend:/app
       - ./logs/frontend:/app/logs:rw
