@@ -95,6 +95,13 @@ class EventService:
                 else:
                     current_progress[k] = v
         participation.progress = current_progress
+        # progress version & timestamp 갱신
+        try:
+            participation.progress_version = (participation.progress_version or 0) + 1
+        except Exception:
+            participation.progress_version = 1
+        from datetime import datetime as _dt
+        participation.last_progress_at = _dt.utcnow()
         
         # 완료 체크: 요구 조건 모두 충족 시 completed 설정 (idempotent)
         event = participation.event
@@ -274,8 +281,15 @@ class MissionService:
         
         completed_missions = []
         
+        from datetime import datetime as _dt
         for user_mission in user_missions:
             user_mission.current_progress += increment
+            # progress version/timestamp
+            try:
+                user_mission.progress_version = (user_mission.progress_version or 0) + 1
+            except Exception:
+                user_mission.progress_version = 1
+            user_mission.last_progress_at = _dt.utcnow()
             
             # 완료 체크
             if user_mission.current_progress >= user_mission.mission.target_value:
@@ -306,10 +320,9 @@ class MissionService:
         
         if not user_mission:
             raise ValueError("보상을 받을 수 없습니다")
-        
         mission = user_mission.mission
         rewards = mission.rewards or {}
-        
+
         # 사용자에게 보상 지급
         user = db.query(User).filter(User.id == user_id).first()
         if 'gold' in rewards:
@@ -323,10 +336,24 @@ class MissionService:
                         setattr(user, 'experience', rewards['exp'])
                     except Exception:
                         pass
-        
+
         user_mission.claimed = True
         user_mission.claimed_at = datetime.utcnow()
+        # progress_version 최종 1 증가 (claim 자체 버전 반영) & timestamp
+        try:
+            user_mission.progress_version = (user_mission.progress_version or 0) + 1
+        except Exception:
+            user_mission.progress_version = 1
+        from datetime import datetime as _dt
+        user_mission.last_progress_at = _dt.utcnow()
         db.commit()
-        
-        logger.info(f"User {user_id} claimed rewards for mission {mission_id}: {rewards}")
-        return rewards
+
+        logger.info(
+            f"User {user_id} claimed rewards for mission {mission_id}: {rewards}",
+            extra={"mission_id": mission_id, "progress_version": user_mission.progress_version}
+        )
+        return {
+            "rewards": rewards,
+            "balance": getattr(user, 'gold_balance', None),
+            "progress_version": user_mission.progress_version,
+        }

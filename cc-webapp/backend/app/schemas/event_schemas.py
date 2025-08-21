@@ -116,3 +116,7 @@ class ClaimRewardResponse(BaseModel):
     success: bool
     rewards: Dict[str, Any]
     message: str
+    # 확장 필드 (event/mission progress context)
+    progress_version: int | None = None
+    reward_items: List[Dict[str, Any]] | None = None
+    new_balance: int | None = None  # 수령 후 최신 gold 잔액 (권위 값)

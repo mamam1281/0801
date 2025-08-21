@@ -211,11 +211,20 @@ async def claim_event_rewards(
         rewards = EventService.claim_event_rewards(
             db, current_user.id, event_id
         )
+        # participation progress_version 조회 (이미 완료 상태)
+        from ..models.event_models import EventParticipation as _EP
+        pv = db.query(_EP.progress_version).filter(_EP.user_id==current_user.id, _EP.event_id==event_id).scalar()
+        reward_items = []
+        # 단순 rewards dict -> reward_items 배열 변환 (타입/값) - gold/exp 기본만
+        for k,v in (rewards or {}).items():
+            reward_items.append({"type": k, "amount": v})
         _metric("events", "claim", "success", "y")
         return ClaimRewardResponse(
             success=True,
             rewards=rewards,
-            message="보상을 성공적으로 수령했습니다!"
+            message="보상을 성공적으로 수령했습니다!",
+            progress_version=pv,
+            reward_items=reward_items,
         )
     except ValueError as e:
         _metric("events", "claim", "error", "y")
@@ -285,14 +294,30 @@ async def claim_mission_rewards(
 ):
     """미션 보상 수령"""
     try:
-        rewards = MissionService.claim_mission_rewards(
+        claim_ctx = MissionService.claim_mission_rewards(
             db, current_user.id, mission_id
         )
         _metric("missions", "claim", "success", "y")
+        # claim_ctx 는 {'rewards': {...}, 'balance': int, 'progress_version': int|None}
+        rewards = claim_ctx.get("rewards", {}) if isinstance(claim_ctx, dict) else {}
+        balance = claim_ctx.get("balance") if isinstance(claim_ctx, dict) else None
+        progress_version = claim_ctx.get("progress_version") if isinstance(claim_ctx, dict) else None
+        # reward_items 표준화 변환 (gold/exp 등 primitive -> list)
+        reward_items = []
+        if isinstance(rewards, dict):
+            for k, v in rewards.items():
+                # 기본 gold/exp -> amount 키 통일
+                if isinstance(v, (int, float)):
+                    reward_items.append({"type": k, "amount": v})
+                else:
+                    reward_items.append({"type": k, "value": v})
         return ClaimRewardResponse(
             success=True,
             rewards=rewards,
-            message="미션 보상을 성공적으로 수령했습니다!"
+            message="미션 보상을 성공적으로 수령했습니다!",
+            progress_version=progress_version,
+            reward_items=reward_items or None,
+            new_balance=balance
         )
     except ValueError as e:
         _metric("missions", "claim", "error", "y")
