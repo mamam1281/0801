@@ -1,4 +1,4 @@
-version: "3.9"
+
 services:
   backend:
     build:
@@ -26,7 +26,7 @@ services:
       OLAP_BATCH_SIZE: ${OLAP_BATCH_SIZE:-200}
       OLAP_FLUSH_SECONDS: ${OLAP_FLUSH_SECONDS:-2}
       CORS_ORIGINS: "http://localhost:3000,http://127.0.0.1:3000,https://localhost:3000,https://127.0.0.1:3000,http://localhost:40001,http://127.0.0.1:40001"
-      AUTO_SEED_BASIC: "1" # 기본 관리자/테스트 계정 자동 시드 (멱등)
+      AUTO_SEED_BASIC: "1"
     volumes:
       - ./cc-webapp/backend:/app
       - ./logs/backend:/app/logs:rw
@@ -56,7 +56,7 @@ services:
       NEXT_DISABLE_WEBPACK_CACHE: "1"
       NEXT_TELEMETRY_DISABLED: "1"
       NEXT_PUBLIC_BUILD_ID: "${NEXT_PUBLIC_BUILD_ID:-dev}"
-  NODE_OPTIONS: "--max_old_space_size=3072" # Node 메모리 상향 (ENOMEM scandir 완화)
+      NODE_OPTIONS: "--max_old_space_size=3072"
     volumes:
       - ./cc-webapp/frontend:/app
       - ./logs/frontend:/app/logs:rw
@@ -66,7 +66,7 @@ services:
     depends_on:
       - backend
     restart: unless-stopped
-    command: ["sh","-c","[ -d node_modules ] || npm install && npm run dev"]
+    command: ["sh", "-c", "[ -d node_modules ] || npm install && npm run dev"]
     healthcheck:
       test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:3000',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))\""]
       start_period: 45s
