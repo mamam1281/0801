@@ -162,8 +162,8 @@ def client():
 		from app.routers import admin_events as _admin_events_router
 		from app.dependencies import get_current_user as _orig_get_current_user
 		def _test_user():
-			# 기본 사용자 (is_admin True 로 설정하여 admin + user 겸용)
-			return SimpleNamespace(id=12345, is_admin=True, nickname="test-admin-event")
+			# 기본 사용자 (is_admin True로 설정). streak/이벤트 보상 테스트 위해 gold_balance 기본값 포함
+			return SimpleNamespace(id=12345, is_admin=True, nickname="test-admin-event", gold_balance=1000, experience=0)
 		fastapi_app.dependency_overrides[_orig_get_current_user] = _test_user
 		# admin_events.require_admin 직접 override (존재 시)
 		if hasattr(_admin_events_router, 'require_admin'):

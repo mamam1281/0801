@@ -270,7 +270,7 @@ export function RockPaperScissorsGame({
   const draws = user.gameStats.rps.totalGames - user.gameStats.rps.wins - losses;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-black to-success/10 relative overflow-hidden">
+  <div className="min-h-screen bg-background relative overflow-hidden">
       {/* Particle Effects */}
       <AnimatePresence>
   {particles.map((particle: { id: number; x: number; y: number; color: string }) => (
@@ -326,14 +326,7 @@ export function RockPaperScissorsGame({
               className="relative"
             >
               <motion.div
-                animate={{ 
-                  scale: [1, 1.3, 1],
-                  textShadow: [
-                    '0 0 20px rgba(255,0,110,0.5)',
-                    '0 0 40px rgba(255,0,110,1)',
-                    '0 0 20px rgba(255,0,110,0.5)'
-                  ]
-                }}
+                animate={{ scale: [1, 1.04, 1] }}
                 transition={{ duration: 0.6 }}
                 className="text-9xl font-black text-primary"
               >
@@ -368,9 +361,7 @@ export function RockPaperScissorsGame({
               뒤로가기
             </Button>
             
-            <h1 className="text-xl lg:text-2xl font-bold text-gradient-primary">
-              가위바위보 대전
-            </h1>
+            <h1 className="text-xl lg:text-2xl font-bold text-primary">가위바위보 대전</h1>
           </div>
 
           <div className="flex items-center gap-4">
@@ -383,7 +374,7 @@ export function RockPaperScissorsGame({
               {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
             </Button>
             
-            <div className="glass-effect rounded-xl p-3 border border-gold/20">
+            <div className="glass-effect rounded-xl p-3 border border-border-secondary/40">
               <div className="text-right">
                 <div className="text-sm text-muted-foreground">보유 골드</div>
                 <div className="text-xl font-black text-gradient-gold">
@@ -400,7 +391,7 @@ export function RockPaperScissorsGame({
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="relative z-10 bg-gradient-to-r from-error to-warning text-white text-center py-3 font-bold"
+          className="relative z-10 bg-card/80 text-white text-center py-2 font-semibold border-b border-border-secondary/30"
         >
           <div className="flex items-center justify-center gap-2">
             <Flame className="w-5 h-5" />
@@ -436,7 +427,7 @@ export function RockPaperScissorsGame({
                 -50G
               </Button>
               
-              <div className="bg-gradient-to-r from-gold to-gold-light text-black px-6 py-3 rounded-lg font-bold text-xl min-w-[120px]">
+              <div className="bg-card/70 text-gold px-5 py-2.5 rounded-lg font-semibold text-lg min-w-[110px] border border-border-secondary/40">
                 {betAmount.toLocaleString()}G
               </div>
               
@@ -532,7 +523,7 @@ export function RockPaperScissorsGame({
                   } : {}
                 }
                 transition={{ duration: 0.6 }}
-                className={`w-40 h-40 mx-auto bg-gradient-to-br from-primary to-primary-light rounded-full flex items-center justify-center text-8xl mb-6 shadow-2xl border-4 border-primary/30 ${
+                className={`w-36 h-36 mx-auto bg-card/70 rounded-xl flex items-center justify-center text-7xl mb-6 shadow-md border border-border-secondary/40 transition-colors ${
                   isSpecialMove ? 'animate-pulse' : ''
                 }`}
               >
@@ -573,7 +564,7 @@ export function RockPaperScissorsGame({
                   repeat: isPlaying ? Infinity : 0,
                   ease: isPlaying ? "linear" : "easeInOut"
                 }}
-                className="w-40 h-40 mx-auto bg-gradient-to-br from-warning to-gold rounded-full flex items-center justify-center text-8xl mb-6 shadow-2xl border-4 border-warning/30"
+                className="w-36 h-36 mx-auto bg-card/70 rounded-xl flex items-center justify-center text-7xl mb-6 shadow-md border border-border-secondary/40"
               >
                 {aiChoice ? CHOICES[aiChoice as Choice].emoji : '🤖'}
               </motion.div>
@@ -586,16 +577,9 @@ export function RockPaperScissorsGame({
           {/* VS */}
           <div className="text-center mb-8">
             <motion.div
-              animate={{ 
-                scale: [1, 1.2, 1],
-                textShadow: [
-                  '0 0 20px rgba(255,0,110,0.5)',
-                  '0 0 40px rgba(255,0,110,1)',
-                  '0 0 20px rgba(255,0,110,0.5)'
-                ]
-              }}
-              transition={{ duration: 2, repeat: Infinity }}
-              className="text-4xl font-black text-gradient-primary"
+              animate={{ scale: [1, 1.02, 1] }}
+              transition={{ duration: 3.2, repeat: Infinity }}
+              className="text-3xl font-bold text-primary"
             >
               ⚔️ VS ⚔️
             </motion.div>
@@ -611,18 +595,8 @@ export function RockPaperScissorsGame({
                 className="text-center mb-6"
               >
                 <motion.div
-                  animate={{ 
-                    scale: [1, 1.2, 1],
-                    textShadow: [
-                      `0 0 20px ${gameResult === 'win' ? 'rgba(0,255,136,0.5)' : 
-                                  gameResult === 'lose' ? 'rgba(255,51,102,0.5)' : 'rgba(255,170,0,0.5)'}`,
-                      `0 0 40px ${gameResult === 'win' ? 'rgba(0,255,136,1)' : 
-                                  gameResult === 'lose' ? 'rgba(255,51,102,1)' : 'rgba(255,170,0,1)'}`,
-                      `0 0 20px ${gameResult === 'win' ? 'rgba(0,255,136,0.5)' : 
-                                  gameResult === 'lose' ? 'rgba(255,51,102,0.5)' : 'rgba(255,170,0,0.5)'}`
-                    ]
-                  }}
-                  transition={{ duration: 0.8, repeat: 3, type: 'tween' }}
+                  animate={{ scale: [1, 1.05, 1] }}
+                  transition={{ duration: 0.6, repeat: 1, type: 'tween' }}
                   className={`text-4xl font-black mb-2 ${
                     gameResult === 'win' ? 'text-success' : 
                     gameResult === 'lose' ? 'text-error' : 'text-warning'
@@ -646,7 +620,7 @@ export function RockPaperScissorsGame({
                   <motion.div
                     animate={{ opacity: [0.5, 1, 0.5] }}
                     transition={{ duration: 0.6, repeat: 3, type: 'tween' }}
-                    className="text-lg text-gradient-gold font-bold"
+                    className="text-sm text-gold font-medium"
                   >
                     ⭐ SPECIAL MOVE! ⭐
                   </motion.div>

@@ -82,16 +82,44 @@ class EventService:
         if not participation:
             participation = EventService.join_event(db, user_id, event_id)
         
-        # 진행 상황 업데이트
+        # 진행 상황 업데이트 (숫자형 값은 누적, 그 외는 overwrite)
         current_progress = participation.progress or {}
-        current_progress.update(progress_data)
+        for k, v in (progress_data or {}).items():
+            if isinstance(v, (int, float)) and isinstance(current_progress.get(k), (int, float)):
+                current_progress[k] = current_progress.get(k, 0) + v
+            else:
+                # 새 키이거나 비숫자형 → 덮어쓰기
+                if isinstance(v, (int, float)) and k not in current_progress:
+                    current_progress[k] = v
+                else:
+                    current_progress[k] = v
         participation.progress = current_progress
         
-        # 완료 체크
+        # 완료 체크: 요구 조건 모두 충족 시 completed 설정 (idempotent)
         event = participation.event
         if EventService._check_event_completion(event, current_progress):
-            participation.completed = True
-            participation.completed_at = datetime.utcnow()
+            if not participation.completed:
+                participation.completed = True
+                participation.completed_at = datetime.utcnow()
+                logger.debug(
+                    "event_progress_completed",
+                    extra={
+                        "event_id": event.id,
+                        "user_id": user_id,
+                        "progress": current_progress,
+                        "requirements": event.requirements,
+                    },
+                )
+            logger.debug(
+                "event_progress_update",
+                extra={
+                    "event_id": event.id if event else None,
+                    "user_id": user_id,
+                    "progress": current_progress,
+                    "requirements": event.requirements if event else None,
+                    "completed": participation.completed,
+                }
+            )
         
         db.commit()
         db.refresh(participation)
@@ -115,18 +143,35 @@ class EventService:
         event_id: int
     ) -> Dict[str, Any]:
         """이벤트 보상 수령"""
+        # 1차: 단순 참여 레코드 조회 (완료/미수령 조건은 후속 검증에서 수행)
         participation = db.query(EventParticipation).filter(
             EventParticipation.user_id == user_id,
             EventParticipation.event_id == event_id,
-            EventParticipation.completed == True,
-            EventParticipation.claimed_rewards == False
         ).first()
-        
+
         if not participation:
             raise ValueError("보상을 받을 수 없습니다")
-        
+
+        # 이미 수령한 경우: 멱등 처리 (중복 요청 → 동일 보상 반환, 추가 지급 없음)
+        if participation.claimed_rewards:
+            event = participation.event
+            return event.rewards or {}
+
         event = participation.event
         rewards = event.rewards or {}
+
+        # 안전장치: completed 플래그가 False 이어도 실제 progress 가 requirements 충족하면 on-the-fly 로 완료 처리
+        if not participation.completed:
+            # staticmethod scope: 직접 클래스명으로 호출
+            if EventService._check_event_completion(event, participation.progress or {}):
+                participation.completed = True
+                participation.completed_at = datetime.utcnow()
+                db.add(participation)
+                db.flush()
+
+        # 여전히 완료되지 않았다면 보상 불가
+        if not participation.completed:
+            raise ValueError("보상을 받을 수 없습니다")
         
         # 사용자에게 보상 지급
         user = db.query(User).filter(User.id == user_id).first()

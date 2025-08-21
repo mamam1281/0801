@@ -1,5 +1,6 @@
 import os
 from pydantic_settings import BaseSettings
+from pydantic import ConfigDict
 
 class Settings(BaseSettings):
     """Application Settings"""
@@ -115,8 +116,8 @@ class Settings(BaseSettings):
         "7️⃣": 2,
     }
 
-    class Config:
-        case_sensitive = True
+    # Pydantic v2 style 설정 (class Config 제거)
+    model_config = ConfigDict(case_sensitive=True, extra='ignore')
 
 # Create global settings object
 settings = Settings()

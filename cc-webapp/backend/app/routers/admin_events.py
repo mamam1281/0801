@@ -6,6 +6,7 @@
 - Alembic 마이그레이션 불필요: 기존 events/event_participations 테이블 활용
 """
 from fastapi import APIRouter, Depends, HTTPException, Query
+import logging
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import datetime, timedelta
@@ -97,7 +98,9 @@ def list_participations(
 
 @router.post("/{event_id}/force-claim/{user_id}", response_model=ClaimRewardResponse)
 def force_claim(event_id: int, user_id: int, db: Session = Depends(get_db), _: User = Depends(require_admin)):
-	# 강제 보상: 미완료 상태라도 지급 가능(감사 로그 필요 시 TODO)
+	# 강제 보상: 미완료 상태라도 지급 가능
+	# 감사(Audit) 로그: 관리자 강제 지급 행위 추적
+	# TODO: 향후 audit_events 테이블( admin_user_id, target_user_id, event_id, rewards, reason, created_at ) 설계 후 DB 기록
 	participation = db.query(EventParticipation).filter(
 		EventParticipation.event_id == event_id,
 		EventParticipation.user_id == user_id
@@ -105,6 +108,14 @@ def force_claim(event_id: int, user_id: int, db: Session = Depends(get_db), _: U
 	if not participation:
 		raise HTTPException(status_code=404, detail="참여 기록 없음")
 	if participation.claimed_rewards:
+		# 중복 호출도 감사 관점에서 로깅
+		logging.getLogger(__name__).info(
+			"admin_force_claim_duplicate", extra={
+				"event_id": event_id,
+				"user_id": user_id,
+				"repeated": True,
+			}
+		)
 		return ClaimRewardResponse(success=True, rewards={}, message="이미 보상 수령")
 	event = participation.event
 	rewards = event.rewards or {}
@@ -119,6 +130,15 @@ def force_claim(event_id: int, user_id: int, db: Session = Depends(get_db), _: U
 		user.experience += rewards['exp']
 	participation.claimed_rewards = True
 	db.commit()
+	logging.getLogger(__name__).info(
+		"admin_force_claim_granted", extra={
+			"event_id": event_id,
+			"user_id": user_id,
+			"rewards": rewards,
+			"completed": participation.completed,
+			"claimed_previously": False,
+		}
+	)
 	return ClaimRewardResponse(success=True, rewards=rewards, message="강제 지급 완료")
 
 @router.post("/seed/model-index", response_model=EventResponse)

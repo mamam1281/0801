@@ -64,8 +64,13 @@ export function HomeDashboard({
   const router = useRouter();
   // Auth Gate (클라이언트 마운트 후 토큰 판정)
   const { isReady: authReady, authenticated } = useAuthGate();
-  // 이벤트: 비로그인 시 자동 로드 skip
-  const { events: activeEvents } = useEvents({ autoLoad: authenticated });
+  // 이벤트: 비로그인 시 자동 로드 skip (로딩/에러/리프레시 포함)
+  const {
+    events: activeEvents,
+    loading: eventsLoading,
+    error: eventsError,
+    refresh: refreshEvents,
+  } = useEvents({ autoLoad: authenticated });
   const [timeLeft, setTimeLeft] = useState({ hours: 0, minutes: 0, seconds: 0 });
   const [showLevelUpModal, setShowLevelUpModal] = useState(false);
   const [showDailyReward, setShowDailyReward] = useState(false);
@@ -729,36 +734,14 @@ export function HomeDashboard({
                   </Button>
                 </div>
               </div>
-              {/* Mini benefits + protection CTA + attendance sketch */}
-              <div className="mt-3 grid grid-cols-1 gap-2 text-xs text-muted-foreground">
-                <div className="flex items-center justify-between">
-                  <div>혜택 패턴: 3일 Rare, 7일 Epic</div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={async () => {
-                      try {
-                        const next = !(streakProtection ?? false);
-                        const res = await streakApi.protectionSet(next, 'DAILY_LOGIN');
-                        setStreakProtection(!!res?.enabled);
-                      } catch (e) {
-                        console.warn('protection toggle failed', e);
-                      }
-                    }}
-                  >
-                    보호 {streakProtection ? 'ON' : 'OFF'}
-                  </Button>
-                </div>
-                {attendanceDays && attendanceDays.length > 0 && (
-                  <div className="text-[11px] text-muted-foreground/80">
-                    (월간 누적 {attendanceDays.length}일)
-                  </div>
-                )}
-              </div>
+              {/* 요구: 혜택 패턴/보호 버튼/월간 누적 문구 제거됨 */}
 
               {/* Minimal monthly attendance calendar (current month) */}
-              {attendanceDays && (
-                <div className="mt-2 border border-border-secondary/40 rounded-lg p-2">
+              {attendanceDays !== null && (
+                <div className="mt-3 border border-border-secondary/40 rounded-lg p-2">
+                  <div className="text-xs font-medium text-muted-foreground mb-1 flex items-center gap-1">
+                    <span className="inline-block w-2 h-2 rounded-full bg-primary/60" />주간 출석 캘린더
+                  </div>
                   {(() => {
                     // 주간(일~토) 7일 캘린더로 전환
                     const now = new Date();
@@ -789,6 +772,13 @@ export function HomeDashboard({
                         active: attendanceDays.includes(iso),
                         isToday: iso === todayUTC.toISOString().slice(0, 10),
                       });
+                    }
+                    if (!attendanceDays.length) {
+                      return (
+                        <div className="text-[11px] text-muted-foreground/60 py-2 text-center">
+                          아직 출석 기록이 없습니다.
+                        </div>
+                      );
                     }
                     return (
                       <div>
@@ -950,8 +940,21 @@ export function HomeDashboard({
                     </div>
                   </motion.div>
                 ) : (
-                  <div className="glass-effect rounded-xl p-4 text-sm text-muted-foreground border border-dashed border-border-secondary">
-                    현재 진행중인 이벤트가 없습니다.
+                  <div className="glass-effect rounded-xl p-4 border border-dashed border-border-secondary flex flex-col items-center gap-3">
+                    <div className="text-sm text-muted-foreground text-center">
+                      {eventsLoading && '이벤트 로딩 중...'}
+                      {!eventsLoading && eventsError && `이벤트 오류: ${eventsError}`}
+                      {!eventsLoading && !eventsError && activeEvents && activeEvents.length === 0 && '현재 진행중인 이벤트가 없습니다.'}
+                      {!authenticated && !eventsLoading && !eventsError && '로그인 후 이벤트 참여가 가능합니다.'}
+                    </div>
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="outline" onClick={() => refreshEvents()} disabled={eventsLoading || !authenticated}>
+                        새로고침
+                      </Button>
+                      <Button size="sm" variant="secondary" onClick={onNavigateToEvents || (()=>{})} disabled={!authenticated}>
+                        전체 보기
+                      </Button>
+                    </div>
                   </div>
                 )}
 

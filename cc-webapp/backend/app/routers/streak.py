@@ -3,6 +3,7 @@ from typing import Optional, List
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
+import logging
 
 from ..dependencies import get_current_user
 from ..models.auth_models import User
@@ -60,9 +61,11 @@ class TickRequest(BaseModel):
 
 @router.post("/tick", response_model=StreakStatus)
 async def tick(
-    body: TickRequest,
+    body: TickRequest | None = None,
     current_user: User = Depends(get_current_user),
 ):
+    if body is None:
+        body = TickRequest()
     action_type = body.action_type or DEFAULT_ACTION
 
     # ------------------------------
@@ -180,6 +183,9 @@ class ClaimRequest(BaseModel):
     action_type: Optional[str] = None
 
 from app.services.reward_service import calculate_streak_daily_reward
+from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 # ----------------------
@@ -251,12 +257,14 @@ async def claim(
         
     # 오늘 이미 보상을 받았는지 확인
     claim_day = datetime.utcnow().date().isoformat()
+    # 기존 코드에서 UserReward.created_at 필드를 참조했으나 모델에는 claimed_at 만 존재
+    # streak 일일 보상은 claimed_at 기준으로 '오늘' 수령 여부 확인
     existing_today = (
         db.query(UserReward)
         .filter(
             UserReward.user_id == current_user.id,
             UserReward.reward_type == "STREAK_DAILY",
-            func.date(UserReward.created_at) == func.date(datetime.utcnow())
+            func.date(UserReward.claimed_at) == func.date(datetime.utcnow())
         )
         .first()
     )
@@ -269,9 +277,10 @@ async def claim(
 
     # Redis/DB 멱등: Redis 플래그(선택적) 우선 확인 (존재 시 DB 조회 생략 가능)
     from app.utils.redis import get_redis
+    r = None
+    redis_flag_key = f"streak_claimed:{current_user.id}:{action_type}:{claim_day}"
     try:
         r = get_redis()
-        redis_flag_key = f"streak_claimed:{current_user.id}:{action_type}:{claim_day}"
         if r.get(redis_flag_key):
             existing = (
                 db.query(UserReward)
@@ -279,13 +288,19 @@ async def claim(
                 .first()
             )
             if existing:
+                # 안전한 gold balance 조회
+                user_balance = getattr(current_user, 'gold_balance', None)
+                if user_balance is None:
+                    from app.models.auth_models import User as ORMUser
+                    db_user = db.query(ORMUser).filter(ORMUser.id == current_user.id).first()
+                    user_balance = getattr(db_user, 'gold_balance', 0) if db_user else 0
                 return StreakClaimResponse(
                     action_type=action_type,
                     streak_count=streak_count,
                     awarded_gold=existing.gold_amount or 0,
                     awarded_xp=existing.xp_amount or 0,
-                    new_gold_balance=current_user.gold_balance,
-                    claimed_at=existing.created_at,
+                    new_gold_balance=user_balance,
+                    claimed_at=existing.claimed_at,
                 )
     except Exception:
         pass
@@ -297,25 +312,34 @@ async def claim(
         .first()
     )
     if existing:
+        user_balance = getattr(current_user, 'gold_balance', None)
+        if user_balance is None:
+            from app.models.auth_models import User as ORMUser
+            db_user = db.query(ORMUser).filter(ORMUser.id == current_user.id).first()
+            user_balance = getattr(db_user, 'gold_balance', 0) if db_user else 0
         return StreakClaimResponse(
             action_type=action_type,
             streak_count=streak_count,
             awarded_gold=existing.gold_amount or 0,
             awarded_xp=existing.xp_amount or 0,
-            new_gold_balance=current_user.gold_balance,
-            claimed_at=existing.created_at,
+            new_gold_balance=user_balance,
+            claimed_at=existing.claimed_at,
         )
 
     gold, xp = calculate_streak_daily_reward(streak_count)
 
     # 트랜잭션 처리
+    orm_user = None
     try:
-        # 유저 골드/XP 업데이트 (모델 필드 명세에 따라 조정 필요)
-        current_user.gold_balance = (current_user.gold_balance or 0) + gold
-        if hasattr(current_user, 'experience'):
-            current_user.experience = (current_user.experience or 0) + xp
-
-        # 실제 유저 액션에만 반응하도록 하드코딩된 통계 증가 없음
+        from app.models.auth_models import User as ORMUser  # 지연 import로 순환참조 회피
+        orm_user = db.query(ORMUser).filter(ORMUser.id == current_user.id).first()
+        if orm_user:
+            orm_user.gold_balance = (getattr(orm_user, 'gold_balance', 0) or 0) + gold
+            if hasattr(orm_user, 'experience'):
+                try:
+                    orm_user.experience = (orm_user.experience or 0) + xp
+                except Exception:
+                    pass
         reward = UserReward(
             user_id=current_user.id,
             reward_type="STREAK_DAILY",
@@ -325,17 +349,19 @@ async def claim(
                 "action_type": action_type,
                 "streak_count": streak_count,
                 "formula": "C_exp_decay_v1",
-                "is_user_action": True,  # 실제 유저 액션 표시
+                "is_user_action": True,
             },
             idempotency_key=idempotency_key,
+            claimed_at=datetime.utcnow(),
         )
         db.add(reward)
-        db.add(current_user)
+        if orm_user:
+            db.add(orm_user)
         db.commit()
         db.refresh(reward)
     except IntegrityError:
         db.rollback()
-        # 재경합 시 재조회 (멱등)
+        # 멱등 경합: 이미 존재하면 재사용
         reward = (
             db.query(UserReward)
             .filter(UserReward.user_id == current_user.id, UserReward.idempotency_key == idempotency_key)
@@ -343,24 +369,59 @@ async def claim(
         )
         if not reward:
             raise HTTPException(status_code=500, detail="Failed to finalize claim")
-    except Exception:
+    except Exception as e:
         db.rollback()
-        raise
+        debug_context = {
+            "user_id": getattr(current_user, 'id', None),
+            "action_type": action_type,
+            "streak_count": streak_count,
+            "idempotency_key": idempotency_key,
+            "has_orm_user": orm_user is not None,
+        }
+        logger.exception("[streak.claim] 내부 오류 발생: %s | context=%s", type(e).__name__, debug_context)
+        detail = "streak claim failed"
+        if getattr(settings, 'ENV', 'production') in ("test", "local", "dev"):
+            detail += f": {type(e).__name__}"
+        raise HTTPException(status_code=500, detail=detail)
 
-    # Redis 플래그 TTL = 1일 (UTC 자정 교차 허용: 26h 여유)
+    # 성공 경로
     try:
         if r:
-            r.set(redis_flag_key, "1", ex=60*60*26)
+            r.set(redis_flag_key, "1", ex=60 * 60 * 26)  # 26h
     except Exception:
         pass
 
+    if orm_user is not None:
+        new_balance = getattr(orm_user, 'gold_balance', 0)
+    else:
+        # current_user 가 단순 객체일 가능성 고려
+        if not hasattr(current_user, 'gold_balance'):
+            try:
+                from app.models.auth_models import User as ORMUser
+                db_user2 = db.query(ORMUser).filter(ORMUser.id == current_user.id).first()
+                new_balance = getattr(db_user2, 'gold_balance', 0) if db_user2 else 0
+            except Exception:
+                new_balance = 0
+        else:
+            # reward commit 후 current_user.gold_balance 는 갱신 안됐을 수 있으니 증가 추정
+            new_balance = (getattr(current_user, 'gold_balance', 0) or 0) + gold
+
+    logger.info(
+        "[streak.claim] SUCCESS user_id=%s action=%s streak=%s gold=%s xp=%s new_balance=%s",
+        getattr(current_user, 'id', None),
+        action_type,
+        streak_count,
+        gold,
+        xp,
+        new_balance,
+    )
     return StreakClaimResponse(
         action_type=action_type,
         streak_count=streak_count,
         awarded_gold=gold,
         awarded_xp=xp,
-        new_gold_balance=current_user.gold_balance,
-        claimed_at=reward.created_at,
+        new_gold_balance=new_balance,
+        claimed_at=reward.claimed_at,
     )
 
 
