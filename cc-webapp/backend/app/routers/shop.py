@@ -1240,6 +1240,11 @@ def buy_limited(req: LimitedBuyRequest, db = Depends(get_db), current_user = Dep
     user_id = getattr(current_user, "id", None)
     if not user_id:
         raise HTTPException(status_code=401, detail="Unauthorized")
+    # Early instrumentation to validate user context extraction reliability (flaky per-user limit bug diagnosis)
+    try:
+        print(f"DEBUG_LIMIT_ENTRY package_req={req.package_id} user={user_id}", flush=True)
+    except Exception:
+        pass
     # Ensure variables used in multiple branches are defined to avoid UnboundLocalError in edge paths
     receipt_signature = None
     # Idempotency guard for limited purchases
@@ -1318,8 +1323,60 @@ def buy_limited(req: LimitedBuyRequest, db = Depends(get_db), current_user = Dep
     # Fast path (이미 pre-lock 전 성공 케이스 확인은 위에서 처리) - 유지 목적 주석
 
     # per-user limit
+    # Per-user purchased count fetched (Redis or in-memory); add deep instrumentation
     already = LimitedPackageService.get_user_purchased(pkg.code, user_id)
+    # Temporary explicit stdout instrumentation (logger for this module not currently surfacing in test output)
+    try:
+        print(f"DEBUG_LIMIT_CHECK package={pkg.code} user={user_id} already={already} qty_req={req.quantity} limit={pkg.per_user_limit}", flush=True)
+    except Exception:
+        pass
+    try:  # diagnostic logging (non-fatal)
+        from app.services.limited_package_service import LimitedPackageService as _LPS  # local import avoid circular
+        rman2 = get_redis_manager()
+        redis_key = _LPS._purchased_key(pkg.code, user_id)
+        raw_val = None
+        try:
+            if rman2.redis_client:
+                raw_val = rman2.redis_client.get(redis_key)
+                if isinstance(raw_val, bytes):
+                    raw_val = raw_val.decode("utf-8")
+        except Exception:
+            pass
+        logger.info(
+            "limited_buy_pre_limit_check",
+            extra={
+                "package": pkg.code,
+                "user_id": user_id,
+                "already": already,
+                "redis_raw": raw_val,
+                "redis_key": redis_key,
+                "quantity_req": req.quantity,
+                "per_user_limit": pkg.per_user_limit,
+            },
+        )
+    except Exception:  # pragma: no cover - logging should not break purchase
+        pass
     if pkg.per_user_limit and already + req.quantity > pkg.per_user_limit:
+        try:
+            print(f"DEBUG_LIMIT_BLOCK package={pkg.code} user={user_id} already={already} qty_req={req.quantity} limit={pkg.per_user_limit}", flush=True)
+        except Exception:
+            pass
+        try:
+            logger.info(
+                "limited_buy_user_limit_block",
+                extra={
+                    "package": pkg.code,
+                    "user_id": user_id,
+                    "already": already,
+                    "quantity_req": req.quantity,
+                    "per_user_limit": pkg.per_user_limit,
+                },
+            )
+        except Exception:
+            try:
+                logger.warning("limited_buy_user_limit_block_raw", extra={"pkg": pkg.code, "user_id": user_id})
+            except Exception:
+                pass
         _metric_inc("limited", "fail", "USER_LIMIT")
         return LimitedBuyReceipt(
             success=False,

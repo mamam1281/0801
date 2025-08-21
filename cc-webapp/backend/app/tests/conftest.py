@@ -160,14 +160,13 @@ def client():
 	# --- 이벤트/어드민 테스트용 get_current_user / require_admin override (테스트 범위 한정) ---
 	try:
 		from app.routers import admin_events as _admin_events_router
-		from app.dependencies import get_current_user as _orig_get_current_user
-		def _test_user():
-			# 기본 사용자 (is_admin True로 설정). streak/이벤트 보상 테스트 위해 gold_balance 기본값 포함
+		# NOTE: 이전에는 get_current_user 전역 override 로 모든 요청이 고정 user_id=12345 로 처리되어
+		# limited package per-user limit 테스트에서 서로 다른 사용자가 동일 사용자로 인식되는 버그 발생.
+		# 따라서 이제는 require_admin 에 대한 override 만 유지하고 일반 인증 경로는 실제 토큰 기반 인증 사용.
+		def _admin_test_user():
 			return SimpleNamespace(id=12345, is_admin=True, nickname="test-admin-event", gold_balance=1000, experience=0)
-		fastapi_app.dependency_overrides[_orig_get_current_user] = _test_user
-		# admin_events.require_admin 직접 override (존재 시)
 		if hasattr(_admin_events_router, 'require_admin'):
-			fastapi_app.dependency_overrides[_admin_events_router.require_admin] = _test_user
+			fastapi_app.dependency_overrides[_admin_events_router.require_admin] = _admin_test_user
 	except Exception:
 		pass
 
@@ -201,6 +200,28 @@ def client():
 		pass
 	with _TC(fastapi_app) as c:
 		yield c
+
+
+# ---- Global deterministic PaymentGateway patch (session scope) ----
+# Ensures limited package purchase tests are not flaky due to random auth/capture results.
+@pytest.fixture(scope="session", autouse=True)
+def _patch_payment_gateway():  # noqa: D401
+	"""Force PaymentGateway.authorize/capture to always succeed for test stability."""
+	try:  # best-effort; if gateway code changes, tests still run with randomness
+		from app.services.payment_gateway import PaymentGateway, PaymentResult  # type: ignore
+		from uuid import uuid4 as _u
+
+		def _auth_ok(self, amount_cents: int, currency: str = "USD", *, card_token: str | None = None):  # noqa: ANN001
+			return PaymentResult(True, "authorized", str(_u()), "Authorized")
+
+		def _cap_ok(self, charge_id: str):  # noqa: ANN001
+			return PaymentResult(True, "captured", charge_id, "Captured")
+
+		PaymentGateway.authorize = _auth_ok  # type: ignore[attr-defined]
+		PaymentGateway.capture = _cap_ok  # type: ignore[attr-defined]
+	except Exception:
+		pass
+	yield
 
 
 @pytest.fixture

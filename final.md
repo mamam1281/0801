@@ -899,4 +899,24 @@ Add CI step: duplicate scan + fail on new .new / temp_openapi pattern
  의심 시 .next 제거 후 재시작
 
  
+### 2025-08-21 (추가) Limited Package 테스트 안정화
+**변경 요약**
+- 한정 패키지 결제 플로우 테스트에서 간헐적 USER_LIMIT / 재고 불일치 / 랜덤 결제 실패로 인한 flakiness 발생.
+- 원인: (1) PaymentGateway 모듈의 확률적 승인/실패 로직, (2) 테스트 간 잔존 Redis per-user 구매 카운터 키(`limited:*:user:*:purchased`) 및 idempotency 키 미삭제로 false positive 한도 초과, (3) 일부 테스트 파일 내 개별 monkeypatch 중복/순서 차이.
+- 조치: 전역(conftest) 결제 게이트웨이 결정론 패치(fixture) 도입, Redis 정리 범위 확장, per-user limit 사전 체크 로깅(INFO) 삽입(`redis_key`, `redis_raw`, `already`, `per_user_limit`), 중복 local monkeypatch 제거 준비.
+
+**검증 결과**
+- 개선 후 `test_limited_packages.py`, `test_limited_packages_promos.py` 통과(3 tests pass, 경고만).
+- 재시드/반복 실행 시 USER_LIMIT 오탐 재현 불가, 랜덤 결제 실패 로그 사라짐.
+- 로깅으로 한도 계산 경로(이미 구매 수량→한도) 추적 가능, 추가 디버깅 시간 단축 예상.
+
+**다음 단계**
+1. 개별 테스트 파일 내 잔존 PaymentGateway monkeypatch 코드 제거(전역 fixture 단일화).
+2. Pydantic v2 경고 정리: 잔존 `class Config` → `model_config = ConfigDict(...)` 마이그레이션.
+3. Limited 구매 플로우 추가 경계 테스트(동시 5 요청, 재시도, idempotent key 재사용) 확대.
+4. 문서(`api docs/20250808.md`) 및 OpenAPI 재수출 후 스키마 drift 주기 점검(Job 도입 검토).
+
+> 본 안정화 절차로 한정 패키지 구매 테스트는 결정론/청결(base state) 보장을 확보했으며, 이후 경제/프로모 확장 시 회귀 리스크를 낮추는 기반을 마련.
+
+
 

@@ -29,13 +29,18 @@ class PaymentGateway:
     """매우 단순한 authorize/capture 기반 목 게이트웨이 (기존 코드 호환)."""
 
     def authorize(self, amount_cents: int, currency: str = "USD", *, card_token: str | None = None) -> PaymentResult:
-        # 데모용으로 90% 성공
+        # 테스트 안정성: TESTING 환경변수 true 이면 항상 성공
+        if os.getenv("TESTING", "").lower() in {"1", "true", "yes"}:
+            return PaymentResult(True, "authorized", str(uuid4()), "Authorized (test deterministic)")
+        # 데모용으로 90% 성공 (prod/dev fuzz)
         if random.random() < 0.9:
             return PaymentResult(True, "authorized", str(uuid4()), "Authorized")
         return PaymentResult(False, "failed", None, "Card declined")
 
     def capture(self, charge_id: str) -> PaymentResult:
-        # authorize 된 건의 99% 캡처 성공
+        if os.getenv("TESTING", "").lower() in {"1", "true", "yes"}:
+            return PaymentResult(True, "captured", charge_id, "Captured (test deterministic)")
+        # authorize 된 건의 99% 캡처 성공 (prod/dev fuzz)
         if random.random() < 0.99:
             return PaymentResult(True, "captured", charge_id, "Captured")
         return PaymentResult(False, "failed", charge_id, "Capture failed")
