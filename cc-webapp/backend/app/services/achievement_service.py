@@ -104,6 +104,7 @@ class AchievementService:
                     related_code=ach.code,
                 )
                 self.db.add(notif)
+                # 기존 hub 브로드캐스트 (레거시)
                 hub.broadcast(history.user_id, {
                     "type": "achievement_unlock",
                     "code": ach.code,
@@ -112,6 +113,21 @@ class AchievementService:
                     # reward_gold 사용 (legacy 제거)
                     "reward_gold": 0,
                 })
+                
+                # 새로운 실시간 브로드캐스트
+                try:
+                    from ..routers.realtime import broadcast_achievement_progress
+                    import asyncio
+                    loop = asyncio.get_event_loop()
+                    if loop.is_running():
+                        loop.create_task(broadcast_achievement_progress(
+                            user_id=history.user_id,
+                            achievement_code=ach.code,
+                            progress=progress_val,
+                            unlocked=True
+                        ))
+                except Exception:
+                    pass
         return unlocked_codes
 
     def _aggregate_user_bet(self, user_id: int, game_type: str | None) -> int:

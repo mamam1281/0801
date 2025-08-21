@@ -110,19 +110,25 @@ class EventService:
                         "requirements": event.requirements,
                     },
                 )
-            logger.debug(
-                "event_progress_update",
-                extra={
-                    "event_id": event.id if event else None,
-                    "user_id": user_id,
-                    "progress": current_progress,
-                    "requirements": event.requirements if event else None,
-                    "completed": participation.completed,
-                }
-            )
         
         db.commit()
         db.refresh(participation)
+        
+        # 실시간 브로드캐스트: 이벤트 진행도 업데이트
+        try:
+            from ..routers.realtime import broadcast_event_progress
+            import asyncio
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                loop.create_task(broadcast_event_progress(
+                    user_id=user_id,
+                    event_id=event_id,
+                    progress=current_progress,
+                    completed=participation.completed
+                ))
+        except Exception:
+            pass
+        
         return participation
     
     @staticmethod
@@ -143,35 +149,18 @@ class EventService:
         event_id: int
     ) -> Dict[str, Any]:
         """이벤트 보상 수령"""
-        # 1차: 단순 참여 레코드 조회 (완료/미수령 조건은 후속 검증에서 수행)
         participation = db.query(EventParticipation).filter(
             EventParticipation.user_id == user_id,
             EventParticipation.event_id == event_id,
+            EventParticipation.completed == True,
+            EventParticipation.claimed_rewards == False
         ).first()
-
+        
         if not participation:
             raise ValueError("보상을 받을 수 없습니다")
-
-        # 이미 수령한 경우: 멱등 처리 (중복 요청 → 동일 보상 반환, 추가 지급 없음)
-        if participation.claimed_rewards:
-            event = participation.event
-            return event.rewards or {}
-
+        
         event = participation.event
         rewards = event.rewards or {}
-
-        # 안전장치: completed 플래그가 False 이어도 실제 progress 가 requirements 충족하면 on-the-fly 로 완료 처리
-        if not participation.completed:
-            # staticmethod scope: 직접 클래스명으로 호출
-            if EventService._check_event_completion(event, participation.progress or {}):
-                participation.completed = True
-                participation.completed_at = datetime.utcnow()
-                db.add(participation)
-                db.flush()
-
-        # 여전히 완료되지 않았다면 보상 불가
-        if not participation.completed:
-            raise ValueError("보상을 받을 수 없습니다")
         
         # 사용자에게 보상 지급
         user = db.query(User).filter(User.id == user_id).first()
@@ -190,6 +179,36 @@ class EventService:
         
         participation.claimed_rewards = True
         db.commit()
+        
+        # 실시간 브로드캐스트: 보상 지급 + 프로필 변경
+        try:
+            from ..routers.realtime import broadcast_reward_granted, broadcast_profile_update
+            import asyncio
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                # 보상 지급 알림
+                if 'gold' in rewards:
+                    loop.create_task(broadcast_reward_granted(
+                        user_id=user_id,
+                        reward_type="event_reward",
+                        amount=rewards['gold'],
+                        balance_after=user.gold_balance
+                    ))
+                
+                # 프로필 변경 알림
+                profile_changes = {}
+                if 'gold' in rewards:
+                    profile_changes["gold_balance"] = user.gold_balance
+                if 'exp' in rewards and hasattr(user, 'experience'):
+                    profile_changes["experience"] = user.experience
+                
+                if profile_changes:
+                    loop.create_task(broadcast_profile_update(
+                        user_id=user_id,
+                        changes=profile_changes
+                    ))
+        except Exception:
+            pass
         
         logger.info(f"User {user_id} claimed rewards for event {event_id}: {rewards}")
         return rewards

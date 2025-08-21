@@ -64,6 +64,7 @@ from app.routers import (
     ai_router,   # AI recommendation system
     events,      # 추가 - 이벤트/미션 라우터
     rbac_demo,   # RBAC demo router
+    realtime,    # 실시간 전역 동기화 WebSocket
 )
 from app.routers import vip  # New import for VIP router
 from app.routers import notification
@@ -389,6 +390,9 @@ app.include_router(abtest.router, tags=["ABTest"])
 # 이벤트/미션 라우터 추가
 app.include_router(events.router)  # 태그 오버라이드 제거 - 이미 events.py에서 "Events & Missions" 태그를 지정함
 app.include_router(kafka_api.router)
+
+# 실시간 동기화 라우터 추가
+app.include_router(realtime.router)
 
 print("✅ Core API endpoints registered")
 print("✅ Progressive Expansion features registered") 

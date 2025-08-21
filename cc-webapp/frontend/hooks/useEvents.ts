@@ -36,7 +36,7 @@ const cache = {
   listeners: new Set<() => void>(),
 };
 
-const notify = () => { cache.listeners.forEach(l => { try { l(); } catch {} }); };
+const notify = () => { cache.listeners.forEach(l => { try { l(); } catch { } }); };
 
 async function loadEvents() {
   if (cache.loading) return;
