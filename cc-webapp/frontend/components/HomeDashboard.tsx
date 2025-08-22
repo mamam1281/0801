@@ -29,13 +29,13 @@ import { calculateExperiencePercentage, calculateWinRate, checkLevelUp } from '.
 import { QUICK_ACTIONS, ACHIEVEMENTS_DATA } from '../constants/dashboardData';
 import { Button } from './ui/button';
 import { Progress } from './ui/progress';
-import { streakApi } from '../utils/apiClient';
 import { getTokens } from '../utils/tokenStorage';
 import { useEvents } from '../hooks/useEvents';
 // useAuthGate 훅: default + named export 모두 지원. 경로/타입 오류 해결 위해 명시적 import
 // 경로 해석 문제로 상대경로 대신 tsconfig paths alias 사용
 import useAuthGate from '@/hooks/useAuthGate';
-import { apiGet, BUILD_ID } from '@/lib/simpleApi';
+import { BUILD_ID } from '@/lib/buildInfo';
+import { api as unifiedApi } from '@/lib/unifiedApi';
 import useDashboard from '@/hooks/useDashboard';
 
 interface HomeDashboardProps {
@@ -70,6 +70,7 @@ export function HomeDashboard({
     loading: dashLoading,
     error: dashError,
     reload: reloadDash,
+    invalidate: invalidateDash,
   } = useDashboard(true);
   // Auth Gate (클라이언트 마운트 후 토큰 판정)
   const { isReady: authReady, authenticated } = useAuthGate();
@@ -248,87 +249,20 @@ export function HomeDashboard({
     }
 
     try {
-      const data = await streakApi.claim('DAILY_LOGIN');
-      // eslint-disable-next-line no-console
-      console.info('[streak.claim] success raw', data);
+      const data = await unifiedApi.post('streak/claim', { action_type: 'DAILY_LOGIN' });
       // data: { awarded_gold, awarded_xp, new_gold_balance, streak_count }
-      // 서버 authoritative 값 사용. fallback 로컬 계산 제거 (중복 증가 방지)
-      // 프로필 재조회 (실시간 동기화) - 서버 최종 상태 반영
-      try {
-        const fresh = await apiGet('/auth/profile');
-        if (fresh && typeof fresh === 'object') {
-          const mapped: any = {
-            ...user,
-            goldBalance: fresh.gold_balance ?? data.new_gold_balance ?? user.goldBalance,
-            experience: fresh.experience ?? fresh.xp ?? user.experience,
-            dailyStreak:
-              fresh.daily_streak ||
-              fresh.dailyStreak ||
-              fresh.streak ||
-              data.streak_count ||
-              user.dailyStreak,
-            level: fresh.level ?? user.level,
-            gameStats: fresh.game_stats || fresh.gameStats || user.gameStats,
-            vipPoints:
-              (fresh as any).vip_points ?? (fresh as any).vipPoints ?? (user as any).vipPoints,
-          };
-          const { updatedUser: finalUser, leveledUp } = checkLevelUp(mapped);
-          // delta 검증
-          const deltaGold = finalUser.goldBalance - prevGold;
-          const deltaXP = finalUser.experience - prevXP;
-          const expectedGold = data.awarded_gold || 0;
-          const expectedXP = data.awarded_xp || 0;
-          if (deltaGold !== expectedGold || deltaXP !== expectedXP) {
-            // eslint-disable-next-line no-console
-            console.error('[streak.claim][mismatch]', {
-              prevGold,
-              prevXP,
-              newGold: finalUser.goldBalance,
-              newXP: finalUser.experience,
-              deltaGold,
-              deltaXP,
-              expectedGold,
-              expectedXP,
-            });
-          } else {
-            // eslint-disable-next-line no-console
-            console.info('[streak.claim][verified]', {
-              awarded_gold: expectedGold,
-              awarded_xp: expectedXP,
-              streak_count: finalUser.dailyStreak,
-            });
-          }
-          if (leveledUp) {
-            setShowLevelUpModal(true);
-            onAddNotification(`🆙 레벨업! ${finalUser.level}레벨 달성!`);
-          }
-          onUpdateUser(finalUser);
-        }
-      } catch (profileErr) {
-        // 재조회 실패 시 최소한 원래 계산 방식 fallback
-        const fallback = {
-          ...user,
-          goldBalance: data.new_gold_balance ?? user.goldBalance,
-          experience: (user.experience || 0) + (data.awarded_xp || 0),
-          dailyStreak: data.streak_count ?? user.dailyStreak,
-        };
-        const { updatedUser: finalUser, leveledUp } = checkLevelUp(fallback);
-        // 프로필 실패 케이스도 delta 로그
-        const deltaGold = finalUser.goldBalance - prevGold;
-        const deltaXP = finalUser.experience - prevXP;
-        // eslint-disable-next-line no-console
-        console.warn('[streak.claim][profile_fallback]', {
-          deltaGold,
-          deltaXP,
-          expectedGold: data.awarded_gold || 0,
-          expectedXP: data.awarded_xp || 0,
-        });
-        if (leveledUp) {
-          setShowLevelUpModal(true);
-          onAddNotification(`🆙 레벨업! ${finalUser.level}레벨 달성!`);
-        }
-        onUpdateUser(finalUser);
+      const fallback = {
+        ...user,
+        goldBalance: data.new_gold_balance ?? user.goldBalance,
+        experience: (user.experience || 0) + (data.awarded_xp || 0),
+        dailyStreak: data.streak_count ?? user.dailyStreak,
+      };
+      const { updatedUser: finalUser, leveledUp } = checkLevelUp(fallback);
+      if (leveledUp) {
+        setShowLevelUpModal(true);
+        onAddNotification(`🆙 레벨업! ${finalUser.level}레벨 달성!`);
       }
+      onUpdateUser(finalUser);
       onAddNotification(
         rewardMessages.success(
           data.awarded_gold || 0,
@@ -338,11 +272,11 @@ export function HomeDashboard({
       );
       setShowDailyReward(false);
       setDailyClaimed(true);
-      // streak / vip 등 통합 스냅샷 재로딩 (TTL 무시 후 최신 반영)
+      // 통합 대시보드 강제 갱신
       try {
+        invalidateDash?.();
         reloadDash();
       } catch {}
-      // 최신 프로필 재조회 대신 VIP 포인트는 streak 보상과 별개이므로 그대로 유지
     } catch (e: any) {
       // 상태코드/메시지 기반 분류 로깅 지원 (apiRequest는 status를 직접 던지지 않으므로 message 패턴 사용)
       if (e?.message === 'Failed to fetch') {

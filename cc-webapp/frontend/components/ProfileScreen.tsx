@@ -8,7 +8,7 @@ import { Card } from './ui/card';
 import { Badge } from './ui/badge';
 import { Progress } from './ui/progress';
 import { User, UserStats, UserBalance } from '../types/user';
-import { userApi } from '../utils/apiClient';
+import { api as unifiedApi } from '@/lib/unifiedApi';
 import { getTokens, setTokens } from '../utils/tokenStorage';
 
 interface ProfileScreenProps {
@@ -37,9 +37,9 @@ export function ProfileScreen({
 
   const fetchProfileBundle = async () => {
     const [rawProfile, rawStats, rawBalance] = await Promise.all([
-      userApi.getProfile(),
-      userApi.getStats(),
-      userApi.getBalance(),
+      unifiedApi.get('users/profile'),
+      unifiedApi.get('users/stats'),
+      unifiedApi.get('users/balance'),
     ]);
     const profileData: any = {
       ...rawProfile,

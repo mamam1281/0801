@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { useApiClient } from './useApiClient';
+import { api } from '@/lib/unifiedApi';
 
 interface GameSession {
   session_id: string;
@@ -8,7 +8,6 @@ interface GameSession {
 }
 
 export function useGameSession(authToken: string | null) {
-  const { call } = useApiClient('/api/games');
   const [session, setSession] = useState(null as GameSession | null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null as string | null);
@@ -16,21 +15,21 @@ export function useGameSession(authToken: string | null) {
   const start = useCallback(async () => {
     setLoading(true); setError(null);
     try {
-      const s = await call('/session/start', { method: 'POST', authToken }) as GameSession;
+    const s = await api.post<GameSession>('games/session/start', {});
       setSession(s);
     } catch (e: any) { setError(e.message); }
     finally { setLoading(false); }
-  }, [authToken, call]);
+  }, []);
 
   const end = useCallback(async () => {
     if (!session) return;
     setLoading(true); setError(null);
     try {
-      await call('/session/end', { method: 'POST', authToken });
+    await api.post('games/session/end', {});
       setSession(null);
     } catch (e: any) { setError(e.message); }
     finally { setLoading(false); }
-  }, [authToken, call, session]);
+  }, [session]);
 
   return { session, start, end, loading, error };
 }

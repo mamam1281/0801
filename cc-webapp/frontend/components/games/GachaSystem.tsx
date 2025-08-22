@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useApiClient } from '../../hooks/game/useApiClient';
+import { api } from '@/lib/unifiedApi';
 import useAuthToken from '../../hooks/useAuthToken';
 import useFeedback from '../../hooks/useFeedback';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -52,7 +52,6 @@ interface GachaPullApiResponse {
 
 export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: GachaSystemProps) {
   const { fromApi } = useFeedback();
-  const api = useApiClient('/api/games/gacha');
   const { getAccessToken } = useAuthToken();
   const [selectedBanner, setSelectedBanner] = useState(GACHA_BANNERS[0] as GachaBanner);
   const [isPulling, setIsPulling] = useState(false);
@@ -127,12 +126,7 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
     let serverUsed = false;
     try {
       // Auth token retrieval (temporary: reading localStorage like slot game)
-      const accessToken = getAccessToken();
-      const res = (await api.call('/pull', {
-        method: 'POST',
-        body: { pull_count: 1 },
-        authToken: accessToken,
-      })) as GachaPullApiResponse;
+  const res = await api.post<GachaPullApiResponse>('games/gacha/pull', { pull_count: 1 });
       fromApi(res);
       if (res?.items?.length) {
         serverUsed = true;
@@ -229,12 +223,7 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
     setPullAnimation('revealing');
     let serverUsed = false;
     try {
-      const accessToken = getAccessToken();
-      const res = (await api.call('/pull', {
-        method: 'POST',
-        body: { pull_count: 10 },
-        authToken: accessToken,
-      })) as GachaPullApiResponse;
+  const res = await api.post<GachaPullApiResponse>('games/gacha/pull', { pull_count: 10 });
       fromApi(res);
       if (res?.items?.length) {
         serverUsed = true;

@@ -1,7 +1,7 @@
 'use client';
 import React, { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { apiGet } from '@/lib/simpleApi';
+import { api } from '@/lib/unifiedApi';
 import { AdminPanel } from '@/components/AdminPanel';
 import { motion } from 'framer-motion';
 
@@ -32,7 +32,7 @@ export default function AdminPage() {
   const load = useCallback(async () => {
     setLoading(true); setError(null);
     try {
-      const profile = await apiGet<ProfileMe>('/api/auth/me');
+      const profile = await api.get<ProfileMe>('auth/me');
       if (!profile.is_admin) {
         router.replace('/');
         return;
@@ -40,7 +40,7 @@ export default function AdminPage() {
       setMe(profile);
       try {
         // 백엔드 확장 통계 (/api/admin/stats) : 모든 필드 서버 계산/캐시 5s
-        const stats = await apiGet<any>('/api/admin/stats');
+        const stats = await api.get<any>('admin/stats');
         setCoreStats({
           total_users: stats.total_users ?? stats.totalUsers ?? 0,
           active_users: stats.active_users ?? stats.activeUsers ?? 0,

@@ -30,7 +30,7 @@ import {
 import { User } from '../../types';
 import { Button } from '../ui/button';
 import { Slider } from '../ui/slider';
-import { apiGet, apiPost } from '@/lib/simpleApi';
+import { api } from '@/lib/unifiedApi';
 
 interface NeonCrashGameProps {
   user: User;
@@ -86,8 +86,8 @@ export function NeonCrashGame({
   );
   const fetchAuthoritativeStats = useCallback(async () => {
     try {
-      // 경로 교정: 백엔드 라우터는 /api/games prefix 이므로 /api 추가
-      const res = await apiGet('/api/games/stats/me');
+      // Unified API: omit '/api' prefix
+      const res = await api.get<any>('games/stats/me');
       if (res?.success && res.stats) {
         setAuthoritativeStats({
           total_bets: res.stats.total_bets ?? 0,
@@ -119,8 +119,8 @@ export function NeonCrashGame({
 
     try {
       // 서버에 크래시 베팅 요청
-  // 경로 교정: /games/crash/bet -> /api/games/crash/bet
-  const gameResult = await apiPost('/api/games/crash/bet', {
+  // Unified API paths
+  const gameResult = await api.post<any>('games/crash/bet', {
         bet_amount: betAmount,
         auto_cashout_multiplier:
           showAdvancedSettings && manualAutoCashout > 0 ? manualAutoCashout : null,
@@ -161,7 +161,7 @@ export function NeonCrashGame({
 
       // 사용자 잔액 업데이트 (서버에서 처리된 결과)
       try {
-        const updatedProfile = await apiGet('/auth/profile');
+        const updatedProfile = await api.get<any>('auth/profile');
         onUpdateUser({
           ...user,
           goldBalance: updatedProfile.gold_balance || user.goldBalance,
@@ -385,7 +385,7 @@ export function NeonCrashGame({
     // 로컬 상태 업데이트는 일시적이며, 실제 게임 통계는 서버에서 관리됩니다
     try {
       // 프로필을 다시 로드하여 서버에서 업데이트된 게임 통계를 가져옵니다
-      const updatedProfile = await apiGet('/auth/profile');
+  const updatedProfile = await api.get<any>('auth/profile');
       onUpdateUser({
         ...user,
         goldBalance: user.goldBalance + winnings,

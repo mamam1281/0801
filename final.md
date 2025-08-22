@@ -3,6 +3,29 @@
 **생성일**: 2025-08-19  
 **브랜치**: feature/e2e-onboarding-playwright  
 
+## 2025-08-22 프론트 API 클라이언트 정리(unifiedApi 통합)
+
+### 변경 요약
+- `frontend/lib/simpleApi.ts`를 한 줄 재-export로 단순화하여 `unifiedApi`와 `BUILD_ID`만 노출(레거시 경로 호환 유지, 로직 단일화).
+- ESLint `no-restricted-imports` 규칙 추가로 레거시 경로 import 금지:
+   - 금지 경로: `@/lib/simpleApi`, `@/utils/apiClient`, `@/hooks/game/useApiClient` 및 상대경로 패턴(`./lib/simpleApi`, `**/utils/apiClient`, `**/hooks/game/useApiClient`).
+- 레거시 파일의 물리 삭제는 다음 커밋 윈도우에서 진행(현재는 미참조 + 규칙으로 차단 상태).
+
+### 검증 결과
+- 백엔드 스모크 테스트(컨테이너): 6 + 3 = 총 9 테스트 통과(경고만 존재, 실패 없음).
+- 프론트 ESLint: 레거시 import 시 즉시 에러 발생으로 재유입 방지 확인.
+- 코드베이스 검색 결과 레거시 사용처 없음(README 예시 언급 제외), 런타임 영향 없음.
+
+### 다음 단계
+- 다음 커밋 윈도우에서 레거시 파일 실제 삭제(`frontend/utils/apiClient.js`, `frontend/hooks/game/useApiClient.ts` 등).
+- 필요 시 OpenAPI 재수출 및 문서 동기화(스키마 변화 발생 시).
+- 컨테이너 기반 프론트 개발 흐름 유지, lint 실행으로 레거시 참조 방지(CI 포함).
+
+#### OpenAPI 재수출 & 문서 동기화 지침
+1) 컨테이너 내부에서 재수출: `python -m app.export_openapi` 실행(backend 컨테이너).
+2) 산출물 확인: `cc-webapp/backend/app/current_openapi.json` 및 루트 스냅샷 파일 갱신 여부 확인.
+3) 문서 반영: 변경점 요약을 `final.md` 상단 최신 섹션에 추가하고, 필요 시 `api docs/20250808.md`에도 동일 요약(변경/검증/다음 단계) 기재.
+
 ## 2025-08-20 AUTO_SEED_BASIC & 로그인 응답 구조 개선
 환경변수 `AUTO_SEED_BASIC=1` 설정 시 서버 startup lifespan 단계에서 기본 계정(admin, user001~004) 자동 멱등 시드.
 - admin 이미 존재하면 skip → 안전

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import apiRequest from '../utils/apiClient';
+import { api as unifiedApi } from '@/lib/unifiedApi';
 import { getTokens } from '../utils/tokenStorage';
 
 export interface EventItem {
@@ -50,11 +50,11 @@ async function loadEvents() {
   try {
     let data: any = null;
     if (hasToken) {
-      data = await apiRequest('/api/events/');
+      data = await unifiedApi.get('events/');
     } else {
       // 비로그인 사용자를 위해 최소 공개 리스트 시도 (서버 인증 의존 → 실패시 무시)
       try {
-        data = await apiRequest('/api/events/'); // 401/403 발생시 catch에서 무시
+        data = await unifiedApi.get('events/'); // 401/403 발생시 catch에서 무시
       } catch (e) {
         data = [];
       }
@@ -88,16 +88,16 @@ export function useEvents(opts: UseEventsOptions = {}): UseEventsReturn {
   }, []);
   const updateOne = (id: number, mut: (e: EventItem) => EventItem) => { cache.items = cache.items.map(e => e.id === id ? mut(e) : e); notify(); };
   const join = useCallback(async (eventId: number) => {
-    const res = await apiRequest('/api/events/join', { method: 'POST', body: JSON.stringify({ event_id: eventId }) });
+    const res = await unifiedApi.post('events/join', { event_id: eventId });
     updateOne(eventId, e => ({ ...e, user_participation: { joined: true, progress: res?.progress ?? 0, completed: !!res?.completed, claimed: !!res?.claimed_rewards } }));
   }, []);
   const claim = useCallback(async (eventId: number) => {
-    const res = await apiRequest(`/api/events/claim/${eventId}`, { method: 'POST', body: JSON.stringify({}) });
+    const res = await unifiedApi.post(`events/claim/${eventId}`, {});
     updateOne(eventId, e => ({ ...e, user_participation: { ...(e.user_participation || { joined: true, progress: 0, completed: true, claimed: false }), claimed: true } }));
     return res;
   }, []);
   const updateProgress = useCallback(async (eventId: number, progress: number) => {
-    const res = await apiRequest(`/api/events/progress/${eventId}`, { method: 'PUT', body: JSON.stringify({ progress }) });
+    const res = await unifiedApi.put(`events/progress/${eventId}`, { progress });
     updateOne(eventId, e => ({ ...e, user_participation: { joined: true, progress: res?.progress ?? progress, completed: !!res?.completed, claimed: !!res?.claimed_rewards } }));
   }, []);
   const find = useCallback((id: number) => cache.items.find(e => e.id === id), []);

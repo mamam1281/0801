@@ -1,6 +1,5 @@
 "use client";
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { useApiClient } from '../hooks/game/useApiClient';
 
 type Toast = {
   id: string;
@@ -43,8 +42,7 @@ export function ToastProvider(props: ToastProviderProps) {
   const lastKeyRef = useRef(null as string | null);
   const lastAtRef = useRef(0 as number);
   const settingsRef = useRef(DEFAULTS as Settings);
-  // Reuse authenticated API client so settings endpoint (auth-protected) doesn't 404 when fetched via Next dev server
-  const { call } = useApiClient('/api/notification');
+  // Settings are local-only for now; no server calls
 
   // 설정 로딩: 로컬 스토리지만 사용 (서버 /settings 제거 → 404 소음 방지)
   useEffect(() => {

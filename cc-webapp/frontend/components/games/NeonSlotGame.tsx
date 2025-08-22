@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import useFeedback from '../../hooks/useFeedback';
-import { useApiClient } from '../../hooks/game/useApiClient';
+import { api } from '@/lib/unifiedApi';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft,
@@ -95,8 +95,7 @@ interface SlotSpinApiResponse {
 
 export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: NeonSlotGameProps) {
   const { fromApi } = useFeedback();
-  // Use /api/games base so subsequent call('/slot/spin') maps to /api/games/slot/spin
-  const { call } = useApiClient('/api/games');
+  // unifiedApi: call games endpoints with relative paths
   const [reels, setReels] = useState([
     SLOT_SYMBOLS[0],
     SLOT_SYMBOLS[1],
@@ -283,15 +282,8 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
     // Attempt authoritative server spin
     try {
       // Backend endpoint: POST /api/games/slot/spin
-      const raw = await (call as any)('/slot/spin', {
-        method: 'POST',
-        body: { bet_amount: betAmount },
-        authToken:
-          typeof window !== 'undefined'
-            ? JSON.parse(localStorage.getItem('cc_auth_tokens') || 'null')?.access_token || null
-            : null,
-      });
-      serverResult = raw as SlotSpinApiResponse;
+      const raw = await api.post<SlotSpinApiResponse>('games/slot/spin', { bet_amount: betAmount });
+      serverResult = raw;
       if (serverResult?.feedback) {
         fromApi(serverResult as any);
       }

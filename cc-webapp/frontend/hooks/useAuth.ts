@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useApiClient } from './game/useApiClient';
+import { api } from '@/lib/unifiedApi';
 
 interface AuthUser {
     id: number;
@@ -59,7 +59,6 @@ function readLegacyToken(): { token: string | null; exp: number | null } {
 }
 
 export function useAuth() {
-    const api = useApiClient();
     // NOTE: build env currently flags generics; fallback to assertion
     const [user, setUser] = useState(null as AuthUser | null);
     const [loading, setLoading] = useState(false);
@@ -89,7 +88,7 @@ export function useAuth() {
     const signup = useCallback(async (data: SignupPayload) => {
         setLoading(true);
         try {
-            const res = await api.call('/api/auth/signup', { method: 'POST', body: data }) as SignupResponse;
+        const res = await api.post<SignupResponse>('auth/signup', data);
             // Backend returns flat structure: { access_token, token_type, user, refresh_token }
             applyTokens(res);
             setUser(res.user);
@@ -97,7 +96,7 @@ export function useAuth() {
         } finally {
             setLoading(false);
         }
-    }, [api, applyTokens]);
+    }, [applyTokens]);
 
     const login = useCallback(async (site_id: string, password: string) => {
         if (!site_id || !password) {
@@ -106,14 +105,14 @@ export function useAuth() {
         setLoading(true);
         try {
             try {
-                const res = await api.call('/api/auth/login', { method: 'POST', body: { site_id: site_id.trim(), password } }) as any;
+                const res = await api.post<any>('auth/login', { site_id: site_id.trim(), password });
                 applyTokens(res);
                 if (res && res.user) {
                     setUser(res.user as AuthUser);
                     return res.user as AuthUser;
                 }
                 // Fallback: profile fetch
-                const profile = await api.call('/api/auth/profile') as AuthUser;
+                const profile = await api.get<AuthUser>('auth/profile');
                 setUser(profile);
                 return profile;
             } catch (e: any) {
@@ -127,7 +126,7 @@ export function useAuth() {
                 throw e;
             }
         } finally { setLoading(false); }
-    }, [api, applyTokens]);
+    }, [applyTokens]);
 
     const adminLogin = useCallback(async (site_id: string, password: string) => {
         if (!site_id || !password) {
@@ -136,14 +135,14 @@ export function useAuth() {
         setLoading(true);
         try {
             try {
-                const res = await api.call('/api/auth/admin/login', { method: 'POST', body: { site_id: site_id.trim(), password } }) as any;
+                const res = await api.post<any>('auth/admin/login', { site_id: site_id.trim(), password });
                 applyTokens(res);
                 if (res && res.user) {
                     setUser(res.user as AuthUser);
                     return res.user as AuthUser;
                 }
                 // Fallback: profile fetch
-                const profile = await api.call('/api/auth/profile') as AuthUser;
+                const profile = await api.get<AuthUser>('auth/profile');
                 setUser(profile);
                 return profile;
             } catch (e: any) {
@@ -160,7 +159,7 @@ export function useAuth() {
                 throw e;
             }
         } finally { setLoading(false); }
-    }, [api, applyTokens]);
+    }, [applyTokens]);
 
     // logout 먼저 선언 필요 (refresh 훅 의존 순서 문제 회피)
     const logout = useCallback(() => {
@@ -183,14 +182,14 @@ export function useAuth() {
         if (!token) return null;
         if (!refreshToken) return null;
         try {
-            const res = await api.call('/api/auth/refresh', { method: 'POST', body: { refresh_token: refreshToken } }) as Tokens;
+        const res = await api.post<Tokens>('auth/refresh', { refresh_token: refreshToken });
             applyTokens(res);
             return res;
         } catch {
             logout();
             return null;
         }
-    }, [api, applyTokens, logout]);
+    }, [applyTokens, logout]);
 
     // 위로 이동 (중복 선언 방지) 
 
@@ -198,7 +197,7 @@ export function useAuth() {
     useEffect(() => {
         const { token } = readLegacyToken();
         if (token) {
-            api.call('/api/auth/profile').then((u: any) => setUser(u as AuthUser)).catch(() => logout());
+            api.get<AuthUser>('auth/profile').then((u: any) => setUser(u as AuthUser)).catch(() => logout());
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);

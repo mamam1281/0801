@@ -1,6 +1,6 @@
 "use client";
 import React, { useEffect, useState } from 'react';
-import adminEventsApi from '../../../utils/adminEventsApi';
+import { adminEventsApi } from '../../../utils/adminEventsApi';
 
 interface AdminEventForm {
   title: string;
