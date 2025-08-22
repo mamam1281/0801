@@ -325,7 +325,9 @@ app.include_router(missions.router)  # 태그 오버라이드 제거 - 이미 mi
 # app.include_router(ai_router.router, tags=["AI Recommendation"])  # DISABLED - non-MVP
 
 # Management & Monitoring (MINIMAL FOR MVP)
-# app.include_router(dashboard.router)  # DISABLED - dashboard complexity
+app.include_router(dashboard.router)  # ENABLED - dashboard for container environment
+from .routers import events as events_router
+app.include_router(events_router.router)  # ENABLED - events for container environment
 # app.include_router(notifications.router, tags=["Real-time Notifications"])  # DISABLED - WebSocket risk
 # app.include_router(notifications_sse_router)  # DISABLED - SSE complexity
 # app.include_router(notifications_api_router)  # DISABLED - notification complexity
@@ -388,8 +390,8 @@ app.include_router(metrics.router)  # Global metrics endpoint
 # app.include_router(unlock.router)
 # app.include_router(abtest.router, tags=["ABTest"])
 
-# Events/Missions (DISABLED - non-MVP, causes complexity)
-# app.include_router(events.router)
+# Events/Missions (ENABLED - required for container environment)
+app.include_router(events.router)
 # app.include_router(kafka_api.router)
 
 # Realtime sync (DISABLED - WebSocket stability risk)

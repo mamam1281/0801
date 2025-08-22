@@ -98,7 +98,8 @@ async def admin_list_events(
         raise HTTPException(status_code=403, detail="권한 없음")
     q = db.query(Event)
     if not include_deleted:
-        q = q.filter(Event.deleted_at.is_(None))
+        # q = q.filter(Event.deleted_at.is_(None))  # 임시 비활성화 - deleted_at 컬럼 없음
+        pass
     return q.order_by(Event.id.desc()).all()
 
 @router.put("/admin/{event_id}", response_model=EventResponse)
@@ -130,11 +131,13 @@ async def admin_soft_delete_event(
     ev = db.query(Event).filter(Event.id == event_id).first()
     if not ev:
         raise HTTPException(status_code=404, detail="이벤트 없음")
-    if ev.deleted_at is None:
-        from datetime import datetime as _dt
-        ev.deleted_at = _dt.utcnow()
-        db.commit()
-    return {"deleted": True, "deleted_at": ev.deleted_at}
+    # 임시 비활성화 - deleted_at 컬럼 없음
+    # if ev.deleted_at is None:
+    #     from datetime import datetime as _dt
+    #     ev.deleted_at = _dt.utcnow()
+    #     db.commit()
+    # return {"deleted": True, "deleted_at": ev.deleted_at}
+    return {"message": "Soft delete temporarily disabled"}
 
 @router.post("/admin/{event_id}/restore")
 async def admin_restore_event(
@@ -147,9 +150,10 @@ async def admin_restore_event(
     ev = db.query(Event).filter(Event.id == event_id).first()
     if not ev:
         raise HTTPException(status_code=404, detail="이벤트 없음")
-    ev.deleted_at = None
-    db.commit()
-    return {"restored": True}
+    # 임시 비활성화 - deleted_at 컬럼 없음  
+    # ev.deleted_at = None
+    # db.commit()
+    return {"message": "Restore temporarily disabled"}
 
 @router.get("/{event_id}", response_model=EventResponse)
 async def get_event_detail(

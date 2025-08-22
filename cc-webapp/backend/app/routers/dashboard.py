@@ -20,7 +20,7 @@ from ..database import get_db
 from ..services.auth_service import AuthService  # For admin protection (optional future)
 
 router = APIRouter(
-    prefix="/dashboard",
+    prefix="/api/dashboard",
     tags=["Dashboard"],
 )
 
