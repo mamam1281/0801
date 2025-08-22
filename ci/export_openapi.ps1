@@ -23,7 +23,7 @@ if (Test-Path $src) {
 $prev = Get-ChildItem -Path $root -Filter "openapi_*.json" | Sort-Object LastWriteTime -Descending | Select-Object -Skip 1 -First 1
 if ($prev) {
   Write-Host "[OpenAPI] diff against: $($prev.FullName)"
-  # Use comp for simple text diff output
-  cmd /c "comp `"$($prev.FullName)`" `"$dst`" /L" | Out-File (Join-Path $root "openapi_diff_$stamp.txt")
+  # Use comp for simple text diff output (Windows built-in)
+  & cmd /c "comp `"$($prev.FullName)`" `"$dst`" /L" | Out-File -Encoding UTF8 (Join-Path $root "openapi_diff_$stamp.txt")
   Write-Host "[OpenAPI] diff saved -> openapi_diff_$stamp.txt"
 }
