@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   backend:
     build:
@@ -51,6 +49,12 @@ services:
       context: ./cc-webapp/frontend
       dockerfile: Dockerfile.dev
     container_name: cc_frontend
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 2G
     environment:
       NEXT_PUBLIC_API_URL: "${NEXT_PUBLIC_API_URL:-http://localhost:8000}"
       NEXT_PUBLIC_API_ORIGIN: "${NEXT_PUBLIC_API_ORIGIN:-http://localhost:8000}"
@@ -58,11 +62,9 @@ services:
       NEXT_DISABLE_WEBPACK_CACHE: "1"
       NEXT_TELEMETRY_DISABLED: "1"
       NEXT_PUBLIC_BUILD_ID: "${NEXT_PUBLIC_BUILD_ID:-dev}"
-      NODE_OPTIONS: "--max_old_space_size=3072"
+      NODE_OPTIONS: "--max_old_space_size=4096"
     volumes:
       - ./cc-webapp/frontend:/app
-      # 컨테이너 전용 node_modules 볼륨으로 호스트 파일시스템 충돌 방지
-      - frontend_node_modules:/app/node_modules
       - ./logs/frontend:/app/logs:rw
     ports:
       - "${FRONTEND_PORT:-3000}:3000"
@@ -92,7 +94,7 @@ services:
       - ./logs/postgres:/var/log/postgresql:rw
       - ./data/init:/docker-entrypoint-initdb.d:ro
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "${POSTGRES_PORT:-15432}:5432"
     networks:
       - ccnet
     restart: unless-stopped
@@ -206,4 +208,3 @@ networks:
 
 volumes:
   clickhouse_data:
-  frontend_node_modules:

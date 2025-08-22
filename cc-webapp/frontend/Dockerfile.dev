@@ -5,16 +5,9 @@ RUN apk add --no-cache libc6-compat
 
 WORKDIR /app
 
-# Copy manifest files first to leverage Docker layer caching
-COPY package.json package-lock.json* ./
 
-# Install dependencies (cached inside image) with fallback
-RUN npm config set audit false \
- && npm config set fund false \
- && npm config set legacy-peer-deps true \
- && (npm ci --no-audit --no-fund || npm install --no-audit --no-fund) \
- && mkdir -p /opt/node_modules_cache \
- && cp -a node_modules/. /opt/node_modules_cache/
+
+COPY . .
 
 # Copy app source
 COPY . .
