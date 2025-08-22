@@ -26,7 +26,7 @@ except Exception:
 
 from .. import models
 from ..database import get_db
-from ..websockets import manager
+from ..realtime.hub import hub
 
 router = APIRouter(prefix="/api/actions", tags=["Game Actions"])
 
@@ -90,10 +90,15 @@ async def log_action(action: ActionCreate, db=Depends(get_db)):
         except Exception as e:
             print(f"Kafka produce failed: {e}")
 
-    # realtime fanout (personal)
+    # realtime fanout via unified hub (personal)
     try:
-        await manager.send_personal_message({"type": "USER_ACTION", "payload": payload}, action.user_id)
+        await hub.broadcast({
+            "type": "user_action",
+            "user_id": action.user_id,
+            "data": payload,
+        })
     except Exception:
+        # 비차단 안전 실패
         pass
 
     return ActionLoggedResponse(

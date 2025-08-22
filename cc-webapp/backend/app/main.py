@@ -394,8 +394,8 @@ app.include_router(metrics.router)  # Global metrics endpoint
 app.include_router(events.router)
 # app.include_router(kafka_api.router)
 
-# Realtime sync (DISABLED - WebSocket stability risk)
-# app.include_router(realtime.router)
+# Realtime sync (ENABLED)
+app.include_router(realtime.router)
 
 print("✅ Core API endpoints registered")
 print("✅ Progressive Expansion features registered") 

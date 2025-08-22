@@ -38,6 +38,9 @@ import useAuthGate from '@/hooks/useAuthGate';
 import { BUILD_ID } from '@/lib/buildInfo';
 import { api as unifiedApi } from '@/lib/unifiedApi';
 import useDashboard from '@/hooks/useDashboard';
+import useRecentActions from '@/hooks/useRecentActions';
+import { API_ORIGIN } from '@/lib/unifiedApi';
+import { createWSClient, WSClient, WebSocketMessage } from '@/utils/wsClient';
 
 interface HomeDashboardProps {
   user: User;
@@ -224,6 +227,44 @@ export function HomeDashboard({
 
   const experiencePercentage = calculateExperiencePercentage(user);
   const winRate = calculateWinRate(user);
+
+  // 최근 액션 로드 (user.id는 문자열로 정의되어 있어 숫자 변환 시도)
+  const numericUserId = (() => {
+    const n = Number((user as any)?.id);
+    return Number.isFinite(n) ? n : undefined;
+  })();
+  const { actions: recentActions, reload: reloadRecentActions } = useRecentActions(numericUserId, 10, true);
+
+  // 선택: 실시간 반영 (NEXT_PUBLIC_REALTIME_ENABLED=1 일 때만 연결)
+  useEffect(() => {
+    try {
+      // @ts-ignore - Node 타입 미설치 환경 대비
+      const enabled = (typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_REALTIME_ENABLED) || '0';
+      if (!(enabled === '1' || enabled?.toLowerCase() === 'true')) return;
+      if (!numericUserId) return;
+      const tokens = getTokens();
+      const token = (tokens as any)?.access_token;
+      if (!token) return;
+
+      const client: WSClient = createWSClient({
+        url: `${API_ORIGIN}/api/realtime/sync`,
+        token,
+        onMessage: (msg: WebSocketMessage) => {
+          const t = String(msg?.type || '').toLowerCase();
+          if (t === 'user_action' || t === 'useraction') {
+            // 동일 유저 이벤트만 반영
+            const uid = (msg as any)?.data?.user_id;
+            if (!uid || Number(uid) !== numericUserId) return;
+            // 간단히 재조회로 동기화
+            try { reloadRecentActions(); } catch {}
+          }
+        },
+        onError: () => {},
+      });
+      client.connect().catch(() => {});
+      return () => client.disconnect();
+    } catch {}
+  }, [numericUserId, reloadRecentActions]);
 
   const renderStreakLocked = () => (
     <div className="mt-4 rounded-md border border-dashed border-neutral-600 p-4 text-sm text-neutral-400">
@@ -681,6 +722,32 @@ export function HomeDashboard({
 
           {/* Right Column - Streak & Events */}
           <div className="space-y-6">
+            {/* Recent Actions */}
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.35 }}
+              className="glass-effect rounded-xl p-4 card-hover-float"
+            >
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <Timer className="w-5 h-5 text-primary" />
+                  <h2 className="text-xl font-bold text-foreground">최근 액션</h2>
+                </div>
+              </div>
+              <div className="space-y-2">
+                {recentActions && recentActions.length > 0 ? (
+                  recentActions.map((a: any) => (
+                    <div key={a.id} className="bg-secondary/40 rounded-md px-3 py-2 text-sm flex items-center justify-between">
+                      <span className="font-medium text-foreground">{a.action_type}</span>
+                      <span className="text-xs text-muted-foreground">{new Date(a.created_at).toLocaleString()}</span>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-sm text-muted-foreground">표시할 최근 액션이 없습니다.</div>
+                )}
+              </div>
+            </motion.div>
             {/* Streak Card */}
             <motion.div
               initial={{ opacity: 0, x: 20 }}
