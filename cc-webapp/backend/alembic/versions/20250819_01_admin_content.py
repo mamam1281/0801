@@ -30,7 +30,7 @@ def upgrade() -> None:
         sa.Column("start_at", sa.DateTime(), nullable=False),
         sa.Column("end_at", sa.DateTime(), nullable=False),
         sa.Column("reward_scheme", sa.JSON(), nullable=False),
-        sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.text("1")),
+    sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.text("true")),
         sa.Column("created_at", sa.DateTime(), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP")),
         sa.Column("updated_at", sa.DateTime(), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP")),
         sa.UniqueConstraint("name", name="uq_admin_events_name"),
@@ -44,7 +44,7 @@ def upgrade() -> None:
         sa.Column("mission_type", sa.String(20), nullable=False),
         sa.Column("target", sa.Integer(), nullable=False, server_default=sa.text("1")),
         sa.Column("reward", sa.JSON(), nullable=False),
-        sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.text("1")),
+    sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.text("true")),
         sa.Column("created_at", sa.DateTime(), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP")),
         sa.Column("updated_at", sa.DateTime(), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP")),
     )
@@ -67,7 +67,7 @@ def upgrade() -> None:
         sa.Column("amount", sa.Integer(), nullable=False),
     # 'metadata' column maps to model attribute 'meta' (SQLAlchemy reserved attr workaround)
     sa.Column("metadata", sa.JSON(), nullable=False),
-        sa.Column("active", sa.Boolean(), nullable=False, server_default=sa.text("1")),
+    sa.Column("active", sa.Boolean(), nullable=False, server_default=sa.text("true")),
         sa.Column("created_at", sa.DateTime(), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP")),
         sa.Column("updated_at", sa.DateTime(), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP")),
         sa.UniqueConstraint("code", name="uq_reward_catalog_code"),

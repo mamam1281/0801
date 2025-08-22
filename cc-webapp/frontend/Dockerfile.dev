@@ -9,12 +9,10 @@ WORKDIR /app
 
 COPY . .
 
-# Copy app source
-COPY . .
-
 # Copy runtime start script
 COPY .docker/start-dev.sh /usr/local/bin/start-dev
-RUN chmod +x /usr/local/bin/start-dev
+# Ensure Unix line endings to avoid Alpine sh "not found" on CRLF
+RUN sed -i 's/\r$//' /usr/local/bin/start-dev && chmod +x /usr/local/bin/start-dev
 
 # Default command uses robust start script
 CMD ["/usr/local/bin/start-dev"]

@@ -1,3 +1,5 @@
+version: "3.9"
+
 services:
   backend:
     build:
@@ -35,6 +37,7 @@ services:
       - postgres
       - redis
       - kafka
+    entrypoint: ["/bin/sh", "-c", "chmod +x /app/entrypoint.sh; sed -i 's/\\r$//' /app/entrypoint.sh; /bin/sh /app/entrypoint.sh"]
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
@@ -43,6 +46,7 @@ services:
       retries: 5
     networks:
       - ccnet
+
 
   frontend:
     build:
@@ -184,10 +188,8 @@ services:
       OLAP_BATCH_SIZE: ${OLAP_BATCH_SIZE:-200}
       OLAP_FLUSH_SECONDS: ${OLAP_FLUSH_SECONDS:-2}
     depends_on:
-      kafka:
-        condition: service_healthy
-      clickhouse:
-        condition: service_healthy
+      - kafka
+      - clickhouse
     restart: unless-stopped
     networks:
       - ccnet

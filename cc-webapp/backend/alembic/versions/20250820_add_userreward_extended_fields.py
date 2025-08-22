@@ -20,6 +20,9 @@ TABLE = 'user_rewards'
 def upgrade() -> None:
     conn = op.get_bind()
     insp = Inspector.from_engine(conn)  # type: ignore
+    # Skip if base table doesn't exist yet (defensive for older branches)
+    if not insp.has_table(TABLE):
+        return
     cols = {c['name'] for c in insp.get_columns(TABLE)}
     # Add columns if missing
     if 'reward_type' not in cols:

@@ -1,5 +1,12 @@
 services:
-  services:
-    frontend:
-      environment:
-        NODE_OPTIONS: "--max-old-space-size=2048"
+  backend:
+    ports:
+      - "8001:8000"
+  frontend:
+    ports:
+      - "3001:3000"
+    environment:
+      NODE_OPTIONS: "--max-old-space-size=2048"
+  postgres:
+    ports:
+      - "5433:5432"
