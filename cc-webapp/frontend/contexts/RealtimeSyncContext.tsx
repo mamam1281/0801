@@ -5,6 +5,7 @@ import { WSClient, createWSClient, WebSocketMessage, SyncEventData } from '../ut
 import { useAuth } from '../hooks/useAuth';
 import { useAuthToken } from '../hooks/useAuthToken';
 import { globalFallbackPoller, createSyncPollingTasks } from '../utils/fallbackPolling';
+import { useToast } from '@/components/NotificationToast';
 
 /**
  * 실시간 동기화 전역 상태 정의
@@ -293,7 +294,7 @@ const RealtimeSyncContext = createContext(null as any);
  * Provider Props
  */
 interface RealtimeSyncProviderProps {
-  children: React.ReactNode;
+  children?: React.ReactNode;
   apiBaseUrl?: string;
 }
 
@@ -306,6 +307,7 @@ export function RealtimeSyncProvider({ children, apiBaseUrl }: RealtimeSyncProvi
   const { getAccessToken, getValidAccessToken } = useAuthToken();
   const wsClientRef = useRef(null as WSClient | null);
   const fallbackPollingActive = useRef(false);
+  const { push } = useToast();
 
   const baseUrl =
     apiBaseUrl ||
@@ -321,6 +323,30 @@ export function RealtimeSyncProvider({ children, apiBaseUrl }: RealtimeSyncProvi
       case 'profile_update':
         dispatch({ type: 'UPDATE_PROFILE', payload: message.data });
         break;
+
+      case 'purchase_update': {
+        const data = message.data as SyncEventData['purchase_update'];
+        // 사용자 토스트 알림
+        const status = data?.status ?? 'pending';
+        const product = data?.product_id ? `상품 ${data.product_id}` : '구매';
+        let type: string = 'shop';
+        let text: string = '';
+        if (status === 'success') {
+          type = 'success';
+          text = `${product} 결제가 완료되었습니다${data?.amount ? ` (금액: ${data.amount})` : ''}.`;
+        } else if (status === 'failed') {
+          type = 'error';
+          text = `${product} 결제가 실패했습니다${data?.reason_code ? ` (${data.reason_code})` : ''}.`;
+        } else if (status === 'idempotent_reuse') {
+          type = 'system';
+          text = `${product} 결제가 이미 처리되었습니다.`;
+        } else {
+          type = 'shop';
+          text = `${product} 결제가 진행 중입니다...`;
+        }
+        try { push(text, type); } catch {}
+        break;
+      }
 
       case 'achievement_progress':
         dispatch({ type: 'UPDATE_ACHIEVEMENT', payload: message.data });
@@ -349,7 +375,7 @@ export function RealtimeSyncProvider({ children, apiBaseUrl }: RealtimeSyncProvi
       default:
         console.warn('[RealtimeSync] Unknown message type:', message.type);
     }
-  }, []);
+  }, [push]);
 
   // WebSocket 연결
   const connect = useCallback(async () => {

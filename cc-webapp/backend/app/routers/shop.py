@@ -93,7 +93,7 @@ logger = logging.getLogger(__name__)
 
 # --- Metrics (best-effort; 실패시 무시) ---
 try:
-    from prometheus_client import Counter
+    from prometheus_client import Counter  # type: ignore
     PURCHASE_COUNTER = Counter(
         "purchase_attempt_total",
         "구매 시도/성공/실패 카운터",
@@ -398,7 +398,7 @@ def buy_limited_compat(req: LimitedBuyCompatRequest, db = Depends(get_db), backg
     # Pricing with promo
     unit_price = pkg.price_cents
     if req.promo_code:
-    if not LimitedPackageService.can_use_promo(req.promo_code):
+        if not LimitedPackageService.can_use_promo(req.promo_code):
             try:
                 if hold_id:
                     LimitedPackageService.remove_hold(pkg.code, hold_id)
@@ -954,6 +954,13 @@ def buy(
             item_name=result.get("item_name"),
             new_gold_balance=new_bal,
         )
+        try:
+            from .realtime import broadcast_purchase_update, broadcast_profile_update
+            if background_tasks is not None:
+                background_tasks.add_task(broadcast_purchase_update, req_user_id, status="success", product_id=req.product_id, amount=req.amount)
+                background_tasks.add_task(broadcast_profile_update, req_user_id, {"gold_balance": new_bal})
+        except Exception:
+            pass
         if idem and rman.redis_client:
             try:
                 rman.redis_client.setex(_idem_key(req_user_id, req.product_id, idem), IDEM_TTL, "1")
@@ -1343,7 +1350,7 @@ def buy_limited_compat(req: LegacyLimitedBuyRequest, db = Depends(get_db)):
         idempotency_key=req.idempotency_key,
     )
     # Call core handler by temporarily faking current_user dependency
-    res = buy_limited(mapped, db=db, current_user=user)
+    res = buy_limited(mapped, db=db, current_user=user)  # background_tasks는 없음
     # Map certain failures to HTTP status codes expected by legacy tests
     if isinstance(res, LimitedBuyReceipt) and not res.success:
         code_map = {
@@ -1363,7 +1370,7 @@ def buy_limited_compat(req: LegacyLimitedBuyRequest, db = Depends(get_db)):
     summary="Buy limited-time package (real money)",
     operation_id="buy_limited_package",
 )
-def buy_limited(req: LimitedBuyRequest, db = Depends(get_db), current_user = Depends(get_current_user)):
+def buy_limited(req: LimitedBuyRequest, db = Depends(get_db), current_user = Depends(get_current_user), background_tasks: BackgroundTasks | None = None):
     user_id = getattr(current_user, "id", None)
     if not user_id:
         raise HTTPException(status_code=401, detail="Unauthorized")

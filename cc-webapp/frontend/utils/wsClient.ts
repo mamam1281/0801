@@ -17,6 +17,14 @@ export interface SyncEventData {
     tier?: string;
     total_spent?: number;
   };
+  purchase_update?: {
+    user_id: number;
+    status: 'pending' | 'success' | 'failed' | 'idempotent_reuse';
+    product_id?: string;
+    receipt_code?: string;
+    amount?: number; // cents or in-app currency depending on product
+    reason_code?: string; // when failed
+  };
   achievement_progress?: {
     user_id: number;
     achievement_id: number;

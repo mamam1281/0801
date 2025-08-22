@@ -20,9 +20,39 @@
 - 브로드캐스트 범위 확대: 상점/결제/프로필 통계 갱신 경로에 `profile_update`/`balance_update`/`stats_update` 일관 송신.
 - 모니터링: Prometheus/Grafana 대시보드에 허브 이벤트 QPS, 실패율, Kafka 라우팅 지표 추가.
 
+## 2025-08-23 상점/결제 WS 브로드캐스트 보강 + 웹훅/정산 연동
+
+### 변경 요약
+- 상점 구매 플로우(`/api/shop/buy`): 모든 분기에서 `purchase_update` 브로드캐스트 추가(`success|failed|pending|idempotent_reuse|grant_failed|insufficient_funds|item_purchase_failed`), 성공 시 `profile_update`로 `gold_balance` 동기화.
+- 한정 패키지 구매(`/api/shop/limited/buy`, compat 포함): 성공/실패/중복 재사용 분기에 `purchase_update` 및 성공 시 `profile_update` 송신.
+- 결제 웹훅(`/api/shop/webhook/payment`): 유효 payload(user_id, status, product_id, receipt_code, amount, new_gold_balance) 수신 시 비차단 브로드캐스트 수행.
+- 결제 정산(`/api/shop/transactions/{receipt}/settle`): 오타 수정(`settle_pending_gems_for_user`→`settle_pending_gold_for_user`), 정산 결과에 따라 `purchase_update` 및 success 시 `profile_update` 송신.
+
+### 검증 결과
+- 로컬 환경에서 구매 성공 시 WS 이벤트 `purchase_update{status:success}`와 `profile_update{gold_balance}` 수신 확인, 실패/보류/중복 재사용 케이스도 이벤트 수신.
+- HTTP 스키마/경로 변경 없음(OpenAPI 영향 최소). Alembic 변경 없음(head 단일 유지).
+
+### 다음 단계
+- 프론트: 공통 WS 핸들러에 `purchase_update` 구독 추가(토스트/배지/잔액 갱신 연결), 보류→정산 완료 전이 처리.
+- 백엔드: 웹훅 payload 표준 스키마 문서화 및 HMAC/nonce 재생 방지 리그레션 테스트 추가.
+- 모니터링: `purchase_attempt_total` Prometheus Counter(라벨 flow/result/reason) 대시보드 반영.
+
 ### 트러블슈팅 노트
 - 이전 커밋에서 `final.md` 패치 충돌로 변경 요약 추가 실패 이력 있음 → 본 섹션으로 정리 반영 완료.
 - 실시간 이벤트 소비 측(프론트)은 레거시 WS 매니저와 혼용 금지; 통합 허브 스키마 `{type,user_id,data,timestamp}`로 정규화 유지.
+
+## 2025-08-23 프론트엔드: purchase_update 구독 및 토스트 처리 추가
+
+### 변경 요약
+- WebSocket 스키마 타입에 `purchase_update` 추가(`frontend/utils/wsClient.ts`).
+- `RealtimeSyncContext`에서 `purchase_update` 수신 시 토스트 알림 노출(성공/실패/멱등/진행중 구분), 프로필 수치는 백엔드의 별도 `profile_update` 이벤트로 동기화.
+
+### 검증 결과
+- 백엔드에서 상점/결제 관련 이벤트 발생 시 브라우저 상단 우측에 토스트 표시 확인 예정(로컬 환경 수동 테스트 대상). OpenAPI/Alembic 영향 없음.
+
+### 다음 단계
+- 배지/장바구니/잔액 UI와 연동(성공 시 잔액 애니메이션은 `profile_update`로 이미 처리됨).
+- `purchase_update` → pending 이후 settle/webhook success 전이시 중복 토스트 억제 로직(키 기반 1.5s 윈도우) 보완 여부 검토.
 
 ## 2025-08-22 프론트 API 클라이언트 정리(unifiedApi 통합)
 
