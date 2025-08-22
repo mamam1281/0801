@@ -1,0 +1,28 @@
+groups:
+  - name: purchase-health
+    interval: 30s
+    rules:
+      - alert: PurchaseFailureRateHigh
+        expr: |
+          sum(rate(purchase_attempt_total{result="failed"}[5m]))
+            /
+          clamp_min(sum(rate(purchase_attempt_total{result=~"success|failed|pending"}[5m])), 1e-9)
+            > 0.02
+        for: 10m
+        labels:
+          severity: warning
+          team: shop
+        annotations:
+          summary: "구매 실패율 상승"
+          description: "최근 5분 평균 실패율이 2%를 초과하고 10분 지속. 결제사/네트워크/스크립트 오류 점검 필요."
+
+      - alert: PurchasePendingSpike
+        expr: |
+          sum(increase(purchase_attempt_total{result="pending"}[10m])) > 20
+        for: 10m
+        labels:
+          severity: critical
+          team: shop
+        annotations:
+          summary: "구매 보류 건 급증"
+          description: "10분 내 pending 건수가 20건 초과. 웹훅/정산 지연 또는 외부 결제 상태 이상 가능성."

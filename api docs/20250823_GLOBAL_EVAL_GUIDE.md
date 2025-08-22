@@ -190,6 +190,16 @@
 2) Prometheus/Grafana 프로비저닝 스크립트 추가 및 기본 패널 배치.
 3) OpenAPI 재수출 자동화 + 변경 감시 테스트(`test_openapi_diff_ci.py`)와 연계.
 
-Grafana 대시보드 실데이터 렌더 확인 및 임계치/패널 튜닝
-OpenAPI 스냅샷/디프 CI 연동(아티팩트 업로드·PR 코멘트)
-결제 전 구간 WS 브로드캐스트와 프론트 전역 리스너 보강
+#### 실행 현황(2025-08-23)
+- WS 브로드캐스트는 buy/limited/webhook/settle 전 구간에서 발화하도록 정비(성공 시 profile_update 포함).
+- Grafana 프로비저닝 스크립트 추가: `scripts/provision_grafana.ps1`(대시보드/데이터소스 템플릿 준비).
+- OpenAPI 변경 감시 테스트 추가: `backend/app/tests/test_openapi_diff_ci.py`(핵심 경로 존재/스냅샷 대비 파괴적 변경 감지).
+
+#### 사용 방법
+- 모니터링 준비: PowerShell에서 `scripts/provision_grafana.ps1` 실행 후 `docker-compose.monitoring.yml`의 Grafana 프로비저닝 경로에 마운트.
+- OpenAPI: 컨테이너 내부에서 `python -m app.export_openapi`로 `current_openapi.json` 갱신 후 pytest 실행.
+
+#### 다음 보강 포인트
+- Grafana 대시보드 실데이터 렌더 확인 및 임계치/패널 튜닝.
+- OpenAPI 스냅샷/디프 CI 연동(아티팩트 업로드·PR 코멘트).
+- 결제 전 구간 WS 브로드캐스트와 프론트 전역 리스너 보강.

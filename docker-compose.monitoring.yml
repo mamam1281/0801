@@ -5,6 +5,7 @@ services:
     volumes:
       - "./cc-webapp/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro"
       - "./cc-webapp/monitoring/invite_code_alerts.yml:/etc/prometheus/rules/invite_code_alerts.yml:ro"
+  - "./cc-webapp/monitoring/purchase_alerts.yml:/etc/prometheus/rules/purchase_alerts.yml:ro"
       - prometheus_data:/prometheus
     ports:
       - "9090:9090"
