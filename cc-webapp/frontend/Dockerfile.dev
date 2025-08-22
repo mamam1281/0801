@@ -1,15 +1,27 @@
 FROM node:20-alpine
 
+# Native deps compatibility (some packages expect glibc-like behavior)
+RUN apk add --no-cache libc6-compat
+
 WORKDIR /app
 
 # Copy manifest files first to leverage Docker layer caching
 COPY package.json package-lock.json* ./
 
-# Install dependencies
-RUN npm install --legacy-peer-deps --no-audit --no-fund
+# Install dependencies (cached inside image) with fallback
+RUN npm config set audit false \
+ && npm config set fund false \
+ && npm config set legacy-peer-deps true \
+ && (npm ci --no-audit --no-fund || npm install --no-audit --no-fund) \
+ && mkdir -p /opt/node_modules_cache \
+ && cp -a node_modules/. /opt/node_modules_cache/
 
 # Copy app source
 COPY . .
 
-# Run Next dev binding to all interfaces
-CMD ["npm", "run", "dev", "--", "-H", "0.0.0.0"]
+# Copy runtime start script
+COPY .docker/start-dev.sh /usr/local/bin/start-dev
+RUN chmod +x /usr/local/bin/start-dev
+
+# Default command uses robust start script
+CMD ["/usr/local/bin/start-dev"]

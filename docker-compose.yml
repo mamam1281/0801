@@ -61,13 +61,16 @@ services:
       NODE_OPTIONS: "--max_old_space_size=3072"
     volumes:
       - ./cc-webapp/frontend:/app
+      # 컨테이너 전용 node_modules 볼륨으로 호스트 파일시스템 충돌 방지
+      - frontend_node_modules:/app/node_modules
       - ./logs/frontend:/app/logs:rw
     ports:
       - "${FRONTEND_PORT:-3000}:3000"
     depends_on:
       - backend
     restart: unless-stopped
-    command: ["npm", "run", "dev", "--", "-H", "0.0.0.0"]
+    # Use image default start script
+    command: ["/usr/local/bin/start-dev"]
     healthcheck:
       test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:3000',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))\""]
       start_period: 45s
@@ -203,3 +206,4 @@ networks:
 
 volumes:
   clickhouse_data:
+  frontend_node_modules:
