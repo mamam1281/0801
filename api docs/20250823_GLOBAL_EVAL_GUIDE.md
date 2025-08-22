@@ -154,3 +154,29 @@
 - user_action: { action_type, client_ts?, context, server_ts }
 
 — 본 문서는 운영 과정에서 계속 보강되며, 변경 요약은 `api docs/20250808.md`와 #final.md 파일에 누적 기록합니다.
+
+## 9) 진행 현황 요약(2025-08-23)
+
+### 완료(현재 반영됨)
+- 리얼타임 허브 단일화: `/api/realtime/sync` 활성, 이벤트 스키마 표준 적용 `{type,user_id,data,timestamp?}`.
+- 게임 액션 브로드캐스트: `POST /api/actions` → `user_action` 허브 전파.
+- 보상 지급 브로드캐스트: `rewards.py` 경로에서 `reward_granted` + `profile_update` 허브 전파(비차단, 스로틀 준수).
+- 환경 자동화: `cc-manage.ps1`에서 `.env.development → .env` 자동 복사(없을 때), README/문서 반영.
+- 최근 액션 스냅샷: `GET /api/actions/recent/{user_id}` 엔드포인트 확인 및 테스트 커버리지 추가.
+	- 테스트 추가: `cc-webapp/backend/app/tests/test_actions_recent_flow.py` (signup → action → recent 검증).
+
+### 부분 진행/보강 예정
+- 상점/결제 전 구간 WS 브로드캐스트 배선 보강(구매 성공/실패, 잔액 변경, 멱등 충돌 알림).
+- Prometheus 지표 확장 및 Grafana 기본 대시보드(profiles: auth 실패율/WS 연결/consumer lag/적재 RPS).
+- Frontend E2E(Playwright) 시나리오: 로그인→대시보드→액션→WS 반영→재연결 초기화.
+
+### 검증/운영 메모
+- 테스트: 컨테이너 내부에서 `pytest -q app/tests` 수행(핵심 스모크 포함), Alembic `upgrade head`로 단일 head 유지 확인.
+- OpenAPI: 필요 시 `python -m app.export_openapi`로 재수출 후 `/docs` 단일성 확인.
+- 트러블슈팅: 스키마 미반영 시 `app.openapi_schema=None` 재생성, JWT 실패는 `auth_token` 픽스처로 재현.
+
+### 다음 단계 제안(우선순위)
+1) 상점/결제 WS 브로드캐스트 완성(잔액/구매 상태 실시간 반영) → 프론트 전역 리스너 연결.
+2) Prometheus/Grafana 프로비저닝 스크립트 추가 및 기본 패널 배치.
+3) OpenAPI 재수출 자동화 + 변경 감시 테스트(`test_openapi_diff_ci.py`)와 연계.
+

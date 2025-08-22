@@ -243,6 +243,36 @@ async def broadcast_stats_update(user_id: int, stats: Dict[str, Any]) -> None:
     await hub.broadcast(event)
 
 
+async def broadcast_purchase_update(
+    user_id: int,
+    *,
+    status: str,
+    product_id: str | None = None,
+    receipt_code: str | None = None,
+    reason_code: str | None = None,
+    amount: int | None = None,
+) -> None:
+    """구매 상태 변경 브로드캐스트
+
+    status 예시: success | failed | pending | idempotent_reuse | processing
+    """
+    event: Dict[str, Any] = {
+        "type": "purchase_update",
+        "user_id": user_id,
+        "status": status,
+        "timestamp": asyncio.get_event_loop().time(),
+    }
+    if product_id is not None:
+        event["product_id"] = product_id
+    if receipt_code is not None:
+        event["receipt_code"] = receipt_code
+    if reason_code is not None:
+        event["reason_code"] = reason_code
+    if amount is not None:
+        event["amount"] = amount
+    await hub.broadcast(event)
+
+
 # 테스트용 엔드포인트 (개발 환경에서만)
 @router.get("/test/broadcast")
 async def test_broadcast(

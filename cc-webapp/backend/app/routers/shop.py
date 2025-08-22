@@ -87,7 +87,7 @@ from ..kafka_client import send_kafka_message
 from ..utils.redis import get_redis_manager
 from ..core.config import settings
 from ..utils.utils import WebhookUtils
-from fastapi import Request
+from fastapi import Request, BackgroundTasks
 
 logger = logging.getLogger(__name__)
 
@@ -300,7 +300,7 @@ def list_limited_catalog_compat():
     summary="[Compat] Buy limited-time package (no auth)",
     operation_id="compat_buy_limited_package",
 )
-def buy_limited_compat(req: LimitedBuyCompatRequest, db = Depends(get_db)):
+def buy_limited_compat(req: LimitedBuyCompatRequest, db = Depends(get_db), background_tasks: BackgroundTasks | None = None):
     user_id = int(req.user_id)
     rman = get_redis_manager()
     idem = (req.idempotency_key or '').strip() or None
@@ -366,6 +366,12 @@ def buy_limited_compat(req: LimitedBuyCompatRequest, db = Depends(get_db)):
     if idem and rman.redis_client:
         try:
             if rman.redis_client.exists(_idem_key(user_id, pkg.code, idem)):
+                try:
+                    from .realtime import broadcast_purchase_update
+                    if background_tasks is not None:
+                        background_tasks.add_task(broadcast_purchase_update, user_id, status="idempotent_reuse", product_id=pkg.code)
+                except Exception:
+                    pass
                 return LimitedBuyReceipt(success=True, message="중복 요청 처리됨", user_id=user_id, code=pkg.code)
         except Exception:
             pass
@@ -392,7 +398,7 @@ def buy_limited_compat(req: LimitedBuyCompatRequest, db = Depends(get_db)):
     # Pricing with promo
     unit_price = pkg.price_cents
     if req.promo_code:
-        if not LimitedPackageService.can_use_promo(req.promo_code):
+    if not LimitedPackageService.can_use_promo(req.promo_code):
             try:
                 if hold_id:
                     LimitedPackageService.remove_hold(pkg.code, hold_id)
@@ -432,7 +438,7 @@ def buy_limited_compat(req: LimitedBuyCompatRequest, db = Depends(get_db)):
                 LimitedPackageService.remove_hold(pkg.code, hold_id)
         finally:
             LimitedPackageService.release_reservation(pkg.code, req.quantity)
-        return LimitedBuyReceipt(
+        receipt = LimitedBuyReceipt(
             success=False,
             message=f"Payment failed: {auth.message}",
             user_id=user_id,
@@ -444,6 +450,13 @@ def buy_limited_compat(req: LimitedBuyCompatRequest, db = Depends(get_db)):
             charge_id=None,
             reason_code="PAYMENT_FAILED",
         )
+        try:
+            from .realtime import broadcast_purchase_update
+            if background_tasks is not None:
+                background_tasks.add_task(broadcast_purchase_update, user_id, status="failed", product_id=pkg.code, reason_code="PAYMENT_FAILED", amount=total_price_cents)
+        except Exception:
+            pass
+        return receipt
     cap = capture_with_retry(gateway, auth.charge_id or "")
     if not cap.success:
         try:
@@ -468,7 +481,7 @@ def buy_limited_compat(req: LimitedBuyCompatRequest, db = Depends(get_db)):
                 LimitedPackageService.remove_hold(pkg.code, hold_id)
         finally:
             LimitedPackageService.release_reservation(pkg.code, req.quantity)
-        return LimitedBuyReceipt(
+        receipt = LimitedBuyReceipt(
             success=False,
             message=f"Capture failed: {cap.message}",
             user_id=user_id,
@@ -480,6 +493,13 @@ def buy_limited_compat(req: LimitedBuyCompatRequest, db = Depends(get_db)):
             charge_id=auth.charge_id,
             reason_code="PAYMENT_FAILED",
         )
+        try:
+            from .realtime import broadcast_purchase_update
+            if background_tasks is not None:
+                background_tasks.add_task(broadcast_purchase_update, user_id, status="failed", product_id=pkg.code, reason_code="PAYMENT_FAILED", amount=total_price_cents)
+        except Exception:
+            pass
+        return receipt
 
     # 골드 지급
     from app.services.currency_service import CurrencyService
@@ -489,7 +509,7 @@ def buy_limited_compat(req: LimitedBuyCompatRequest, db = Depends(get_db)):
     except Exception:
         try: db.rollback()
         except Exception: pass
-        return LimitedBuyReceipt(
+        receipt = LimitedBuyReceipt(
             success=False,
             message="골드 지급 실패",
             user_id=user_id,
@@ -501,6 +521,13 @@ def buy_limited_compat(req: LimitedBuyCompatRequest, db = Depends(get_db)):
             charge_id=cap.charge_id,
             reason_code="GRANT_FAILED",
         )
+        try:
+            from .realtime import broadcast_purchase_update
+            if background_tasks is not None:
+                background_tasks.add_task(broadcast_purchase_update, user_id, status="failed", product_id=pkg.code, reason_code="GRANT_FAILED", amount=total_price_cents)
+        except Exception:
+            pass
+        return receipt
 
     # Reward + action log
     reward = models.Reward(
@@ -576,7 +603,7 @@ def buy_limited_compat(req: LimitedBuyCompatRequest, db = Depends(get_db)):
             rman.redis_client.setex(_idem_key(user_id, pkg.code, idem), IDEM_TTL, receipt_code)
         except Exception:
             pass
-    return LimitedBuyReceipt(
+    resp = LimitedBuyReceipt(
         success=True,
         message="Purchase completed",
         user_id=user_id,
@@ -600,7 +627,7 @@ class LegacyLimitedBuyRequest(BaseModel):
     idempotency_key: Optional[str] = Field(None, description="Client-provided idempotency key (unique per purchase attempt)")
 
 @router.post("/webhook/payment", summary="Payment Webhook (Replay & 멱등 보호)")
-async def payment_webhook(request: Request):
+async def payment_webhook(request: Request, background_tasks: BackgroundTasks | None = None):
     """결제 프로바이더 웹훅 수신.
     보안 계층:
       1) HMAC 서명 검증 (X-Signature)
@@ -678,13 +705,37 @@ async def payment_webhook(request: Request):
         except Exception as e:
             logger.warning(f"Webhook event idempotency set 실패(degrade): {e}")
 
-    # TODO: 실제 비즈니스 처리 (예: 결제 상태 업데이트, 보상 지급 등)
+    # Best-effort: payload 내에 user_id/receipt_code/status 가 있으면 브로드캐스트
+    try:
+        if not duplicate:
+            if payload_json is None:
+                payload_json = json.loads(raw_body.decode("utf-8"))
+            if isinstance(payload_json, dict):
+                uid = payload_json.get("user_id") or payload_json.get("uid")
+                status = payload_json.get("status")
+                product_id = payload_json.get("product_id") or payload_json.get("code")
+                receipt = payload_json.get("receipt_code") or payload_json.get("receipt")
+                new_balance = payload_json.get("new_gold_balance") or payload_json.get("balance")
+                amount = payload_json.get("amount")
+                if uid and status:
+                    try:
+                        from .realtime import broadcast_purchase_update, broadcast_profile_update
+                        if background_tasks is not None:
+                            background_tasks.add_task(broadcast_purchase_update, int(uid), status=status, product_id=str(product_id) if product_id else None, receipt_code=receipt, amount=amount)
+                            if status == "success" and new_balance is not None:
+                                background_tasks.add_task(broadcast_profile_update, int(uid), {"gold_balance": int(new_balance)})
+                    except Exception:
+                        pass
+    except Exception:
+        pass
+
     return {"ok": True, "duplicate": duplicate}
 
 @router.post("/purchase", response_model=ShopPurchaseResponse, summary="Purchase Item", description="Purchase shop item using user's gold tokens")
 def purchase_shop_item(
     request: ShopPurchaseRequest,
-    shop_service: ShopService = Depends(get_shop_service)
+    shop_service: ShopService = Depends(get_shop_service),
+    background_tasks: BackgroundTasks | None = None,
 ):
     """
     ### Request Body:
@@ -710,7 +761,7 @@ def purchase_shop_item(
         )
         if not result["success"]:
             # Handle the case of insufficient funds gracefully
-            return ShopPurchaseResponse(
+            resp = ShopPurchaseResponse(
                 success=False,
                 message=result["message"],
                 new_gold_balance=result.get("new_gold_balance") or result.get("new_balance"),
@@ -718,8 +769,15 @@ def purchase_shop_item(
                 item_name=request.item_name,
                 new_item_count=0
             )
+            try:
+                from .realtime import broadcast_purchase_update
+                if background_tasks is not None:
+                    background_tasks.add_task(broadcast_purchase_update, request.user_id, status="failed", product_id=str(request.item_id), reason_code="INSUFFICIENT_FUNDS", amount=request.price)
+            except Exception:
+                pass
+            return resp
 
-        return ShopPurchaseResponse(
+        resp = ShopPurchaseResponse(
             success=True,
             message=result["message"],
             new_gold_balance=result.get("new_gold_balance") or result.get("new_balance"),
@@ -727,6 +785,14 @@ def purchase_shop_item(
             item_name=result["item_name"],
             new_item_count=result["new_item_count"]
         )
+        try:
+            from .realtime import broadcast_purchase_update, broadcast_profile_update
+            if background_tasks is not None:
+                background_tasks.add_task(broadcast_purchase_update, request.user_id, status="success", product_id=str(request.item_id), amount=request.price)
+                background_tasks.add_task(broadcast_profile_update, request.user_id, {"gold_balance": resp.new_gold_balance})
+        except Exception:
+            pass
+        return resp
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
@@ -738,6 +804,7 @@ def buy(
     req: BuyRequest,
     db = Depends(get_db),
     current_user = Depends(get_current_user_optional),
+    background_tasks: BackgroundTasks = None,
 ):
     # Prefer authenticated user; for dev/test allow fallback to body.user_id when safe
     user = current_user
@@ -805,7 +872,7 @@ def buy(
     if idem and rman.redis_client:
         if rman.redis_client.exists(_idem_key(req_user_id, req.product_id, idem)):
             # Return a soft acknowledgement; real state already applied
-            return BuyReceipt(
+            receipt = BuyReceipt(
                 success=True,
                 message="중복 요청 처리됨",
                 user_id=req_user_id,
@@ -816,6 +883,13 @@ def buy(
                 charge_id=None,
                 receipt_code=None,
             )
+            try:
+                from .realtime import broadcast_purchase_update
+                if background_tasks is not None:
+                    background_tasks.add_task(broadcast_purchase_update, req_user_id, status="idempotent_reuse", product_id=req.product_id)
+            except Exception:
+                pass
+            return receipt
 
     if req.kind == "item":
         # 통화 차감 우선 (기존 cyber_token_balance -> premium_gem_balance 또는 coin 구분)
@@ -825,7 +899,7 @@ def buy(
         try:
             new_bal = cur_svc.deduct(req_user_id, req.amount, 'gem' if currency_mode == 'gem' else 'coin')
         except InsufficientBalanceError as ie:
-            return BuyReceipt(
+            receipt = BuyReceipt(
                 success=False,
                 message=str(ie),
                 user_id=req_user_id,
@@ -835,6 +909,13 @@ def buy(
                 item_name=req.item_name or req.product_id,
                 new_gold_balance=getattr(user, "gold_balance", 0),
             )
+            try:
+                from .realtime import broadcast_purchase_update
+                if background_tasks is not None:
+                    background_tasks.add_task(broadcast_purchase_update, req_user_id, status="failed", product_id=req.product_id, reason_code="INSUFFICIENT_FUNDS", amount=req.amount)
+            except Exception:
+                pass
+            return receipt
         # Item DB 기록 (기존 ShopService 로직 재사용)
         result = shop_svc.purchase_item(
             user_id=req_user_id,
@@ -846,7 +927,7 @@ def buy(
         )
         if not result["success"]:
             # 실패 시 롤백으로 잔액 보정 고려(현재 단순 실패 반환)
-            return BuyReceipt(
+            receipt = BuyReceipt(
                 success=False,
                 message=result["message"],
                 user_id=req_user_id,
@@ -856,6 +937,13 @@ def buy(
                 item_name=req.item_name or req.product_id,
                 new_gold_balance=new_bal,
             )
+            try:
+                from .realtime import broadcast_purchase_update
+                if background_tasks is not None:
+                    background_tasks.add_task(broadcast_purchase_update, req_user_id, status="failed", product_id=req.product_id, reason_code="ITEM_PURCHASE_FAILED", amount=req.amount)
+            except Exception:
+                pass
+            return receipt
         resp = BuyReceipt(
             success=True,
             message=result["message"],
@@ -1036,7 +1124,7 @@ def buy(
             extra={"currency": req.currency},
             idempotency_key=idem,
         )
-        if reused_receipt:
+    if reused_receipt:
             receipt_code = reused_receipt
     # Also append a lightweight action log for environments without transactions table
     try:
@@ -1066,7 +1154,7 @@ def buy(
                 db.commit()
             except Exception:
                 db.rollback()
-        return BuyReceipt(
+        receipt = BuyReceipt(
             success=False,
             message="결제 거절됨",
             user_id=req_user_id,
@@ -1077,6 +1165,13 @@ def buy(
             new_gold_balance=getattr(user, "gold_balance", 0),
             reason_code="PAYMENT_DECLINED",
         )
+        try:
+            from .realtime import broadcast_purchase_update
+            if background_tasks is not None:
+                background_tasks.add_task(broadcast_purchase_update, req_user_id, status="failed", product_id=req.product_id, receipt_code=receipt_code, reason_code="PAYMENT_DECLINED", amount=int(req.amount))
+        except Exception:
+            pass
+        return receipt
     elif status == "pending":
         # Update action log with gateway_reference for later settlement mapping
         try:
@@ -1103,7 +1198,7 @@ def buy(
                 db.commit()
         except Exception:
             db.rollback()
-        return BuyReceipt(
+        receipt = BuyReceipt(
             success=False,
             message="결제 대기 중",
             user_id=req_user_id,
@@ -1114,6 +1209,13 @@ def buy(
             new_gold_balance=getattr(user, "gold_balance", 0),
             reason_code="PAYMENT_PENDING",
         )
+        try:
+            from .realtime import broadcast_purchase_update
+            if background_tasks is not None:
+                background_tasks.add_task(broadcast_purchase_update, req_user_id, status="pending", product_id=req.product_id, receipt_code=receipt_code, amount=int(req.amount))
+        except Exception:
+            pass
+        return receipt
     else:
         # success immediately
         # If catalog product known, use its gold * quantity; otherwise fall back to amount-as-gold.
@@ -1130,7 +1232,7 @@ def buy(
                 db.rollback()
             except Exception:
                 pass
-            return BuyReceipt(
+            receipt = BuyReceipt(
                 success=False,
                 message="골드 지급 실패",
                 user_id=req_user_id,
@@ -1140,6 +1242,13 @@ def buy(
                 new_gold_balance=getattr(user, "gold_balance", 0),
                 reason_code="GRANT_FAILED",
             )
+            try:
+                from .realtime import broadcast_purchase_update
+                if background_tasks is not None:
+                    background_tasks.add_task(broadcast_purchase_update, req_user_id, status="failed", product_id=req.product_id, receipt_code=receipt_code, reason_code="GRANT_FAILED", amount=int(req.amount))
+            except Exception:
+                pass
+            return receipt
         # mark success
     db_tx = existing_tx or shop_svc.get_tx_by_receipt_for_user(req_user_id, receipt_code)
     if db_tx:
@@ -1171,6 +1280,14 @@ def buy(
             rman.redis_client.setex(_idem_key(req_user_id, req.product_id, idem), IDEM_TTL, receipt_code)
         except Exception:
             pass
+    try:
+        from .realtime import broadcast_purchase_update, broadcast_profile_update
+        if background_tasks is not None:
+            background_tasks.add_task(broadcast_purchase_update, req_user_id, status="success", product_id=req.product_id, receipt_code=receipt_code, amount=int(req.amount))
+            # 잔액 변경 반영
+            background_tasks.add_task(broadcast_profile_update, req_user_id, {"gold_balance": new_gold_balance})
+    except Exception:
+        pass
     return resp
 
 
@@ -1181,11 +1298,21 @@ def list_my_transactions(limit: int = 20, db = Depends(get_db), current_user = D
 
 
 @router.post("/transactions/{receipt}/settle")
-def settle_my_transaction(receipt: str, db = Depends(get_db), current_user = Depends(get_current_user)):
+def settle_my_transaction(receipt: str, db = Depends(get_db), current_user = Depends(get_current_user), background_tasks: BackgroundTasks | None = None):
     svc = ShopService(db)
-    res = svc.settle_pending_gems_for_user(current_user.id, receipt)
+    # 메서드명 오타 수정: settle_pending_gold_for_user
+    res = svc.settle_pending_gold_for_user(current_user.id, receipt)
     if not res.get("success"):
         raise HTTPException(status_code=400, detail=res.get("message", "Failed"))
+    try:
+        from .realtime import broadcast_purchase_update, broadcast_profile_update
+        status = res.get("status") or ("success" if res.get("new_balance") is not None else None)
+        if status and background_tasks is not None:
+            background_tasks.add_task(broadcast_purchase_update, current_user.id, status=status, receipt_code=receipt)
+            if status == "success" and res.get("new_balance") is not None:
+                background_tasks.add_task(broadcast_profile_update, current_user.id, {"gold_balance": int(res.get("new_balance"))})
+    except Exception:
+        pass
     return res
 
 
@@ -1652,4 +1779,11 @@ def buy_limited(req: LimitedBuyRequest, db = Depends(get_db), current_user = Dep
             pass
 
     _metric_inc("limited", "success", None)
+    try:
+        from .realtime import broadcast_purchase_update, broadcast_profile_update
+        if background_tasks is not None:
+            background_tasks.add_task(broadcast_purchase_update, user_id, status="success", product_id=pkg.code, receipt_code=receipt_code, amount=total_price_cents)
+            background_tasks.add_task(broadcast_profile_update, user_id, {"gold_balance": new_gold_balance})
+    except Exception:
+        pass
     return resp
