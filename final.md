@@ -3,6 +3,23 @@
 **생성일**: 2025-08-19  
 **브랜치**: feature/e2e-onboarding-playwright  
 
+## 2025-08-23 모니터링 정합 + 프론트 Shop 배지 + OpenAPI diff 자동화(준비)
+
+### 변경 요약
+- Prometheus/Grafana 정합: `cc-webapp/monitoring/prometheus.yml`의 `job_name`을 `cc-webapp-backend`로 변경하여 대시보드의 PromQL 필터와 일치시킴. `rule_files` 활성화(`/etc/prometheus/rules/*.yml`) 및 `docker-compose.monitoring.yml`에 `invite_code_alerts.yml` 마운트 추가.
+- 프론트 실시간 UX: `RealtimeSyncContext`에 경량 `purchase` 상태(pending_count/last_status) 추가, `purchase_update` 수신 시 상태 갱신 + 기존 토스트 유지. `useRealtimePurchaseBadge` 훅 신설, `BottomNavigation`의 Shop 탭에 진행 중 결제 수를 표시하는 배지 적용(최대 9 표시, 펄스 애니메이션).
+- OpenAPI 자동화(준비): 기존 `ci/export_openapi.ps1` 스크립트 경로/동작 확인. CI 워크플로 추가는 다음 단계로 이관.
+
+### 검증 결과
+- 설정 파일 정합: Compose(YAML) 들여쓰기 오류 수정, Prometheus 설정 유효 구문 확인. Grafana 프로비저닝 경로 변경 없음(대시보드/데이터소스 유지).
+- 타입/빌드: 변경된 프론트 파일들(TypeScript) 오류 없음. 백엔드/Alembic 마이그레이션 변경 없음(단일 head 유지). OpenAPI 스키마 파일 내 변화 없음(수출 스크립트 정상).
+- 런타임 체크(부분): 기존 대시보드의 HTTP/WS/구매 패널 쿼리가 변경된 `job` 라벨과 일치(쿼리와 스크레이프 타깃 매칭 확인).
+
+### 다음 단계
+- 모니터링 가동 검증: `docker-compose.monitoring.yml`로 Prometheus/Grafana 기동 후, 구매 전환/에러율/WS 패널 실데이터 확인 및 필요 시 PromQL 라벨 튜닝. 알림 룰(구매 실패 스파이크/보류 비율 임계치) 추가.
+- CI 통합: GitHub Actions 워크플로 생성(백엔드 OpenAPI 계약 테스트 실행 + `ci/export_openapi.ps1`로 스냅샷/차이 산출 → 아티팩트 업로드/PR 코멘트).
+- 프론트 연동 보강: 골드 잔액 UI 일부 레거시 모델과 실시간 프로필 업데이트 동기화, 장바구니/배지 확장 지점 도입 검토.
+
 ## 2025-08-23 환경 자동화 및 보상 브로드캐스트 표준화
 
 ### 변경 요약

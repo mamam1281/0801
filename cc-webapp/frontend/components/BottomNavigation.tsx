@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { useRealtimePurchaseBadge } from '@/hooks/useRealtimeData';
 import { motion } from 'framer-motion';
 import { 
   Home, 
@@ -20,6 +21,7 @@ interface BottomNavigationProps {
 }
 
 export function BottomNavigation({ currentScreen, onNavigate, user }: BottomNavigationProps) {
+  const { pendingCount } = useRealtimePurchaseBadge();
   const handleModelNavigation = () => {
     // 본사 사이트로 리다이렉트
     window.open('https://md-01.com', '_blank');
@@ -124,13 +126,13 @@ export function BottomNavigation({ currentScreen, onNavigate, user }: BottomNavi
                 </motion.div>
                 
                 {/* Notification badges */}
-                {item.id === 'shop' && (
+        {item.id === 'shop' && pendingCount > 0 && (
                   <motion.div
                     animate={{ scale: [1, 1.2, 1] }}
                     transition={{ duration: 2, repeat: Infinity, type: 'tween' }}
                     className="absolute -top-2 -right-2 w-4 h-4 bg-gradient-to-r from-error to-warning rounded-full flex items-center justify-center"
                   >
-                    <span className="text-white text-xs font-bold">!</span>
+          <span className="text-white text-[10px] font-bold">{Math.min(9, pendingCount)}</span>
                   </motion.div>
                 )}
                 
