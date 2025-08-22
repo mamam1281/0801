@@ -63,7 +63,9 @@ function Start-Environment {
     # Ensure .env exists (auto-copy from .env.development if present)
     try {
         if (-not (Test-Path ".env") -and (Test-Path ".env.development")) {
-            Copy-Item ".env.development" ".env" -Force
+            $content = Get-Content ".env.development" -Raw
+            # Force UTF8 without BOM to avoid docker compose parse errors
+            [System.IO.File]::WriteAllText((Join-Path (Get-Location) ".env"), $content, (New-Object System.Text.UTF8Encoding($false)))
             Write-Host "Created .env from .env.development (auto)" -ForegroundColor Yellow
         }
     } catch {}
@@ -146,7 +148,8 @@ function Check-Prerequisites {
     # Ensure .env exists (auto-copy from .env.development if present)
     try {
         if (-not (Test-Path ".env") -and (Test-Path ".env.development")) {
-            Copy-Item ".env.development" ".env" -Force
+            $content = Get-Content ".env.development" -Raw
+            [System.IO.File]::WriteAllText((Join-Path (Get-Location) ".env"), $content, (New-Object System.Text.UTF8Encoding($false)))
             Write-Host "Created .env from .env.development (auto)" -ForegroundColor Yellow
         }
     } catch {}
