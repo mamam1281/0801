@@ -3,13 +3,29 @@ import os
 from pathlib import Path
 
 # 간단한 OpenAPI 계약 변화 감시 스모크
-# 컨테이너 내부에서 실행 가정(파일 경로는 프로젝트 표준을 따름)
+# 다양한 컨테이너/로컬 경로에서 동작하도록 경로 탐색을 유연화
 
-ROOT = Path("/workspace").resolve() if Path("/workspace").exists() else Path("/")
-# 백엔드 저장 위치(레포 구조에 맞춰 상대 경로 계산)
-BASE = Path(__file__).resolve().parents[3]  # cc-webapp/backend/app/tests -> cc-webapp
-CUR_SPEC = BASE / "backend" / "app" / "current_openapi.json"
-SNAPSHOT = BASE / "backend" / "app" / "openapi_snapshot.json"
+HERE = Path(__file__).resolve()
+
+def _find_openapi_file() -> Path:
+    candidates = [
+        # 1) 패키지 로컬(app/) 위치(컨테이너 표준)
+        HERE.parents[1] / "current_openapi.json",           # /app/app/current_openapi.json
+        # 2) 백엔드 루트 위치
+        HERE.parents[2] / "current_openapi.json",           # /app/current_openapi.json
+        # 3) 레포 루트 기준(cc-webapp/backend/app/..)
+        HERE.parents[3] / "backend" / "app" / "current_openapi.json",
+        # 4) 구절대 경로(일부 CI 환경 가정)
+        Path("/backend/app/current_openapi.json"),
+    ]
+    for p in candidates:
+        if p.exists():
+            return p
+    # 마지막 수단: 존재하지 않는 기본 경로 반환(검증에서 메시지 표시)
+    return candidates[0]
+
+CUR_SPEC = _find_openapi_file()
+SNAPSHOT = CUR_SPEC.parent / "openapi_snapshot.json"
 
 REQUIRED_PATHS = [
     "/health",

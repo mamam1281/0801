@@ -28,16 +28,42 @@ def main() -> None:
     except Exception:
         pass
     schema = app.openapi()
-    # Always update canonical file
+    # Always update canonical file under backend root (cc-webapp/backend/current_openapi.json)
     canonical_path = os.path.join(BACKEND_ROOT, "current_openapi.json")
     with open(canonical_path, "w", encoding="utf-8") as f:
         json.dump(schema, f, ensure_ascii=False, indent=2)
-    # Timestamped snapshot for change tracking
+
+    # Also place a copy under the package directory for legacy/test compatibility
+    # Path: cc-webapp/backend/app/current_openapi.json (inside container: /app/app/current_openapi.json)
+    app_local_path = os.path.join(HERE, "current_openapi.json")
+    try:
+        with open(app_local_path, "w", encoding="utf-8") as f:
+            json.dump(schema, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        # Non-fatal; tests may still rely on canonical
+        print(f"[warn] failed to write app-local current_openapi.json: {e}")
+
+    # Timestamped snapshot for change tracking (backend root)
     ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
     snapshot_path = os.path.join(BACKEND_ROOT, f"openapi_{ts}.json")
     with open(snapshot_path, "w", encoding="utf-8") as f:
         json.dump(schema, f, ensure_ascii=False, indent=2)
-    print(f"✅ Exported OpenAPI: canonical={canonical_path}, snapshot={snapshot_path}")
+
+    # Stable snapshot name under app/ to enable simple diff in CI if desired
+    app_snapshot_path = os.path.join(HERE, "openapi_snapshot.json")
+    try:
+        with open(app_snapshot_path, "w", encoding="utf-8") as f:
+            json.dump(schema, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"[warn] failed to write app-local openapi_snapshot.json: {e}")
+
+    print(
+        "✅ Exported OpenAPI:\n"
+        f"  - canonical={canonical_path}\n"
+        f"  - app_current={app_local_path}\n"
+        f"  - snapshot(ts)={snapshot_path}\n"
+        f"  - app_snapshot={app_snapshot_path}"
+    )
 
 
 if __name__ == "__main__":
