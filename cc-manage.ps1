@@ -46,6 +46,8 @@ function Compose {
     param([Parameter(ValueFromRemainingArguments=$true)][string[]]$Args)
     $envArgs = @()
     if (Test-Path ".env.local") { $envArgs += @('--env-file', '.env.local') }
+    # Force compose to use .env.development to avoid BOM issues in .env
+    if (Test-Path ".env.development") { $env:COMPOSE_DOTENV_PATH = (Join-Path (Get-Location) ".env.development") }
     if ($UseComposeV2) { & docker @('compose') @envArgs @Args }
     else { & docker-compose @envArgs @Args }
 }
@@ -70,6 +72,22 @@ function Start-Environment {
         }
     } catch {}
     Write-Host "Starting Casino-Club F2P environment..." -ForegroundColor Cyan
+    # Fix .env BOM issues (rewrite UTF-16 -> UTF-8 without BOM if detected)
+    try {
+        $envPath = ".env"
+        if (Test-Path $envPath) {
+            $bytes = [System.IO.File]::ReadAllBytes($envPath)
+            if ($bytes.Length -ge 2) {
+                $isUtf16Le = ($bytes[0] -eq 0xFF -and $bytes[1] -eq 0xFE)
+                $isUtf16Be = ($bytes[0] -eq 0xFE -and $bytes[1] -eq 0xFF)
+                if ($isUtf16Le -or $isUtf16Be) {
+                    $text = [System.Text.Encoding]::Unicode.GetString($bytes)
+                    [System.IO.File]::WriteAllText((Join-Path (Get-Location) $envPath), $text, (New-Object System.Text.UTF8Encoding($false)))
+                    Write-Host "Rewrote .env as UTF-8 (no BOM)" -ForegroundColor Yellow
+                }
+            }
+        }
+    } catch {}
     $composeArgs = Get-ComposeArgs
     Compose @composeArgs up -d --build
     if ($LASTEXITCODE -ne 0) {
@@ -117,6 +135,37 @@ function Show-Status {
     Write-Host "Checking environment status..." -ForegroundColor Cyan
     $composeArgs = Get-ComposeArgs
     Compose @composeArgs ps
+}
+
+function Tools-Start {
+    Detect-Compose
+    Write-Host "Starting monitoring tools (Prometheus/Grafana/Metabase)..." -ForegroundColor Cyan
+    $file = "docker-compose.monitoring.yml"
+    if (-not (Test-Path $file)) { Write-Host "Monitoring compose file not found: $file" -ForegroundColor Red; exit 1 }
+    if ($UseComposeV2) { & docker compose -f $file up -d }
+    else { & docker-compose -f $file up -d }
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "Failed to start monitoring tools" -ForegroundColor Red
+        exit $LASTEXITCODE
+    }
+    Write-Host "Monitoring tools started!" -ForegroundColor Green
+}
+
+function Tools-Stop {
+    Detect-Compose
+    Write-Host "Stopping monitoring tools..." -ForegroundColor Cyan
+    $file = "docker-compose.monitoring.yml"
+    if ($UseComposeV2) { & docker compose -f $file down }
+    else { & docker-compose -f $file down }
+    Write-Host "Monitoring tools stopped!" -ForegroundColor Green
+}
+
+function Tools-Status {
+    Detect-Compose
+    Write-Host "Checking monitoring tools status..." -ForegroundColor Cyan
+    $file = "docker-compose.monitoring.yml"
+    if ($UseComposeV2) { & docker compose -f $file ps }
+    else { & docker-compose -f $file ps }
 }
 
 function Enter-Container {
@@ -235,6 +284,7 @@ function Show-Help {
     Write-Host "  check       Verify prerequisites (Docker, ports, compose)" -ForegroundColor White
     Write-Host "  health      Probe http://localhost:8000/health and :3000" -ForegroundColor White
     Write-Host "  db-check    Verify PostgreSQL connectivity (port, pg_isready, SELECT 1)" -ForegroundColor White
+    Write-Host "  tools       Manage monitoring tools (usage: tools start|stop|status)" -ForegroundColor White
     Write-Host "  help        Show this help" -ForegroundColor White
     Write-Host "" 
     Write-Host "Examples:" -ForegroundColor Cyan
@@ -255,6 +305,14 @@ switch ($Command) {
     "check" { Check-Prerequisites }
     "health" { Check-Health }
     "db-check" { Check-DBConnection }
+    "tools" {
+        switch ($Service) {
+            "start" { Tools-Start }
+            "stop" { Tools-Stop }
+            "status" { Tools-Status }
+            default { Write-Host "Usage: ./cc-manage.ps1 tools <start|stop|status>" -ForegroundColor Yellow }
+        }
+    }
     "help" { Show-Help }
     default { Show-Help }
 }

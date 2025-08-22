@@ -304,6 +304,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ===== Monitoring: Prometheus Instrumentation (optional) =====
+if Instrumentator is not None:
+    try:
+        # Idempotent setup: ensure we don't re-register in reloads
+        if not hasattr(app.state, "prometheus_instrumented"):
+            Instrumentator().instrument(app).expose(app, endpoint="/metrics", include_in_schema=False)
+            app.state.prometheus_instrumented = True
+            print("📈 Prometheus /metrics endpoint exposed")
+    except Exception as e:
+        # Non-fatal if instrumentation fails
+        print(f"⚠️ Prometheus instrumentation failed: {e}")
+
 # ===== Core API Router Registration =====
 
 # Authentication & User Management (no prefix - routers have their own)
