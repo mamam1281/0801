@@ -36,8 +36,8 @@ function resolveOrigin(): string {
   const env = (typeof process !== 'undefined' ? (process as any).env?.NEXT_PUBLIC_API_ORIGIN : undefined);
   if (env && /^https?:\/\//.test(env)) return env.replace(/\/$/, '');
   if (typeof window !== 'undefined') {
-    // dev fallback (프론트 3000, 백 8000)
-    const fallback = window.location.port === '3000' ? 'http://localhost:8000' : `${window.location.origin}`;
+    // dev fallback (프론트 3000/3001, 백 8000)
+    const fallback = (window.location.port === '3000' || window.location.port === '3001') ? 'http://localhost:8000' : `${window.location.origin}`;
     if (!env) console.warn('[unifiedApi] NEXT_PUBLIC_API_ORIGIN 미설정 → fallback:', fallback);
     return fallback.replace(/\/$/, '');
   }
@@ -47,6 +47,9 @@ function resolveOrigin(): string {
 const ORIGIN = resolveOrigin();
 // 다른 모듈에서 재사용할 수 있도록 공개
 export const API_ORIGIN = ORIGIN;
+
+// 디버깅을 위한 ORIGIN 로깅
+console.log('[unifiedApi] 초기화됨 - API_ORIGIN:', ORIGIN);
 
 async function refreshOnce(): Promise<boolean> {
   try {
@@ -106,6 +109,7 @@ export async function apiCall<T=any>(path: string, opts: UnifiedRequestOptions<T
     if (devLog && attempt === 0) {
       console.groupCollapsed(`[unifiedApi] ${method} ${url}`);
       console.log('opts', { method, body, auth, retry });
+      console.log('headers', finalHeaders);
       console.groupEnd();
     }
 
@@ -141,6 +145,7 @@ export async function apiCall<T=any>(path: string, opts: UnifiedRequestOptions<T
         attempt++; continue;
       }
       const errText = await response.text().catch(()=>`HTTP ${response.status}`);
+      console.error(`[unifiedApi] API 오류 - ${response.status} ${response.statusText}:`, errText);
       throw new Error(`[unifiedApi] ${response.status} ${errText}`);
     }
 

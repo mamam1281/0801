@@ -21,6 +21,7 @@ import {
 import { User } from '../../types';
 import { Button } from '../ui/button';
 import { Slider } from '../ui/slider';
+import { useGameConfig } from '../../hooks/useGameConfig';
 
 interface NeonSlotGameProps {
   user: User;
@@ -95,6 +96,8 @@ interface SlotSpinApiResponse {
 
 export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: NeonSlotGameProps) {
   const { fromApi } = useFeedback();
+  const { config: gameConfig, loading: configLoading } = useGameConfig();
+  
   // unifiedApi: call games endpoints with relative paths
   const [reels, setReels] = useState([
     SLOT_SYMBOLS[0],
@@ -104,7 +107,7 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
   const [spinningReels, setSpinningReels] = useState([[], [], []] as SlotSymbol[][]);
   const [isSpinning, setIsSpinning] = useState(false);
   const [reelStopOrder, setReelStopOrder] = useState([] as number[]);
-  const [betAmount, setBetAmount] = useState(100);
+  const [betAmount, setBetAmount] = useState(() => gameConfig.slotGameCost || 100);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [winAmount, setWinAmount] = useState(0);
   const [isWin, setIsWin] = useState(false);
@@ -119,6 +122,14 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
   const [isAutoSpinning, setIsAutoSpinning] = useState(false);
   const [autoSpinCount, setAutoSpinCount] = useState(0);
   const [coinDrops, setCoinDrops] = useState([] as Array<{ id: number; x: number; delay: number }>);
+
+  // gameConfig가 로드되면 슬롯 게임 비용으로 베팅 금액 업데이트
+  useEffect(() => {
+    if (!configLoading && gameConfig.slotGameCost) {
+      setBetAmount(gameConfig.slotGameCost);
+      console.log('[NeonSlotGame] 베팅 금액 설정:', gameConfig.slotGameCost);
+    }
+  }, [configLoading, gameConfig.slotGameCost]);
 
   // Jackpot calculation
   useEffect(() => {

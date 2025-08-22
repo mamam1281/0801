@@ -36,46 +36,60 @@ export function ProfileScreen({
   const AUTO_REFRESH_MS = 60_000; // 1분
 
   const fetchProfileBundle = async () => {
-    const [rawProfile, rawStats, rawBalance] = await Promise.all([
-      unifiedApi.get('users/profile'),
-      unifiedApi.get('users/stats'),
-      unifiedApi.get('users/balance'),
-    ]);
-    const profileData: any = {
-      ...rawProfile,
-      experience: (rawProfile as any).experience ?? (rawProfile as any).xp ?? 0,
-      maxExperience:
-        (rawProfile as any).maxExperience ?? (rawProfile as any).max_experience ?? 1000,
-      dailyStreak:
-        (rawProfile as any).dailyStreak ||
-        (rawProfile as any).daily_streak ||
-        (rawProfile as any).streak ||
-        0,
-      level: (rawProfile as any).level ?? (rawProfile as any).lvl ?? 1,
-      gameStats: (rawProfile as any).gameStats || (rawProfile as any).game_stats || {},
-    };
-    const statsData: any = {
-      ...rawStats,
-      total_games_played:
-        (rawStats as any).total_games_played ||
-        (rawStats as any).totalGamesPlayed ||
-        (rawStats as any).total_games ||
-        (rawStats as any).totalGames ||
-        0,
-      total_wins:
-        (rawStats as any).total_wins || (rawStats as any).totalWins || (rawStats as any).wins || 0,
-    };
-    const balanceData: any = {
-      ...rawBalance,
-      cyber_token_balance:
-        (rawBalance as any).cyber_token_balance ||
-        (rawBalance as any).gold ||
-        (rawBalance as any).tokens ||
-        0,
-    };
-    setUser(profileData as any);
-    setStats(statsData as any);
-    setBalance(balanceData as any);
+    console.log('[fetchProfileBundle] 시작');
+    
+    try {
+      const [rawProfile, rawStats, rawBalance] = await Promise.all([
+        unifiedApi.get('users/profile'),
+        unifiedApi.get('users/stats'),
+        unifiedApi.get('users/balance'),
+      ]);
+      
+      console.log('[fetchProfileBundle] API 응답 받음:', {
+        profile: rawProfile,
+        stats: rawStats,
+        balance: rawBalance
+      });
+      
+      const profileData: any = {
+        ...rawProfile,
+        experience: (rawProfile as any).experience ?? (rawProfile as any).xp ?? 0,
+        maxExperience:
+          (rawProfile as any).maxExperience ?? (rawProfile as any).max_experience ?? 1000,
+        dailyStreak:
+          (rawProfile as any).dailyStreak ||
+          (rawProfile as any).daily_streak ||
+          (rawProfile as any).streak ||
+          0,
+        level: (rawProfile as any).level ?? (rawProfile as any).lvl ?? 1,
+        gameStats: (rawProfile as any).gameStats || (rawProfile as any).game_stats || {},
+      };
+      const statsData: any = {
+        ...rawStats,
+        total_games_played:
+          (rawStats as any).total_games_played ||
+          (rawStats as any).totalGamesPlayed ||
+          (rawStats as any).total_games ||
+          (rawStats as any).totalGames ||
+          0,
+        total_wins:
+          (rawStats as any).total_wins || (rawStats as any).totalWins || (rawStats as any).wins || 0,
+      };
+      const balanceData: any = {
+        ...rawBalance,
+        cyber_token_balance:
+          (rawBalance as any).cyber_token_balance ||
+          (rawBalance as any).gold ||
+          (rawBalance as any).tokens ||
+          0,
+      };
+      setUser(profileData as any);
+      setStats(statsData as any);
+      setBalance(balanceData as any);
+    } catch (error) {
+      console.error('[fetchProfileBundle] 오류:', error);
+      throw error;
+    }
   };
 
   // DEV 전용 자동 로그인/부트스트랩: NEXT_PUBLIC_DEV_AUTO_LOGIN=1 일 때만 수행
@@ -83,18 +97,29 @@ export function ProfileScreen({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const env: any = typeof process !== 'undefined' ? (process as any).env : {};
     const enable = env?.NEXT_PUBLIC_DEV_AUTO_LOGIN;
+    console.log('[DEV] 자동 로그인 설정:', enable);
     if (!(enable === '1' || enable === 'true')) return false;
     try {
+      console.log('[DEV] 자동 로그인 환경변수:', {
+        enable,
+        siteId: env?.NEXT_PUBLIC_DEV_SITE_ID || 'test123',
+        password: env?.NEXT_PUBLIC_DEV_PASSWORD || 'password123'
+      });
+      
       const siteId = env?.NEXT_PUBLIC_DEV_SITE_ID || 'test123';
       const password = env?.NEXT_PUBLIC_DEV_PASSWORD || 'password123';
       const invite = env?.NEXT_PUBLIC_DEV_INVITE_CODE || '5858';
       // 1) 로그인 우선 시도
       let res: any;
       try {
+        console.log('[DEV] 로그인 시도 with:', { siteId, password });
         res = await unifiedApi.post('auth/login', { site_id: siteId, password }, { auth: false });
+        console.log('[DEV] 로그인 응답:', res);
       } catch (e) {
+        console.log('[DEV] 로그인 실패, 회원가입 시도:', e);
         // 2) 로그인 실패 시 자동 회원가입 후 재로그인
         try {
+          console.log('[DEV] 회원가입 시도 with:', { siteId, nickname: siteId, phone_number: '010-0000-0000', password, invite_code: invite });
           await unifiedApi.post(
             'auth/signup',
             {
@@ -106,23 +131,32 @@ export function ProfileScreen({
             },
             { auth: false }
           );
+          console.log('[DEV] 회원가입 성공, 재로그인 시도');
           res = await unifiedApi.post('auth/login', { site_id: siteId, password }, { auth: false });
+          console.log('[DEV] 재로그인 응답:', res);
         } catch {
           // 회원가입까지 실패하면 dev 자동 처리 중단
+          console.log('[DEV] 회원가입도 실패');
           res = null;
         }
       }
       if (res?.access_token) {
+        console.log('[DEV] 토큰 받음, 저장 중:', res.access_token.substring(0, 20) + '...');
         setTokens({
           access_token: res.access_token,
           refresh_token: res.refresh_token || res.access_token,
         });
         onAddNotification('DEV 자동 로그인 완료');
+        console.log('[DEV] 자동 로그인 완료');
         return true;
+      } else {
+        console.log('[DEV] 토큰이 없음:', res);
       }
     } catch (e) {
+      console.log('[DEV] 자동 로그인 예외:', e);
       // dev 자동 로그인 실패는 조용히 무시
     }
+    console.log('[DEV] 자동 로그인 실패, false 반환');
     return false;
   };
 
@@ -134,14 +168,18 @@ export function ProfileScreen({
 
         // 먼저 localStorage에서 토큰 확인
         const tokens = getTokens();
+        console.log('[ProfileScreen] 토큰 확인:', tokens);
         let accessToken = tokens?.access_token;
         if (!accessToken) {
           // DEV 자동 로그인 시도 (플래그가 켜져있을 때만)
+          console.log('[ProfileScreen] 토큰 없음, DEV 자동 로그인 시도');
           const autoLoggedIn = await maybeDevAutoLogin();
           if (autoLoggedIn) {
+            console.log('[ProfileScreen] DEV 자동 로그인 성공');
             accessToken = getTokens()?.access_token;
           }
           if (!accessToken) {
+            console.log('[ProfileScreen] 최종적으로 토큰 없음, 로그인 필요');
             console.log('액세스 토큰이 없습니다. 로그인이 필요합니다.');
             setError('로그인이 필요합니다.');
             setAuthChecked(true);
@@ -152,6 +190,7 @@ export function ProfileScreen({
         }
 
         console.log('액세스 토큰이 있습니다. 프로필 데이터를 가져옵니다...');
+        console.log('사용할 액세스 토큰:', accessToken?.substring(0, 20) + '...');
 
         // 인증된 경우 프로필 데이터 가져오기
         await fetchProfileBundle();
@@ -269,24 +308,26 @@ export function ProfileScreen({
                     onClick={async () => {
                       try {
                         // 테스트 로그인 시도 (통합 API 사용, ORIGIN/프리픽스 일관화)
-                        console.log('테스트 로그인 시도...');
+                        console.log('[ProfileScreen] 테스트 로그인 시도...');
                         const loginData: any = await unifiedApi.post(
                           'auth/login',
                           { site_id: 'test123', password: 'password123' },
                           { auth: false }
                         );
+                        console.log('[ProfileScreen] 로그인 응답:', loginData);
                         if (loginData?.access_token) {
                           setTokens({
                             access_token: loginData.access_token,
                             refresh_token: loginData.refresh_token || loginData.access_token,
                           });
                           onAddNotification('테스트 로그인 성공!');
+                          console.log('[ProfileScreen] 토큰 저장 완료, 페이지 새로고침');
                           window.location.reload();
                         } else {
                           onAddNotification('테스트 로그인 실패. 테스트 계정이 없습니다.');
                         }
                       } catch (err) {
-                        console.error('로그인 오류:', err);
+                        console.error('[ProfileScreen] 로그인 오류:', err);
                         onAddNotification('로그인 중 오류가 발생했습니다.');
                       }
                     }}

@@ -136,11 +136,15 @@ export function calculateWinRate(user: User): number {
   return Math.round((user.stats.gamesWon / user.stats.gamesPlayed) * 100);
 }
 
-export function checkLevelUp(user: User): { updatedUser: User; leveledUp: boolean } {
+export function checkLevelUp(
+  user: User, 
+  levelUpExpPerLevel = 100, 
+  levelUpBonusPerLevel = 500
+): { updatedUser: User; leveledUp: boolean } {
   if (user.experience >= user.maxExperience) {
     const newLevel = user.level + 1;
     const remainingExp = user.experience - user.maxExperience;
-    const newMaxExp = user.maxExperience + (newLevel * 100); // 레벨당 경험치 증가
+    const newMaxExp = user.maxExperience + (newLevel * levelUpExpPerLevel); // 설정에서 가져온 값 사용
     
     return {
       updatedUser: {
@@ -148,7 +152,7 @@ export function checkLevelUp(user: User): { updatedUser: User; leveledUp: boolea
         level: newLevel,
         experience: remainingExp,
         maxExperience: newMaxExp,
-        goldBalance: user.goldBalance + (newLevel * 500) // 레벨업 보너스
+        goldBalance: user.goldBalance + (newLevel * levelUpBonusPerLevel) // 설정에서 가져온 값 사용
       },
       leveledUp: true
     };
@@ -157,9 +161,13 @@ export function checkLevelUp(user: User): { updatedUser: User; leveledUp: boolea
   return { updatedUser: user, leveledUp: false };
 }
 
-export function calculateDailyBonus(user: User): { updatedUser: User; bonusGold: number } {
-  const baseBonus = 1000;
-  const streakBonus = user.dailyStreak * 200;
+export function calculateDailyBonus(
+  user: User, 
+  dailyBonusBase = 1000, 
+  dailyBonusPerStreak = 200
+): { updatedUser: User; bonusGold: number } {
+  const baseBonus = dailyBonusBase;
+  const streakBonus = user.dailyStreak * dailyBonusPerStreak;
   const bonusGold = baseBonus + streakBonus;
   
   const updatedUser = {

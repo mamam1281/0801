@@ -28,6 +28,7 @@ import { User } from '../types';
 import { calculateExperiencePercentage, calculateWinRate, checkLevelUp } from '../utils/userUtils';
 import { QUICK_ACTIONS, ACHIEVEMENTS_DATA } from '../constants/dashboardData';
 import { Button } from './ui/button';
+import { useGameConfig } from '../hooks/useGameConfig';
 import { Progress } from './ui/progress';
 import { getTokens } from '../utils/tokenStorage';
 import { useEvents } from '../hooks/useEvents';
@@ -64,6 +65,10 @@ export function HomeDashboard({
   onToggleSideMenu,
 }: HomeDashboardProps) {
   const router = useRouter();
+  
+  // 게임 설정 로드 (하드코딩 대체)
+  const { config: gameConfig, loading: configLoading } = useGameConfig();
+  
   // 통합 대시보드 데이터 (profile + events summary 등) - streak, vip/status 등 개별 일부 호출 단계적 병합 예정
   const {
     data: unifiedDash,
@@ -893,11 +898,11 @@ export function HomeDashboard({
 
               <div className="bg-gold-soft rounded-lg p-4 mb-6">
                 <div className="text-gold font-bold text-xl">
-                  {/* TODO: 서버 계산된 awarded_gold 표시로 대체. 현재 모달 오픈 시 미리보기는 streak.count 기반 예상치 */}
-                  {(1000 + (streak.count ?? user.dailyStreak) * 500).toLocaleString()}G
+                  {/* 서버 설정 기반 일일 보너스 계산 */}
+                  {(gameConfig.dailyBonusBase + (streak.count ?? user.dailyStreak) * gameConfig.dailyBonusPerStreak).toLocaleString()}G
                 </div>
                 <div className="text-sm text-muted-foreground">
-                  {/* TODO: 서버 계산 XP 반영 */}+ {50 + (streak.count ?? user.dailyStreak) * 25} XP
+                  {/* 서버 설정 기반 XP 계산 */}+ {Math.floor(gameConfig.dailyBonusBase / 20) + (streak.count ?? user.dailyStreak) * Math.floor(gameConfig.dailyBonusPerStreak / 8)} XP
                 </div>
               </div>
 
