@@ -5,6 +5,15 @@
 
 ## 2025-08-23 모니터링 네트워크/도구 가동 + 백엔드 /metrics 노출(계측) + OpenAPI 테스트 상태
 
+스크랩 타깃 고정화
+옵션 A: docker-compose에 networks.ccnet.aliases: [backend] 영구 추가.
+옵션 B: Prometheus 타깃을 cc_backend:8000으로 변경 후 툴즈 재시작.
+OpenAPI 재수출 및 테스트
+컨테이너 내부에서 python -m app.export_openapi 실행 → 스냅샷 갱신 후 pytest의 openapi_diff_ci 통과 확인.
+대시보드/알람 튜닝
+Grafana에서 purchase_attempt_total 등 커스텀 카운터 실데이터 반영 확인.
+실패율/지연 임계치 알람 규칙 튜닝.
+
 ### 변경 요약
 - 외부 도커 네트워크 `ccnet`를 생성하고 Prometheus/Grafana/Metabase(툴즈 프로파일)를 기동(`cc-manage.ps1 tools start`).
 - 백엔드에 Prometheus 계측을 선택적으로 활성화: `app/main.py`에 Instrumentator 연동 추가 → `/metrics` 엔드포인트 노출(라이브러리 미존재 시 자동 무시, 앱 기동 영향 없음).
