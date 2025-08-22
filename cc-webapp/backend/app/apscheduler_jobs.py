@@ -59,8 +59,17 @@ def cleanup_stale_pending_transactions(max_age_minutes: int = None):
             except Exception:
                 print(f"[{datetime.utcnow()}] APScheduler: cleanup skipped - could not inspect 'shop_transactions' columns.")
                 return 0
+            # Legacy schemas may lack some columns (e.g., 'extra').
+            # If required columns for ORM-mapped model are missing, skip to avoid ProgrammingError
+            required_for_safe_query = {'status', 'created_at', 'failure_reason'}
             if 'receipt_signature' not in col_names:
                 print(f"[{datetime.utcnow()}] APScheduler: cleanup skipped - column 'receipt_signature' not present in 'shop_transactions'.")
+                return 0
+            if 'extra' not in col_names:
+                print(f"[{datetime.utcnow()}] APScheduler: cleanup skipped - column 'extra' not present in 'shop_transactions' (legacy schema).")
+                return 0
+            if not required_for_safe_query.issubset(set(col_names)):
+                print(f"[{datetime.utcnow()}] APScheduler: cleanup skipped - required columns missing: {required_for_safe_query - set(col_names)}")
                 return 0
 
             # 조건에 맞는 row 수만 먼저 count -> 과도한 업데이트 방지

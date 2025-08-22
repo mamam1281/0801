@@ -10,7 +10,6 @@ services:
       - "3001:3000"
     environment:
       NODE_OPTIONS: "--max-old-space-size=2048"
-  NEXT_PUBLIC_REALTIME_ENABLED: "0"
   postgres:
     ports:
       - "5433:5432"

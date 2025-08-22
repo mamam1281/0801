@@ -300,7 +300,7 @@ def list_limited_catalog_compat():
     summary="[Compat] Buy limited-time package (no auth)",
     operation_id="compat_buy_limited_package",
 )
-def buy_limited_compat(req: LimitedBuyCompatRequest, db = Depends(get_db), background_tasks: BackgroundTasks | None = None):
+def buy_limited_compat(req: LimitedBuyCompatRequest, *, db = Depends(get_db), background_tasks: BackgroundTasks):
     user_id = int(req.user_id)
     rman = get_redis_manager()
     idem = (req.idempotency_key or '').strip() or None
@@ -615,6 +615,7 @@ def buy_limited_compat(req: LimitedBuyCompatRequest, db = Depends(get_db), backg
         charge_id=cap.charge_id,
         receipt_code=receipt_code,
     )
+    return resp
  
 # Legacy/test-only schema to support body user_id/code for limited purchase
 class LegacyLimitedBuyRequest(BaseModel):
@@ -627,7 +628,7 @@ class LegacyLimitedBuyRequest(BaseModel):
     idempotency_key: Optional[str] = Field(None, description="Client-provided idempotency key (unique per purchase attempt)")
 
 @router.post("/webhook/payment", summary="Payment Webhook (Replay & 멱등 보호)")
-async def payment_webhook(request: Request, background_tasks: BackgroundTasks | None = None):
+async def payment_webhook(request: Request, background_tasks: BackgroundTasks):
     """결제 프로바이더 웹훅 수신.
     보안 계층:
       1) HMAC 서명 검증 (X-Signature)
@@ -734,8 +735,9 @@ async def payment_webhook(request: Request, background_tasks: BackgroundTasks | 
 @router.post("/purchase", response_model=ShopPurchaseResponse, summary="Purchase Item", description="Purchase shop item using user's gold tokens")
 def purchase_shop_item(
     request: ShopPurchaseRequest,
+    *,
     shop_service: ShopService = Depends(get_shop_service),
-    background_tasks: BackgroundTasks | None = None,
+    background_tasks: BackgroundTasks,
 ):
     """
     ### Request Body:
@@ -802,9 +804,10 @@ def purchase_shop_item(
 @router.post("/buy", response_model=BuyReceipt, summary="Buy gold top-up or items")
 def buy(
     req: BuyRequest,
+    *,
     db = Depends(get_db),
     current_user = Depends(get_current_user_optional),
-    background_tasks: BackgroundTasks = None,
+    background_tasks: BackgroundTasks,
 ):
     # Prefer authenticated user; for dev/test allow fallback to body.user_id when safe
     user = current_user
@@ -1305,7 +1308,7 @@ def list_my_transactions(limit: int = 20, db = Depends(get_db), current_user = D
 
 
 @router.post("/transactions/{receipt}/settle")
-def settle_my_transaction(receipt: str, db = Depends(get_db), current_user = Depends(get_current_user), background_tasks: BackgroundTasks | None = None):
+def settle_my_transaction(receipt: str, *, db = Depends(get_db), current_user = Depends(get_current_user), background_tasks: BackgroundTasks):
     svc = ShopService(db)
     # 메서드명 오타 수정: settle_pending_gold_for_user
     res = svc.settle_pending_gold_for_user(current_user.id, receipt)
@@ -1370,7 +1373,7 @@ def buy_limited_compat(req: LegacyLimitedBuyRequest, db = Depends(get_db)):
     summary="Buy limited-time package (real money)",
     operation_id="buy_limited_package",
 )
-def buy_limited(req: LimitedBuyRequest, db = Depends(get_db), current_user = Depends(get_current_user), background_tasks: BackgroundTasks | None = None):
+def buy_limited(req: LimitedBuyRequest, *, db = Depends(get_db), current_user = Depends(get_current_user), background_tasks: BackgroundTasks):
     user_id = getattr(current_user, "id", None)
     if not user_id:
         raise HTTPException(status_code=401, detail="Unauthorized")

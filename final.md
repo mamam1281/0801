@@ -3,6 +3,40 @@
 **생성일**: 2025-08-19  
 **브랜치**: feature/e2e-onboarding-playwright  
 
+## 2025-08-23 백엔드 헬스 이슈 해소 + 스케줄러 가드 추가
+
+### 변경 요약
+- FastAPI 오류 원인 제거: `app/routers/shop.py`에서 `BackgroundTasks | None` 주석으로 인한 응답 필드 오류를 해소(모든 엔드포인트에서 `BackgroundTasks`를 키워드 전용 파라미터로 사용).
+- 누락된 반환 보완: 제한 패키지 호환 엔드포인트(`[Compat] /api/shop/limited/buy`) 말미에 `return resp` 추가.
+- 스케줄러 안정화: `app/apscheduler_jobs.py`의 오래된 pending 정리 작업에서 스키마 열(`extra`) 부재 시 안전하게 skip하도록 가드 추가.
+
+### 검증 결과
+- 컨테이너 상태: `cc-manage.ps1 status` 결과 backend=healthy.
+- `/health` 직접 호출 200 확인. 로그인 대기 현상 재현 불가(정상 응답).
+- 스케줄러: 이전 `shop_transactions.extra does not exist` 에러 대신 skip 로그 출력(다음 실행 주기부터 적용).
+
+### 다음 단계
+- Alembic로 `shop_transactions.extra` 컬럼 도입 예정 시 가드 제거 검토(단일 head 유지 필수).
+- 상점/결제 플로우 스모크 재검증(pytest) 및 `/docs` 스키마 재수출 점검.
+- 프론트 로그인/구매 화면에서 실시간 토스트/배지 갱신 체감 테스트.
+
+## 2025-08-23 구성 파일 오류 정리(JSON/YAML/PS1)
+
+### 변경 요약
+- Grafana 대시보드 JSON의 PromQL expr 내 따옴표 이스케이프 오류 수정: `result="success|failed|pending"` 세 군데를 올바른 JSON 문자열로 교정(`\"` → `"`).
+- `docker-compose.override.local.yml`에서 `services` 루트에 잘못 위치한 `NEXT_PUBLIC_REALTIME_ENABLED` 키 제거(스키마 오류 해결). 필요 시 `frontend.environment` 하위로 재도입 가능.
+- `ci/export_openapi.ps1`의 diff 출력 경로/호출 보강(Windows `comp` 호출을 안전하게 실행, UTF-8 저장).
+
+### 검증 결과
+- `grafana_dashboard.json` JSON 파싱 성공(에디터 경고 해소). 대시보드의 다른 PromQL 쿼리는 기존과 동일 유지.
+- `docker compose -f docker-compose.yml -f docker-compose.override.local.yml config` 성공 → 오버라이드 YAML 스키마 오류 제거.
+- PowerShell 5.1 환경에서 스크립트 실행 구문 에러 없음(알리아스/스타일 경고는 유지 가능).
+
+### 다음 단계
+- 모니터링 스택 재기동 후 대시보드 패널 정상 렌더 확인(필요 시 브라우저 캐시 무효화).
+- `NEXT_PUBLIC_REALTIME_ENABLED`가 필요하면 `frontend.environment`에만 추가해 사용(루트 키에 배치 금지).
+- 변경사항 커밋 및 CI에 OpenAPI 스냅샷 diff 아티팩트 업로드 연동 검토.
+
 ## 2025-08-23 모니터링 정합 + 프론트 Shop 배지 + OpenAPI diff 자동화(준비)
 
 ### 변경 요약

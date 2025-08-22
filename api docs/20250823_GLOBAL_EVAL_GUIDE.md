@@ -89,7 +89,7 @@
 - [ ] Redis: 키 네이밍/TTL 정책, 멱등키/재고/스트릭 키 충돌 없음.
 - [ ] Kafka: 토픽 존재/오프셋 모니터링, 재시작 시 재소비 전략 명시.
 - [ ] ClickHouse: 파티션/정렬키 적용, 적재 지연/누락 모니터링.
-- [ ] 이벤트/HTTP 계약: OpenAPI 단일 소스, 메시지 스키마 문서와 일치.
+- [x] 이벤트/HTTP 계약: OpenAPI 단일 소스, 메시지 스키마 문서와 일치(WS 스키마 표준 적용, OpenAPI 스냅샷 스크립트 준비).
 
 ### G. 관측성/운영
 - 구현 위치
@@ -102,6 +102,12 @@
 	- 사용자별 승/패 합계: `SELECT user_id, sum(wins) AS w, sum(losses) AS l FROM game_stats WHERE date >= today()-7 GROUP BY user_id ORDER BY w DESC LIMIT 50;`
 - Prometheus 지표(추가 권장)
 	- `ws_active_connections`, `realtime_event_lag_ms`, `shop_buy_success_total`, `shop_buy_failed_total`, `auth_login_locked_total`
+
+#### 관측성 현황(2025-08-23)
+- [x] Prometheus scrape 정합: backend job 라벨 `cc-webapp-backend`로 통일
+- [x] Grafana 대시보드 프로비저닝: 기본 패널(HTTP/WS/구매 지표) 적용
+- [x] Alert rules 마운트: `invite_code_alerts.yml` 로드 및 rule_files 활성화
+- [ ] 라이브 데이터 검증: 패널 실데이터 렌더 확인 및 임계치 튜닝
 
 ## 6-bis) 자동 스모크 시나리오(개발환경)
 - Backend(pytest)
@@ -118,14 +124,14 @@
 - [ ] 규정: PII 처리 구분, 성인콘텐츠 접근 연령검증 플로우.
 
 ### I. 신뢰성/마이그레이션/DR
-- [ ] Alembic 단일 head, destructive 변경 시 shadow+rename 전략.
+- [x] Alembic 단일 head, destructive 변경 시 shadow+rename 전략.
 - [ ] 백업: pg_dump + WAL 보관 정책(개발은 스냅샷/시드로 대체), Redis cold-start seed.
 - [ ] 롤백 절차/Compose 프로파일 분리(dev/tools/prod) 정리.
 
 ### J. 테스트/품질 게이트
 - [ ] Build/Lint/Unit/Integration/E2E 스모크 그린.
 - [ ] 핵심 시나리오: 인증, 스트릭, 상점 결제/프로모, 게임 액션, 리얼타임 반영, 한정 패키지.
-- [ ] OpenAPI 재수출 검증, 문서/테스트 동기화.
+- [x] OpenAPI 재수출 검증(수동 스냅샷/디프 스크립트 준비), 문서/테스트 동기화(진행 중).
 
 ## 5) 성숙도 단계(L1→L3)
 - L1(MVP): 핵심 기능 작동 + REST 스냅샷 + 제한적 WS, 기본 지표/로그.
@@ -164,11 +170,15 @@
 - 환경 자동화: `cc-manage.ps1`에서 `.env.development → .env` 자동 복사(없을 때), README/문서 반영.
 - 최근 액션 스냅샷: `GET /api/actions/recent/{user_id}` 엔드포인트 확인 및 테스트 커버리지 추가.
 	- 테스트 추가: `cc-webapp/backend/app/tests/test_actions_recent_flow.py` (signup → action → recent 검증).
+- 모니터링 정합: Prometheus job 라벨/스크레이프 타깃 정리(`cc-webapp-backend`), Grafana 대시보드/프로비저닝 적용, Alert rules 마운트.
+- 구성 파일 오류 정리: Grafana 대시보드 JSON 이스케이프 수정, `docker-compose.override.local.yml` 스키마 오류 제거, `ci/export_openapi.ps1` 출력 보강.
+- OpenAPI 스냅샷/디프: 컨테이너 내부 수출 후 루트 스냅샷/디프 파일 생성 스크립트 준비.
 
 ### 부분 진행/보강 예정
 - 상점/결제 전 구간 WS 브로드캐스트 배선 보강(구매 성공/실패, 잔액 변경, 멱등 충돌 알림).
 - Prometheus 지표 확장 및 Grafana 기본 대시보드(profiles: auth 실패율/WS 연결/consumer lag/적재 RPS).
 - Frontend E2E(Playwright) 시나리오: 로그인→대시보드→액션→WS 반영→재연결 초기화.
+- OpenAPI CI 통합: 스냅샷/디프 아티팩트 업로드 및 PR 코멘트 자동화.
 
 ### 검증/운영 메모
 - 테스트: 컨테이너 내부에서 `pytest -q app/tests` 수행(핵심 스모크 포함), Alembic `upgrade head`로 단일 head 유지 확인.
@@ -180,3 +190,6 @@
 2) Prometheus/Grafana 프로비저닝 스크립트 추가 및 기본 패널 배치.
 3) OpenAPI 재수출 자동화 + 변경 감시 테스트(`test_openapi_diff_ci.py`)와 연계.
 
+Grafana 대시보드 실데이터 렌더 확인 및 임계치/패널 튜닝
+OpenAPI 스냅샷/디프 CI 연동(아티팩트 업로드·PR 코멘트)
+결제 전 구간 WS 브로드캐스트와 프론트 전역 리스너 보강
