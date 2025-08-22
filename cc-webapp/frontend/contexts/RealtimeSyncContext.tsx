@@ -73,6 +73,15 @@ export interface RealtimeSyncState {
     timestamp: string;
   }>;
 
+  // 결제 진행 상태 (배지/알림용 경량 상태)
+  purchase: {
+    pending_count: number; // 진행중 결제 건수(추정)
+    last_status?: 'pending' | 'success' | 'failed' | 'idempotent_reuse';
+    last_product_id?: string;
+    last_receipt?: string;
+    last_updated?: string;
+  };
+
   // WebSocket 연결 상태
   connection: {
     status: 'disconnected' | 'connecting' | 'connected' | 'reconnecting';
@@ -100,7 +109,8 @@ type SyncAction =
   | { type: 'ADD_REWARD'; payload: SyncEventData['reward_granted'] }
   | { type: 'CLEAR_OLD_REWARDS' }
   | { type: 'SET_LAST_POLL_TIME'; payload: string }
-  | { type: 'INITIALIZE_STATE'; payload: Partial<RealtimeSyncState> };
+  | { type: 'INITIALIZE_STATE'; payload: Partial<RealtimeSyncState> }
+  | { type: 'UPDATE_PURCHASE'; payload: SyncEventData['purchase_update'] };
 
 /**
  * 초기 상태
@@ -117,6 +127,9 @@ const initialState: RealtimeSyncState = {
   events: {},
   stats: {},
   recent_rewards: [],
+  purchase: {
+    pending_count: 0,
+  },
   connection: {
     status: 'disconnected',
     reconnect_attempts: 0,
@@ -234,6 +247,27 @@ function syncStateReducer(state: RealtimeSyncState, action: SyncAction): Realtim
           ...state.recent_rewards.slice(0, 9), // 최대 10개 유지
         ],
       };
+
+    case 'UPDATE_PURCHASE': {
+      const p = action.payload;
+      if (!p) return state;
+      // pending 증가/감소 로직 (최소 0 유지)
+      let pending = state.purchase.pending_count;
+      if (p.status === 'pending') pending += 1;
+      if (p.status === 'success' || p.status === 'failed' || p.status === 'idempotent_reuse') {
+        pending = Math.max(0, pending - 1);
+      }
+      return {
+        ...state,
+        purchase: {
+          pending_count: pending,
+          last_status: p.status,
+          last_product_id: p.product_id,
+          last_receipt: p.receipt_code,
+          last_updated: timestamp,
+        },
+      };
+    }
 
     case 'CLEAR_OLD_REWARDS':
       const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
@@ -359,6 +393,8 @@ export function RealtimeSyncProvider({ children, apiBaseUrl }: RealtimeSyncProvi
           text = `${product} 결제가 진행 중입니다...`;
         }
         try { push(text, type); } catch {}
+  // 전역 상태 업데이트(배지/요약용)
+  dispatch({ type: 'UPDATE_PURCHASE', payload: data });
         break;
       }
 

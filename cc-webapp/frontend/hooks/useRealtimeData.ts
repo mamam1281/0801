@@ -249,3 +249,16 @@ export function useRealtimeGoldAnimation() {
         shouldAnimate: changeDetection.profileChanged
     };
 }
+
+/**
+ * 결제 진행 배지/요약 훅
+ */
+export function useRealtimePurchaseBadge() {
+    const { state } = useRealtimeSync();
+    return {
+        pendingCount: state.purchase?.pending_count ?? 0,
+        lastStatus: state.purchase?.last_status,
+        lastUpdated: state.purchase?.last_updated,
+        lastProductId: state.purchase?.last_product_id
+    };
+}
