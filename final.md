@@ -3,6 +3,35 @@
 **생성일**: 2025-08-19  
 **브랜치**: feature/e2e-onboarding-playwright  
 
+## 2025-08-23 모니터링 네트워크/도구 가동 + 백엔드 /metrics 노출(계측) + OpenAPI 테스트 상태
+
+### 변경 요약
+- 외부 도커 네트워크 `ccnet`를 생성하고 Prometheus/Grafana/Metabase(툴즈 프로파일)를 기동(`cc-manage.ps1 tools start`).
+- 백엔드에 Prometheus 계측을 선택적으로 활성화: `app/main.py`에 Instrumentator 연동 추가 → `/metrics` 엔드포인트 노출(라이브러리 미존재 시 자동 무시, 앱 기동 영향 없음).
+- 실행 중 컨테이너들을 `ccnet`에 연결(backend/postgres/redis/frontend). Prometheus → Backend 스크랩 경로는 컨테이너 이름(`cc_backend:8000`)로 직접 확인 완료.
+
+### 검증 결과
+- 호스트에서 `/metrics` 200 확인: `http://localhost:8000/metrics` 응답 OK.
+- Prometheus 컨테이너 내부에서 백엔드 직접 확인: `wget -qO- http://cc_backend:8000/metrics` 성공(지표 노출). Prometheus readiness `/-/ready` 200, `/targets` 페이지 접근 가능.
+- 현재 `cc-webapp/monitoring/prometheus.yml`의 스크랩 타깃은 `backend:8000`로 설정됨. 런타임에 수동 네트워크 alias(`--alias backend`)를 부여했으나 BusyBox nslookup 기준 즉시 확인은 불가(일시적/도커 DNS 캐시 영향 가능). 대시보드에서 해당 잡 활성 표시는 PowerShell 파싱 문제로 자동 검증까지는 미완.
+- 테스트: 백엔드 컨테이너에서 OpenAPI diff 관련 테스트(`-k openapi_diff_ci`) 1건 실패 보고됨(최근 출력 기준). 스냅샷/내보내기 스크립트 재실행 필요.
+
+### 다음 단계
+- 스크랩 타깃 정합성 확정: 아래 둘 중 하나로 고정화
+   1) Compose에 영구 alias 추가(frontend/backend 서비스의 `networks.ccnet.aliases: [backend, frontend]`) 또는
+   2) Prometheus 설정의 타깃을 `cc_backend:8000`로 변경 후 툴즈 재시작.
+- OpenAPI 스냅샷 재수출 및 테스트 재실행: 백엔드 컨테이너에서 `python -m app.export_openapi` 실행 → `app/current_openapi.json` 갱신 확인 → pytest 재실행하여 `openapi_diff_ci` 통과 확인.
+- Alembic head 단일성 재확인: 컨테이너 내부에서 `alembic heads`로 단일 head 유지 확인(문서 기준 현재 head: `f79d04ea1016`). 필요 시 merge 계획 수립 후 문서 반영.
+
+### 참고(변경 파일)
+- `backend/app/main.py`: Prometheus Instrumentator 연동 추가(옵션). 앱 시작 시 `Instrumentator().instrument(app).expose(app, endpoint="/metrics")` 수행, 실패는 무시 로그만 남김.
+
+### 모니터링 퀵 체크(수동)
+- Prometheus: http://localhost:9090  (Targets 페이지에서 `job_name="cc-webapp-backend"` 활성 여부 확인)
+- Grafana: http://localhost:3003  (대시보드 프로비저닝 정상 렌더 확인)
+- Backend Metrics: http://localhost:8000/metrics  (응답 200 + 기본 Python/HTTP 지표 노출)
+
+
 ## 2025-08-23 백엔드 헬스 이슈 해소 + 스케줄러 가드 추가
 
 ### 변경 요약
