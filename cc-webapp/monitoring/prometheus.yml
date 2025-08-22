@@ -1,8 +1,8 @@
 # cc-webapp/monitoring/prometheus.yml
 
 global:
-  scrape_interval: 15s # How frequently to scrape targets by default.
-  evaluation_interval: 15s # How frequently to evaluate rules.
+  scrape_interval: 10s
+  evaluation_interval: 10s
 
 # Alerting specifies rules for sending alerts to an Alertmanager if configured.
 # alertmanager_config:
@@ -15,9 +15,16 @@ global:
 
 # scrape_configs define the targets Prometheus will scrape metrics from.
 scrape_configs:
-  - job_name: 'cc-webapp-backend'
+  - job_name: 'backend'
+    metrics_path: /metrics
     static_configs:
       - targets: ['backend:8000']
+        labels:
+          service: backend
+
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
 
   # Example for scraping Prometheus itself (optional)
   # - job_name: 'prometheus'

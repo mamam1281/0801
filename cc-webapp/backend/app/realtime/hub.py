@@ -10,6 +10,13 @@ import asyncio
 import time
 import os
 from typing import Dict, Set, Any
+try:  # optional prometheus metrics
+    from prometheus_client import Gauge, Counter  # type: ignore
+    _REALTIME_ACTIVE_USERS = Gauge("realtime_active_users", "Active users with WS connections")
+    _REALTIME_EVENTS_TOTAL = Counter("realtime_events_total", "Total realtime events broadcasted")
+except Exception:  # pragma: no cover
+    _REALTIME_ACTIVE_USERS = None
+    _REALTIME_EVENTS_TOTAL = None
 
 class RealtimeHub:
     def __init__(self) -> None:
@@ -33,6 +40,11 @@ class RealtimeHub:
     async def register_user(self, user_id: int, ws: Any) -> None:
         async with self._lock:
             self._user_channels.setdefault(user_id, set()).add(ws)
+            if _REALTIME_ACTIVE_USERS is not None:
+                try:
+                    _REALTIME_ACTIVE_USERS.set(len(self._user_channels))
+                except Exception:
+                    pass
 
     async def unregister_user(self, user_id: int, ws: Any) -> None:
         async with self._lock:
@@ -41,6 +53,11 @@ class RealtimeHub:
                 bucket.remove(ws)
                 if not bucket:
                     self._user_channels.pop(user_id, None)
+            if _REALTIME_ACTIVE_USERS is not None:
+                try:
+                    _REALTIME_ACTIVE_USERS.set(len(self._user_channels))
+                except Exception:
+                    pass
 
     async def register_monitor(self, ws: Any) -> None:
         async with self._lock:
@@ -62,6 +79,11 @@ class RealtimeHub:
         event 예시: {"type":"game_event","user_id":123,"game_type":"slot", ...}
         """
         self._remember(event)
+        if _REALTIME_EVENTS_TOTAL is not None:
+            try:
+                _REALTIME_EVENTS_TOTAL.inc()
+            except Exception:
+                pass
         text = None
         try:
             import json

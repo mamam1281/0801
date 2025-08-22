@@ -308,6 +308,7 @@ export function RealtimeSyncProvider({ children, apiBaseUrl }: RealtimeSyncProvi
   const wsClientRef = useRef(null as WSClient | null);
   const fallbackPollingActive = useRef(false);
   const { push } = useToast();
+  const lastPurchaseByReceiptRef = useRef(new Map<string, { status: string; at: number }>());
 
   const baseUrl =
     apiBaseUrl ||
@@ -331,6 +332,19 @@ export function RealtimeSyncProvider({ children, apiBaseUrl }: RealtimeSyncProvi
         const product = data?.product_id ? `상품 ${data.product_id}` : '구매';
         let type: string = 'shop';
         let text: string = '';
+        // 중복/전이 억제: 동일 receipt_code 기준 1.5초 내 동일 상태 무시, pending→final 병합
+        const key = data?.receipt_code || `${data?.user_id || 'me'}:${data?.product_id || ''}`;
+        const now = Date.now();
+        const last = key ? lastPurchaseByReceiptRef.current.get(key) : undefined;
+        if (last && last.status === status && now - last.at < 1500) {
+          break; // 동일 상태 단시간 재수신 무시
+        }
+        // pending 이후 최종 상태 도달 시 최종 상태만 노출
+        if (last && last.status === 'pending' && (status === 'success' || status === 'failed')) {
+          // 계속 진행 (pending 토스트는 생략하고 최종만 표시)
+        }
+        lastPurchaseByReceiptRef.current.set(key, { status, at: now });
+
         if (status === 'success') {
           type = 'success';
           text = `${product} 결제가 완료되었습니다${data?.amount ? ` (금액: ${data.amount})` : ''}.`;
