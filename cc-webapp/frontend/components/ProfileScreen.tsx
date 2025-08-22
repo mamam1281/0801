@@ -78,6 +78,34 @@ export function ProfileScreen({
     setBalance(balanceData as any);
   };
 
+  // DEV 전용 자동 로그인: NEXT_PUBLIC_DEV_AUTO_LOGIN=1 일 때만 수행
+  const maybeDevAutoLogin = async (): Promise<boolean> => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const env: any = typeof process !== 'undefined' ? (process as any).env : {};
+    const enable = env?.NEXT_PUBLIC_DEV_AUTO_LOGIN;
+    if (!(enable === '1' || enable === 'true')) return false;
+    try {
+      const siteId = env?.NEXT_PUBLIC_DEV_SITE_ID || 'test123';
+      const password = env?.NEXT_PUBLIC_DEV_PASSWORD || 'password123';
+      const res: any = await unifiedApi.post(
+        'auth/login',
+        { site_id: siteId, password },
+        { auth: false }
+      );
+      if (res?.access_token) {
+        setTokens({
+          access_token: res.access_token,
+          refresh_token: res.refresh_token || res.access_token,
+        });
+        onAddNotification('DEV 자동 로그인 완료');
+        return true;
+      }
+    } catch (e) {
+      // dev 자동 로그인 실패는 조용히 무시
+    }
+    return false;
+  };
+
   useEffect(() => {
     let cancelled = false;
     const checkAuthAndFetchData = async () => {
@@ -86,14 +114,21 @@ export function ProfileScreen({
 
         // 먼저 localStorage에서 토큰 확인
         const tokens = getTokens();
-        const accessToken = tokens?.access_token;
+        let accessToken = tokens?.access_token;
         if (!accessToken) {
-          console.log('액세스 토큰이 없습니다. 로그인이 필요합니다.');
-          setError('로그인이 필요합니다.');
-          setAuthChecked(true);
-          setLoading(false);
-          onAddNotification('로그인 후 프로필을 확인할 수 있습니다.');
-          return;
+          // DEV 자동 로그인 시도 (플래그가 켜져있을 때만)
+          const autoLoggedIn = await maybeDevAutoLogin();
+          if (autoLoggedIn) {
+            accessToken = getTokens()?.access_token;
+          }
+          if (!accessToken) {
+            console.log('액세스 토큰이 없습니다. 로그인이 필요합니다.');
+            setError('로그인이 필요합니다.');
+            setAuthChecked(true);
+            setLoading(false);
+            onAddNotification('로그인 후 프로필을 확인할 수 있습니다.');
+            return;
+          }
         }
 
         console.log('액세스 토큰이 있습니다. 프로필 데이터를 가져옵니다...');
@@ -213,26 +248,19 @@ export function ProfileScreen({
                     className="w-full bg-primary hover:bg-primary/90 transition-all duration-300"
                     onClick={async () => {
                       try {
-                        // 테스트 로그인 시도
+                        // 테스트 로그인 시도 (통합 API 사용, ORIGIN/프리픽스 일관화)
                         console.log('테스트 로그인 시도...');
-                        const loginResponse = await fetch('/api/auth/login', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({
-                            site_id: 'test123',
-                            password: 'password123',
-                          }),
-                        });
-
-                        if (loginResponse.ok) {
-                          const loginData = await loginResponse.json();
-                          // 통합 번들 저장 (legacy 개별 키 사용 제거)
+                        const loginData: any = await unifiedApi.post(
+                          'auth/login',
+                          { site_id: 'test123', password: 'password123' },
+                          { auth: false }
+                        );
+                        if (loginData?.access_token) {
                           setTokens({
                             access_token: loginData.access_token,
                             refresh_token: loginData.refresh_token || loginData.access_token,
                           });
                           onAddNotification('테스트 로그인 성공!');
-                          // 페이지 새로고침으로 프로필 다시 로드
                           window.location.reload();
                         } else {
                           onAddNotification('테스트 로그인 실패. 테스트 계정이 없습니다.');
