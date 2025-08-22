@@ -9,6 +9,7 @@ from typing import Sequence, Union
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.engine.reflection import Inspector
+from sqlalchemy.exc import NoSuchTableError
 
 revision: str = '20250820_add_userreward_extended_fields'
 down_revision: Union[str, None] = 'e93ff77e600b'
@@ -19,11 +20,25 @@ TABLE = 'user_rewards'
 
 def upgrade() -> None:
     conn = op.get_bind()
-    insp = Inspector.from_engine(conn)  # type: ignore
+    # Prefer sa.inspect for SQLAlchemy 1.4/2.0 compatibility
+    try:
+        insp = sa.inspect(conn)  # type: ignore
+    except Exception:
+        insp = Inspector.from_engine(conn)  # type: ignore
+
     # Skip if base table doesn't exist yet (defensive for older branches)
-    if not insp.has_table(TABLE):
+    try:
+        if not insp.has_table(TABLE):
+            return
+    except Exception:
+        # If inspector can't determine, fall back to safe return
         return
-    cols = {c['name'] for c in insp.get_columns(TABLE)}
+
+    try:
+        cols = {c['name'] for c in insp.get_columns(TABLE)}
+    except NoSuchTableError:
+        # Table truly doesn't exist; skip migration
+        return
     # Add columns if missing
     if 'reward_type' not in cols:
         op.add_column(TABLE, sa.Column('reward_type', sa.String(length=50), nullable=True))
@@ -37,7 +52,11 @@ def upgrade() -> None:
         op.add_column(TABLE, sa.Column('idempotency_key', sa.String(length=120), nullable=True))
 
     # Indexes / constraints
-    indexes = {i['name'] for i in insp.get_indexes(TABLE)}
+    try:
+        indexes = {i['name'] for i in insp.get_indexes(TABLE)}
+    except NoSuchTableError:
+        # Table vanished or not present; nothing to index
+        return
     if 'ix_user_rewards_reward_type' not in indexes and 'reward_type' in (cols | {'reward_type'}):
         op.create_index('ix_user_rewards_reward_type', TABLE, ['reward_type'])
     if 'ix_user_rewards_idempotency_key' not in indexes and 'idempotency_key' in (cols | {'idempotency_key'}):

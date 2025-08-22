@@ -14,10 +14,24 @@ export async function postAction(payload: ActionPayload) {
 }
 
 export async function postActionsBatch(payloads: ActionPayload[]) {
-  return await apiRequest('/api/actions/batch', {
-    method: 'POST',
-    body: JSON.stringify({ actions: payloads })
-  });
+  // Backend expects POST /api/actions/bulk with { items: [...] }
+  try {
+    return await apiRequest('/api/actions/bulk', {
+      method: 'POST',
+      body: JSON.stringify({ items: payloads })
+    });
+  } catch (err) {
+    // Fallback: if bulk is unavailable, degrade to sequential single posts
+    try {
+      const results = [] as any[];
+      for (const p of payloads) {
+        results.push(await postAction(p));
+      }
+      return { logged: results.length };
+    } catch (_) {
+      throw err;
+    }
+  }
 }
 
 export type ShopBuyPayload = {
