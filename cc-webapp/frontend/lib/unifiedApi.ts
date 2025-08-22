@@ -45,6 +45,8 @@ function resolveOrigin(): string {
 }
 
 const ORIGIN = resolveOrigin();
+// 다른 모듈에서 재사용할 수 있도록 공개
+export const API_ORIGIN = ORIGIN;
 
 async function refreshOnce(): Promise<boolean> {
   try {

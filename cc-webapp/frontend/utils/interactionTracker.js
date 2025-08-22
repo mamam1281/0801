@@ -38,7 +38,10 @@ export function getInteractionLogs() {
 
 export async function sendLogsToBackend() {
   try {
-  const url = (process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000').replace(/\/+$/,'') + '/api/dev/logs';
+    // NOTE: ESModule 환경에서 직접 import가 더 안전하지만, 이 파일은 .js이므로 동적 import 사용
+    const mod = await import('../lib/unifiedApi');
+    const origin = (mod.API_ORIGIN || process.env.NEXT_PUBLIC_API_ORIGIN || 'http://127.0.0.1:8000');
+    const url = origin.replace(/\/+$/, '') + '/api/dev/logs';
     // Best-effort: non-blocking
     await fetch(url, {
       method: 'POST',

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { API_ORIGIN } from '@/lib/unifiedApi';
 import { useRouter } from 'next/navigation';
 
 type LoadingStatus = 'checking' | 'loading' | 'ready' | 'error';
@@ -65,7 +66,7 @@ export const useLoadingController = () => {
   // API 서버 상태 확인
   const checkApiServer = async () => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/health`, {
+      const response = await fetch(`${API_ORIGIN}/health`, {
         method: 'GET',
         headers: { 'Content-Type': 'application/json' },
         cache: 'no-store'

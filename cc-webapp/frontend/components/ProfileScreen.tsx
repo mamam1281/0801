@@ -78,7 +78,7 @@ export function ProfileScreen({
     setBalance(balanceData as any);
   };
 
-  // DEV 전용 자동 로그인: NEXT_PUBLIC_DEV_AUTO_LOGIN=1 일 때만 수행
+  // DEV 전용 자동 로그인/부트스트랩: NEXT_PUBLIC_DEV_AUTO_LOGIN=1 일 때만 수행
   const maybeDevAutoLogin = async (): Promise<boolean> => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const env: any = typeof process !== 'undefined' ? (process as any).env : {};
@@ -87,11 +87,31 @@ export function ProfileScreen({
     try {
       const siteId = env?.NEXT_PUBLIC_DEV_SITE_ID || 'test123';
       const password = env?.NEXT_PUBLIC_DEV_PASSWORD || 'password123';
-      const res: any = await unifiedApi.post(
-        'auth/login',
-        { site_id: siteId, password },
-        { auth: false }
-      );
+      const invite = env?.NEXT_PUBLIC_DEV_INVITE_CODE || '5858';
+      // 1) 로그인 우선 시도
+      let res: any;
+      try {
+        res = await unifiedApi.post('auth/login', { site_id: siteId, password }, { auth: false });
+      } catch (e) {
+        // 2) 로그인 실패 시 자동 회원가입 후 재로그인
+        try {
+          await unifiedApi.post(
+            'auth/signup',
+            {
+              site_id: siteId,
+              nickname: siteId,
+              phone_number: '010-0000-0000',
+              password,
+              invite_code: invite,
+            },
+            { auth: false }
+          );
+          res = await unifiedApi.post('auth/login', { site_id: siteId, password }, { auth: false });
+        } catch {
+          // 회원가입까지 실패하면 dev 자동 처리 중단
+          res = null;
+        }
+      }
       if (res?.access_token) {
         setTokens({
           access_token: res.access_token,

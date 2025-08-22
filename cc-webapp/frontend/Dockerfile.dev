@@ -1,11 +1,15 @@
-FROM node:18-alpine
+FROM node:20-alpine
 
 WORKDIR /app
 
-COPY package*.json ./
-# Use legacy peer deps to tolerate React 19 + older peer ranges (e.g., next-themes)
-RUN npm install --legacy-peer-deps
+# Copy manifest files first to leverage Docker layer caching
+COPY package.json package-lock.json* ./
 
+# Install dependencies
+RUN npm install --legacy-peer-deps --no-audit --no-fund
+
+# Copy app source
 COPY . .
 
-CMD ["npm", "run", "dev"]
+# Run Next dev binding to all interfaces
+CMD ["npm", "run", "dev", "--", "-H", "0.0.0.0"]
