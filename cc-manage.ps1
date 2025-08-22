@@ -60,6 +60,13 @@ function Resolve-ServiceName($name) {
 
 function Start-Environment {
     Detect-Compose
+    # Ensure .env exists (auto-copy from .env.development if present)
+    try {
+        if (-not (Test-Path ".env") -and (Test-Path ".env.development")) {
+            Copy-Item ".env.development" ".env" -Force
+            Write-Host "Created .env from .env.development (auto)" -ForegroundColor Yellow
+        }
+    } catch {}
     Write-Host "Starting Casino-Club F2P environment..." -ForegroundColor Cyan
     $composeArgs = Get-ComposeArgs
     Compose @composeArgs up -d --build
@@ -136,6 +143,13 @@ function Enter-Container {
 function Check-Prerequisites {
     Write-Host "Running environment checks..." -ForegroundColor Cyan
     Detect-Compose
+    # Ensure .env exists (auto-copy from .env.development if present)
+    try {
+        if (-not (Test-Path ".env") -and (Test-Path ".env.development")) {
+            Copy-Item ".env.development" ".env" -Force
+            Write-Host "Created .env from .env.development (auto)" -ForegroundColor Yellow
+        }
+    } catch {}
     Write-Host "✔ Docker detected" -ForegroundColor Green
     try { Compose -f $ComposeFile config *> $null; Write-Host "✔ Compose file valid" -ForegroundColor Green } catch { Write-Host "✖ Compose file invalid" -ForegroundColor Red; exit 1 }
     # Quick port checks

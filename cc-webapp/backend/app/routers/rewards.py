@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_serializer
 from datetime import timezone
 from datetime import datetime
 import json, logging
+logger = logging.getLogger(__name__)
 from app.core.config import settings
 
 # Assuming models and database session setup are in these locations
@@ -143,6 +144,32 @@ async def distribute_reward_to_user(
             idempotency_key=request.idempotency_key,
             metadata=request.metadata,
         )
+        # 실시간 브로드캐스트: 보상 지급 + 프로필 변경 (best-effort)
+        try:
+            from ..realtime.hub import hub
+            from ..models.auth_models import User as _User
+            import asyncio
+            # balance_after 계산 (gold_balance 기준 단일 통화)
+            user = db.query(_User).filter(_User.id == request.user_id).first()
+            balance_after = getattr(user, 'gold_balance', None)
+            evt = {
+                "type": "reward_granted",
+                "user_id": request.user_id,
+                "reward_type": request.reward_type,
+                "amount": request.amount,
+                "balance_after": balance_after,
+            }
+            prof = {
+                "type": "profile_update",
+                "user_id": request.user_id,
+                "changes": {"gold_balance": balance_after},
+            }
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                loop.create_task(hub.broadcast(evt))
+                loop.create_task(hub.broadcast(prof))
+        except Exception:
+            pass
         # Kafka 프로듀서 가져오기
         prod = get_producer()
         if prod:

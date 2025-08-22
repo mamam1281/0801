@@ -62,6 +62,8 @@ cd auto7777
 .\docker-manage.ps1 start --tools
 ```
 
+> 참고: 루트에 `.env`가 없고 `.env.development`만 있을 경우, `cc-manage.ps1`가 자동으로 `.env`를 생성합니다.
+
 ### 3. 서비스 접근
 - **프론트엔드**: http://localhost:3000
 - **백엔드 API**: http://localhost:8000

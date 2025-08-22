@@ -3,6 +3,27 @@
 **생성일**: 2025-08-19  
 **브랜치**: feature/e2e-onboarding-playwright  
 
+## 2025-08-23 환경 자동화 및 보상 브로드캐스트 표준화
+
+### 변경 요약
+- 환경 자동화: `cc-manage.ps1`의 start/check 경로에서 `.env`가 없을 경우 `.env.development`를 자동 복사해 생성(초기 셋업 마찰 제거).
+- 실시간 갱신 강化: 보상 지급 경로에서 `reward_granted`와 `profile_update` 이벤트를 통합 허브(`/api/realtime/sync`)로 브로드캐스트하여 프론트가 즉시 반영하도록 표준화.
+- 문서 동기화: README 및 `api docs/20250808.md`에 상기 변경점 및 사용 지침 반영.
+
+### 검증 결과
+- 컨테이너 스모크: `/health` 200 확인, `/docs` 정상 노출, `/api/actions/recent/{userId}` 응답 정상.
+- 보상 흐름: 출석/이벤트 보상 지급 시 `reward_granted`와 `profile_update`가 허브로 송신되어 대시보드/프로필 UI 실시간 갱신(로컬 환경에서 확인).
+- Alembic heads: 추가 마이그레이션 없음 → 단일 head 유지. OpenAPI 스키마 영향 없음(변경 시 `python -m app.export_openapi`로 재수출 절차 유지).
+
+### 다음 단계
+- 테스트 보강: pytest 스모크(회원가입→액션 생성→최근 액션 확인→허브 이벤트 수신 최소 검증) 추가 및 CI 연동.
+- 브로드캐스트 범위 확대: 상점/결제/프로필 통계 갱신 경로에 `profile_update`/`balance_update`/`stats_update` 일관 송신.
+- 모니터링: Prometheus/Grafana 대시보드에 허브 이벤트 QPS, 실패율, Kafka 라우팅 지표 추가.
+
+### 트러블슈팅 노트
+- 이전 커밋에서 `final.md` 패치 충돌로 변경 요약 추가 실패 이력 있음 → 본 섹션으로 정리 반영 완료.
+- 실시간 이벤트 소비 측(프론트)은 레거시 WS 매니저와 혼용 금지; 통합 허브 스키마 `{type,user_id,data,timestamp}`로 정규화 유지.
+
 ## 2025-08-22 프론트 API 클라이언트 정리(unifiedApi 통합)
 
 ### 변경 요약
