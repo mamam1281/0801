@@ -45,7 +45,16 @@ def upgrade() -> None:
         except Exception:
             pass
         if not _has_index(insp, EVT_TABLE, 'ix_event_participations_user_completed'):
-            op.create_index('ix_event_participations_user_completed', EVT_TABLE, ['user_id', 'completed', 'claimed_rewards'])
+            cols = ['user_id', 'completed']
+            # Prefer claimed_rewards if exists; fallback to claimed if present; otherwise keep two columns
+            if _has_column(insp, EVT_TABLE, 'claimed_rewards'):
+                cols.append('claimed_rewards')
+            elif _has_column(insp, EVT_TABLE, 'claimed'):
+                cols.append('claimed')
+            try:
+                op.create_index('ix_event_participations_user_completed', EVT_TABLE, cols)
+            except Exception:
+                pass
 
     # user_missions
     if _has_column(insp, MIS_TABLE, 'id'):
