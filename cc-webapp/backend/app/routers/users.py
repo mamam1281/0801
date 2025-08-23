@@ -2,7 +2,7 @@
 import logging
 from fastapi import APIRouter, Depends, HTTPException, status, Response
 from sqlalchemy.orm import Session
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, List
 from ..database import get_db
 from ..models.auth_models import User
@@ -40,8 +40,20 @@ class UserStatsResponse(BaseModel):
     level: int
     experience: int
     # 새 표준 지표 (UTC 일 절단, UserAction 기반 distinct date)
-    last_30d_active_days: int
-    lifetime_active_days: int
+    last_30d_active_days: int = Field(
+        0,
+        description=(
+            "최근 30일 활성 일수 (UTC 00:00 경계 기준). UserAction.created_at의 일 단위 distinct로 산출하며, "
+            "예외적으로 UserAction이 비어있는 케이스는 GameHistory.created_at 기반 distinct로 보정."
+        ),
+    )
+    lifetime_active_days: int = Field(
+        0,
+        description=(
+            "평생 누적 활성 일수 (UTC 00:00 경계 기준). UserAction.created_at의 일 단위 distinct로 산출하며, "
+            "예외적으로 UserAction이 비어있는 케이스는 GameHistory.created_at 기반 distinct로 보정."
+        ),
+    )
 
 # Dependency injection
 def get_user_service(db = Depends(get_db)) -> UserService:

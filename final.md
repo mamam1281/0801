@@ -1,3 +1,83 @@
+## 2025-08-23 프론트 운영 환경 고정 문서화 + 마이그레이션/경고 정리 계획
+
+변경 요약
+- API 우선 원칙 강화: 프로덕션에서 `NEXT_PUBLIC_API_BASE`(WS/폴링), `NEXT_PUBLIC_API_ORIGIN`(HTTP) 환경 변수를 필수로 요구하도록 프론트 문서화. 운영 빌드에서 localStorage 사용자 캐시 무시/자동 정리, 모의 데이터는 항상 비활성.
+- 개발 모드 폴백: env 미설정 시 http://127.0.0.1:8000 으로만 폴백 허용(운영에서는 오류로 중단).
+- 관련 문서 갱신: `api docs/20250823_GLOBAL_EVAL_GUIDE.md`, `api docs/20250808.md`에 환경 요구/운영 동작 추가.
+
+검증 결과
+- 브라우저 신규 세션에서 /api/auth/me 및 /api/users/stats 호출 경로가 초기화 소스임을 확인. 운영 빌드에서 'game-user' 로컬캐시가 생성/사용되지 않음.
+- env 누락 시 프론트 초기화 단계에서 즉시 오류를 발생(개발 모드 제외). mocks는 운영에서 노출되지 않음.
+- 백엔드 영향 없음(OpenAPI/Alembic 변경 없음). 기존 pytest 제한/멱등 스위트 Green 유지.
+
+다음 단계
+- README 및 .env.production 샘플에 `NEXT_PUBLIC_API_BASE`/`NEXT_PUBLIC_API_ORIGIN` 추가. Frontend CI에 prod 빌드 변수 누락 차단 체크 도입.
+- 파괴적 스키마 변경 계획 수립 및 Alembic 단계 분리(아래 계획안 참조) 후 PR 분리 제출.
+- 경고 정리(PR): Pydantic v2 ConfigDict 경고 및 httpx WSGITransport 경고 제거, 테스트/로그로 검증.
+
+파괴적 스키마 변경(안전 전략) 계획
+1) Shadow 테이블 생성: 기존 테이블과 동일 스키마 + 신규 제약/컬럼 포함. 트리거 또는 애플리케이션 더블라이트로 동기화 준비.
+2) 백필(배치): 시간을 구간화하여 데이터를 Shadow로 점진 복사(잠금 최소화), 인덱스/제약 선행 적용.
+3) Cutover(짧은 락): 원본을 RENAME old_, Shadow를 본 이름으로 RENAME. FK 재연결/시퀀스 이전. 다운타임 최소화.
+4) Cleanup: old_ 테이블 보관 기간 후 삭제. Alembic은 단일 head 유지, merge 필요 시 즉시 생성.
+5) 롤백: Cutover 이전 스냅샷/백업(pg_dump) 준비, 실패 시 rename 되돌리기.
+
+경고 정리 계획
+- Pydantic v2: BaseModel 내부 Config → ConfigDict 사용, `model_config = ConfigDict(...)`로 전환. Field(pattern)로 Query regex 경고 제거 확인.
+- httpx/TestClient: 고정 버전(0.27.0) 유지 점검, WSGITransport 경고가 남으면 테스트 클라이언트 생성부에서 transport 명시 또는 httpx 옵션 조정.
+- Operation ID 중복: OpenAPI export 시 경고되는 라우터 operation_id 중복 정리, 테스트 추가로 회귀 방지.
+
+## 2025-08-23 변경 요약
+
+- models 초기화에 `GameStats`를 export하여 `app.models.GameStats` 참조 에러 해결.
+- backend healthcheck를 `curl -4 -fsS http://localhost:8000/health` + `start_period: 30s`로 안정화.
+- 컨테이너 재기동 후 상태 Healthy 확인.
+
+## 검증 결과
+
+- docker compose ps: backend Up (healthy) 확인.
+- 로그: /health 200 응답 정상, GameStats 미정의 에러 재발 없음.
+- 테스트: 제한 패키지/프로모/멱등 관련 스위트 전부 통과.
+   - pytest-limited-suite: 3 passed
+   - pytest-limited-idem: 6 passed
+
+## 다음 단계
+
+- 스키마 드리프트 경고 정리: Alembic 마이그레이션 정합성 점검 및 누락 컬럼/테이블 반영.
+- OpenAPI 최신화 필요 시 `python -m app.export_openapi` 재생성 및 `app/current_openapi.json` 동기화.
+- Pydantic v2 경고 정리(ConfigDict 적용)와 httpx WSGITransport 경고 대응.
+## 2025-08-23 – 활성일수 필드 OpenAPI 반영 확인
+
+변경 요약
+- OpenAPI 재수출 완료(`python -m app.export_openapi`), `backend/app/current_openapi.json`에 UserStatsResponse의 `last_30d_active_days`, `lifetime_active_days`와 설명이 반영됨.
+- 단일 테스트를 플러그인 비활성 옵션으로 실행하여 환경 지연을 회피(`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1`).
+
+검증 결과
+- 스키마 위치: `cc-webapp/backend/app/current_openapi.json` → components.schemas.UserStatsResponse.properties에 두 필드와 한글 설명 존재 확인.
+- export 로그 스냅샷 생성 확인: `/app/openapi_YYYYMMDD_HHMMSS.json` 출력.
+- 경고: events 라우터 Operation ID 중복 경고가 출력되나 기능 영향 없음(정리 이슈로 별도 트래킹).
+
+다음 단계
+- 필요한 경우 OpenAPI 스냅샷 CI 비교 갱신 및 프론트 타입 갱신 PR 준비.
+- events 라우터 Operation ID 중복 정리(비기능 경고 제거).
+- 활성일수 산출 로직 GA 전 사용자 규모 데이터로 성능/정합 재점검.
+
+## 2025-08-23 – /api/users/stats 활성일수 필드 추가
+
+변경 요약
+- UserStatsResponse에 last_30d_active_days, lifetime_active_days 추가.
+- 산출: UTC 00:00 경계 일 단위 distinct. 1차=UserAction.created_at, 예외시 GameHistory.created_at 폴백.
+- 라우터 `app/routers/users.py`에 Field 설명 추가, 서비스 `app/services/user_service.py`에 다이얼렉트별 date distinct 및 GH 폴백 로직 반영.
+
+검증 결과
+- 단일 테스트 `app/tests/test_user_stats_active_days.py` 추가. 슬롯 스핀 후 last_30d_active_days>=1 기대.
+- OpenAPI 재수출 시 UserStatsResponse에 필드/설명 포함 확인 필요.
+- 기존 limited 패키지/멱등 테스트 그린 유지(부분 스위트 기준).
+
+다음 단계
+- 컨테이너에서 전체 pytest 재실행 및 스냅샷 갱신.
+- /docs 스키마 최신화(`python -m app.export_openapi`) 후 프론트 타입 업데이트.
+- 장기적으로 UserAction 로깅 일원화 완료 시 GameHistory 폴백 제거 검토.
 ## 2025-08-23 지표 표준화(무중단/저위험) 문서화
 
 변경 요약

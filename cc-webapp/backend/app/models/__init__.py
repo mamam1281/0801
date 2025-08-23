@@ -35,6 +35,7 @@ from .game_models import (
     Reward,
     GachaResult,
     UserProgress,
+    GameStats,
 )
 
 # User Segment 모델 추가
@@ -119,6 +120,7 @@ __all__ = [
     "Reward",
     "GachaResult",
     "UserProgress",
+    "GameStats",
 
     # User
         # User Segments

@@ -37,11 +37,19 @@ function resolveOrigin(): string {
   if (env && /^https?:\/\//.test(env)) return env.replace(/\/$/, '');
   if (typeof window !== 'undefined') {
     // dev fallback (프론트 3000/3001, 백 8000)
-    const fallback = (window.location.port === '3000' || window.location.port === '3001') ? 'http://localhost:8000' : `${window.location.origin}`;
-    if (!env) console.warn('[unifiedApi] NEXT_PUBLIC_API_ORIGIN 미설정 → fallback:', fallback);
+    const isProd = (process as any)?.env?.NODE_ENV === 'production';
+    if (isProd) {
+      throw new Error('[unifiedApi] Production requires NEXT_PUBLIC_API_ORIGIN');
+    }
+    const fallback = (window.location.port === '3000' || window.location.port === '3001') ? 'http://127.0.0.1:8000' : `${window.location.origin}`;
+    if (!env) console.warn('[unifiedApi] NEXT_PUBLIC_API_ORIGIN 미설정 → dev fallback:', fallback);
     return fallback.replace(/\/$/, '');
   }
-  return 'http://localhost:8000';
+  // SSR 환경: 프로덕션이면 반드시 설정 필요
+  if ((process as any)?.env?.NODE_ENV === 'production') {
+    throw new Error('[unifiedApi] Production requires NEXT_PUBLIC_API_ORIGIN');
+  }
+  return 'http://127.0.0.1:8000';
 }
 
 const ORIGIN = resolveOrigin();

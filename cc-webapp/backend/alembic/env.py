@@ -117,9 +117,25 @@ def run_migrations_online() -> None:
         poolclass=pool.NullPool,
     )
 
+    def include_object(object, name, type_, reflected, compare_to):
+        """Autogenerate filter to prevent destructive diffs.
+
+        - Skip drops: when DB has object (reflected=True) but model doesn't (compare_to is None)
+        - Allow additions/new objects from models (reflected=False, compare_to is not None)
+        - Allow non-destructive changes only
+        """
+        # Skip dropping tables, columns, indexes, constraints
+        if reflected and compare_to is None:
+            return False
+        return True
+
     with connectable.connect() as connection:
         context.configure(
-            connection=connection, target_metadata=target_metadata
+            connection=connection,
+            target_metadata=target_metadata,
+            include_object=include_object,
+            compare_type=False,
+            compare_server_default=False,
         )
 
         with context.begin_transaction():

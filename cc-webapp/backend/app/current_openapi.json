@@ -2997,7 +2997,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/shop/catalog": {
@@ -13364,6 +13369,18 @@
           "experience": {
             "type": "integer",
             "title": "Experience"
+          },
+          "last_30d_active_days": {
+            "type": "integer",
+            "title": "Last 30D Active Days",
+            "description": "최근 30일 활성 일수 (UTC 00:00 경계 기준). UserAction.created_at의 일 단위 distinct로 산출하며, 예외적으로 UserAction이 비어있는 케이스는 GameHistory.created_at 기반 distinct로 보정.",
+            "default": 0
+          },
+          "lifetime_active_days": {
+            "type": "integer",
+            "title": "Lifetime Active Days",
+            "description": "평생 누적 활성 일수 (UTC 00:00 경계 기준). UserAction.created_at의 일 단위 distinct로 산출하며, 예외적으로 UserAction이 비어있는 케이스는 GameHistory.created_at 기반 distinct로 보정.",
+            "default": 0
           }
         },
         "type": "object",
@@ -13376,7 +13393,7 @@
           "experience"
         ],
         "title": "UserStatsResponse",
-        "description": "User statistics response"
+        "description": "User statistics response\n\nNotes:\n- last_30d_active_days / lifetime_active_days are computed from UserAction distinct UTC dates.\n- Timezone: UTC 00:00 day boundary.\n- Activity scope: all actions recorded in UserAction."
       },
       "UserSummary": {
         "properties": {

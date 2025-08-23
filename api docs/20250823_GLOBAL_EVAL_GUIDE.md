@@ -1,3 +1,28 @@
+- [2025-08-23] /api/users/stats 활성일수 필드 추가
+	- 필드: last_30d_active_days, lifetime_active_days.
+	- 정의: UTC 00:00 경계 기준으로 UserAction.created_at의 일 단위 distinct.
+	- 폴백: UserAction이 비어있을 때 GameHistory.created_at 기반 distinct로 계산.
+	- 프론트 매핑: 게임횟수는 stats.total_games_played만 사용, 접속일수는 활성일수 중 하나만 사용(권장 last_30d_active_days).
+	- 검증: pytest app/tests/test_user_stats_active_days.py, 슬롯 1회 후 last_30d_active_days >= 1.
+ 
+## 프론트 프로덕션 환경 요구사항(운영 데이터 고정)
+
+프로덕션(NODE_ENV=production)에서는 다음 환경 변수가 반드시 설정되어야 합니다. 누락 시 프론트가 부팅 단계에서 오류를 발생시키며, 로컬 캐시/모의 데이터는 사용하지 않습니다.
+
+- NEXT_PUBLIC_API_BASE: WebSocket/폴링 기반 실시간 동기화가 참조하는 백엔드 Base URL
+	- 예) https://api.example.com 또는 http://localhost:8000
+- NEXT_PUBLIC_API_ORIGIN: HTTP 통합 클라이언트(unifiedApi)가 호출하는 백엔드 Origin
+	- 예) https://api.example.com 또는 http://localhost:8000
+
+운영 동작 고정 정책
+- localStorage의 'game-user' 등 사용자 캐시는 프로덕션에서 무시 및 자동 정리(운영 데이터는 반드시 API 응답을 단일 소스로 사용).
+- 모의 데이터/시드 UI는 프로덕션에서 항상 비활성. 개발 환경에서만 NEXT_PUBLIC_ENABLE_MOCKS=1로 허용.
+- 개발 편의: 개발 모드에서 위 env가 비어있으면 http://127.0.0.1:8000 으로 안전 폴백.
+
+빠른 점검 체크리스트
+- 브라우저 콘솔에서 Realtime/HTTP 클라이언트 초기화 로그에 설정된 BASE/ORIGIN이 의도와 일치하는지 확인.
+- 새 세션에서 로컬스토리지에 'game-user'가 남지 않고, 로그인 후 /api/auth/me 및 /api/users/stats를 통해 값이 로드되는지 확인.
+- 운영 빌드에서 mock 전용 컴포넌트/데이터가 표시되지 않는지 확인.
 ## 지표 표준화(무중단/저위험) 즉시 적용 가이드
 
 본 섹션은 게임횟수/접속일수 지표의 혼선을 제거하기 위한 단기 보정안을 문서화합니다. 코드 변경 없이도 적용 가능한 사용 가이드와 빠른 검증 루틴을 포함하며, 차기 릴리스에서의 API 확장 방향을 제시합니다.

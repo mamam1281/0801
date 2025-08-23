@@ -42,8 +42,15 @@ export function ShopManager({ onAddNotification }: ShopManagerProps) {
   const [editingItem, setEditingItem] = useState(null as ShopItem | null);
   const [isLoading, setIsLoading] = useState(false as boolean);
 
-  // Mock shop items
+  // Mock shop items (개발 중에만, 플래그로 제어)
   useEffect(() => {
+    const enableMocks =
+      (typeof window !== 'undefined' ? (window as any).process?.env?.NEXT_PUBLIC_ENABLE_MOCKS : process.env.NEXT_PUBLIC_ENABLE_MOCKS) === '1';
+    const isProd = process.env.NODE_ENV === 'production';
+    if (isProd || !enableMocks) {
+      setShopItems([] as ShopItem[]);
+      return;
+    }
     const mockItems: ShopItem[] = [
       {
         id: '1',
@@ -92,7 +99,7 @@ export function ShopManager({ onAddNotification }: ShopManagerProps) {
         tags: ['luck', 'rare', 'gambling']
       }
     ];
-    setShopItems(mockItems);
+  setShopItems(mockItems);
   }, []);
 
   // Filter items
