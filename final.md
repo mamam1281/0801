@@ -1,3 +1,19 @@
+## 2025-08-23 지표 표준화(무중단/저위험) 문서화
+
+변경 요약
+- 게임횟수/접속일수 혼선 제거를 위한 단기 보정안 문서화
+- /api/users/profile 소프트 디프리케이션 재강조(Deprecation/Link 헤더)
+- 프론트 엔드포인트 사용 고정: 프로필=/api/auth/me, 통계=/api/users/stats
+- API 확장 제안: last_30d_active_days, lifetime_active_days(비파괴 가산)
+
+검증 결과
+- 핵심 pytest 그린(최근 스위트 기준), alembic 단일 head 유지, /docs 정상
+- 수동 루틴: 슬롯 3회 → stats.total_games_played 증가, streak 2일 → distinct date=2 확인
+
+다음 단계
+- /api/users/stats에 접속일 관련 2필드 추가 및 테스트/문서 동반
+- 프론트 매핑 정리(PR): 공개 프로필 사용 금지, canonical 엔드포인트 강제
+- OpenAPI 재수출 및 api docs 동기화
 # 변경 요약 / 검증 / 다음 단계 (2025-08-23)
 
 변경 요약
@@ -7,17 +23,25 @@
 - SSE 스트림 오류 수정: /api/metrics/stream에서 UserReward 필드 오기 사용( created_at, amount_gold )을 모델 정의(claimed_at, gold_amount)로 교정.
 - WS 스모크 표준화: `app/scripts/ws_smoke.py`가 `/api/realtime/sync` 우선, 실패 시 `/api/games/ws` 폴백으로 단일화. 컨테이너 실행 결과 `sync_connected` 초프레임 수신 확인.
 
+추가 변경 (보안/CI/모니터링)
+- OpenAPI diff CI 게이트 강화: 커밋된 스냅샷 대비 현재 스키마를 비교해 브레이킹 변경(경로/메서드 삭제) 시 워크플로 실패 + PR 코멘트 요약 게시.
+- RBAC 확장: 민감 비관리자 엔드포인트 `/api/rewards/distribute`에 `require_min_rank("PREMIUM")` 가드 적용. 표준 사용자는 403, PREMIUM 이상만 허용.
+- Grafana 패널 추가: `Legacy WS Connections Rate` 패널(쿼리: `sum(rate(ws_legacy_games_connections_total[5m]))`)로 레거시 WS 이용량 가시화.
+
 검증
 - Prometheus Targets: cc-webapp-backend(cc_backend:8000) health=up 확인(HTTP API /api/v1/targets).
 - Pytest: app/tests/test_openapi_diff_ci.py, tests/test_openapi_diff_ci.py, tests/test_main.py 합계 13개 테스트 전부 통과.
 - Alembic: heads=current=86171b66491f (단일 head) 확인.
 - SSE 스모크: 컨테이너 내 curl -N로 /api/metrics/stream 2초 간격 수신 확인(event: metrics 프레임 연속 수신).
 - WS 스모크: `docker compose exec backend python -m app.scripts.ws_smoke` → /api/realtime/sync 접속 성공, 첫 프레임 수신.
+- CI: OpenAPI diff 워크플로에서 삭제 항목 탐지 시 실패 동작 및 PR 코멘트 생성 확인.
+- 테스트: `backend/tests/test_rbac_premium_rewards.py` 추가로 `/api/rewards/distribute` RBAC 403/200 경계 검증.
 
 다음 단계
 - WS 스모크(상점/정산/웹훅): 브라우저에서 배지/토스트 표시 동작 체크 및 스크린샷 캡처.
 - Grafana 대시보드: 구매 지표 패널에 실데이터 유입 확인 및 경보룰 세부 튜닝.
 - CI: OpenAPI diff CI를 워크플로에 통합(스냅샷 아티팩트 업로드/PR 코멘트).
+- 레거시 WS 제거 준비: 대시보드에서 잔여 사용 0 수렴 확인 후 `ENABLE_LEGACY_GAMES_WS=0` 고정화 및 라우터 제거 PR.
 
 ---
 
