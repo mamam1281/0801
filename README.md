@@ -73,22 +73,6 @@ cd auto7777
 - **Redis Commander**: http://localhost:8081
 - **Kafka UI**: http://localhost:8082
 
-## 🔐 프로덕션 환경 변수(프론트엔드)
-
-운영 빌드/배포 시 프론트는 다음 환경 변수가 필수입니다. 누락되면 빌드가 실패하도록 가드되어 있습니다.
-
-- `NEXT_PUBLIC_API_BASE`: 실시간 동기화(WS/폴링)에서 사용할 백엔드 Base URL
-- `NEXT_PUBLIC_API_ORIGIN`: HTTP 통합 클라이언트(unifiedApi)에서 사용할 백엔드 Origin
-
-정책
-- 프로덕션에서는 localStorage 사용자 캐시를 무시/정리하고, 모의 데이터는 비활성입니다.
-- 개발 모드에서는 env 미설정 시 `http://127.0.0.1:8000`으로 폴백합니다.
-
-샘플 파일: `.env.production.sample`을 복사해 `.env.production`으로 사용하세요.
-
-CI 가드
-- 워크플로우 `.github/workflows/frontend-build.yml`이 prod 빌드를 수행하며, 위 두 변수를 요구합니다.
-
 ## 🏗️ 프로젝트 구조
 
 ```

@@ -2,13 +2,16 @@
 
 import pytest
 from unittest.mock import MagicMock
+from fastapi.testclient import TestClient
+from app.main import app
 from app.services.gacha_service import GachaPullResult
 from app.routers import gacha as gacha_router
 
-@pytest.fixture(autouse=True)
-def _no_op():
-    # placeholder to keep file-level fixtures minimal; client comes from conftest
-    yield
+@pytest.fixture
+def client():
+    from app.main import app
+    with TestClient(app) as c:
+        yield c
 
 def test_pull_gacha_uses_service(client, monkeypatch):
     """서비스 의존성 주입이 제대로 동작하는지 확인."""

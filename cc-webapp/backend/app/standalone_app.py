@@ -14,7 +14,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session, relationship
 from jose import jwt, JWTError
 from passlib.context import CryptContext
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field
 
 # 로깅 설정
 logging.basicConfig(
@@ -150,7 +150,9 @@ class UserCreate(UserBase):
 class UserResponse(UserBase):
     id: int
     is_admin: bool
-    model_config = ConfigDict(from_attributes=True)
+    
+    class Config:
+        orm_mode = True
 
 class TokenData(BaseModel):
     user_id: int

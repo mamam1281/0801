@@ -1,170 +1,3 @@
-## 2025-08-23 DB 마이그레이션 후속 적용: PK 인덱스 정규화
-
-변경 요약
-- Alembic 스탬프를 현재 적용 상태(be6edf74183a, 컷오버)로 맞춘 뒤 head까지 업그레이드(c6a1b5e2e2b1) 수행
-- `shop_transactions` 테이블의 PK 인덱스명을 `shop_transactions_pkey`로 정규화(기존 shadow 기원 이름을 공식명으로 교체)
-- 백업 테이블 `shop_transactions_old`는 안전 기간을 위해 유지(추후 정리 PR에서 제거 예정)
-
-검증 결과
-- `alembic heads` 단일 head: c6a1b5e2e2b1 확인
-- 인덱스 목록 확인: `shop_transactions_pkey`, `ix_shop_tx_*`, `uq_shop_tx_user_product_idem` 정상
-- 제한/멱등 핵심 테스트 스위트 통과: limited holds/concurrency + shop_buy + limited packages/promos 전부 green
-
-다음 단계
-- 안전 기간 경과 후 `shop_transactions_old` 제거(드롭 전 최종 파리티 스냅샷 기록)
-- 경고 정리 PR 진행: Pydantic ConfigDict/`protected_namespaces` 조정, httpx TestClient deprecation 처리, OpenAPI operationId 고유화
-- 필요 시 OpenAPI 재수출 및 /docs 스키마 점검(스키마 변화 없으므로 보류 가능)
-
-## 2025-08-23 안전 기간 종료 후 DB 정리 & 경고 최소화(무중단)
-- 백업 테이블 최종 스냅샷: `data_export/shop_transactions_old_snapshot.csv` 생성
-- 백업 테이블 제거: `DROP TABLE IF EXISTS shop_transactions_old CASCADE;` 적용, 존재 확인 결과 NULL
-- Alembic 단일 head 재확인: `c6a1b5e2e2b1 (head)`
-- OpenAPI operationId 고유화: FastAPI init에 generate_unique_id_function 추가(메서드+경로 기반)
-- Pydantic v2 전환(부분): admin/tracking/standalone_app의 `class Config` → `model_config = ConfigDict(...)`
-- httpx 테스트 경고 감소: pytest.ini에 일시적 필터 추가(ASGITransport 전환은 후속 PR)
-
-## 2025-08-23 테스트 클라이언트 httpx 전환 검증 + 경고 필터 보강
-
-변경 요약
-- 테스트 클라이언트를 httpx.ASGITransport 기반 호환 래퍼로 대체(conftest.py에서 TestClient 패치)하여 httpx 'app' 단축 경고 제거 준비.
-- 제한/멱등 스위트 재실행으로 회귀 확인(환경 TTL 오버라이드 포함).
-- pytest.ini에 경고 필터 보강: passlib crypt, pydantic v2 Config 경고, model_ 네임스페이스 충돌 경고 임시 억제.
-
-검증 결과
-- pytest-limited-suite: 3 passed (경고 일부 잔존)
-- pytest-limited-idem: 6 passed (경고 일부 잔존)
-- Alembic heads: c6a1b5e2e2b1 (단일 head) 유지
-
-다음 단계
-- Pydantic v2 전환 마무리: 남은 class Config 제거 및 protected_namespaces=( ) 적용 범위 확정
-- httpx 경고 완전 제거: 전역 TestClient 사용처가 conftest 패치를 모두 타도록 tests 트리 정리 또는 직접 import 경로 통일
-- OpenAPI 스냅샷/CI 감시 지속 및 /docs 스모크
-
-## 2025-08-23 섀도우 마이그레이션(PR1) 적용 메모
-
-변경 요약
-- Alembic rev1 생성: `shop_transactions_shadow` 테이블 신설, 유니크 제약(`uq_shop_tx_user_product_idem_shadow`) 및 인덱스 4종 생성.
-- 더블라이트(DB 트리거) 적용: `shop_tx_shadow_replica` 함수 + `trg_shop_tx_shadow_replica` 트리거로 `shop_transactions`의 INSERT/UPDATE/DELETE를 섀도우에 동기화.
-- 백필 스크립트 1회 실행(최대 1만건); 초기 상태에서 누락 0건. 트리거 실증 위해 데모 트랜잭션 1건 삽입 → 섀도우 복제 확인.
-
-검증 결과
-- Alembic heads: 단일 head 유지(`9043e151c7b9`). `alembic upgrade head` 정상.
-- 테이블 존재 확인: `SELECT to_regclass('public.shop_transactions_shadow')` → true.
-- 파리티: 행수 0/0, 합계 0/0(초기 데이터 없음); 데모 삽입(id=66) 후 섀도우 존재 `t` 확인.
-- 테스트: `pytest-limited-suite` 및 `pytest-limited-idem` 통과(6+3 tests pass). Pydantic/httpx 관련 경고는 기존 수준 유지.
-
-다음 단계
-- PR1 마감 전: 운영 데이터 기준 백필 반복 실행(배치 크기 10k, 0행 시 종료), 최근 24h 파리티 점검 유지.
-- PR2 준비: 컷오버/리네임 및 구테이블 정리 리비전 작성, 애플리케이션 레벨 읽기 전환 점검.
-- 경고 정리 PR: Pydantic ConfigDict 전환, Query pattern 점검, httpx TestClient 초기화 조정, OpenAPI operationId 중복 제거 및 스냅샷 테스트 추가.
-
-## 2025-08-23 프론트 운영 환경 고정 문서화 + 마이그레이션/경고 정리 계획
-
-변경 요약
-- API 우선 원칙 강화: 프로덕션에서 `NEXT_PUBLIC_API_BASE`(WS/폴링), `NEXT_PUBLIC_API_ORIGIN`(HTTP) 환경 변수를 필수로 요구하도록 프론트 문서화. 운영 빌드에서 localStorage 사용자 캐시 무시/자동 정리, 모의 데이터는 항상 비활성.
-- 개발 모드 폴백: env 미설정 시 http://127.0.0.1:8000 으로만 폴백 허용(운영에서는 오류로 중단).
-- 관련 문서 갱신: `api docs/20250823_GLOBAL_EVAL_GUIDE.md`, `api docs/20250808.md`에 환경 요구/운영 동작 추가.
-
-검증 결과
-- 브라우저 신규 세션에서 /api/auth/me 및 /api/users/stats 호출 경로가 초기화 소스임을 확인. 운영 빌드에서 'game-user' 로컬캐시가 생성/사용되지 않음.
-- env 누락 시 프론트 초기화 단계에서 즉시 오류를 발생(개발 모드 제외). mocks는 운영에서 노출되지 않음.
-- 백엔드 영향 없음(OpenAPI/Alembic 변경 없음). 기존 pytest 제한/멱등 스위트 Green 유지.
-
-다음 단계
-- README 및 .env.production 샘플에 `NEXT_PUBLIC_API_BASE`/`NEXT_PUBLIC_API_ORIGIN` 추가. Frontend CI에 prod 빌드 변수 누락 차단 체크 도입.
-- 파괴적 스키마 변경 계획 수립 및 Alembic 단계 분리(아래 계획안 참조) 후 PR 분리 제출.
-- 경고 정리(PR): Pydantic v2 ConfigDict 경고 및 httpx WSGITransport 경고 제거, 테스트/로그로 검증.
-
-파괴적 스키마 변경(안전 전략) 계획
-1) Shadow 테이블 생성: 기존 테이블과 동일 스키마 + 신규 제약/컬럼 포함. 트리거 또는 애플리케이션 더블라이트로 동기화 준비.
-2) 백필(배치): 시간을 구간화하여 데이터를 Shadow로 점진 복사(잠금 최소화), 인덱스/제약 선행 적용.
-3) Cutover(짧은 락): 원본을 RENAME old_, Shadow를 본 이름으로 RENAME. FK 재연결/시퀀스 이전. 다운타임 최소화.
-4) Cleanup: old_ 테이블 보관 기간 후 삭제. Alembic은 단일 head 유지, merge 필요 시 즉시 생성.
-5) 롤백: Cutover 이전 스냅샷/백업(pg_dump) 준비, 실패 시 rename 되돌리기.
-
-경고 정리 계획
-- Pydantic v2: BaseModel 내부 Config → ConfigDict 사용, `model_config = ConfigDict(...)`로 전환. Field(pattern)로 Query regex 경고 제거 확인.
-- httpx/TestClient: 고정 버전(0.27.0) 유지 점검, WSGITransport 경고가 남으면 테스트 클라이언트 생성부에서 transport 명시 또는 httpx 옵션 조정.
-- Operation ID 중복: OpenAPI export 시 경고되는 라우터 operation_id 중복 정리, 테스트 추가로 회귀 방지.
-
-추가 변경(프론트/CI)
-- `.env.production.sample` 파일 추가: 필수 ENV(NEXT_PUBLIC_API_BASE/ORIGIN) 포함.
-- 프론트 `prebuild`에 `scripts/validate-env.mjs` 도입: prod 빌드 시 필수 ENV 누락이면 실패.
-- CI 워크플로우 `frontend-build.yml` 추가: prod 빌드가 항상 ENV 가드를 통과하는지 검증.
-
-문서/PR 스캐폴딩
-- `api docs/20250823_MIGRATION_AND_WARNINGS_PLAN.md` 신설: PR 1/2 단계, 병행 테스트, 경고 정리 구체 계획 수록.
-- `cc-webapp/backend/app/migrations_plan/` 폴더에 백필/일관성 검증 템플릿과 가이드 추가.
- - Alembic 템플릿 초안 추가(rev1/2/3): shop_transactions 대상으로 Shadow 생성→Cutover→Cleanup 스켈레톤 파일 배치.
- - 더블라이트(앱 레벨) 스텁 가이드 문서 추가.
-
-## 2025-08-23 변경 요약
-
-- models 초기화에 `GameStats`를 export하여 `app.models.GameStats` 참조 에러 해결.
-- backend healthcheck를 `curl -4 -fsS http://localhost:8000/health` + `start_period: 30s`로 안정화.
-- 컨테이너 재기동 후 상태 Healthy 확인.
-
-## 검증 결과
-
-- docker compose ps: backend Up (healthy) 확인.
-- 로그: /health 200 응답 정상, GameStats 미정의 에러 재발 없음.
-- 테스트: 제한 패키지/프로모/멱등 관련 스위트 전부 통과.
-   - pytest-limited-suite: 3 passed
-   - pytest-limited-idem: 6 passed
-
-## 다음 단계
-
-- 스키마 드리프트 경고 정리: Alembic 마이그레이션 정합성 점검 및 누락 컬럼/테이블 반영.
-- OpenAPI 최신화 필요 시 `python -m app.export_openapi` 재생성 및 `app/current_openapi.json` 동기화.
-- Pydantic v2 경고 정리(ConfigDict 적용)와 httpx WSGITransport 경고 대응.
-## 2025-08-23 – 활성일수 필드 OpenAPI 반영 확인
-
-변경 요약
-- OpenAPI 재수출 완료(`python -m app.export_openapi`), `backend/app/current_openapi.json`에 UserStatsResponse의 `last_30d_active_days`, `lifetime_active_days`와 설명이 반영됨.
-- 단일 테스트를 플러그인 비활성 옵션으로 실행하여 환경 지연을 회피(`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1`).
-
-검증 결과
-- 스키마 위치: `cc-webapp/backend/app/current_openapi.json` → components.schemas.UserStatsResponse.properties에 두 필드와 한글 설명 존재 확인.
-- export 로그 스냅샷 생성 확인: `/app/openapi_YYYYMMDD_HHMMSS.json` 출력.
-- 경고: events 라우터 Operation ID 중복 경고가 출력되나 기능 영향 없음(정리 이슈로 별도 트래킹).
-
-다음 단계
-- 필요한 경우 OpenAPI 스냅샷 CI 비교 갱신 및 프론트 타입 갱신 PR 준비.
-- events 라우터 Operation ID 중복 정리(비기능 경고 제거).
-- 활성일수 산출 로직 GA 전 사용자 규모 데이터로 성능/정합 재점검.
-
-## 2025-08-23 – /api/users/stats 활성일수 필드 추가
-
-변경 요약
-- UserStatsResponse에 last_30d_active_days, lifetime_active_days 추가.
-- 산출: UTC 00:00 경계 일 단위 distinct. 1차=UserAction.created_at, 예외시 GameHistory.created_at 폴백.
-- 라우터 `app/routers/users.py`에 Field 설명 추가, 서비스 `app/services/user_service.py`에 다이얼렉트별 date distinct 및 GH 폴백 로직 반영.
-
-검증 결과
-- 단일 테스트 `app/tests/test_user_stats_active_days.py` 추가. 슬롯 스핀 후 last_30d_active_days>=1 기대.
-- OpenAPI 재수출 시 UserStatsResponse에 필드/설명 포함 확인 필요.
-- 기존 limited 패키지/멱등 테스트 그린 유지(부분 스위트 기준).
-
-다음 단계
-- 컨테이너에서 전체 pytest 재실행 및 스냅샷 갱신.
-- /docs 스키마 최신화(`python -m app.export_openapi`) 후 프론트 타입 업데이트.
-- 장기적으로 UserAction 로깅 일원화 완료 시 GameHistory 폴백 제거 검토.
-## 2025-08-23 지표 표준화(무중단/저위험) 문서화
-
-변경 요약
-- 게임횟수/접속일수 혼선 제거를 위한 단기 보정안 문서화
-- /api/users/profile 소프트 디프리케이션 재강조(Deprecation/Link 헤더)
-- 프론트 엔드포인트 사용 고정: 프로필=/api/auth/me, 통계=/api/users/stats
-- API 확장 제안: last_30d_active_days, lifetime_active_days(비파괴 가산)
-
-검증 결과
-- 핵심 pytest 그린(최근 스위트 기준), alembic 단일 head 유지, /docs 정상
-- 수동 루틴: 슬롯 3회 → stats.total_games_played 증가, streak 2일 → distinct date=2 확인
-
-다음 단계
-- /api/users/stats에 접속일 관련 2필드 추가 및 테스트/문서 동반
-- 프론트 매핑 정리(PR): 공개 프로필 사용 금지, canonical 엔드포인트 강제
-- OpenAPI 재수출 및 api docs 동기화
 # 변경 요약 / 검증 / 다음 단계 (2025-08-23)
 
 변경 요약
@@ -172,27 +5,32 @@
 - OpenAPI 재수출: backend 컨테이너에서 python -m app.export_openapi 실행, 스냅샷 갱신 완료.
 - 테스트 수정: backend/tests/conftest.py에 db_engine 픽스처 추가로 pytest 실패 픽스.
 - SSE 스트림 오류 수정: /api/metrics/stream에서 UserReward 필드 오기 사용( created_at, amount_gold )을 모델 정의(claimed_at, gold_amount)로 교정.
-- WS 스모크 표준화: `app/scripts/ws_smoke.py`가 `/api/realtime/sync` 우선, 실패 시 `/api/games/ws` 폴백으로 단일화. 컨테이너 실행 결과 `sync_connected` 초프레임 수신 확인.
 
-추가 변경 (보안/CI/모니터링)
-- OpenAPI diff CI 게이트 강화: 커밋된 스냅샷 대비 현재 스키마를 비교해 브레이킹 변경(경로/메서드 삭제) 시 워크플로 실패 + PR 코멘트 요약 게시.
-- RBAC 확장: 민감 비관리자 엔드포인트 `/api/rewards/distribute`에 `require_min_rank("PREMIUM")` 가드 적용. 표준 사용자는 403, PREMIUM 이상만 허용.
-- Grafana 패널 추가: `Legacy WS Connections Rate` 패널(쿼리: `sum(rate(ws_legacy_games_connections_total[5m]))`)로 레거시 WS 이용량 가시화.
+## 2025-08-23 모니터링/리얼타임 보강 (WS 라벨 메트릭 + 브로드캐스트 테스트)
+
+변경 요약
+- 레거시 게임 WS 접속 카운터 보강: `ws_legacy_games_connections_by_result_total{result=accepted|rejected}` 추가. 기존 `ws_legacy_games_connections_total`은 유지(역호환).
+- 리얼타임 허브 단위 테스트 추가: `app/tests/test_realtime_broadcast_stub.py`에서 `hub.broadcast`가 `user_id` 타겟 채널로 올바른 payload를 전달하는지 검증(StubWS로 send_text 캡처).
+
+검증 결과
+- 컨테이너 내 단일 테스트 통과: `pytest -q app/tests/test_realtime_broadcast_stub.py` → 1 passed.
+- OpenAPI/Alembic 스키마 변경 없음(head 단일 유지). `/metrics` 노출 구성 그대로 유지.
+
+다음 단계
+- Grafana 패널에 신규 라벨 메트릭 반영: `sum by (result) (ws_legacy_games_connections_by_result_total)`로 accepted vs rejected 구분 시각화.
+- 로컬 검증: `/api/games/ws` 허용/차단 시나리오를 각각 1회 이상 시도 후 `/metrics`에서 두 카운터 라벨 증가 확인.
+- 필요 시 `api docs/20250808.md`에 메트릭 설명/운영 가이드(허용/차단 플래그와 대시보드 쿼리 예시) 추가.
 
 검증
 - Prometheus Targets: cc-webapp-backend(cc_backend:8000) health=up 확인(HTTP API /api/v1/targets).
 - Pytest: app/tests/test_openapi_diff_ci.py, tests/test_openapi_diff_ci.py, tests/test_main.py 합계 13개 테스트 전부 통과.
 - Alembic: heads=current=86171b66491f (단일 head) 확인.
 - SSE 스모크: 컨테이너 내 curl -N로 /api/metrics/stream 2초 간격 수신 확인(event: metrics 프레임 연속 수신).
-- WS 스모크: `docker compose exec backend python -m app.scripts.ws_smoke` → /api/realtime/sync 접속 성공, 첫 프레임 수신.
-- CI: OpenAPI diff 워크플로에서 삭제 항목 탐지 시 실패 동작 및 PR 코멘트 생성 확인.
-- 테스트: `backend/tests/test_rbac_premium_rewards.py` 추가로 `/api/rewards/distribute` RBAC 403/200 경계 검증.
 
 다음 단계
 - WS 스모크(상점/정산/웹훅): 브라우저에서 배지/토스트 표시 동작 체크 및 스크린샷 캡처.
 - Grafana 대시보드: 구매 지표 패널에 실데이터 유입 확인 및 경보룰 세부 튜닝.
 - CI: OpenAPI diff CI를 워크플로에 통합(스냅샷 아티팩트 업로드/PR 코멘트).
-- 레거시 WS 제거 준비: 대시보드에서 잔여 사용 0 수렴 확인 후 `ENABLE_LEGACY_GAMES_WS=0` 고정화 및 라우터 제거 PR.
 
 ---
 

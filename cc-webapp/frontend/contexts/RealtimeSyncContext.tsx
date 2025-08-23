@@ -344,21 +344,11 @@ export function RealtimeSyncProvider({ children, apiBaseUrl }: RealtimeSyncProvi
   const { push } = useToast();
   const lastPurchaseByReceiptRef = useRef(new Map<string, { status: string; at: number }>());
 
-  const baseUrl = React.useMemo(() => {
-    if (apiBaseUrl) return apiBaseUrl;
-    const envBase =
-      typeof window !== 'undefined'
-        ? (window as any).process?.env?.NEXT_PUBLIC_API_BASE
-        : process.env.NEXT_PUBLIC_API_BASE;
-    if (!envBase || envBase.trim() === '') {
-      if (process.env.NODE_ENV === 'production') {
-        throw new Error('NEXT_PUBLIC_API_BASE is required in production');
-      }
-      // 개발 기본값: IPv4 루프백
-      return 'http://127.0.0.1:8000';
-    }
-    return envBase;
-  }, [apiBaseUrl]);
+  const baseUrl =
+    apiBaseUrl ||
+    (typeof window !== 'undefined'
+      ? (window as any).process?.env?.NEXT_PUBLIC_API_BASE || 'http://localhost:8000'
+      : 'http://localhost:8000');
 
   // WebSocket 메시지 핸들러
   const handleWebSocketMessage = useCallback((message: WebSocketMessage) => {

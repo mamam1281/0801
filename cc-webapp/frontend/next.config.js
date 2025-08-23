@@ -33,18 +33,6 @@ const nextConfig = {
         '**/node_modules/**/.cache/**'
       ],
     };
-    // 운영 데이터 고정 정책: 프로덕션 빌드 시 API Base 필수
-    if (process.env.NODE_ENV === 'production') {
-      const required = ['NEXT_PUBLIC_API_BASE'];
-      const missing = required.filter((k) => !process.env[k] || process.env[k].trim() === '');
-      if (missing.length > 0) {
-        throw new Error(
-          `환경 변수 누락: ${missing.join(', ')}\n` +
-            '프로덕션 빌드에서 NEXT_PUBLIC_API_BASE는 반드시 설정되어야 합니다.'
-        );
-      }
-    }
-
     return config;
   },
 };

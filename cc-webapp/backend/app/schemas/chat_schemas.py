@@ -164,8 +164,7 @@ class AIAssistantResponse(BaseModel):
     can_provide_rewards: bool = False
     is_active: bool = True
     created_at: datetime
-    # Allow fields starting with "model_" without protected-namespace warnings (Pydantic v2)
-    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
+    model_config = ConfigDict(from_attributes=True)
 
 
 class AIConversationCreate(BaseModel):

@@ -38,8 +38,7 @@ services:
     entrypoint: ["/bin/sh", "-c", "chmod +x /app/entrypoint.sh; sed -i 's/\\r$//' /app/entrypoint.sh; /bin/sh /app/entrypoint.sh"]
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "curl -4 -fsS http://localhost:8000/health || exit 1"]
-      start_period: 30s
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 15s
       timeout: 5s
       retries: 5

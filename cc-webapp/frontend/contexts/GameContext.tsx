@@ -126,11 +126,6 @@ export function GameProvider({ children }: GameProviderProps) {
 
   // Auto-save user data
   const persistUser = useCallback(async (user: User): Promise<void> => {
-    if (process.env.NODE_ENV === 'production') {
-      // 운영에서는 로컬 사용자 캐시 금지
-      try { localStorage.removeItem('game-user'); } catch {}
-      return;
-    }
     try {
       const validatedUser = validateUser(user);
       const serializedUser = JSON.stringify({
@@ -149,14 +144,11 @@ export function GameProvider({ children }: GameProviderProps) {
   // Load user data
   const loadUser = useCallback(async (): Promise<User | null> => {
     try {
-      if (process.env.NODE_ENV === 'production') {
-        try { localStorage.removeItem('game-user'); } catch {}
-        return null;
-      }
       const savedUser = localStorage.getItem('game-user');
       if (!savedUser) return null;
 
       const userData = JSON.parse(savedUser);
+      
       // Convert date strings back to Date objects
       if (userData.lastLogin) userData.lastLogin = new Date(userData.lastLogin);
       if (userData.registrationDate) userData.registrationDate = new Date(userData.registrationDate);
@@ -164,10 +156,11 @@ export function GameProvider({ children }: GameProviderProps) {
 
       const compatibleUser = ensureUserCompatibility(userData);
       const validatedUser = validateUser(compatibleUser);
+      
       return validatedUser;
     } catch (error) {
       console.error('Failed to load user:', error);
-      try { localStorage.removeItem('game-user'); } catch {}
+      localStorage.removeItem('game-user');
       dispatch({ type: 'SET_ERROR', payload: '사용자 데이터 로드에 실패했습니다.' });
       return null;
     }

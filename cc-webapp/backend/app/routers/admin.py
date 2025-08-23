@@ -4,7 +4,7 @@ import logging
 import uuid
 from typing import List, Optional, Any
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field
 from typing import Any
 from fastapi.responses import StreamingResponse
 import csv
@@ -121,7 +121,8 @@ class UserSummary(BaseModel):
     user_rank: Optional[str] = None
     created_at: datetime
 
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        from_attributes = True
 
 class UserDetail(UserSummary):
     cyber_token_balance: int
@@ -490,11 +491,10 @@ class AdminCatalogItemIn(BaseModel):
     discount_ends_at: Optional[datetime] = None
     min_rank: Optional[str] = None
 
-    model_config = ConfigDict(
-        populate_by_name=True,
+    class Config:
         # Backward compatibility: accept incoming 'gems' field but internally we are gold-only.
-        fields={"gold": {"alias": "gems"}},
-    )
+        fields = {"gold": {"alias": "gems"}}
+        allow_population_by_field_name = True
 
 class AdminCatalogItemOut(BaseModel):
     id: int
@@ -511,7 +511,8 @@ class AdminCatalogItemOut(BaseModel):
         # ensure deprecated alias mirrors gold for legacy clients
         object.__setattr__(self, 'gems', self.gold)
 
-    model_config = ConfigDict(populate_by_name=True)
+    class Config:
+        allow_population_by_field_name = True
 
 @router.get("/shop/items", response_model=list[AdminCatalogItemOut])
 async def admin_list_items(admin_user = Depends(require_admin_access)):
