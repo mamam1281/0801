@@ -1,3 +1,38 @@
+## 2025-08-23 DB 마이그레이션 후속 적용: PK 인덱스 정규화
+
+변경 요약
+- Alembic 스탬프를 현재 적용 상태(be6edf74183a, 컷오버)로 맞춘 뒤 head까지 업그레이드(c6a1b5e2e2b1) 수행
+- `shop_transactions` 테이블의 PK 인덱스명을 `shop_transactions_pkey`로 정규화(기존 shadow 기원 이름을 공식명으로 교체)
+- 백업 테이블 `shop_transactions_old`는 안전 기간을 위해 유지(추후 정리 PR에서 제거 예정)
+
+검증 결과
+- `alembic heads` 단일 head: c6a1b5e2e2b1 확인
+- 인덱스 목록 확인: `shop_transactions_pkey`, `ix_shop_tx_*`, `uq_shop_tx_user_product_idem` 정상
+- 제한/멱등 핵심 테스트 스위트 통과: limited holds/concurrency + shop_buy + limited packages/promos 전부 green
+
+다음 단계
+- 안전 기간 경과 후 `shop_transactions_old` 제거(드롭 전 최종 파리티 스냅샷 기록)
+- 경고 정리 PR 진행: Pydantic ConfigDict/`protected_namespaces` 조정, httpx TestClient deprecation 처리, OpenAPI operationId 고유화
+- 필요 시 OpenAPI 재수출 및 /docs 스키마 점검(스키마 변화 없으므로 보류 가능)
+
+## 2025-08-23 섀도우 마이그레이션(PR1) 적용 메모
+
+변경 요약
+- Alembic rev1 생성: `shop_transactions_shadow` 테이블 신설, 유니크 제약(`uq_shop_tx_user_product_idem_shadow`) 및 인덱스 4종 생성.
+- 더블라이트(DB 트리거) 적용: `shop_tx_shadow_replica` 함수 + `trg_shop_tx_shadow_replica` 트리거로 `shop_transactions`의 INSERT/UPDATE/DELETE를 섀도우에 동기화.
+- 백필 스크립트 1회 실행(최대 1만건); 초기 상태에서 누락 0건. 트리거 실증 위해 데모 트랜잭션 1건 삽입 → 섀도우 복제 확인.
+
+검증 결과
+- Alembic heads: 단일 head 유지(`9043e151c7b9`). `alembic upgrade head` 정상.
+- 테이블 존재 확인: `SELECT to_regclass('public.shop_transactions_shadow')` → true.
+- 파리티: 행수 0/0, 합계 0/0(초기 데이터 없음); 데모 삽입(id=66) 후 섀도우 존재 `t` 확인.
+- 테스트: `pytest-limited-suite` 및 `pytest-limited-idem` 통과(6+3 tests pass). Pydantic/httpx 관련 경고는 기존 수준 유지.
+
+다음 단계
+- PR1 마감 전: 운영 데이터 기준 백필 반복 실행(배치 크기 10k, 0행 시 종료), 최근 24h 파리티 점검 유지.
+- PR2 준비: 컷오버/리네임 및 구테이블 정리 리비전 작성, 애플리케이션 레벨 읽기 전환 점검.
+- 경고 정리 PR: Pydantic ConfigDict 전환, Query pattern 점검, httpx TestClient 초기화 조정, OpenAPI operationId 중복 제거 및 스냅샷 테스트 추가.
+
 ## 2025-08-23 프론트 운영 환경 고정 문서화 + 마이그레이션/경고 정리 계획
 
 변경 요약
@@ -26,6 +61,17 @@
 - Pydantic v2: BaseModel 내부 Config → ConfigDict 사용, `model_config = ConfigDict(...)`로 전환. Field(pattern)로 Query regex 경고 제거 확인.
 - httpx/TestClient: 고정 버전(0.27.0) 유지 점검, WSGITransport 경고가 남으면 테스트 클라이언트 생성부에서 transport 명시 또는 httpx 옵션 조정.
 - Operation ID 중복: OpenAPI export 시 경고되는 라우터 operation_id 중복 정리, 테스트 추가로 회귀 방지.
+
+추가 변경(프론트/CI)
+- `.env.production.sample` 파일 추가: 필수 ENV(NEXT_PUBLIC_API_BASE/ORIGIN) 포함.
+- 프론트 `prebuild`에 `scripts/validate-env.mjs` 도입: prod 빌드 시 필수 ENV 누락이면 실패.
+- CI 워크플로우 `frontend-build.yml` 추가: prod 빌드가 항상 ENV 가드를 통과하는지 검증.
+
+문서/PR 스캐폴딩
+- `api docs/20250823_MIGRATION_AND_WARNINGS_PLAN.md` 신설: PR 1/2 단계, 병행 테스트, 경고 정리 구체 계획 수록.
+- `cc-webapp/backend/app/migrations_plan/` 폴더에 백필/일관성 검증 템플릿과 가이드 추가.
+ - Alembic 템플릿 초안 추가(rev1/2/3): shop_transactions 대상으로 Shadow 생성→Cutover→Cleanup 스켈레톤 파일 배치.
+ - 더블라이트(앱 레벨) 스텁 가이드 문서 추가.
 
 ## 2025-08-23 변경 요약
 

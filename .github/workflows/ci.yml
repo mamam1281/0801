@@ -55,6 +55,10 @@ jobs:
           # Run only curated green path tests for gating
           docker exec -e KAFKA_TEST_TOPIC=cc_test_ci -e KAFKA_ENABLED=1 cc_backend_test pytest -q app/tests/test_user_journey.py app/tests/test_kafka_roundtrip.py
 
+  # TODO: 향후 추가
+  # - Pydantic v2 경고 스캔 단계
+  # - OpenAPI operationId 중복 검출 단계
+
       - name: Teardown
         if: always()
         run: docker compose -f docker-compose.yml -f docker-compose.test.yml --env-file .env.test down -v
