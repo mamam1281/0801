@@ -244,6 +244,15 @@ async def lifespan(app: FastAPI):
 
 # ===== FastAPI App Initialization =====
 
+def _unique_id(route):
+    # method-경로 기반 고유 operationId (경로의 중괄호는 밑줄로 치환)
+    method = next(iter(route.methods or []), 'get').lower()
+    path = (route.path.replace('/', '_')
+                     .replace('{', '')
+                     .replace('}', '')
+                     .strip('_'))
+    return f"{method}_{path}" if path else method
+
 app = FastAPI(
     title="Casino-Club F2P API",
     description="Backend API for Casino-Club F2P gaming platform",
@@ -251,6 +260,7 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
     lifespan=lifespan,
+    generate_unique_id_function=_unique_id,
 )
 
 # ===== Request/Response Models =====

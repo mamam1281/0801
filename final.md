@@ -15,6 +15,31 @@
 - 경고 정리 PR 진행: Pydantic ConfigDict/`protected_namespaces` 조정, httpx TestClient deprecation 처리, OpenAPI operationId 고유화
 - 필요 시 OpenAPI 재수출 및 /docs 스키마 점검(스키마 변화 없으므로 보류 가능)
 
+## 2025-08-23 안전 기간 종료 후 DB 정리 & 경고 최소화(무중단)
+- 백업 테이블 최종 스냅샷: `data_export/shop_transactions_old_snapshot.csv` 생성
+- 백업 테이블 제거: `DROP TABLE IF EXISTS shop_transactions_old CASCADE;` 적용, 존재 확인 결과 NULL
+- Alembic 단일 head 재확인: `c6a1b5e2e2b1 (head)`
+- OpenAPI operationId 고유화: FastAPI init에 generate_unique_id_function 추가(메서드+경로 기반)
+- Pydantic v2 전환(부분): admin/tracking/standalone_app의 `class Config` → `model_config = ConfigDict(...)`
+- httpx 테스트 경고 감소: pytest.ini에 일시적 필터 추가(ASGITransport 전환은 후속 PR)
+
+## 2025-08-23 테스트 클라이언트 httpx 전환 검증 + 경고 필터 보강
+
+변경 요약
+- 테스트 클라이언트를 httpx.ASGITransport 기반 호환 래퍼로 대체(conftest.py에서 TestClient 패치)하여 httpx 'app' 단축 경고 제거 준비.
+- 제한/멱등 스위트 재실행으로 회귀 확인(환경 TTL 오버라이드 포함).
+- pytest.ini에 경고 필터 보강: passlib crypt, pydantic v2 Config 경고, model_ 네임스페이스 충돌 경고 임시 억제.
+
+검증 결과
+- pytest-limited-suite: 3 passed (경고 일부 잔존)
+- pytest-limited-idem: 6 passed (경고 일부 잔존)
+- Alembic heads: c6a1b5e2e2b1 (단일 head) 유지
+
+다음 단계
+- Pydantic v2 전환 마무리: 남은 class Config 제거 및 protected_namespaces=( ) 적용 범위 확정
+- httpx 경고 완전 제거: 전역 TestClient 사용처가 conftest 패치를 모두 타도록 tests 트리 정리 또는 직접 import 경로 통일
+- OpenAPI 스냅샷/CI 감시 지속 및 /docs 스모크
+
 ## 2025-08-23 섀도우 마이그레이션(PR1) 적용 메모
 
 변경 요약

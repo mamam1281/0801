@@ -28,8 +28,12 @@ from sqlalchemy.orm import sessionmaker
 from app.models import Base
 from app.database import get_db
 from app.main import app
-from fastapi.testclient import TestClient
+from fastapi.testclient import TestClient as _OrigTestClient
+import httpx
+import fastapi.testclient as _ftc
+import anyio
 import os
+from functools import partial
 
 # Set test environment variables
 os.environ["TESTING"] = "true"
@@ -87,6 +91,95 @@ def db_session(db_engine):
         transaction.rollback()
         connection.close()
 
+class _CompatTestClient:
+    """
+    Sync wrapper around httpx.AsyncClient + ASGITransport using an anyio blocking portal.
+    This avoids deprecated fastapi.testclient usage and works with httpx>=0.27.
+    """
+
+    # prevent pytest from collecting this class as a test
+    __test__ = False
+
+    def __init__(self, fastapi_app, base_url: str = "http://test", headers: dict | None = None):
+        self.app = fastapi_app
+        self._transport = httpx.ASGITransport(app=fastapi_app)
+        self._ac = httpx.AsyncClient(transport=self._transport, base_url=base_url, headers=headers)
+        self._portal = None
+        self._portal_cm = None  # context manager for portal
+
+    def _ensure_started(self):
+        if self._portal is None:
+            # start_blocking_portal may act as a context manager depending on anyio version
+            self._portal_cm = anyio.from_thread.start_blocking_portal()
+            self._portal = self._portal_cm.__enter__()
+            self._portal.call(self._ac.__aenter__)
+
+    # context manager
+    def __enter__(self):
+        self._ensure_started()
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        try:
+            if self._portal is not None:
+                self._portal.call(self._ac.__aexit__, exc_type, exc, tb)
+        finally:
+            if self._portal_cm is not None:
+                self._portal_cm.__exit__(exc_type, exc, tb)
+            self._portal = None
+            self._portal_cm = None
+
+    # compat surface
+    def request(self, method: str, url: str, **kwargs):
+        self._ensure_started()
+    return self._portal.call(partial(self._ac.request, method, url, **kwargs))
+
+    def get(self, url: str, **kwargs):
+        self._ensure_started()
+    return self._portal.call(partial(self._ac.get, url, **kwargs))
+
+    def post(self, url: str, **kwargs):
+        self._ensure_started()
+    return self._portal.call(partial(self._ac.post, url, **kwargs))
+
+    def put(self, url: str, **kwargs):
+        self._ensure_started()
+    return self._portal.call(partial(self._ac.put, url, **kwargs))
+
+    def patch(self, url: str, **kwargs):
+        self._ensure_started()
+    return self._portal.call(partial(self._ac.patch, url, **kwargs))
+
+    def delete(self, url: str, **kwargs):
+        self._ensure_started()
+    return self._portal.call(partial(self._ac.delete, url, **kwargs))
+
+    def close(self):
+        # best-effort close when not used as a context manager
+        if self._portal is not None:
+            try:
+                self._portal.call(self._ac.__aexit__, None, None, None)
+            except Exception:
+                pass
+        if self._portal_cm is not None:
+            try:
+                self._portal_cm.__exit__(None, None, None)
+            except Exception:
+                pass
+        self._portal = None
+        self._portal_cm = None
+
+    @property
+    def headers(self):
+        return self._ac.headers
+
+    @property
+    def cookies(self):
+        return self._ac.cookies
+
+# Patch module symbol so test files importing TestClient get the compat version
+_ftc.TestClient = _CompatTestClient
+
 @pytest.fixture(scope="function")
 def client(db_session):
     def override_get_db():
@@ -96,5 +189,6 @@ def client(db_session):
             pass
 
     app.dependency_overrides[get_db] = override_get_db
-    yield TestClient(app)
+    with _CompatTestClient(app) as c:
+        yield c
     del app.dependency_overrides[get_db]

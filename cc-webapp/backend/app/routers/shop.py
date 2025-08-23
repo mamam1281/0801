@@ -1408,6 +1408,13 @@ def buy_limited(req: LimitedBuyRequest, *, db = Depends(get_db), current_user = 
             if cnt > 5:
                 rate_limited = True
                 _metric_inc("limited", "fail", "RATE_LIMIT")
+                # Broadcast rate limit failure (best-effort)
+                try:
+                    from .realtime import broadcast_purchase_update
+                    if background_tasks is not None:
+                        background_tasks.add_task(broadcast_purchase_update, user_id, status="failed", product_id=req.package_id, reason_code="RATE_LIMIT")
+                except Exception:
+                    pass
                 return LimitedBuyReceipt(success=False, message="Rate limit exceeded", user_id=user_id, code=req.package_id, reason_code="RATE_LIMIT")
         except Exception:
             pass
@@ -1418,16 +1425,37 @@ def buy_limited(req: LimitedBuyRequest, *, db = Depends(get_db), current_user = 
             if rman.redis_client.exists(_idem_key(user_id, req.package_id, idem)):
                 # 이미 성공 처리됨
                 cur_user = db.query(models.User).filter(models.User.id == user_id).first()
+                # Broadcast idempotent reuse info (best-effort)
+                try:
+                    from .realtime import broadcast_purchase_update
+                    if background_tasks is not None:
+                        background_tasks.add_task(broadcast_purchase_update, user_id, status="idempotent_reuse", product_id=req.package_id)
+                except Exception:
+                    pass
                 return LimitedBuyReceipt(success=True, message="중복 요청 처리됨", user_id=user_id, code=req.package_id, new_gold_balance=getattr(cur_user, 'gold_balance', 0) if cur_user else None)
             # pre-lock 획득 시도
             if not rman.redis_client.set(_idem_lock_key(user_id, req.package_id, idem), "1", nx=True, ex=60):
                 _metric_inc("limited", "fail", "PROCESSING")
+                # Broadcast processing duplicate (best-effort)
+                try:
+                    from .realtime import broadcast_purchase_update
+                    if background_tasks is not None:
+                        background_tasks.add_task(broadcast_purchase_update, user_id, status="processing", product_id=req.package_id, reason_code="PROCESSING")
+                except Exception:
+                    pass
                 return LimitedBuyReceipt(success=False, message="Processing duplicate", user_id=user_id, code=req.package_id, reason_code="PROCESSING")
         except Exception:
             pass
     pkg = LimitedPackageService.get(req.package_id)
     if not pkg:
         _metric_inc("limited", "fail", "NOT_FOUND")
+        # Broadcast not found (best-effort)
+        try:
+            from .realtime import broadcast_purchase_update
+            if background_tasks is not None:
+                background_tasks.add_task(broadcast_purchase_update, user_id, status="failed", product_id=req.package_id, reason_code="NOT_FOUND")
+        except Exception:
+            pass
         return LimitedBuyReceipt(success=False, message="Package not found", user_id=user_id, reason_code="NOT_FOUND")
     now = datetime.utcnow()
     # normalize to naive for comparison if needed
@@ -1436,6 +1464,13 @@ def buy_limited(req: LimitedBuyRequest, *, db = Depends(get_db), current_user = 
     if not (pkg.is_active and pkg.start_at <= now <= pkg.end_at):
         cur_user = db.query(models.User).filter(models.User.id == user_id).first()
         _metric_inc("limited", "fail", "WINDOW_CLOSED")
+        # Broadcast window closed (best-effort)
+        try:
+            from .realtime import broadcast_purchase_update
+            if background_tasks is not None:
+                background_tasks.add_task(broadcast_purchase_update, user_id, status="failed", product_id=pkg.code, reason_code="WINDOW_CLOSED")
+        except Exception:
+            pass
         return LimitedBuyReceipt(
             success=False,
             message="Package not available",
@@ -1448,6 +1483,13 @@ def buy_limited(req: LimitedBuyRequest, *, db = Depends(get_db), current_user = 
     user = db.query(models.User).filter(models.User.id == user_id).first()
     if not user:
         _metric_inc("limited", "fail", "UNAUTHORIZED")
+        # Broadcast unauthorized (best-effort)
+        try:
+            from .realtime import broadcast_purchase_update
+            if background_tasks is not None:
+                background_tasks.add_task(broadcast_purchase_update, user_id, status="failed", product_id=req.package_id, reason_code="UNAUTHORIZED")
+        except Exception:
+            pass
         return LimitedBuyReceipt(
             success=False,
             message="User not found",
@@ -1515,6 +1557,13 @@ def buy_limited(req: LimitedBuyRequest, *, db = Depends(get_db), current_user = 
             except Exception:
                 pass
         _metric_inc("limited", "fail", "USER_LIMIT")
+        # Broadcast per-user limit failure (best-effort)
+        try:
+            from .realtime import broadcast_purchase_update
+            if background_tasks is not None:
+                background_tasks.add_task(broadcast_purchase_update, user_id, status="failed", product_id=pkg.code, reason_code="USER_LIMIT")
+        except Exception:
+            pass
         return LimitedBuyReceipt(
             success=False,
             message="Per-user limit exceeded",
@@ -1534,6 +1583,13 @@ def buy_limited(req: LimitedBuyRequest, *, db = Depends(get_db), current_user = 
     hold_id: Optional[str] = None
     if not LimitedPackageService.try_reserve(pkg.code, req.quantity):
         _metric_inc("limited", "fail", "OUT_OF_STOCK")
+        # Broadcast stock failure (best-effort)
+        try:
+            from .realtime import broadcast_purchase_update
+            if background_tasks is not None:
+                background_tasks.add_task(broadcast_purchase_update, user_id, status="failed", product_id=pkg.code, reason_code="OUT_OF_STOCK")
+        except Exception:
+            pass
         return LimitedBuyReceipt(
             success=False,
             message="Out of stock",
@@ -1561,6 +1617,13 @@ def buy_limited(req: LimitedBuyRequest, *, db = Depends(get_db), current_user = 
             finally:
                 LimitedPackageService.release_reservation(pkg.code, req.quantity)
             _metric_inc("limited", "fail", "PROMO_EXHAUSTED")
+            # Broadcast promo exhausted (best-effort)
+            try:
+                from .realtime import broadcast_purchase_update
+                if background_tasks is not None:
+                    background_tasks.add_task(broadcast_purchase_update, user_id, status="failed", product_id=pkg.code, reason_code="PROMO_EXHAUSTED")
+            except Exception:
+                pass
             return LimitedBuyReceipt(
                 success=False,
                 message="Promo code usage limit reached",
@@ -1584,6 +1647,13 @@ def buy_limited(req: LimitedBuyRequest, *, db = Depends(get_db), current_user = 
                 rman.redis_client.expire(rl_key, 10)
             if cnt > 5:
                 _metric_inc("limited", "fail", "RATE_LIMIT")
+                # Broadcast rate limit failure (best-effort)
+                try:
+                    from .realtime import broadcast_purchase_update
+                    if background_tasks is not None:
+                        background_tasks.add_task(broadcast_purchase_update, user_id, status="failed", product_id=req.package_id, reason_code="RATE_LIMIT")
+                except Exception:
+                    pass
                 return LimitedBuyReceipt(success=False, message="Rate limit exceeded", user_id=user_id, code=req.package_id, reason_code="RATE_LIMIT")
         except Exception:
             pass
@@ -1598,6 +1668,13 @@ def buy_limited(req: LimitedBuyRequest, *, db = Depends(get_db), current_user = 
         finally:
             LimitedPackageService.release_reservation(pkg.code, req.quantity)
         _metric_inc("limited", "fail", "PAYMENT_AUTH")
+        # Broadcast payment authorize failure (best-effort)
+        try:
+            from .realtime import broadcast_purchase_update
+            if background_tasks is not None:
+                background_tasks.add_task(broadcast_purchase_update, user_id, status="failed", product_id=pkg.code, reason_code="PAYMENT_FAILED", amount=total_price_cents)
+        except Exception:
+            pass
         return LimitedBuyReceipt(
             success=False,
             message=f"Payment failed: {auth.message}",
@@ -1619,6 +1696,13 @@ def buy_limited(req: LimitedBuyRequest, *, db = Depends(get_db), current_user = 
         finally:
             LimitedPackageService.release_reservation(pkg.code, req.quantity)
         _metric_inc("limited", "fail", "PAYMENT_CAPTURE")
+        # Broadcast payment capture failure (best-effort)
+        try:
+            from .realtime import broadcast_purchase_update
+            if background_tasks is not None:
+                background_tasks.add_task(broadcast_purchase_update, user_id, status="failed", product_id=pkg.code, reason_code="PAYMENT_FAILED", amount=total_price_cents)
+        except Exception:
+            pass
         return LimitedBuyReceipt(
             success=False,
             message=f"Capture failed: {cap.message}",
@@ -1639,6 +1723,13 @@ def buy_limited(req: LimitedBuyRequest, *, db = Depends(get_db), current_user = 
     except Exception:
         try:
             db.rollback()
+        except Exception:
+            pass
+        # Broadcast grant failure (best-effort)
+        try:
+            from .realtime import broadcast_purchase_update
+            if background_tasks is not None:
+                background_tasks.add_task(broadcast_purchase_update, user_id, status="failed", product_id=pkg.code, reason_code="GRANT_FAILED", amount=total_price_cents)
         except Exception:
             pass
         return LimitedBuyReceipt(

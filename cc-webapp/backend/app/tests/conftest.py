@@ -2,6 +2,110 @@ import os, sys, pytest
 from types import SimpleNamespace
 from fastapi.testclient import TestClient
 from types import SimpleNamespace
+import httpx
+import anyio
+from functools import partial
+
+# --- Replace FastAPI TestClient with httpx.ASGITransport-based client to avoid deprecation ---
+try:
+	import fastapi.testclient as _ftc
+
+	class _CompatTestClient:
+		"""
+		Sync facade over httpx.AsyncClient + ASGITransport using anyio blocking portal.
+		Ensures proper ASGI lifespan handling and keeps a synchronous TestClient-like API.
+		"""
+
+		# prevent pytest from collecting this as a test class
+		__test__ = False
+
+		def __init__(self, app, base_url: str = "http://test", headers: dict | None = None):
+			self._app = app
+			self._transport = httpx.ASGITransport(app=app)
+			self._ac = httpx.AsyncClient(transport=self._transport, base_url=base_url, headers=headers)
+			self._portal = None  # type: ignore[assignment]
+			self._portal_cm = None  # context manager for portal
+
+		def _ensure_started(self):
+			"""Start anyio portal and enter AsyncClient context if not started."""
+			if self._portal is None:
+				# anyio.from_thread.start_blocking_portal returns a context manager in some versions
+				self._portal_cm = anyio.from_thread.start_blocking_portal()
+				# enter context manager to obtain a usable BlockingPortal instance
+				self._portal = self._portal_cm.__enter__()
+				# Enter AsyncClient context inside the portal to manage ASGI lifespan
+				self._portal.call(self._ac.__aenter__)
+
+		# context manager
+		def __enter__(self):
+			self._ensure_started()
+			return self
+
+		def __exit__(self, exc_type, exc, tb):
+			try:
+				# Exit async client context (triggers ASGI lifespan shutdown)
+				if self._portal is not None:
+					self._portal.call(self._ac.__aexit__, exc_type, exc, tb)
+			finally:
+				# Close portal context manager if active
+				if self._portal_cm is not None:
+					self._portal_cm.__exit__(exc_type, exc, tb)
+				self._portal = None
+				self._portal_cm = None
+
+		# minimal surface compatible with TestClient usage in repo
+		def request(self, method: str, url: str, **kwargs):
+			self._ensure_started()
+			return self._portal.call(partial(self._ac.request, method, url, **kwargs))
+
+		def get(self, url: str, **kwargs):
+			self._ensure_started()
+			return self._portal.call(partial(self._ac.get, url, **kwargs))
+
+		def post(self, url: str, **kwargs):
+			self._ensure_started()
+			return self._portal.call(partial(self._ac.post, url, **kwargs))
+
+		def put(self, url: str, **kwargs):
+			self._ensure_started()
+			return self._portal.call(partial(self._ac.put, url, **kwargs))
+
+		def patch(self, url: str, **kwargs):
+			self._ensure_started()
+			return self._portal.call(partial(self._ac.patch, url, **kwargs))
+
+		def delete(self, url: str, **kwargs):
+			self._ensure_started()
+			return self._portal.call(partial(self._ac.delete, url, **kwargs))
+
+		def close(self):
+			# Allow manual close when not using context manager
+			try:
+				if self._portal is not None:
+					try:
+						self._portal.call(self._ac.__aexit__, None, None, None)
+					except Exception:
+						pass
+			finally:
+				if self._portal_cm is not None:
+					self._portal_cm.__exit__(None, None, None)
+				self._portal = None
+				self._portal_cm = None
+
+		# convenience proxies used in tests
+		@property
+		def headers(self):
+			return self._ac.headers
+
+		@property
+		def cookies(self):
+			return self._ac.cookies
+
+	# Patch module symbol so subsequent imports get the compat client
+	_ftc.TestClient = _CompatTestClient
+except Exception:
+	# fail-soft: keep original TestClient
+	pass
 
 # Add backend root to sys.path if missing (when pytest launched from repo root)
 _here = os.path.dirname(__file__)

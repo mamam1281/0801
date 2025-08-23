@@ -65,6 +65,19 @@
 
 원하시면 서버에 위 2개 필드를 추가하고(비파괴/가산 필드), 컨테이너 내에서 빠른 테스트까지 실행해 드릴 수 있습니다.
 
+## [업데이트 로그] 2025-08-23 DB 마이그레이션 후속 적용(핵심 안정화)
+- 내용: Alembic 스탬프를 컷오버 리비전(be6edf74183a)으로 정렬 후 head(c6a1b5e2e2b1)까지 업그레이드하여 `shop_transactions`의 PK 인덱스명을 `shop_transactions_pkey`로 정규화.
+- 검증: `alembic heads` 단일 head 유지, `pg_indexes`로 인덱스 목록 확인(`shop_transactions_pkey`, `ix_shop_tx_*`, `uq_shop_tx_user_product_idem`).
+- 테스트: 제한/멱등 핵심 스위트 green(limited holds/concurrency, shop_buy, limited packages/promos).
+- 메모: 백업 테이블 `shop_transactions_old`는 안전 기간 동안 유지(후속 정리 PR에서 삭제 예정, 드롭 전 파리티 스냅샷 기록).
+
+## [업데이트 로그] 2025-08-23 안전 기간 종료 후 DB 정리 & 경고 최소화
+- 스냅샷: `data_export/shop_transactions_old_snapshot.csv` 생성 후 `shop_transactions_old` 드롭 완료.
+- Alembic: 단일 head 재확인(`c6a1b5e2e2b1`).
+- OpenAPI: operationId 고유화 함수 적용(메서드+경로 기반) → 중복 operationId 경고 방지.
+- Pydantic v2 전환(부분): admin/tracking/standalone_app의 `class Config` → `model_config=ConfigDict(...)`.
+- httpx 경고: 테스트에서는 일시 필터로 감춤(ASGITransport 적용은 후속 PR에서 처리).
+
 # 🎰 Casino-Club F2P 상용 기준 전역 가이드 & 점검 체크리스트 (v0.1 / 2025-08-23)
 
 본 문서는 상용 카지노 게임 웹 수준을 기준으로, 현재 프로젝트를 전역적으로 평가·개선하기 위한 실행형 가이드와 체크리스트입니다. 최소 변경 원칙과 컨테이너 표준(docker-compose) 하에 진행하며, 테스트 그린·Alembic 단일 head·/docs 스키마 일관을 성공 기준으로 합니다.
@@ -184,16 +197,7 @@
 	- 유실 대비: 재연결 후 초기 상태 수신 확인
   	- 폴백: `/api/games/ws`는 임시 호환용(가능한 사용 지양)
 - 로그 포인트
-	- 허브 register/unregister INFO, 브로드캐스트 DEBUG(샘플링), 스로틀 히트 카운트
-
-### F. 데이터/스키마/계약
-- [ ] Postgres: 핵심 인덱스(`user_actions(user_id, created_at)` 등) 및 FK/UNIQUE 무결성.
-- [ ] Redis: 키 네이밍/TTL 정책, 멱등키/재고/스트릭 키 충돌 없음.
-- [ ] Kafka: 토픽 존재/오프셋 모니터링, 재시작 시 재소비 전략 명시.
-- [ ] ClickHouse: 파티션/정렬키 적용, 적재 지연/누락 모니터링.
-- [x] 이벤트/HTTP 계약: OpenAPI 단일 소스, 메시지 스키마 문서와 일치(WS 스키마 표준 적용, OpenAPI 스냅샷 스크립트 준비).
-- 메모(2025-08-23): CI 게이트 강화 – 경로/메서드 제거 외에 스키마 타입 변경 및 required 필드 추가도 차단. PR 코멘트에 변경 요약 자동 기입.
-
+	- 허브 register/unregister INFO, 브로드캐스트 DEBUG(샘플링), 스로틀 히트 카운트  
 ### G. 관측성/운영
 - 구현 위치
 	- 글로벌 메트릭 라우터: `backend/app/routers/metrics.py` (`/api/metrics/global`, `/api/metrics/stream`)
