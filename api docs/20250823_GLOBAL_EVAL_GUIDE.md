@@ -2,6 +2,39 @@
 
 본 문서는 상용 카지노 게임 웹 수준을 기준으로, 현재 프로젝트를 전역적으로 평가·개선하기 위한 실행형 가이드와 체크리스트입니다. 최소 변경 원칙과 컨테이너 표준(docker-compose) 하에 진행하며, 테스트 그린·Alembic 단일 head·/docs 스키마 일관을 성공 기준으로 합니다.
 
+## [업데이트 로그] 2025-08-23 WS 표준화/스모크 결과
+- 변경 요약
+	- 리얼타임 표준 경로를 `/api/realtime/sync`로 확정. 레거시 `/api/games/ws`는 비권장(deprecated) 폴백으로만 유지(추후 제거 예정).
+	- 스모크 스크립트(`backend/app/scripts/ws_smoke.py`)를 표준→폴백 순으로 접속하도록 단일화.
+- 검증
+	- 컨테이너 내부 실행: `docker compose exec backend python -m app.scripts.ws_smoke` → 첫 프레임 `sync_connected` 수신.
+- 다음 단계
+	- 프론트 전역 리스너 기본 경로 재확인(OK) 및 문서 주석 강화.
+	- 레거시 `/api/games/ws` 사용처 모니터링 후 제거 스위치 도입 → 단계적 제거.
+
+## 현재 진행도 요약 (2025-08-23)
+- A. 인증/세션: Green ~80%
+	- 가입/로그인/락아웃/토큰 기본 시나리오 동작, 테스트 스모크 통과. 리프레시/락 정책 추가 검증 일부 남음.
+- B. 프로필/스트릭/업적/배틀패스: Yellow ~60%
+	- 프로필/스트릭 OK, 업적 기본 반영. 배틀패스는 설계/연동 대기.
+- C. 경제/상점/보상: Yellow ~70%
+	- buy/limited/webhook/settle 전 구간 브로드캐스트 배선 적용, 멱등/Fraud 정책 반영. 리그레션/경계 테스트 보강 필요.
+- D. 게임 & 통계: Yellow ~65%
+	- `/api/actions` 로깅/최근 액션/WS 브로드캐스트 OK. Crash/세부 통계 검증 일부 대기.
+- E. 리얼타임(WS): Green ~90%
+	- 허브 표준화(`/api/realtime/sync`), 프론트 기본 경로 전환 확인, 스모크 성공. 레거시 제거 스위치 도입 예정.
+	- 레거시 제거 스위치 추가: ENABLE_LEGACY_GAMES_WS=false 설정 시 `/api/games/ws` 거부 및 Prometheus 카운터(ws_legacy_games_connections_total) 집계.
+- F. 데이터/스키마/계약: Yellow-Green ~75%
+	- OpenAPI 단일 소스/스냅샷/디프 준비 완료. 핵심 인덱스/제약/마이그레이션 점검 일부 남음.
+- G. 관측성/운영: Yellow-Green ~75%
+	- Prometheus/Grafana 가동/라벨 정합, 기본 패널 OK. 지표/임계치 튜닝 및 실데이터 검증 진행 중.
+- H. 보안/권한: Red ~30%
+	- RBAC/관리자 보호/감사로그/키 회전 강화 진행: JWT kid 헤더(kid=KEY_ROTATION_VERSION) 추가, 감사로그 유틸(app/security/audit.py) 도입 및 일부 Admin 엔드포인트에 적용.
+- I. 신뢰성/DR: Yellow ~50%
+	- Alembic 단일 head 유지. 백업/롤백 절차/프로파일 분리 보강 대기.
+- J. 테스트/품질: Yellow ~60%
+	- 백엔드 스모크/WS 스모크 OK. OpenAPI CI 연동/프론트 E2E(Playwright) 보강 예정.
+
 ## 1) 목적/범위
 - 목적: 가입→로그인→플레이→보상/결제→이벤트→로그아웃 전 과정이 실시간으로 UI에 반영되고, 데이터/보안/관측성이 상용 기준을 충족하도록 보증.
 - 범위: Backend(FastAPI) / Frontend(Next.js) / DB(PostgreSQL) / Cache(Redis) / MQ(Kafka) / OLAP(ClickHouse) / Monitoring(Prometheus+Grafana).
@@ -14,7 +47,8 @@
 ## 3) 아키텍처 표준 요약
 - 설정: `app.core.config.settings` 단일 소스. 레거시 `app/config.py`는 shim(확장 금지).
 - 라우터: games 관련 엔드포인트는 `app/routers/games.py` 단일화.
-- 리얼타임: `/api/realtime/sync` WS 허브 단일 채널. 메시지 스키마 `{ type, user_id, data, timestamp? }`.
+- 리얼타임: `/api/realtime/sync` WS 허브 단일 채널(표준). 메시지 스키마 `{ type, user_id, data, timestamp? }`.
+	- 레거시 `/api/games/ws`는 비권장 폴백(신규 기능 비보장, 제거 예정).
 - 마이그레이션: Alembic 단일 head 유지(현재 head: f79d04ea1016), merge 전략 엄수.
 
 ## 4) 기능 영역별 체크리스트(실행형)
@@ -78,9 +112,10 @@
 	- 허브: `backend/app/realtime/hub.py` (브로드캐스트/스로틀/최근 이벤트)
 	- 프론트 클라이언트: `frontend/utils/wsClient.ts`, 대시보드 연동 `frontend/components/HomeDashboard.tsx`
 - 검증 방법
-	- WS 연결: `/api/realtime/sync` 접속, `sync_connected`/`initial_state` 수신
+  	- WS 연결: `/api/realtime/sync` 접속, `sync_connected`/`initial_state` 수신(표준)
 	- 이벤트: `user_action` 수신 시 최근 액션 자동 갱신(프론트 훅 트리거)
 	- 유실 대비: 재연결 후 초기 상태 수신 확인
+  	- 폴백: `/api/games/ws`는 임시 호환용(가능한 사용 지양)
 - 로그 포인트
 	- 허브 register/unregister INFO, 브로드캐스트 DEBUG(샘플링), 스로틀 히트 카운트
 
@@ -108,6 +143,12 @@
 - [x] Grafana 대시보드 프로비저닝: 기본 패널(HTTP/WS/구매 지표) 적용
 - [x] Alert rules 마운트: `invite_code_alerts.yml` 로드 및 rule_files 활성화
 - [ ] 라이브 데이터 검증: 패널 실데이터 렌더 확인 및 임계치 튜닝
+- [x] SSE 스트림 정상화: `/api/metrics/stream` 오류 필드 교정 후 metrics 프레임 수신 확인
+
+#### 운영 팁: WS 스모크 실행(개발환경)
+- 명령: 컨테이너 내부에서 `python -m app.scripts.ws_smoke` (외부에서 `docker compose exec backend ...`로 호출 가능)
+- 동작: `/api/realtime/sync` 우선 연결 → 실패 시 `/api/games/ws` 폴백 → 첫 프레임 또는 타임아웃 로깅
+ - 레거시 경로 모니터링: Prometheus 지표 `ws_legacy_games_connections_total`를 패널에 추가하여 사용처 잔존 확인.
 
 ## 6-bis) 자동 스모크 시나리오(개발환경)
 - Backend(pytest)
@@ -132,6 +173,7 @@
 - [ ] Build/Lint/Unit/Integration/E2E 스모크 그린.
 - [ ] 핵심 시나리오: 인증, 스트릭, 상점 결제/프로모, 게임 액션, 리얼타임 반영, 한정 패키지.
 - [x] OpenAPI 재수출 검증(수동 스냅샷/디프 스크립트 준비), 문서/테스트 동기화(진행 중).
+ - [ ] CI 통합 상태: GitHub Actions OpenAPI 계약(workflows/openapi-ci.yml) 및 Frontend Playwright(workflows/frontend-e2e.yml) 추가.
 
 ## 5) 성숙도 단계(L1→L3)
 - L1(MVP): 핵심 기능 작동 + REST 스냅샷 + 제한적 WS, 기본 지표/로그.
@@ -179,6 +221,7 @@
 - Prometheus 지표 확장 및 Grafana 기본 대시보드(profiles: auth 실패율/WS 연결/consumer lag/적재 RPS).
 - Frontend E2E(Playwright) 시나리오: 로그인→대시보드→액션→WS 반영→재연결 초기화.
 - OpenAPI CI 통합: 스냅샷/디프 아티팩트 업로드 및 PR 코멘트 자동화.
+- 레거시 WS 제거 스위치 도입: `/api/games/ws` 완전 제거 전 단계적 비활성 옵션 제공.
 
 ### 검증/운영 메모
 - 테스트: 컨테이너 내부에서 `pytest -q app/tests` 수행(핵심 스모크 포함), Alembic `upgrade head`로 단일 head 유지 확인.

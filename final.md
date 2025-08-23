@@ -1,3 +1,26 @@
+# 변경 요약 / 검증 / 다음 단계 (2025-08-23)
+
+변경 요약
+- 모니터링 네트워크 정합: Prometheus/Grafana를 애플리케이션 네트워크(0801_ccnet)에 연결. Prometheus scrape 타깃 cc_backend:8000 정상화.
+- OpenAPI 재수출: backend 컨테이너에서 python -m app.export_openapi 실행, 스냅샷 갱신 완료.
+- 테스트 수정: backend/tests/conftest.py에 db_engine 픽스처 추가로 pytest 실패 픽스.
+- SSE 스트림 오류 수정: /api/metrics/stream에서 UserReward 필드 오기 사용( created_at, amount_gold )을 모델 정의(claimed_at, gold_amount)로 교정.
+- WS 스모크 표준화: `app/scripts/ws_smoke.py`가 `/api/realtime/sync` 우선, 실패 시 `/api/games/ws` 폴백으로 단일화. 컨테이너 실행 결과 `sync_connected` 초프레임 수신 확인.
+
+검증
+- Prometheus Targets: cc-webapp-backend(cc_backend:8000) health=up 확인(HTTP API /api/v1/targets).
+- Pytest: app/tests/test_openapi_diff_ci.py, tests/test_openapi_diff_ci.py, tests/test_main.py 합계 13개 테스트 전부 통과.
+- Alembic: heads=current=86171b66491f (단일 head) 확인.
+- SSE 스모크: 컨테이너 내 curl -N로 /api/metrics/stream 2초 간격 수신 확인(event: metrics 프레임 연속 수신).
+- WS 스모크: `docker compose exec backend python -m app.scripts.ws_smoke` → /api/realtime/sync 접속 성공, 첫 프레임 수신.
+
+다음 단계
+- WS 스모크(상점/정산/웹훅): 브라우저에서 배지/토스트 표시 동작 체크 및 스크린샷 캡처.
+- Grafana 대시보드: 구매 지표 패널에 실데이터 유입 확인 및 경보룰 세부 튜닝.
+- CI: OpenAPI diff CI를 워크플로에 통합(스냅샷 아티팩트 업로드/PR 코멘트).
+
+---
+
 # Casino-Club F2P 프로젝트 Final 체크 & 트러블슈팅 기록
 
 **생성일**: 2025-08-19  
