@@ -252,3 +252,48 @@
 3) Grafana 실데이터 확인과 알람 임계치 튜닝: `purchase_attempt_total` 등 핵심 카운터 패널 점검.
 
 참고: Alembic head 단일 유지(문서 기준 f79d04ea1016), 스키마 변경 없음.
+
+---
+
+## 11) 업데이트 메모(2025-08-25)
+
+### 변경 요약
+- Backend pytest 스모크 일부 실행 결과 반영:
+  - app/tests/test_reward_formula.py: 2 passed (경고 다수: passlib crypt, Pydantic v2 ConfigDict 전환 경고 – 기능 영향 없음).
+  - app/tests/test_mvp_smoke.py::TestMVPSmoke::test_streak_claim_idempotency: FAIL (회원가입 500).
+- 프론트 품질 규칙 강화: ESLint에 문자열 리터럴 `'/api/users/profile'` 사용 금지 룰 추가(대안: `'/api/users/me'`). 루트와 프론트 둘 다 적용하여 편차 방지.
+- 알림 임계 외부화 현황: `.env.*`에 ALERT_PENDING_SPIKE_THRESHOLD dev=20, staging=25, prod=30 반영 상태.
+
+### 검증 결과(원문 출력 요약)
+```
+FAILED app/tests/test_mvp_smoke.py::TestMVPSmoke::test_streak_claim_idempotency
+AssertionError: {"detail":"Registration failed","error":{"code":"HTTP_500","message":"Registration failed","details":null,"request_id":"0b0fe75c84e2"}}
+status_code: 500
+Captured stdout: 🗄️ Alembic 데이터베이스 URL: postgres:5432/cc_webapp
+```
+
+### 트러블슈팅 요약(가설 → 점검 → 개선)
+1) 가설
+	- 초대코드 검증 실패 시 400이 반환되어야 하나 내부에서 500으로 승격되는 경로 존재(예외 매핑 미흡).
+	- 혹은 회원가입 처리 중 DB 제약(UNIQUE/NOT NULL) 예외가 표준화되지 않고 500으로 전달.
+	- INVITE_CODE 기본값(5858)과 런타임 설정 불일치 가능성(settings.UNLIMITED_INVITE_CODE).
+2) 즉시 점검
+	- 백엔드 컨테이너 로그 확인: `./cc-manage.ps1 logs backend` → /api/auth/register 호출 직후 Traceback/에러 원인 추출.
+	- ENV 확인: `.env(.development)` 및 backend 환경에 `UNLIMITED_INVITE_CODE=5858` 노출 여부 확인.
+	- FastAPI 예외 핸들러: Validation/도메인 에러가 HTTPException 4xx로 매핑되는지 확인.
+3) 개선 제안
+	- Invite 코드 불일치/중복 닉네임 등 사용자 입력 오류는 400 계열로 고정(메시지/에러코드 표준화).
+	- AuthService.register 내 DB IntegrityError 캐치 → 409/400 변환.
+	- 테스트 보강: register 실패 경로(잘못된 코드) 400 assert 추가.
+
+### 다음 단계
+- [ ] 컨테이너 로그에서 /api/auth/register 스택트레이스 캡처 후 원인 확정(Invite 검증/DB 제약/기타).
+- [ ] 설정 정합성 확인: `UNLIMITED_INVITE_CODE=5858`이 런타임에서 유효한지 점검 및 문서화.
+- [ ] 예외 매핑 보강(PR): 500 → 4xx 표준화, 에러페이로드 `{error:{code,message}}` 유지.
+- [ ] 재검증: 아래 최소 스모크를 컨테이너 내부에서 재실행하여 GREEN 확인.
+  - `pytest -q app/tests/test_mvp_smoke.py::TestMVPSmoke::test_streak_claim_idempotency`
+  - `pytest -q app/tests/test_shop_buy.py::test_buy_gold_happy_path`
+
+### 품질/운영 메모
+- Pydantic v2 경고는 ConfigDict 전환으로 제거 가능(우선순위 낮음, 기능 영향 없음). 향후 모델별 config 마이그레이션 권장.
+- ESLint 금지 경로 룰 추가로 프론트에서 레거시 프로필 엔드포인트 사용을 예방(권장 경로 `GET /api/users/me`).
