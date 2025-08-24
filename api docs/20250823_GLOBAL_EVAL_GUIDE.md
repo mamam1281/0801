@@ -16,6 +16,7 @@
 	- 모니터링 정상: Prometheus 기동/정상, 룰 로드 OK(purchase-health 4개, kafka_consumer_health 2개), /targets up.
 	- Kafka Exporter up, Grafana Consumer Lag 패널 동작.
 	- OpenAPI 스모크 통과(수동 수출 기준), Alembic head 단일 유지.
+- 뱃지: [상점/관리자: 미완(프론트 목/연동 대기)] – 본 커밋부터 Shop UI(/api/shop/catalog,/api/shop/buy) 및 Admin Shop CRUD 연동 착수.
 - 남은 것(우선순위)
 	1) pytest 스모크: 결제(/api/shop/buy), 스트릭 경계 케이스 복구/검증.
 	2) ALERT_PENDING_SPIKE_THRESHOLD 환경별 튜닝(.env.* 반영) 및 관찰값 기반 재보정.
