@@ -3,6 +3,21 @@
 **생성일**: 2025-08-19  
 **브랜치**: feature/e2e-onboarding-playwright  
 
+## 2025-08-25 Frontend ESLint 규칙 추가(금지 경로)
+
+변경 요약
+- 프론트엔드 ESLint에 '/api/users/profile' 문자열 사용 금지 규칙 추가. 대안: '/api/users/me'.
+- 루트 .eslintrc.json에도 동일 규칙 반영(편차 방지).
+
+검증 결과
+- `npm run lint` 기준 프론트엔드에서 해당 문자열 사용 시 에러 발생 확인 예상. CI 연동 시 자동 차단.
+- OpenAPI/Alembic 영향 없음.
+
+다음 단계
+- 기존 코드에서 해당 문자열 사용 여부 grep 후 필요 시 수정 PR 생성.
+- WS selector 마이그레이션 및 폴링 표준화 진행.
+- 컨테이너 내부 pytest 스모크(결제/스트릭) 실행 및 결과 반영.
+
 ## 2025-08-24 Prometheus 룰 파싱 오류 복구 + Kafka 알림/대시보드 검증
 
 변경 요약

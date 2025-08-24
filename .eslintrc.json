@@ -9,7 +9,14 @@
     "@typescript-eslint/no-unused-vars": ["error", { "argsIgnorePattern": "^_" }],
     "no-console": "warn",
     "react-hooks/exhaustive-deps": "warn",
-    "react/display-name": "off"
+    "react/display-name": "off",
+    "no-restricted-syntax": [
+      "error",
+      {
+        "selector": "Literal[value='/api/users/profile']",
+        "message": "'/api/users/profile' 경로는 금지됩니다. 대신 '/api/users/me'를 사용하세요."
+      }
+    ]
   },
   "parser": "@typescript-eslint/parser",
   "parserOptions": {
