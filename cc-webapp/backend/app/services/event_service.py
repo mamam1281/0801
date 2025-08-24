@@ -18,8 +18,7 @@ class EventService:
         events = db.query(Event).filter(
             Event.is_active == True,
             Event.start_date <= now,
-            Event.end_date >= now,
-            Event.deleted_at.is_(None)
+            Event.end_date >= now
         ).order_by(Event.priority.desc()).all()
 
         # 참여자 수를 각 인스턴스에 임시 속성으로 부여 (Pydantic 직렬화 시 participation_count 사용)

@@ -15,6 +15,11 @@ import logging
 from types import SimpleNamespace
 
 from app import models
+try:
+    # Ensure GameStats is resolvable via models; fallback import if missing in some environments
+    _GameStatsModel = models.GameStats  # type: ignore[attr-defined]
+except Exception:  # pragma: no cover - defensive
+    from app.models.game_models import GameStats as _GameStatsModel  # type: ignore
 from app.repositories import UserRepository, AuthRepository
 
 logger = logging.getLogger(__name__)
@@ -108,8 +113,8 @@ class UserService:
             ).count()
 
             # GameStats 집계
-            stats_rows = self.db.query(models.GameStats).filter(
-                models.GameStats.user_id == user_id
+            stats_rows = self.db.query(_GameStatsModel).filter(
+                _GameStatsModel.user_id == user_id
             ).all()
             total_bet = sum(getattr(r, "total_bet", 0) or 0 for r in stats_rows)
             total_won = sum(getattr(r, "total_won", 0) or 0 for r in stats_rows)

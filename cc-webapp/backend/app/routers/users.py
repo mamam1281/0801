@@ -48,6 +48,14 @@ def get_user_service(db = Depends(get_db)) -> UserService:
     """User service dependency"""
     return UserService(db)
 
+# /api/users/me 별칭: /api/auth/me 와 동일한 응답 형태(UserResponse)
+@router.get("/me", response_model=UserResponse)
+async def get_me(
+    current_user: User = Depends(get_current_user),
+):
+    """현재 로그인한 사용자 프로필 별칭(/api/auth/me 동일)."""
+    return current_user
+
 # API endpoints
 @router.get("/profile", response_model=UserResponse)
 async def get_profile(

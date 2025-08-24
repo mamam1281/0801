@@ -44,6 +44,7 @@ async def get_active_events(
     """활성 이벤트 목록 조회"""
     auth = "y" if current_user else "n"
     try:
+        # Event.deleted_at 컬럼이 현재 스키마에 없으므로 서비스 레벨에서 해당 필터를 제거하여 500 회피
         events = EventService.get_active_events(db)
         _metric("events", "list", "success", auth)
         # 사용자 참여 정보 추가

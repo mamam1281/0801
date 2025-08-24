@@ -96,6 +96,12 @@
 	- WS: 라운드 직후 `stats_update` 수신으로 DOM 반영(`useStats`) 확인. 유실 시 재연결 후 초기 상태 일치.
 	- 성능/일관성: 단일 트랜잭션 내 액션 기록→집계→WS 송신까지 지연 `game_stats_update_latency_ms` 모니터링.
 
+##### 업데이트(2025-08-24)
+- /api/games/stats/me 422 문제 해결: 정적 경로(`/stats/me`)를 동적 경로(`/stats/{user_id}`)보다 먼저 선언해 경로 매칭 충돌 제거. 비인증 401, 인증 200 정상화.
+- Crash 베팅 확정 시 서버 권위 집계(GameStatsService.update_from_round) 수행 후 `stats_update` WS 이벤트 브로드캐스트(페이로드에 `game_type` 및 집계 통계 포함).
+- Prometheus 히스토그램 `game_stats_update_latency_ms` 도입(집계→브로드캐스트 구간 지연 측정) 및 Grafana 패널 “Game Stats Update Latency (ms)” 연동.
+- 프론트는 RealtimeSyncContext가 `stats_update` 수신 시 `UPDATE_STATS`로 전역 상태 갱신, 화면은 `useStats(gameType?)` 셀렉터로 일관 소비.
+
 ### E. 리얼타임(WS) 표준
 - 구현 위치
 	- 라우터: `backend/app/routers/realtime.py`
@@ -144,6 +150,8 @@
 - [x] Prometheus 룰 파싱 오류 복구: `purchase_alerts.tmpl.yml` 들여쓰기/expr 정리 → 렌더 → `purchase_alerts.yml` 정상 로드.
 - [x] Kafka 알림/패널 검증: `kafka_consumer_health` 그룹 로드, Kafka Exporter up, Grafana Consumer Lag 패널 동작.
 - [ ] ENV 임계 튜닝: `ALERT_PENDING_SPIKE_THRESHOLD` 환경별 값 반영 및 관찰 후 재보정(다음 단계).
+
+- [x] 게임 통계 지연 계측 추가: `game_stats_update_latency_ms` 히스토그램 노출 및 Grafana “Game Stats Update Latency (ms)” 패널 연결.
 
 ##### 알림 임계 및 외부화 계획(2025-08-24)
 - 성공율 임계 98%→99% 상향 검토: 실데이터 추이 확인 후 `grafana_dashboard.json` thresholds green 기준 99로 상향 예정(스테이징에서 먼저 적용).
@@ -250,6 +258,27 @@
 - OpenAPI 스냅샷/디프 CI 연동(아티팩트 업로드·PR 코멘트).
 - 결제 전 구간 WS 브로드캐스트와 프론트 전역 리스너 보강.
 
+### 추가 업데이트/핫픽스 (2025-08-24 저녁)
+
+- 변경 요약
+	- /api/events/ 500 수정: Event.deleted_at 컬럼 부재로 인한 AttributeError를 제거하기 위해 서비스 레이어의 필터(Event.deleted_at.is_(None))를 제거. Admin soft delete/restore 엔드포인트는 컬럼 부재 주석 상태 유지(기능 비활성)로 안전화.
+	- /api/users/me 422 수정: 동적 라우트(/api/users/{user_id})가 정적 경로(me)를 선점하던 문제를 제거하기 위해 Users 라우터에 정식 별칭 엔드포인트 GET /api/users/me 추가(응답 스키마 UserResponse). 기대 동작: 비인증 401, 인증 200.
+	- 사용자 통계 내부 오류 보강: 일부 환경에서 app.models.GameStats 심볼 미노출로 발생하던 AttributeError를 방어하기 위해 models.GameStats 조회가 실패하면 game_models.GameStats로 폴백 임포트하여 집계 쿼리 수행.
+
+- 검증 결과
+	- ./cc-manage.ps1 health: API /health 200, Web 200 확인.
+	- 런타임 로그 상 /api/events/ 호출 시 500 재현 → 코드 수정 반영 완료. 재기동 후 /api/events/ 200 + 리스트(빈 배열 가능) 스모크 예정.
+	- /api/users/me 별칭 추가 완료. 인증/비인증 상태코드 스모크로 최종 확인 예정(401→토큰 부여→200).
+
+- 다음 단계
+	- 컨테이너 내부에서 pytest 핵심 스모크 실행: auth/events/users/stats 경로 중심으로 그린 확인.
+	- Alembic heads 단일성 점검(alembic heads → 단일), /docs 스키마 정상 확인 및 필요 시 OpenAPI 재수출.
+	- Grafana “Game Stats Update Latency (ms)” 패널 관찰(라운드/액션 수행 중 p95/99 기록), 임계 제안값 도출.
+	- 프론트 ESLint 가드(직접 /api/users/profile 호출 금지) 적용 및 위반 0 확인.
+
+- 운영 메모
+	- docker compose 경고: docker-compose.yml의 version 키는 더 이상 필요하지 않으므로 추후 제거 예정(기능 영향 없음).
+
 ---
 
 ## 10) 업데이트 메모(2025-08-24)
@@ -335,6 +364,12 @@ useAuthToken.ts: “MVP 임시” 주석(로컬 스토리지 토큰 관리)
 ### 상태
 - OpenAPI 중복 문제 해결 상태 유지(이벤트 라우터 중복 include 제거). 
 - 계약 테스트 2 passed, Alembic head 단일(c6a1b5e2e2b1) 확인.
+
+### 진행 현황(업데이트 2025-08-24)
+- 프로필 표준화: 프론트 프로필 초기 로딩을 `/api/users/me`로 통일, 골드 표시는 RealtimeSyncContext.state.profile.gold를 단일 소스로 사용.
+- 셀렉터 적용: `useGold`/`selectGold`, `useStats` 경로로 소비 일원화(직접 `user.goldBalance` 참조 제거 진행 중).
+- 실시간 갱신: 구매/보상은 `profile_update`, 게임 통계는 `stats_update`로 반영. 폴백 폴링은 보조 수단으로 유지.
+- 재유입 방지: `/api/users/profile` 직접 호출 금지 가드(ESLint 규칙) 도입 검토 중.
 
 ### 실행 체크리스트(운영)
 - [ ] 셀렉터 적용 PR에서 `goldBalance` 직접 사용 grep → 전량 교체.
