@@ -142,6 +142,16 @@ function Tools-Start {
     Write-Host "Starting monitoring tools (Prometheus/Grafana/Metabase)..." -ForegroundColor Cyan
     $file = "docker-compose.monitoring.yml"
     if (-not (Test-Path $file)) { Write-Host "Monitoring compose file not found: $file" -ForegroundColor Red; exit 1 }
+    # Render Prometheus rule templates with ENV thresholds before starting
+    $renderScript = Join-Path (Get-Location) 'scripts/render_prometheus_rules.ps1'
+    if (Test-Path $renderScript) {
+        try {
+            Write-Host "Rendering Prometheus rule templates..." -ForegroundColor Yellow
+            & $renderScript
+        } catch {
+            Write-Host "Rule template rendering failed (continuing with existing rules): $($_.Exception.Message)" -ForegroundColor Yellow
+        }
+    }
     if ($UseComposeV2) { & docker compose -f $file up -d }
     else { & docker-compose -f $file up -d }
     if ($LASTEXITCODE -ne 0) {

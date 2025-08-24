@@ -1281,3 +1281,5 @@ Outbox + Kafka + Metrics → Dashboard 캐시/ETag → 부하 테스트
 ClickHouse 적재 검증 → Rate Limit/보안 → 릴리즈 자동 체크 스크립트
 문서/플레이북 정리 → Deprecated 관찰 기간 → 최종 Go/No-Go
 필요하면 위 단계 중 첫 작업을 바로 진행할 수 있으니 “중복 스캔 시작” / “RewardService 통합” 등 한 문장으로 지시 주세요.
+
+2025-08-24 11:29:59 ����: docker-compose.yml ����(duplicate services ����, version ���, ccnet external). ����: docker compose ps OK, Prometheus activeTargets UP. ����: OpenAPI ����� �� pytest, Grafana Ʃ��.
