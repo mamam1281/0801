@@ -35,6 +35,7 @@ import { useEvents } from '../hooks/useEvents';
 import useAuthGate from '../hooks/useAuthGate';
 import useTelemetry from '../hooks/useTelemetry';
 import { Button } from './ui/button';
+import { useRealtimeSync } from '../contexts/RealtimeSyncContext';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
@@ -56,6 +57,7 @@ export function EventMissionPanel({
   onUpdateUser,
   onAddNotification,
 }: EventMissionPanelProps) {
+  const { state: sync } = useRealtimeSync();
   // 공통 Auth Gate (마운트 후 토큰 존재 여부 결정)
   const { isReady: authReady, authenticated } = useAuthGate();
   const { record: t } = useTelemetry('events');
@@ -104,6 +106,22 @@ export function EventMissionPanel({
     }));
     setEvents(formattedEvents);
   }, [rawEvents]);
+
+  // RealtimeSync 이벤트 진행도/완료 상태를 오버레이(일원화)
+  useEffect(() => {
+    if (!events || events.length === 0) return;
+  const mapped = events.map((ev: any) => {
+      const evId = Number(ev.id);
+      const syncEv = sync?.events?.[evId];
+      if (!syncEv) return ev;
+      return {
+        ...ev,
+        progress: syncEv.progress ?? ev.progress,
+        completed: typeof syncEv.completed === 'boolean' ? syncEv.completed : ev.completed,
+      };
+    });
+    setEvents(mapped);
+  }, [sync?.events]);
 
   const [authRequired, setAuthRequired] = useState(false);
   const [loadError, setLoadError] = useState(null as string | null);
@@ -296,12 +314,11 @@ export function EventMissionPanel({
       return;
     }
     try {
-      await joinEvent(parseInt(eventId));
+  await joinEvent(parseInt(eventId));
 
-      onAddNotification(`🎉 이벤트에 참여했습니다! 조건을 달성하여 보상을 받으세요.`);
-
-      // 최신 데이터로 업데이트
-      refreshEvents();
+  // Optimistic UI 업데이트 (WS 확정 대기)
+  setEvents((curr: any[]) => curr.map((e: any) => e.id === eventId ? { ...e, joined: true } : e));
+  onAddNotification(`🎉 이벤트에 참여했습니다! 조건을 달성하여 보상을 받으세요.`);
       t('event_join_success', { eventId });
     } catch (error) {
       console.error('이벤트 참여 중 오류:', error);
@@ -319,7 +336,7 @@ export function EventMissionPanel({
       return;
     }
     try {
-      const response = await claimEvent(parseInt(eventId));
+  const response = await claimEvent(parseInt(eventId));
 
       if (response && response.success) {
         // 보상 내역 표시
@@ -339,8 +356,8 @@ export function EventMissionPanel({
           // 젬은 사용자 타입에 없으면 추가해야 함
         });
 
-        // 데이터 다시 로드
-        refreshEvents();
+  // Optimistic UI 업데이트 (WS 확정 대기)
+  setEvents((curr: any[]) => curr.map((e: any) => e.id === eventId ? { ...e, claimed: true, completed: true } : e));
         t('event_claim_success', { eventId });
       }
     } catch (error) {
@@ -360,7 +377,12 @@ export function EventMissionPanel({
           ? target.progress.model_index_points
           : 0;
       await updateEventProgress(parseInt(eventId), current + delta);
-      await refreshEvents();
+      // Optimistic UI 업데이트 (WS 확정 대기)
+      setEvents((curr: any[]) => curr.map((e: any) => {
+        if (e.id !== eventId) return e;
+        const currentVal = typeof e.progress?.model_index_points === 'number' ? e.progress.model_index_points : 0;
+        return { ...e, progress: { ...(e.progress || {}), model_index_points: currentVal + delta } };
+      }));
       onAddNotification(`모델 지민 +${delta}`);
       t('event_progress_update', { eventId, delta });
     } catch (e) {

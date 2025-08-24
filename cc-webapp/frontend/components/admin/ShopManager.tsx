@@ -30,6 +30,7 @@ import { Badge } from '../ui/badge';
 import { Switch } from '../ui/switch';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
   import { Label } from '../ui/Label';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog';
 
 interface ShopManagerProps {
   onAddNotification: (message: string) => void;
@@ -42,6 +43,14 @@ export function ShopManager({ onAddNotification }: ShopManagerProps) {
   const [showCreateModal, setShowCreateModal] = useState(false as boolean);
   const [editingItem, setEditingItem] = useState(null as ShopItem | null);
   const [isLoading, setIsLoading] = useState(false as boolean);
+  // PATCH 모달 상태
+  const [patchTarget, setPatchTarget] = useState(null as ShopItem | null);
+  const [showDiscountModal, setShowDiscountModal] = useState(false);
+  const [showRankModal, setShowRankModal] = useState(false);
+  const [discountForm, setDiscountForm] = useState({ percent: 0, endsAt: '' } as { percent: number; endsAt: string | '' });
+  const [rankForm, setRankForm] = useState({ min_rank: '' } as { min_rank: '' | 'STANDARD' | 'PREMIUM' | 'VIP' });
+  const percentInvalid = Number.isNaN(discountForm.percent) || discountForm.percent < 0 || discountForm.percent > 100;
+  const isoEndsAtInvalid = !!discountForm.endsAt && !/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:.+Z?$/.test(discountForm.endsAt);
 
   // 서버 데이터 매핑 유틸: AdminCatalogItemOut -> ShopItem(뷰 전용)
   const mapAdminItem = (it: AdminCatalogItemOut): ShopItem => ({
@@ -208,6 +217,75 @@ export function ShopManager({ onAddNotification }: ShopManagerProps) {
   // Toggle item active status (API 미제공 → 안내)
   const toggleItemStatus = async () => {
     onAddNotification('ℹ️ 현재 API에 상점 아이템 활성/비활성 토글 엔드포인트가 없습니다. (백엔드 확장 필요)');
+  };
+
+  // 할인 PATCH (optimistic)
+  const openDiscountModal = (item: ShopItem) => {
+    setPatchTarget(item);
+    setDiscountForm({ percent: item.discount || 0, endsAt: '' });
+    setShowDiscountModal(true);
+  };
+  const submitDiscount = async () => {
+    const item = patchTarget; if (!item) return;
+    const id = Number(item.id);
+    if (!id) { onAddNotification('⚠️ 잘못된 아이템 ID'); return; }
+  const percent = Math.max(0, Math.min(100, Math.round(discountForm.percent || 0)));
+  const endsAt = (discountForm.endsAt || '').trim();
+    // endsAt 간단 검증(ISO-like)
+  if (endsAt && !/\d{4}-\d{2}-\d{2}T\d{2}:.+Z?$/.test(endsAt)) {
+      onAddNotification('⚠️ 종료 시각은 ISO 형식이어야 합니다. 예: 2025-08-20T00:00:00Z');
+      return;
+    }
+    const prev = [...shopItems];
+    setIsLoading(true);
+    setShopItems((curr: ShopItem[]) => curr.map((it: ShopItem) => (it.id === item.id ? { ...it, discount: percent } : it)));
+    try {
+      const res = await adminApi.setDiscount(id, { discount_percent: percent, discount_ends_at: endsAt || null });
+      setShopItems((curr: ShopItem[]) => curr.map((it: ShopItem) => (it.id === item.id ? mapAdminItem(res) : it)));
+      onAddNotification('✅ 할인 설정이 적용되었습니다.');
+      setShowDiscountModal(false);
+      setPatchTarget(null);
+    } catch (e: any) {
+      setShopItems(prev);
+      const status = e?.status ?? e?.response?.status;
+      if (status === 403) onAddNotification('⛔ 권한이 없습니다(403).');
+      else onAddNotification(`❌ 할인 설정 실패: ${e?.message ?? e}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // 랭크 PATCH (optimistic)
+  const openRankModal = (item: ShopItem) => {
+    setPatchTarget(item);
+    const current = extractRankFromTags(item.tags) as any;
+    setRankForm({ min_rank: (current === 'STANDARD' || current === 'PREMIUM' || current === 'VIP') ? current : '' });
+    setShowRankModal(true);
+  };
+  const submitRank = async () => {
+    const item = patchTarget; if (!item) return;
+    const id = Number(item.id);
+    if (!id) { onAddNotification('⚠️ 잘못된 아이템 ID'); return; }
+    const rankValue: null | 'STANDARD' | 'PREMIUM' | 'VIP' = rankForm.min_rank ? rankForm.min_rank : null;
+    const sku = item.tags?.[0] ?? '';
+    const newTags = [sku, ...(rankValue ? [rankValue] : [])];
+    const prev = [...shopItems];
+    setIsLoading(true);
+    setShopItems((curr: ShopItem[]) => curr.map((it: ShopItem) => (it.id === item.id ? { ...it, tags: newTags } : it)));
+    try {
+      const res = await adminApi.setRank(id, { min_rank: rankValue });
+      setShopItems((curr: ShopItem[]) => curr.map((it: ShopItem) => (it.id === item.id ? mapAdminItem(res) : it)));
+      onAddNotification('✅ 최소 랭크가 적용되었습니다.');
+      setShowRankModal(false);
+      setPatchTarget(null);
+    } catch (e: any) {
+      setShopItems(prev);
+      const status = e?.status ?? e?.response?.status;
+      if (status === 403) onAddNotification('⛔ 권한이 없습니다(403).');
+      else onAddNotification(`❌ 랭크 설정 실패: ${e?.message ?? e}`);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // Get rarity color
@@ -449,6 +527,26 @@ export function ShopManager({ onAddNotification }: ShopManagerProps) {
               <Button
                 size="sm"
                 variant="outline"
+                onClick={() => openDiscountModal(item)}
+                className="flex-1"
+                title="할인율/종료시각 패치"
+              >
+                <Tag className="w-4 h-4 mr-1" />
+                할인
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => openRankModal(item)}
+                className="flex-1"
+                title="최소 랭크 패치"
+              >
+                <Filter className="w-4 h-4 mr-1" />
+                랭크
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
                 onClick={() => handleDeleteItem(item)}
                 className="border-error text-error hover:bg-error hover:text-white"
               >
@@ -472,6 +570,98 @@ export function ShopManager({ onAddNotification }: ShopManagerProps) {
         categories={categories}
         rarities={rarities}
       />
+
+      {/* 할인 패치 모달 */}
+      <Dialog open={showDiscountModal} onOpenChange={setShowDiscountModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>할인 설정</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label>대상 아이템</Label>
+              <div className="text-sm text-foreground font-medium">{patchTarget?.name} ({patchTarget?.id})</div>
+            </div>
+            <div>
+              <Label htmlFor="discount_percent">할인율 (%)</Label>
+              <Input id="discount_percent" type="number" min={0} max={100}
+                value={discountForm.percent}
+                onChange={(e: any) => setDiscountForm((prev: { percent: number; endsAt: string | '' }) => ({ ...prev, percent: parseInt(e.target.value || '0', 10) }))} />
+              {percentInvalid && (
+                <div className="mt-1 text-xs text-error">0~100 사이의 정수를 입력하세요.</div>
+              )}
+            </div>
+            <div>
+              <Label htmlFor="discount_ends_at">할인 종료 시각 (ISO, 선택)</Label>
+              <Input id="discount_ends_at" placeholder="2025-08-20T00:00:00Z"
+                value={discountForm.endsAt}
+                onChange={(e: any) => setDiscountForm((prev: { percent: number; endsAt: string | '' }) => ({ ...prev, endsAt: e.target.value }))} />
+              {isoEndsAtInvalid && (
+                <div className="mt-1 text-xs text-warning">예: 2025-08-20T00:00:00Z (UTC). 비워두면 제한 없음.</div>
+              )}
+              <div className="mt-2 text-xs text-muted-foreground">팁: 브라우저 날짜 선택을 쓰려면 아래 입력을 사용하세요.</div>
+              <Input type="datetime-local" onChange={(e: any) => {
+                try {
+                  const v = e.target.value; // yyyy-MM-ddTHH:mm
+                  if (!v) return;
+                  // 로컬 시간을 UTC ISO로 변환(Z)
+                  const d = new Date(v);
+                  if (!isNaN(d.getTime())) {
+                    const iso = new Date(Date.UTC(
+                      d.getFullYear(), d.getMonth(), d.getDate(), d.getHours(), d.getMinutes(), 0, 0
+                    )).toISOString();
+                    setDiscountForm((prev: { percent: number; endsAt: string | '' }) => ({ ...prev, endsAt: iso }));
+                  }
+                } catch {}
+              }} />
+            </div>
+            {patchTarget && (
+              <div className="text-sm text-muted-foreground">
+                미리보기: 원가 {patchTarget.price.toLocaleString()}G →
+                {' '}
+                <span className="font-bold text-gold">
+                  {Math.floor(patchTarget.price * (1 - (Math.max(0, Math.min(100, discountForm.percent))/100))).toLocaleString()}G
+                </span>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="flex gap-2">
+            <Button variant="outline" onClick={() => setShowDiscountModal(false)} disabled={isLoading}>취소</Button>
+            <Button onClick={submitDiscount} disabled={isLoading || percentInvalid || isoEndsAtInvalid} className="bg-gradient-game">{isLoading ? '적용 중...' : '적용'}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 랭크 패치 모달 */}
+      <Dialog open={showRankModal} onOpenChange={setShowRankModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>최소 랭크 설정</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label>대상 아이템</Label>
+              <div className="text-sm text-foreground font-medium">{patchTarget?.name} ({patchTarget?.id})</div>
+            </div>
+            <div>
+              <Label htmlFor="min_rank_select">최소 랭크</Label>
+              <Select value={rankForm.min_rank || ''} onValueChange={(v: any) => setRankForm({ min_rank: v as any })}>
+                <SelectTrigger id="min_rank_select"><SelectValue placeholder="없음" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">없음</SelectItem>
+                  <SelectItem value="STANDARD">STANDARD</SelectItem>
+                  <SelectItem value="PREMIUM">PREMIUM</SelectItem>
+                  <SelectItem value="VIP">VIP</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter className="flex gap-2">
+            <Button variant="outline" onClick={() => setShowRankModal(false)} disabled={isLoading}>취소</Button>
+            <Button onClick={submitRank} disabled={isLoading} className="bg-gradient-game">{isLoading ? '적용 중...' : '적용'}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

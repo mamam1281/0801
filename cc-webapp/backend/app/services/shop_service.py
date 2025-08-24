@@ -120,21 +120,14 @@ class ShopService:
                 "item_name": item_name,
                 "new_item_count": 0,
             }
+        # Deduct tokens using the service, then read the updated balance explicitly.
+        # 일부 호출자는 deduct_tokens 반환값을 사용하지 않으므로(사이드이펙트성),
+        # 일관성을 위해 차감 후 get_token_balance로 확정 잔액을 조회한다.
+        self.token_service.deduct_tokens(user_id, price)
+        new_balance = self.token_service.get_token_balance(user_id)
 
-        # Deduct tokens using the service
-        new_balance = self.token_service.deduct_tokens(user_id, price)
-        if new_balance is None:
-            return {
-                "success": False,
-                "message": "토큰이 부족합니다.",
-                "new_balance": current_balance,
-                "item_id": product_id or str(item_id),
-                "item_name": item_name,
-                "new_item_count": 0,
-            }
-
-        # Log purchase as UserAction (BUY_PACKAGE)
-        payload = {
+        # Record as UserReward for consistency with reward pipelines
+        reward_meta = {
             "product_id": product_id or str(item_id),
             "item_id": item_id,
             "item_name": item_name,
@@ -142,25 +135,24 @@ class ShopService:
             "description": description,
             "kind": "item",
         }
-        ua = models.UserAction(
+        user_reward = models.UserReward(
             user_id=user_id,
-            action_type='BUY_PACKAGE',
-            action_data=json.dumps(payload, ensure_ascii=False),
+            reward_type="SHOP_ITEM",
+            reward_metadata=reward_meta,
         )
-        self.db.add(ua)
+        self.db.add(user_reward)
         self.db.commit()
 
-        # Compute new item count using action logs
-        count_query = self.db.query(models.UserAction).filter(
-            models.UserAction.user_id == user_id,
-            models.UserAction.action_type == 'BUY_PACKAGE',
+        # Compute new item count using UserReward entries
+        item_count = (
+            self.db
+            .query(models.UserReward)
+            .filter(
+                models.UserReward.user_id == user_id,
+                models.UserReward.reward_type == "SHOP_ITEM",
+            )
+            .count()
         )
-        # Narrow by product_id when provided
-        if product_id:
-            count_query = count_query.filter(models.UserAction.action_data.contains(f'"product_id":"{product_id}"'))
-        else:
-            count_query = count_query.filter(models.UserAction.action_data.contains(f'"item_id": {item_id}'))
-        item_count = count_query.count()
 
         return {
             "success": True,

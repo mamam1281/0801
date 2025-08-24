@@ -1,5 +1,49 @@
 # Casino-Club F2P 프로젝트 Final 체크 & 트러블슈팅 기록
 
+## 2025-08-24 Admin Shop: 할인/랭크 패치 모달/폼 UX 적용 및 TS 오류 정리
+
+변경 요약
+- `ShopManager.tsx`에 할인/랭크 입력을 프롬프트→모달/폼으로 전환. 할인율(0~100) 검증, ISO 종료시각 간단 패턴 검증, 가격 미리보기 추가.
+- Optimistic 패치 흐름 유지(성공 시 확정/실패 시 롤백). 403 권한/기타 오류 토스트 유지. 내부 상태: `patchTarget/discountForm/rankForm` 추가.
+- TypeScript: useState 제네릭 사용 에러 환경을 우회하도록 as 캐스팅으로 초기값 지정, setState 콜백의 prev 타입 명시하여 암시적 any 제거.
+
+검증 결과
+- 파일 단위 타입 오류 0(IDE 오류 검사 기준). 기존 CRUD 및 PATCH(할인/랭크) 동작 수동 확인. 백엔드/마이그레이션/문서 스키마 영향 없음.
+
+다음 단계
+- 할인/랭크 모달에 폼 검증 메시지/비활성화 조건 보강 및 날짜 피커(선택) 검토.
+- 이벤트 패널 서버 진행도/WS 전환, 사이드메뉴 공용 훅/WS 일원화, `useGameConfig` 폴백 축소/경고.
+- 컨테이너 내부 pytest 스모크(결제/스트릭) 실행, 필요 시 OpenAPI 재수출 및 `api docs/20250808.md` 갱신.
+
+## 2025-08-24 Admin Shop: 할인/랭크 PATCH UI 연동(Optimistic)
+
+## 2025-08-24 이벤트/WS 일원화 1차: refreshEvents 구현 + 사이드메뉴 배지
+
+변경 요약
+- `RealtimeSyncContext.refreshEvents`가 `/api/events/active` 응답을 전역 상태(events[id])로 반영. WS의 `event_progress`와 동일 스키마로 통합.
+- `SideMenu.tsx`에 `useRealtimeSync` 연동 메뉴 추가: 진행 중 결제 건수(pending_count) 배지 노출.
+
+검증 결과
+- 타입 오류 없음. 런타임에서 WS 또는 폴백 폴링 활성 시 배지 증감 확인 필요. OpenAPI/Alembic 영향 없음.
+
+다음 단계
+- EventMissionPanel이 컨텍스트 상태를 직접 참조하도록 리팩터링(수동 refresh 최소화) 및 클레임/조인 후 즉시 반영.
+- 사이드메뉴에 streak/event 완료 가능 항목 배지 검토.
+
+변경 요약
+- `frontend/components/admin/ShopManager.tsx`에 할인/랭크 패치 버튼 추가. `adminApi.setDiscount`/`adminApi.setRank` 호출로 실제 엔드포인트 연동.
+- Optimistic UI 적용: 입력 직후 목록에 즉시 반영 후 서버 응답으로 확정, 실패 시 롤백. 403 권한 에러/기타 에러별 토스트 메시지 표준화.
+- 활성/비활성 토글은 백엔드 엔드포인트 미제공으로 안내 토스트 유지.
+
+검증 결과
+- TypeScript 빌드 오류 없음. 기존 CRUD와 함께 할인/랭크 패치 동작 수동 확인(프롬프트 입력 기반). OpenAPI/Alembic 변경 없음.
+- 관리자 권한 없는 계정으로 호출 시 403 토스트 노출 확인.
+
+다음 단계
+- 할인/랭크 입력 UI를 모달/폼으로 개선(프롬프트 제거) 및 유효성/미리보기 강화.
+- 이벤트 패널 서버 진행도/WS 전환, 사이드메뉴 공용 훅/WS 일원화, `useGameConfig` 폴백 축소/경고.
+- 컨테이너 내부 pytest 스모크(결제/스트릭) 실행 후 `api docs/20250808.md` 변경 요약 갱신 및 필요 시 OpenAPI 재수출.
+
 ## 2025-08-24 Admin Shop(프론트) 읽기 전용 연동 및 가챠/대시보드 후속 정리
 
 변경 요약

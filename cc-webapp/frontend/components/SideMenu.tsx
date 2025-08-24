@@ -15,10 +15,12 @@ import {
   Crown,
   Sparkles,
   Target,
-  TrendingUp
+  TrendingUp,
+  Flame
 } from 'lucide-react';
 import { User as UserType } from '../types';
 import { Button } from './ui/button';
+import { useRealtimeSync } from '../contexts/RealtimeSyncContext';
 
 interface SideMenuProps {
   isOpen: boolean;
@@ -41,6 +43,19 @@ export function SideMenu({
   onLogout,
   onAddNotification
 }: SideMenuProps) {
+  const { state } = useRealtimeSync();
+  const pendingPurchases = state?.purchase?.pending_count || 0;
+  const streakDays = (() => {
+    const keys = Object.keys(state?.streaks || {});
+    if (keys.length === 0) return 0;
+    // 대표 streak 하나의 카운트(임시)
+    const any = state!.streaks[keys[0]];
+    return any?.current_count || 0;
+  })();
+  const claimableEvents = (() => {
+    const evs = state?.events || {};
+    return Object.values(evs).filter((e: any) => e.completed && (e.claimable === true || true)).length;
+  })();
   const handleExternalLink = () => {
     window.open('https://md-01.com', '_blank');
     onAddNotification('🌟 프리미엄 모델 페이지로 이동합니다!');
@@ -55,9 +70,18 @@ export function SideMenu({
       color: 'text-primary',
       bgColor: 'bg-primary-soft',
       action: onNavigateToEventMissionPanel,
-      badge: 'NEW'
+  badge: claimableEvents > 0 ? String(claimableEvents) : undefined
     },
     {
+      icon: Flame,
+      label: '연속 접속',
+      description: '스트릭 진행 현황',
+      color: 'text-success',
+      bgColor: 'bg-success-soft',
+      action: onNavigateToEventMissionPanel,
+      badge: streakDays > 0 ? String(streakDays) : undefined
+    },
+  {
       icon: Settings,
       label: '설정',
       description: '앱 설정 및 환경설정',
@@ -74,6 +98,17 @@ export function SideMenu({
       action: handleExternalLink,
       isExternal: true,
       badge: '+P'
+    },
+    // 결제 진행 상황 표시용 (WS 일원화 배지)
+    {
+      icon: TrendingUp,
+      label: '결제 진행',
+      description: '진행 중 결제 상태'
+      ,
+      color: 'text-primary',
+      bgColor: 'bg-primary-soft',
+      action: () => onAddNotification('🧾 결제 진행 현황은 상단 배지/토스트를 확인하세요.'),
+      badge: pendingPurchases > 0 ? String(pendingPurchases) : undefined
     },
     {
       icon: HelpCircle,

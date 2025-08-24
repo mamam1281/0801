@@ -564,9 +564,23 @@ export function RealtimeSyncProvider({ children, apiBaseUrl }: RealtimeSyncProvi
 
   const refreshEvents = useCallback(async () => {
     try {
+      // 활성 이벤트 + 사용자 참여/진행 정보 포함 응답 가정
       const events = await apiCall('/api/events/active');
-      // TODO: 이벤트 상태 업데이트 로직
-      console.log('[RealtimeSync] Events refresh - TODO:', events);
+      if (Array.isArray(events)) {
+        events.forEach((ev: any) => {
+          const progress = ev.user_participation?.progress || {};
+          const completed = !!ev.user_participation?.completed;
+          dispatch({
+            type: 'UPDATE_EVENT',
+            payload: {
+              user_id: ev.user_id || 0,
+              event_id: ev.id,
+              progress,
+              completed,
+            },
+          });
+        });
+      }
     } catch (error) {
       console.error('[RealtimeSync] Failed to refresh events:', error);
     }
