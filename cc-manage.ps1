@@ -23,7 +23,7 @@ $UseComposeV2 = $true
 function Test-DockerInstalled {
     try { & docker --version *> $null; return $true } catch { return $false }
 }
-function Detect-Compose {
+function Test-Compose {
     if (-not (Test-DockerInstalled)) {
         Write-Host "Docker Desktop is not installed or the engine is not running." -ForegroundColor Red
         Write-Host "Start Docker Desktop, then retry. (C: Program Files Docker Docker Docker Desktop.exe)" -ForegroundColor Yellow
@@ -61,7 +61,7 @@ function Resolve-ServiceName($name) {
 }
 
 function Start-Environment {
-    Detect-Compose
+    Test-Compose
     # Ensure .env exists (auto-copy from .env.development if present)
     try {
         if (-not (Test-Path ".env") -and (Test-Path ".env.development")) {
@@ -115,7 +115,7 @@ function Start-Environment {
 }
 
 function Stop-Environment {
-    Detect-Compose
+    Test-Compose
     Write-Host "Stopping Casino-Club F2P environment..." -ForegroundColor Cyan
     $composeArgs = Get-ComposeArgs
     Compose @composeArgs down
@@ -123,7 +123,7 @@ function Stop-Environment {
 }
 
 function Show-Logs {
-    Detect-Compose
+    Test-Compose
     $resolved = Resolve-ServiceName $Service
     if ($resolved) {
         Write-Host "Showing logs for $resolved..." -ForegroundColor Cyan
@@ -137,14 +137,14 @@ function Show-Logs {
 }
 
 function Show-Status {
-    Detect-Compose
+    Test-Compose
     Write-Host "Checking environment status..." -ForegroundColor Cyan
     $composeArgs = Get-ComposeArgs
     Compose @composeArgs ps
 }
 
-function Tools-Start {
-    Detect-Compose
+function Start-Tools {
+    Test-Compose
     Write-Host "Starting monitoring tools (Prometheus/Grafana/Metabase)..." -ForegroundColor Cyan
     $file = "docker-compose.monitoring.yml"
     if (-not (Test-Path $file)) { Write-Host "Monitoring compose file not found: $file" -ForegroundColor Red; exit 1 }
@@ -167,8 +167,8 @@ function Tools-Start {
     Write-Host "Monitoring tools started!" -ForegroundColor Green
 }
 
-function Tools-Stop {
-    Detect-Compose
+function Stop-Tools {
+    Test-Compose
     Write-Host "Stopping monitoring tools..." -ForegroundColor Cyan
     $file = "docker-compose.monitoring.yml"
     if ($UseComposeV2) { & docker compose -f $file down }
@@ -176,8 +176,8 @@ function Tools-Stop {
     Write-Host "Monitoring tools stopped!" -ForegroundColor Green
 }
 
-function Tools-Status {
-    Detect-Compose
+function Get-ToolsStatus {
+    Test-Compose
     Write-Host "Checking monitoring tools status..." -ForegroundColor Cyan
     $file = "docker-compose.monitoring.yml"
     if ($UseComposeV2) { & docker compose -f $file ps }
@@ -185,7 +185,7 @@ function Tools-Status {
 }
 
 function Enter-Container {
-    Detect-Compose
+    Test-Compose
     if (-not $Service) {
         Write-Host "Error: Service name is required" -ForegroundColor Red
         Write-Host "Usage: ./cc-manage.ps1 shell <service_name> (postgres, backend, or frontend)" -ForegroundColor Yellow
@@ -207,9 +207,9 @@ function Enter-Container {
     }
 }
 
-function Check-Prerequisites {
+function Test-Prerequisites {
     Write-Host "Running environment checks..." -ForegroundColor Cyan
-    Detect-Compose
+    Test-Compose
     # Ensure .env exists (auto-copy from .env.development if present)
     try {
         if (-not (Test-Path ".env") -and (Test-Path ".env.development")) {
@@ -232,7 +232,7 @@ function Check-Prerequisites {
     Write-Host "Done." -ForegroundColor Cyan
 }
 
-function Check-Health {
+function Test-Health {
     Write-Host "Probing service health..." -ForegroundColor Cyan
     $apiPort = 8000
     $webPort = 3000
@@ -251,9 +251,9 @@ function Check-Health {
     try { $web = Invoke-WebRequest -Uri "http://localhost:$webPort" -UseBasicParsing -TimeoutSec 5; Write-Host ("Web / => {0}" -f $web.StatusCode) -ForegroundColor Green } catch { Write-Host "Web not responding on http://localhost:$webPort" -ForegroundColor Yellow }
 }
 
-function Check-DBConnection {
+function Test-DBConnection {
     Write-Host "Checking database connectivity..." -ForegroundColor Cyan
-    Detect-Compose
+    Test-Compose
 
     # Host port check
     $dbPort = 5432
@@ -318,14 +318,14 @@ switch ($Command) {
     "logs" { Show-Logs }
     "status" { Show-Status }
     "shell" { Enter-Container }
-    "check" { Check-Prerequisites }
-    "health" { Check-Health }
-    "db-check" { Check-DBConnection }
+    "check" { Test-Prerequisites }
+    "health" { Test-Health }
+    "db-check" { Test-DBConnection }
     "tools" {
         switch ($Service) {
-            "start" { Tools-Start }
-            "stop" { Tools-Stop }
-            "status" { Tools-Status }
+            "start" { Start-Tools }
+            "stop" { Stop-Tools }
+            "status" { Get-ToolsStatus }
             default { Write-Host "Usage: ./cc-manage.ps1 tools <start|stop|status>" -ForegroundColor Yellow }
         }
     }
