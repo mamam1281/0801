@@ -91,19 +91,123 @@ export function ShopManager({ onAddNotification }: ShopManagerProps) {
     return matchesSearch && matchesCategory;
   });
 
-  // Handle create/edit item
-  const handleSaveItem = async () => {
-    onAddNotification('ℹ️ 현재 관리 화면은 읽기 전용입니다. 생성/수정은 추후 연동됩니다.');
+  // 유틸: tags에서 SKU와 랭크 후보 추출
+  const extractSkuFromTags = (tags?: string[]) => (Array.isArray(tags) && tags.length > 0 ? tags[0] : undefined);
+  const knownRanks = ['STANDARD', 'PREMIUM', 'VIP'];
+  const extractRankFromTags = (tags?: string[]) => {
+    if (!Array.isArray(tags)) return null;
+    const t = tags.find((t) => knownRanks.includes(String(t).toUpperCase()));
+    return t ? String(t).toUpperCase() : null;
   };
 
-  // Handle delete item
-  const handleDeleteItem = async () => {
-    onAddNotification('ℹ️ 현재 관리 화면은 읽기 전용입니다. 삭제는 추후 연동됩니다.');
+  // Handle create/edit item (optimistic)
+  const handleSaveItem = async (itemData: Partial<ShopItem> & { productId?: number; sku?: string; min_rank?: string | null; discount_ends_at?: string | null }) => {
+    try {
+      setIsLoading(true);
+      const isEdit = !!editingItem;
+      // 기본 매핑 → AdminCatalogItemIn
+      const id = isEdit ? Number(editingItem!.id) : Number(itemData.productId);
+      const sku = itemData.sku || extractSkuFromTags(itemData.tags) || (isEdit ? extractSkuFromTags(editingItem!.tags) : undefined);
+      const min_rank = (itemData.min_rank ?? extractRankFromTags(itemData.tags)) || null;
+      if (!id || !sku) {
+        onAddNotification('⚠️ Product ID 또는 SKU가 없습니다. (첫 번째 태그를 SKU로 사용하거나 모달 입력을 채워주세요)');
+        return;
+      }
+      const payload = {
+        id,
+        sku,
+        name: String(itemData.name ?? editingItem?.name ?? ''),
+        price_cents: 0,
+        gold: Number(itemData.price ?? editingItem?.price ?? 0) || 0,
+        discount_percent: (itemData.discount ?? editingItem?.discount ?? 0) || 0,
+        discount_ends_at: (itemData.discount_ends_at ?? null) as any,
+        min_rank,
+      } as any;
+
+      if (isEdit) {
+        // Optimistic update snapshot
+        const prev = [...shopItems];
+        const optimistic: ShopItem = {
+          ...(editingItem as ShopItem),
+          name: payload.name,
+          price: payload.gold,
+          discount: payload.discount_percent,
+          tags: [sku, ...(min_rank ? [min_rank] : [])],
+        };
+        setShopItems(prev.map((it) => (it.id === editingItem!.id ? optimistic : it)));
+        try {
+          const res = await adminApi.updateShopItem(id, payload);
+          setShopItems((curr: ShopItem[]) => curr.map((it: ShopItem) => (it.id === editingItem!.id ? mapAdminItem(res) : it)));
+          onAddNotification('✅ 아이템이 수정되었습니다.');
+        } catch (e: any) {
+          setShopItems(prev); // rollback
+          const status = e?.status ?? e?.response?.status;
+          if (status === 403) onAddNotification('⛔ 권한이 없습니다(403).');
+          else onAddNotification(`❌ 수정 실패: ${e?.message ?? e}`);
+        }
+      } else {
+        // Create optimistic add
+        const tempId = `temp-${Date.now()}`;
+        const optimistic: ShopItem = {
+          id: String(id) || tempId,
+          name: payload.name,
+          description: String(itemData.description ?? ''),
+          price: payload.gold,
+          category: (itemData.category as any) || 'currency',
+          rarity: (itemData.rarity as any) || 'common',
+          isActive: itemData.isActive ?? true,
+          stock: itemData.stock,
+          discount: payload.discount_percent,
+          icon: itemData.icon || '💰',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          sales: 0,
+          tags: [sku, ...(min_rank ? [min_rank] : [])],
+        };
+        const prev = [...shopItems];
+        setShopItems([optimistic, ...prev]);
+        try {
+          const res = await adminApi.createShopItem(payload);
+          // replace optimistic with real
+          setShopItems((curr: ShopItem[]) => curr.map((it: ShopItem) => (it === optimistic ? mapAdminItem(res) : it)));
+          onAddNotification('✅ 아이템이 생성되었습니다.');
+        } catch (e: any) {
+          setShopItems(prev); // rollback
+          const status = e?.status ?? e?.response?.status;
+          if (status === 403) onAddNotification('⛔ 권한이 없습니다(403).');
+          else onAddNotification(`❌ 생성 실패: ${e?.message ?? e}`);
+        }
+      }
+    } finally {
+      setIsLoading(false);
+      setShowCreateModal(false);
+      setEditingItem(null);
+    }
   };
 
-  // Toggle item active status
+  // Handle delete item (optimistic)
+  const handleDeleteItem = async (item: ShopItem) => {
+    const id = Number(item.id);
+    if (!id) {
+      onAddNotification('⚠️ 잘못된 아이템 ID');
+      return;
+    }
+    const prev = [...shopItems];
+    setShopItems(prev.filter((it) => it.id !== item.id));
+    try {
+      await adminApi.deleteShopItem(id);
+      onAddNotification('🗑️ 아이템이 삭제되었습니다.');
+    } catch (e: any) {
+      setShopItems(prev); // rollback
+      const status = e?.status ?? e?.response?.status;
+      if (status === 403) onAddNotification('⛔ 권한이 없습니다(403).');
+      else onAddNotification(`❌ 삭제 실패: ${e?.message ?? e}`);
+    }
+  };
+
+  // Toggle item active status (API 미제공 → 안내)
   const toggleItemStatus = async () => {
-    onAddNotification('ℹ️ 현재 관리 화면은 읽기 전용입니다. 활성/비활성 전환은 추후 연동됩니다.');
+    onAddNotification('ℹ️ 현재 API에 상점 아이템 활성/비활성 토글 엔드포인트가 없습니다. (백엔드 확장 필요)');
   };
 
   // Get rarity color
@@ -154,7 +258,7 @@ export function ShopManager({ onAddNotification }: ShopManagerProps) {
             가져오기
           </Button>
           <Button 
-            onClick={() => onAddNotification('ℹ️ 읽기 전용: 생성은 추후 연동 예정입니다.')}
+            onClick={() => { setEditingItem(null); setShowCreateModal(true); }}
             className="bg-gradient-game btn-hover-lift"
           >
             <Plus className="w-4 h-4 mr-2" />
@@ -336,7 +440,7 @@ export function ShopManager({ onAddNotification }: ShopManagerProps) {
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => onAddNotification('ℹ️ 읽기 전용: 수정은 추후 연동 예정입니다.')}
+                onClick={() => { setEditingItem(item); setShowCreateModal(true); }}
                 className="flex-1"
               >
                 <Edit className="w-4 h-4 mr-1" />
@@ -345,7 +449,7 @@ export function ShopManager({ onAddNotification }: ShopManagerProps) {
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => handleDeleteItem()}
+                onClick={() => handleDeleteItem(item)}
                 className="border-error text-error hover:bg-error hover:text-white"
               >
                 <Trash2 className="w-4 h-4" />
@@ -362,7 +466,7 @@ export function ShopManager({ onAddNotification }: ShopManagerProps) {
           setShowCreateModal(false);
           setEditingItem(null);
         }}
-        onSave={handleSaveItem}
+  onSave={handleSaveItem}
         editingItem={editingItem}
         isLoading={isLoading}
         categories={categories}
@@ -376,7 +480,7 @@ export function ShopManager({ onAddNotification }: ShopManagerProps) {
 interface ItemModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (itemData: Partial<ShopItem>) => void;
+  onSave: (itemData: Partial<ShopItem> & { productId?: number; sku?: string; min_rank?: string | null; discount_ends_at?: string | null }) => void;
   editingItem: ShopItem | null;
   isLoading: boolean;
   categories: Array<{ value: string; label: string }>;
@@ -400,12 +504,25 @@ function ItemModal({
     rarity: 'common',
     isActive: true,
     icon: '📦',
-    tags: []
-  } as Partial<ShopItem>);
+    tags: [],
+    // 확장 필드 (API 매핑)
+    productId: undefined as number | undefined,
+    sku: '',
+    min_rank: undefined as string | null | undefined,
+    discount_ends_at: undefined as string | null | undefined,
+  } as Partial<ShopItem> & { productId?: number; sku?: string; min_rank?: string | null; discount_ends_at?: string | null });
 
   useEffect(() => {
     if (editingItem) {
-      setFormData(editingItem);
+      // 편집 시: 기존 ShopItem에서 확장 필드 추정 세팅
+      const rankTag = (editingItem.tags || []).find((t) => ['STANDARD','PREMIUM','VIP'].includes(String(t).toUpperCase()));
+      setFormData({
+        ...editingItem,
+        productId: Number(editingItem.id) || undefined,
+        sku: (editingItem.tags && editingItem.tags.length > 0) ? editingItem.tags[0] : '',
+        min_rank: rankTag ? String(rankTag).toUpperCase() : undefined,
+        discount_ends_at: undefined,
+      } as any);
     } else {
       setFormData({
         name: '',
@@ -415,8 +532,12 @@ function ItemModal({
         rarity: 'common',
         isActive: true,
         icon: '📦',
-        tags: []
-      });
+        tags: [],
+        productId: undefined,
+        sku: '',
+        min_rank: undefined,
+        discount_ends_at: undefined,
+      } as any);
     }
   }, [editingItem, isOpen]);
 
@@ -453,6 +574,32 @@ function ItemModal({
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
+            {/* ID / SKU */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="productId">Product ID {editingItem ? '' : '*'}</Label>
+                <Input
+                  id="productId"
+                  type="number"
+                  value={(formData as any).productId || ''}
+                  onChange={(e: any) => setFormData((prev: any) => ({ ...prev, productId: e.target.value ? parseInt(e.target.value) : undefined }))}
+                  placeholder="고유 상품 ID"
+                  min="1"
+                  required={!editingItem}
+                />
+              </div>
+              <div>
+                <Label htmlFor="sku">SKU {editingItem ? '' : '*'} (태그 첫 번째로도 인식)</Label>
+                <Input
+                  id="sku"
+                  value={(formData as any).sku || ''}
+                  onChange={(e: any) => setFormData((prev: any) => ({ ...prev, sku: e.target.value }))}
+                  placeholder="e.g. GOLD_1000"
+                  required={!editingItem}
+                />
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="name">아이템 이름 *</Label>
@@ -524,6 +671,27 @@ function ItemModal({
                   placeholder="0"
                   min="0"
                   max="100"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="min_rank">최소 랭크 (선택)</Label>
+                <Input
+                  id="min_rank"
+                  value={(formData as any).min_rank || ''}
+                  onChange={(e: any) => setFormData((prev: any) => ({ ...prev, min_rank: e.target.value || null }))}
+                  placeholder="예: STANDARD/VIP"
+                />
+              </div>
+              <div>
+                <Label htmlFor="discount_ends_at">할인 종료 시각 (ISO, 선택)</Label>
+                <Input
+                  id="discount_ends_at"
+                  value={(formData as any).discount_ends_at || ''}
+                  onChange={(e: any) => setFormData((prev: any) => ({ ...prev, discount_ends_at: e.target.value || null }))}
+                  placeholder="2025-08-20T00:00:00Z"
                 />
               </div>
             </div>
