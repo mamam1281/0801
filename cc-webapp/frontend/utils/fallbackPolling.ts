@@ -273,7 +273,7 @@ export function createSyncPollingTasks(
             execute: refreshProfile,
             options: {
                 ...defaultOptions,
-                interval: 60000 // 프로필은 1분마다
+                interval: 30000 // 표준: 30초
             }
         },
         {
@@ -281,7 +281,7 @@ export function createSyncPollingTasks(
             execute: refreshStreaks,
             options: {
                 ...defaultOptions,
-                interval: 30000 // 스트릭은 30초마다
+                interval: 30000 // 표준: 30초
             }
         },
         {
@@ -289,7 +289,7 @@ export function createSyncPollingTasks(
             execute: refreshEvents,
             options: {
                 ...defaultOptions,
-                interval: 45000 // 이벤트는 45초마다
+                interval: 30000 // 표준: 30초
             }
         }
     ];
