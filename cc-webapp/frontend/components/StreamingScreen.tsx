@@ -30,6 +30,7 @@ import { User } from '../types';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
+import { useGold } from '@/hooks/useSelectors';
 
 interface StreamingScreenProps {
   user: User;
@@ -137,6 +138,7 @@ const VIDEO_GALLERY = [
 type HeartAnim = { id: number; x: number; y: number; type: string };
 
 export function StreamingScreen({ user, onBack, onUpdateUser, onAddNotification }: StreamingScreenProps) {
+  const gold = useGold();
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [isPlaying, setIsPlaying] = useState(true);
   const [currentViewers, setCurrentViewers] = useState(EXCLUSIVE_VJ.currentViewers as number);
@@ -178,7 +180,7 @@ export function StreamingScreen({ user, onBack, onUpdateUser, onAddNotification 
 
   // 선물 보내기
   const sendGift = (gift: typeof GIFTS[0]) => {
-    if (user.goldBalance < gift.price) {
+    if (gold < gift.price) {
       onAddNotification(`❌ ${gift.price}G가 필요합니다!`);
       return;
     }
@@ -196,7 +198,7 @@ export function StreamingScreen({ user, onBack, onUpdateUser, onAddNotification 
 
   // VIP 구독
   const subscribeVip = () => {
-    if (user.goldBalance < EXCLUSIVE_VJ.vipPrice) {
+    if (gold < EXCLUSIVE_VJ.vipPrice) {
       onAddNotification(`❌ VIP 구독에 ${EXCLUSIVE_VJ.vipPrice}G가 필요합니다!`);
       return;
     }
@@ -213,7 +215,7 @@ export function StreamingScreen({ user, onBack, onUpdateUser, onAddNotification 
 
   // 개인방 신청
   const requestPrivate = () => {
-    if (user.goldBalance < EXCLUSIVE_VJ.privatePrice) {
+    if (gold < EXCLUSIVE_VJ.privatePrice) {
       onAddNotification(`❌ 개인방에 ${EXCLUSIVE_VJ.privatePrice}G가 필요합니다!`);
       return;
     }
@@ -235,7 +237,7 @@ export function StreamingScreen({ user, onBack, onUpdateUser, onAddNotification 
       return;
     }
 
-    if (user.goldBalance < video.price) {
+    if (gold < video.price) {
       onAddNotification(`❌ ${video.price}G가 필요합니다!`);
       return;
     }
@@ -319,9 +321,7 @@ export function StreamingScreen({ user, onBack, onUpdateUser, onAddNotification 
             
             <div className="text-right">
               <div className="text-sm text-muted-foreground">보유 골드</div>
-              <div className="text-xl font-bold text-gold">
-                {user.goldBalance.toLocaleString()}G
-              </div>
+              <div className="text-xl font-bold text-gold">{gold.toLocaleString()}G</div>
             </div>
           </div>
         </div>

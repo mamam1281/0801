@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { User } from '../../types';
 import { Button } from '../ui/button';
+import { useGold } from '../../hooks/useSelectors';
 
 interface RockPaperScissorsGameProps {
   user: User;
@@ -65,6 +66,7 @@ export function RockPaperScissorsGame({
   onUpdateUser, 
   onAddNotification 
 }: RockPaperScissorsGameProps) {
+  const gold = useGold();
   const [playerChoice, setPlayerChoice] = useState(null as Choice | null);
   const [aiChoice, setAiChoice] = useState(null as Choice | null);
   const [gameResult, setGameResult] = useState(null as GameResult | null);
@@ -127,7 +129,7 @@ export function RockPaperScissorsGame({
   const playGame = async (choice: Choice) => {
     if (isPlaying) return;
     
-    if (user.goldBalance < betAmount) {
+  if (gold < betAmount) {
       onAddNotification('❌ 골드가 부족합니다!');
       return;
     }
@@ -386,9 +388,7 @@ export function RockPaperScissorsGame({
             <div className="glass-effect rounded-xl p-3 border border-gold/20">
               <div className="text-right">
                 <div className="text-sm text-muted-foreground">보유 골드</div>
-                <div className="text-xl font-black text-gradient-gold">
-                  {user.goldBalance.toLocaleString()}G
-                </div>
+                <div className="text-xl font-black text-gradient-gold">{gold.toLocaleString()}G</div>
               </div>
             </div>
           </div>
@@ -665,7 +665,7 @@ export function RockPaperScissorsGame({
               >
                 <Button
                   onClick={() => playGame(choice)}
-                  disabled={isPlaying || user.goldBalance < betAmount}
+                  disabled={isPlaying || gold < betAmount}
                   className="h-32 w-full bg-gradient-to-r from-secondary to-secondary-hover hover:from-primary hover:to-primary-light text-white font-bold text-xl flex flex-col items-center gap-3 relative overflow-hidden btn-hover-glow"
                 >
                   <motion.div

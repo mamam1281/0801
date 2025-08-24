@@ -24,6 +24,7 @@ import { User as UserType } from '../types';
 import { Button } from './ui/button';
 import { Switch } from './ui/switch';
 import { Slider } from './ui/slider';
+import { useGold } from '@/hooks/useSelectors';
 
 interface SettingsScreenProps {
   user: UserType;
@@ -33,6 +34,7 @@ interface SettingsScreenProps {
 }
 
 export function SettingsScreen({ user, onBack, onUpdateUser, onAddNotification }: SettingsScreenProps) {
+  const gold = useGold();
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [soundVolume, setSoundVolume] = useState([80]);
   const [musicEnabled, setMusicEnabled] = useState(true);
@@ -234,7 +236,7 @@ export function SettingsScreen({ user, onBack, onUpdateUser, onAddNotification }
             </div>
             <div className="flex-1">
               <h3 className="text-lg font-bold text-foreground">{user.nickname}</h3>
-              <p className="text-sm text-muted-foreground">레벨 {user.level} • {user.goldBalance.toLocaleString()}G</p>
+              <p className="text-sm text-muted-foreground">레벨 {user.level} • {gold.toLocaleString()}G</p>
               <p className="text-xs text-primary">{user.stats.gamesPlayed}게임 플레이 • {user.stats.gamesWon}승</p>
             </div>
             <div className="text-right">

@@ -41,6 +41,7 @@ import useDashboard from '@/hooks/useDashboard';
 import useRecentActions from '@/hooks/useRecentActions';
 import { API_ORIGIN } from '@/lib/unifiedApi';
 import { createWSClient, WSClient, WebSocketMessage } from '@/utils/wsClient';
+import { useGold } from '@/hooks/useSelectors';
 
 interface HomeDashboardProps {
   user: User;
@@ -229,6 +230,7 @@ export function HomeDashboard({
 
   const experiencePercentage = calculateExperiencePercentage(user);
   const winRate = calculateWinRate(user);
+  const gold = useGold();
 
   // 최근 액션 로드 (user.id는 문자열로 정의되어 있어 숫자 변환 시도)
   const numericUserId = (() => {
@@ -276,7 +278,7 @@ export function HomeDashboard({
 
   const claimDailyReward = async () => {
     // 기존 프로필 스냅샷(검증용)
-    const prevGold = user.goldBalance;
+    const prevGold = gold;
     const prevXP = user.experience;
     const prevStreak = user.dailyStreak;
     const tokens = getTokens();
@@ -301,7 +303,7 @@ export function HomeDashboard({
       // data: { awarded_gold, awarded_xp, new_gold_balance, streak_count }
       const fallback = {
         ...user,
-        goldBalance: data.new_gold_balance ?? user.goldBalance,
+        goldBalance: data.new_gold_balance ?? gold,
         experience: (user.experience || 0) + (data.awarded_xp || 0),
         dailyStreak: data.streak_count ?? user.dailyStreak,
       };
@@ -622,7 +624,7 @@ export function HomeDashboard({
                 className="bg-gradient-gold text-black px-4 py-3 rounded-xl font-bold cursor-pointer btn-hover-lift"
               >
                 <Coins className="w-6 h-6 mx-auto mb-1" />
-                <div className="text-xl lg:text-2xl">{user.goldBalance.toLocaleString()}</div>
+                <div className="text-xl lg:text-2xl">{gold.toLocaleString()}</div>
                 <div className="text-xs opacity-80">골드</div>
               </motion.div>
             </div>

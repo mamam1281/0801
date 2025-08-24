@@ -1,4 +1,19 @@
 # Casino-Club F2P 프로젝트 Final 체크 & 트러블슈팅 기록
+ 
+## 2025-08-24 UI 골드 표기 일관성 – 셀렉터 2차 적용(5개 컴포넌트)
+
+변경 요약
+- 공용 셀렉터(useGold/selectGold) 기반으로 `user.goldBalance` 직접 참조 제거: `BottomNavigation`, `SettingsScreen`, `GameDashboard`, `games/GachaSystem`, `StreamingScreen` 치환 완료.
+- WS `profile_update` + 폴백 폴링으로 모든 화면의 골드 표시가 단일 소스(RealtimeSyncContext.state.profile.gold)로 수렴.
+
+검증 결과
+- 프론트 타입 오류 0, 로컬 빌드 통과. OpenAPI/Alembic 변경 없음(head 단일 유지).
+- 주요 화면(홈/사이드/샵/가챠/스트리밍)에서 구매 후 잔액 증가가 일관되게 반영됨(수동 스모크).
+
+다음 단계
+- 남은 컴포넌트 치환: `games/NeonCrashGame`, `games/NeonSlotGame`, `games/RockPaperScissorsGame`, `EventMissionPanel` 등.
+- `/api/users/me` 표준화 점검 및 `/api/users/profile` 호출부는 어댑터만 잔존하도록 정리.
+- 결제/스트릭 스모크 재실행 및 UI 일관성 스크린샷을 `api docs/20250823_GLOBAL_EVAL_GUIDE.md`/본 문서에 첨부.
 
 ## 2025-08-24 Shop/Admin 연동 고도화 + OpenAPI 중복 제거
 

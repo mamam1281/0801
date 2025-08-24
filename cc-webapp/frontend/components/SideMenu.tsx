@@ -21,6 +21,7 @@ import {
 import { User as UserType } from '../types';
 import { Button } from './ui/button';
 import { useRealtimeSync } from '../contexts/RealtimeSyncContext';
+import { useGold } from '../hooks/useSelectors';
 
 interface SideMenuProps {
   isOpen: boolean;
@@ -201,7 +202,8 @@ export function SideMenu({
                   
                   <div className="grid grid-cols-2 gap-3">
                     <div className="bg-secondary/30 rounded-lg p-3 text-center">
-                      <div className="text-lg font-bold text-gold">{user.goldBalance.toLocaleString()}G</div>
+                      {/* Realtime gold (selector) */}
+                      <GoldDisplay />
                       <div className="text-xs text-muted-foreground">골드</div>
                     </div>
                     <div className="bg-secondary/30 rounded-lg p-3 text-center">
@@ -293,3 +295,10 @@ export function SideMenu({
     </AnimatePresence>
   );
 }
+
+// 내부 표시용: RealtimeSync 기반 골드 표시 위젯
+function GoldDisplay() {
+  const gold = useGold();
+  return (
+    <div className="text-lg font-bold text-gold">{gold.toLocaleString()}G</div>
+  );}

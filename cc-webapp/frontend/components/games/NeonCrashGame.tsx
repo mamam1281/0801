@@ -31,6 +31,7 @@ import { User } from '../../types';
 import { Button } from '../ui/button';
 import { Slider } from '../ui/slider';
 import { api } from '@/lib/unifiedApi';
+import { useGold } from '../../hooks/useSelectors';
 
 interface NeonCrashGameProps {
   user: User;
@@ -45,6 +46,7 @@ export function NeonCrashGame({
   onUpdateUser,
   onAddNotification,
 }: NeonCrashGameProps) {
+  const gold = useGold();
   const [betAmount, setBetAmount] = useState(10);
   const [multiplier, setMultiplier] = useState(1.0);
   const [isRunning, setIsRunning] = useState(false);
@@ -107,7 +109,7 @@ export function NeonCrashGame({
 
   // 게임 시작 - 서버에서 실제 베팅 처리
   const startGame = async () => {
-    if (user.goldBalance < betAmount) {
+  if (gold < betAmount) {
       onAddNotification('베팅할 골드가 부족합니다.');
       return;
     }
@@ -548,7 +550,7 @@ export function NeonCrashGame({
               className={`h-6 w-6 ${showAdvancedSettings ? 'text-primary' : 'text-muted-foreground'}`}
             />
           </Button>
-          <div className="text-xl font-bold">{user.goldBalance.toLocaleString()} G</div>
+            <div className="text-xl font-bold">{gold.toLocaleString()} G</div>
         </div>
       </motion.header>
 
@@ -591,7 +593,7 @@ export function NeonCrashGame({
             {/* 그래프 영역 */}
             {showGraph && (
               <div className="w-full h-60 sm:h-72 md:h-80 mb-6 bg-background/30 rounded-lg p-3 border border-border/50 relative">
-                <canvas ref={canvasRef} className="w-full h-full" style={{ touchAction: 'none' }} />
+                <canvas ref={canvasRef} className="w-full h-full touch-none" />
 
                 {/* 멀티플라이어 오버레이 - 그래프 위에 큰 숫자로 표시 */}
                 {isRunning && (
@@ -753,7 +755,7 @@ export function NeonCrashGame({
                 <div className="py-2 px-1">
                   <Slider
                     min={1}
-                    max={Math.min(user.goldBalance, 1000)}
+                    max={Math.min(gold, 1000)}
                     step={1}
                     value={[betAmount]}
                     onValueChange={(values: number[]) => changeBetAmount(values[0])}
@@ -888,7 +890,7 @@ export function NeonCrashGame({
                     size="lg"
                     className="bg-primary text-white hover:bg-primary/80 h-14 rounded-xl text-lg font-bold"
                     onClick={startGame}
-                    disabled={user.goldBalance < betAmount}
+                    disabled={gold < betAmount}
                   >
                     <TrendingUp className="w-5 h-5 mr-2" />
                     게임 시작

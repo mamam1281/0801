@@ -29,6 +29,7 @@ import {
 } from './gacha/components';
 import type { GachaBanner } from '../../types/gacha';
 import { useGachaPull } from '@/hooks/game/useGachaPull';
+import { useGold } from '@/hooks/useSelectors';
 
 interface GachaSystemProps {
   user: User;
@@ -56,6 +57,7 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
   const { fromApi } = useFeedback();
   const { getAccessToken } = useAuthToken();
   const { config: gameConfig, loading: configLoading } = useGameConfig();
+  const gold = useGold();
   
   const [selectedBanner, setSelectedBanner] = useState(GACHA_BANNERS[0] as GachaBanner);
   const [isPulling, setIsPulling] = useState(false);
@@ -132,7 +134,7 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
   // Perform single pull
   const performSinglePull = async () => {
     const cost = getSinglePullCost();
-    if (user.goldBalance < cost) {
+  if (gold < cost) {
       onAddNotification('❌ 골드가 부족합니다!');
       return;
     }
@@ -197,7 +199,7 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
   // Perform 10-pull
   const performTenPull = async () => {
     const discountedCost = getTenPullCost();
-    if (user.goldBalance < discountedCost) {
+  if (gold < discountedCost) {
       onAddNotification('❌ 골드가 부족합니다!');
       return;
     }
@@ -385,9 +387,7 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
 
             <div className="text-right">
               <div className="text-sm text-pink-300/60">보유 골드</div>
-              <div className="text-xl font-bold text-yellow-400">
-                {user.goldBalance.toLocaleString()}G
-              </div>
+              <div className="text-xl font-bold text-yellow-400">{gold.toLocaleString()}G</div>
             </div>
           </div>
         </div>
@@ -514,7 +514,7 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
               <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                 <Button
                   onClick={performSinglePull}
-                  disabled={isPulling || user.goldBalance < getSinglePullCost()}
+                  disabled={isPulling || gold < getSinglePullCost()}
                   className="w-full h-20 bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-400 hover:to-purple-400 text-white font-bold text-lg relative overflow-hidden border-0"
                   style={{ boxShadow: '0 0 20px rgba(236, 72, 153, 0.5)' }}
                 >
@@ -547,7 +547,7 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
               <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                 <Button
                   onClick={performTenPull}
-                  disabled={isPulling || user.goldBalance < getTenPullCost()}
+                  disabled={isPulling || gold < getTenPullCost()}
                   className="w-full h-20 bg-gradient-to-r from-yellow-500 to-red-500 hover:from-yellow-400 hover:to-red-400 text-white font-bold text-lg relative overflow-hidden border-0"
                   style={{ boxShadow: '0 0 20px rgba(245, 158, 11, 0.5)' }}
                 >
