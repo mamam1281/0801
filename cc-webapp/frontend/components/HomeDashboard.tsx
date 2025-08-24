@@ -26,7 +26,7 @@ import {
 } from 'lucide-react';
 import { User } from '../types';
 import { calculateExperiencePercentage, calculateWinRate, checkLevelUp } from '../utils/userUtils';
-// Removed static QUICK_ACTIONS/ACHIEVEMENTS_DATA in favor of server/WS data
+import { QUICK_ACTIONS, ACHIEVEMENTS_DATA } from '../constants/dashboardData';
 import { Button } from './ui/button';
 import { useGameConfig } from '../hooks/useGameConfig';
 import { Progress } from './ui/progress';
@@ -41,7 +41,6 @@ import useDashboard from '@/hooks/useDashboard';
 import useRecentActions from '@/hooks/useRecentActions';
 import { API_ORIGIN } from '@/lib/unifiedApi';
 import { createWSClient, WSClient, WebSocketMessage } from '@/utils/wsClient';
-import { useGold } from '@/hooks/useSelectors';
 
 interface HomeDashboardProps {
   user: User;
@@ -97,8 +96,6 @@ export function HomeDashboard({
     (user as any)?.vip_points ?? (user as any)?.vipPoints ?? 0
   );
   const [isAchievementsExpanded, setIsAchievementsExpanded] = useState(false);
-  const [achievements, setAchievements] = useState([] as any[]);
-  const [achievementsLoading, setAchievementsLoading] = useState(false);
   const [streak, setStreak] = useState({
     count: user?.dailyStreak ?? 0,
     ttl_seconds: null as number | null,
@@ -230,7 +227,6 @@ export function HomeDashboard({
 
   const experiencePercentage = calculateExperiencePercentage(user);
   const winRate = calculateWinRate(user);
-  const gold = useGold();
 
   // 최근 액션 로드 (user.id는 문자열로 정의되어 있어 숫자 변환 시도)
   const numericUserId = (() => {
@@ -278,7 +274,7 @@ export function HomeDashboard({
 
   const claimDailyReward = async () => {
     // 기존 프로필 스냅샷(검증용)
-    const prevGold = gold;
+    const prevGold = user.goldBalance;
     const prevXP = user.experience;
     const prevStreak = user.dailyStreak;
     const tokens = getTokens();
@@ -303,7 +299,7 @@ export function HomeDashboard({
       // data: { awarded_gold, awarded_xp, new_gold_balance, streak_count }
       const fallback = {
         ...user,
-        goldBalance: data.new_gold_balance ?? gold,
+        goldBalance: data.new_gold_balance ?? user.goldBalance,
         experience: (user.experience || 0) + (data.awarded_xp || 0),
         dailyStreak: data.streak_count ?? user.dailyStreak,
       };
@@ -368,95 +364,57 @@ export function HomeDashboard({
     }
   };
 
-  // Compute quick actions from server flags/config (fallback to basic four but still dynamic)
-  const quickActionsWithHandlers = (() => {
-    const base = [
-      {
-        title: '게임 플레이',
-        description: '4가지 중독성 게임!',
-        icon: Crown, // reusing existing imported icons for minimal diff
-        color: 'from-primary to-primary-light',
-        highlight: true,
-        badge: 'HOT',
-      },
-      {
-        title: '상점',
-        description: '스킨 & 아이템',
-        icon: Gift,
-        color: 'from-gold to-gold-light',
-        highlight: false,
-      },
-      {
-        title: '방송보기',
-        description: '실시간 게임 방송',
-        icon: Zap,
-        color: 'from-success to-info',
-        highlight: false,
-        badge: 'LIVE',
-      },
-      {
-        title: '랭킹',
-        description: '전체 순위 확인',
-        icon: Trophy,
-        color: 'from-warning to-error',
-        highlight: false,
-      },
-    ];
-    // Example: hide Shop if no catalog available
-    if (!gameConfig?.shop || gameConfig.shop.length === 0) {
-      base.splice(1, 1); // remove 상점
-    }
-    return base.map((action) => ({
-      ...action,
-      onClick: () => {
-        switch (action.title) {
-          case '게임 플레이':
-            onNavigateToGames();
-            break;
-          case '상점':
-            if (onNavigateToShop) {
-              onNavigateToShop();
-            } else {
-              onAddNotification('🛍️ 상점 기능 준비중!');
-            }
-            break;
-          case '방송보기':
-            if (onNavigateToStreaming) {
-              onNavigateToStreaming();
-            } else {
-              onAddNotification('📺 방송보기 기능 준비중!');
-            }
-            break;
-          case '랭킹':
-            setShowRankingModal(true);
-            break;
-        }
-      },
-    }));
-  })();
-
-  // Load achievements from API; rely on backend unlocked/progress
-  useEffect(() => {
-    let cancelled = false;
-    const load = async () => {
-      try {
-        setAchievementsLoading(true);
-        const list = await unifiedApi.get('games/achievements/my');
-        if (!cancelled) setAchievements(Array.isArray(list) ? list : []);
-      } catch {
-        if (!cancelled) setAchievements([]);
-      } finally {
-        if (!cancelled) setAchievementsLoading(false);
+  const quickActionsWithHandlers = QUICK_ACTIONS.map((action) => ({
+    ...action,
+    onClick: () => {
+      switch (action.title) {
+        case '게임 플레이':
+          onNavigateToGames();
+          break;
+        case '상점':
+          if (onNavigateToShop) {
+            onNavigateToShop();
+          } else {
+            onAddNotification('🛍️ 상점 기능 준비중!');
+          }
+          break;
+        case '방송보기':
+          if (onNavigateToStreaming) {
+            onNavigateToStreaming();
+          } else {
+            onAddNotification('📺 방송보기 기능 준비중!');
+          }
+          break;
+        case '랭킹':
+          setShowRankingModal(true);
+          break;
       }
-    };
-    // only when authenticated
-    if (authenticated) load();
-    return () => {
-      cancelled = true;
-    };
-  }, [authenticated]);
+    },
+  }));
 
-  const unlockedAchievements = achievements.filter((a: any) => a?.achieved_at).length;
+  const achievements = ACHIEVEMENTS_DATA.map((achievement) => ({
+    ...achievement,
+    unlocked: (() => {
+      switch (achievement.id) {
+        case 'first_login':
+          return true;
+        case 'level_5':
+          return user.level >= 5;
+        case 'win_10':
+          return user.stats.gamesWon >= 10;
+        case 'treasure_hunt':
+          return treasureProgress >= 50;
+        case 'gold_100k':
+          return user.goldBalance >= 100000;
+        case 'daily_7':
+          return (streak.count ?? user.dailyStreak) >= 7;
+        default:
+          return false;
+      }
+    })(),
+  }));
+
+  const unlockedAchievements = achievements.filter((a) => a.unlocked).length;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-black to-primary-soft relative overflow-hidden pb-20">
@@ -630,7 +588,7 @@ export function HomeDashboard({
                 className="bg-gradient-gold text-black px-4 py-3 rounded-xl font-bold cursor-pointer btn-hover-lift"
               >
                 <Coins className="w-6 h-6 mx-auto mb-1" />
-                <div className="text-xl lg:text-2xl">{gold.toLocaleString()}</div>
+                <div className="text-xl lg:text-2xl">{user.goldBalance.toLocaleString()}</div>
                 <div className="text-xs opacity-80">골드</div>
               </motion.div>
             </div>
@@ -873,7 +831,10 @@ export function HomeDashboard({
                             </div>
                           ))}
                         </div>
-                        <div className="grid gap-1 grid-cols-7">
+                        <div
+                          className="grid gap-1"
+                          style={{ gridTemplateColumns: 'repeat(7, minmax(0, 1fr))' }}
+                        >
                           {days.map((c, idx) => (
                             <div
                               key={idx}

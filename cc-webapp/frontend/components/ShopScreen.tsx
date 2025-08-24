@@ -23,7 +23,6 @@ import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { Badge } from './ui/badge';
 import { User, GameItem } from '../types';
-import { useGold } from '@/hooks/useSelectors';
 
 interface ShopScreenProps {
   user: User;
@@ -155,7 +154,6 @@ export function ShopScreen({
 }: ShopScreenProps) {
   const [showPurchaseModal, setShowPurchaseModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null as import('../types').GameItem | null);
-  const gold = useGold();
 
   // 🎨 등급별 스타일링 (글래스메탈 버전)
   const getRarityStyles = (rarity: string) => {
@@ -202,7 +200,7 @@ export function ShopScreen({
   const handlePurchase = (item: any) => {
     const finalPrice = Math.floor(item.price * (1 - item.discount / 100));
     
-  if (gold < finalPrice) {
+    if (user.goldBalance < finalPrice) {
       onAddNotification('❌ 골드가 부족합니다!');
       return;
     }
@@ -221,17 +219,17 @@ export function ShopScreen({
     let updatedUser = { ...user };
 
     // 골드 타입 아이템은 즉시 골드로 변환
-  if (item.type === 'currency') {
+    if (item.type === 'currency') {
       updatedUser = {
         ...updatedUser,
-    goldBalance: (user.goldBalance ?? 0) - finalPrice + item.value
+        goldBalance: user.goldBalance - finalPrice + item.value
       };
       onAddNotification(`💰 ${item.value.toLocaleString()}G를 획득했습니다!`);
     } else {
       // 일반 아이템은 인벤토리에 추가
       updatedUser = {
         ...updatedUser,
-    goldBalance: (user.goldBalance ?? 0) - finalPrice,
+        goldBalance: user.goldBalance - finalPrice,
         inventory: [...user.inventory, newItem]
       };
       onAddNotification(`✅ ${item.name}을(를) 구매했습니다!`);
@@ -298,7 +296,7 @@ export function ShopScreen({
             <div className="text-right">
               <div className="text-sm text-muted-foreground">보유 골드</div>
               <div className="text-xl font-black text-gradient-gold">
-                {gold.toLocaleString()}G
+                {user.goldBalance.toLocaleString()}G
               </div>
             </div>
           </div>
@@ -434,7 +432,7 @@ export function ShopScreen({
           {SHOP_ITEMS.map((item, index) => {
             const styles = getRarityStyles(item.rarity);
             const finalPrice = Math.floor(item.price * (1 - item.discount / 100));
-            const canAfford = gold >= finalPrice;
+            const canAfford = user.goldBalance >= finalPrice;
             
             return (
               <motion.div

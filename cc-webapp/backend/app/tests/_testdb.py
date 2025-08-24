@@ -1,7 +1,6 @@
 import os
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
-from sqlalchemy.engine import Engine
 
 
 def reset_db(engine: Engine) -> None:
@@ -15,28 +14,6 @@ def reset_db(engine: Engine) -> None:
     - RESTART IDENTITY 가 다중 실행/부분 재사용 시 낮은 id 재사용으로 user 기반 로직(per-user limit 등) 오작동 유발
     - max(id)+1 로 보정(setval) 하면 누적 id 증가 방식 유지되어 충돌 방지
     """
-    # Fast-path for Postgres: (옵트인) DROP SCHEMA CASCADE → CREATE SCHEMA
-    # 실행 중인 앱에 영향을 줄 수 있으므로 TEST_DB_ALLOW_SCHEMA_DROP=true 일 때만 적용
-    try:
-        if (
-            engine.url.get_backend_name() in ("postgresql", "postgres")
-            and os.getenv("TEST_DB_ALLOW_SCHEMA_DROP", "false").lower() == "true"
-        ):
-            with engine.begin() as conn:
-                conn.execute(text("DROP SCHEMA IF EXISTS public CASCADE"))
-                conn.execute(text("CREATE SCHEMA public"))
-            # 드롭 후 즉시 ORM 기준으로 테이블 재생성 (테스트 안정화)
-            try:
-                # 지연 임포트로 순환 참조 방지
-                from app.database import Base as _Base
-                _Base.metadata.create_all(bind=engine)
-            except Exception:
-                pass
-            return
-    except Exception:
-        # 폴백: 일반 TRUNCATE 경로로 진행
-        pass
-
     with engine.connect() as conn:
         # Drop dependent views first (best-effort)
         try:
@@ -89,4 +66,4 @@ def reset_db(engine: Engine) -> None:
                         # best-effort: 특정 테이블이 없거나 id 컬럼 없으면 스킵
                         pass
 
-    conn.commit()
+        conn.commit()

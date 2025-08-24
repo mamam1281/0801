@@ -28,8 +28,6 @@ import {
   BackgroundEffects, // BackgroundEffects 컴포넌트 추가
 } from './gacha/components';
 import type { GachaBanner } from '../../types/gacha';
-import { useGachaPull } from '@/hooks/game/useGachaPull';
-import { useGold } from '@/hooks/useSelectors';
 
 interface GachaSystemProps {
   user: User;
@@ -57,7 +55,6 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
   const { fromApi } = useFeedback();
   const { getAccessToken } = useAuthToken();
   const { config: gameConfig, loading: configLoading } = useGameConfig();
-  const gold = useGold();
   
   const [selectedBanner, setSelectedBanner] = useState(GACHA_BANNERS[0] as GachaBanner);
   const [isPulling, setIsPulling] = useState(false);
@@ -128,13 +125,10 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
     }
   }, []);
 
-  // Server-only gacha via hook
-  const { pull: pullGacha, loading: pulling, error: pullError } = useGachaPull(getAccessToken());
-
   // Perform single pull
   const performSinglePull = async () => {
     const cost = getSinglePullCost();
-  if (gold < cost) {
+    if (user.goldBalance < cost) {
       onAddNotification('❌ 골드가 부족합니다!');
       return;
     }
@@ -142,12 +136,15 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
     setPullAnimation('opening');
     await new Promise((r) => setTimeout(r, ANIMATION_DURATIONS.fadeIn));
     setPullAnimation('revealing');
+    let serverUsed = false;
     try {
-      const res = await pullGacha(1);
+      // Auth token retrieval (temporary: reading localStorage like slot game)
+  const res = await api.post<GachaPullApiResponse>('games/gacha/pull', { pull_count: 1 });
       fromApi(res);
-      if ((res as any)?.items?.length) {
-        const mapped: GachaItem[] = (res as any).items.map(
-          (it: any, idx: number) =>
+      if (res?.items?.length) {
+        serverUsed = true;
+        const mapped: GachaItem[] = res.items.map(
+          (it, idx) =>
             ({
               id: `srv-${Date.now()}-${idx}`,
               name: it.name,
@@ -163,7 +160,7 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
         setCurrentPullIndex(0);
         setShowResults(true);
         // Update user from authoritative balance & stats
-        const newBalance = (res as any).balance ?? (res as any).currency_balance?.tokens;
+        const newBalance = res.balance ?? res.currency_balance?.tokens;
         const first = mapped[0];
         const updatedUser = updateUserInventory(
           {
@@ -190,7 +187,37 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
         onAddNotification(getRarityMessage(first));
       }
     } catch (e) {
-      onAddNotification('가챠 요청에 실패했습니다. 잠시 후 다시 시도해주세요.');
+      // Fallback to local simulation
+    }
+    if (!serverUsed) {
+      // Local fallback logic replicating previous behavior
+      let updatedUser = {
+        ...user,
+        goldBalance: user.goldBalance - cost,
+        gameStats: {
+          ...user.gameStats,
+          gacha: {
+            ...user.gameStats.gacha,
+            pulls: user.gameStats.gacha.pulls + 1,
+            totalSpent: user.gameStats.gacha.totalSpent + cost,
+          },
+        },
+      };
+      const item = getRandomItem(selectedBanner, updatedUser);
+      const newParticles = generateParticles(item.rarity);
+      setParticles(newParticles);
+      updatedUser = updateUserInventory(updatedUser as unknown as User, item);
+      if (item.rarity === 'epic') {
+        updatedUser.gameStats.gacha.epicCount = (updatedUser.gameStats.gacha.epicCount || 0) + 1;
+      } else if (item.rarity === 'legendary' || item.rarity === 'mythic') {
+        updatedUser.gameStats.gacha.legendaryCount =
+          (updatedUser.gameStats.gacha.legendaryCount || 0) + 1;
+      }
+      setPullResults([item]);
+      setCurrentPullIndex(0);
+      setShowResults(true);
+      onUpdateUser(updatedUser as User);
+      onAddNotification(getRarityMessage(item));
     }
     setIsPulling(false);
     setPullAnimation(null);
@@ -199,7 +226,7 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
   // Perform 10-pull
   const performTenPull = async () => {
     const discountedCost = getTenPullCost();
-  if (gold < discountedCost) {
+    if (user.goldBalance < discountedCost) {
       onAddNotification('❌ 골드가 부족합니다!');
       return;
     }
@@ -207,12 +234,14 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
     setPullAnimation('opening');
     await new Promise((r) => setTimeout(r, ANIMATION_DURATIONS.fadeIn + 500));
     setPullAnimation('revealing');
+    let serverUsed = false;
     try {
-      const res = await pullGacha(10);
+  const res = await api.post<GachaPullApiResponse>('games/gacha/pull', { pull_count: 10 });
       fromApi(res);
-      if ((res as any)?.items?.length) {
-        const mapped: GachaItem[] = (res as any).items.map(
-          (it: any, idx: number) =>
+      if (res?.items?.length) {
+        serverUsed = true;
+        const mapped: GachaItem[] = res.items.map(
+          (it, idx) =>
             ({
               id: `srv-${Date.now()}-${idx}`,
               name: it.name,
@@ -241,7 +270,7 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
         setParticles(generateParticles(bestItem.rarity));
         const ultraAdds = mapped.filter((i) => ['legendary', 'mythic'].includes(i.rarity)).length;
         const epicAdds = mapped.filter((i) => i.rarity === 'epic').length;
-        const newBalance = (res as any).balance ?? (res as any).currency_balance?.tokens;
+        const newBalance = res.balance ?? res.currency_balance?.tokens;
         const updatedUser = mapped.reduce(
           (acc, item) => updateUserInventory(acc as User, item) as User,
           {
@@ -264,7 +293,49 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
         onAddNotification(getTenPullMessage(mapped));
       }
     } catch (e) {
-      onAddNotification('가챠 요청에 실패했습니다. 잠시 후 다시 시도해주세요.');
+      // swallow & fallback
+    }
+    if (!serverUsed) {
+      const items: GachaItem[] = [];
+      let updatedUser = {
+        ...user,
+        goldBalance: user.goldBalance - discountedCost,
+        gameStats: {
+          ...user.gameStats,
+          gacha: {
+            ...user.gameStats.gacha,
+            pulls: user.gameStats.gacha.pulls + 10,
+            totalSpent: user.gameStats.gacha.totalSpent + discountedCost,
+          },
+        },
+      };
+      for (let i = 0; i < 10; i++) {
+        const item = getRandomItem(selectedBanner, updatedUser);
+        items.push(item);
+        updatedUser = updateUserInventory(updatedUser as unknown as User, item);
+        if (item.rarity === 'epic') {
+          updatedUser.gameStats.gacha.epicCount = (updatedUser.gameStats.gacha.epicCount || 0) + 1;
+        } else if (['legendary', 'mythic'].includes(item.rarity)) {
+          updatedUser.gameStats.gacha.legendaryCount =
+            (updatedUser.gameStats.gacha.legendaryCount || 0) + 1;
+        }
+      }
+      const rarityOrder: Record<string, number> = {
+        common: 1,
+        rare: 2,
+        epic: 3,
+        legendary: 4,
+        mythic: 5,
+      };
+      const bestItem = items.reduce((b, c) =>
+        rarityOrder[c.rarity] > rarityOrder[b.rarity] ? c : b
+      );
+      setParticles(generateParticles(bestItem.rarity));
+      setPullResults(items);
+      setCurrentPullIndex(0);
+      setShowResults(true);
+      onUpdateUser(updatedUser as User);
+      onAddNotification(getTenPullMessage(items));
     }
     setIsPulling(false);
     setPullAnimation(null);
@@ -387,7 +458,9 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
 
             <div className="text-right">
               <div className="text-sm text-pink-300/60">보유 골드</div>
-              <div className="text-xl font-bold text-yellow-400">{gold.toLocaleString()}G</div>
+              <div className="text-xl font-bold text-yellow-400">
+                {user.goldBalance.toLocaleString()}G
+              </div>
             </div>
           </div>
         </div>
@@ -514,7 +587,7 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
               <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                 <Button
                   onClick={performSinglePull}
-                  disabled={isPulling || gold < getSinglePullCost()}
+                  disabled={isPulling || user.goldBalance < getSinglePullCost()}
                   className="w-full h-20 bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-400 hover:to-purple-400 text-white font-bold text-lg relative overflow-hidden border-0"
                   style={{ boxShadow: '0 0 20px rgba(236, 72, 153, 0.5)' }}
                 >
@@ -547,7 +620,7 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
               <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                 <Button
                   onClick={performTenPull}
-                  disabled={isPulling || gold < getTenPullCost()}
+                  disabled={isPulling || user.goldBalance < getTenPullCost()}
                   className="w-full h-20 bg-gradient-to-r from-yellow-500 to-red-500 hover:from-yellow-400 hover:to-red-400 text-white font-bold text-lg relative overflow-hidden border-0"
                   style={{ boxShadow: '0 0 20px rgba(245, 158, 11, 0.5)' }}
                 >

@@ -34,20 +34,6 @@ def _ensure_schema():
 
 	We avoid Base.metadata.drop_all due to FK dependencies across modules.
 	"""
-	# Fast-path for containerized Postgres: 엔트리포인트가 이미 alembic upgrade head 수행.
-	# 테스트 시간 단축과 교착 회피를 위해 Postgres에서는 Alembic을 건너뛰고 진행.
-	try:
-		backend = engine.url.get_backend_name()
-		if backend in ("postgresql", "postgres"):
-			# 최소한 ORM이 아는 테이블은 보장 (create_all은 존재시 no-op)
-			try:
-				Base.metadata.create_all(bind=engine)
-			except Exception:
-				pass
-			yield
-			return
-	except Exception:
-		pass
 	# 항상 초기화 (drift 지속 발생하므로 test DB 파일 제거)
 	try:
 		from sqlalchemy import inspect as _insp

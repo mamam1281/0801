@@ -15,13 +15,10 @@ import {
   Crown,
   Sparkles,
   Target,
-  TrendingUp,
-  Flame
+  TrendingUp
 } from 'lucide-react';
 import { User as UserType } from '../types';
 import { Button } from './ui/button';
-import { useRealtimeSync } from '../contexts/RealtimeSyncContext';
-import { useGold } from '../hooks/useSelectors';
 
 interface SideMenuProps {
   isOpen: boolean;
@@ -44,19 +41,6 @@ export function SideMenu({
   onLogout,
   onAddNotification
 }: SideMenuProps) {
-  const { state } = useRealtimeSync();
-  const pendingPurchases = state?.purchase?.pending_count || 0;
-  const streakDays = (() => {
-    const keys = Object.keys(state?.streaks || {});
-    if (keys.length === 0) return 0;
-    // 대표 streak 하나의 카운트(임시)
-    const any = state!.streaks[keys[0]];
-    return any?.current_count || 0;
-  })();
-  const claimableEvents = (() => {
-    const evs = state?.events || {};
-    return Object.values(evs).filter((e: any) => e.completed && (e.claimable === true || true)).length;
-  })();
   const handleExternalLink = () => {
     window.open('https://md-01.com', '_blank');
     onAddNotification('🌟 프리미엄 모델 페이지로 이동합니다!');
@@ -71,18 +55,9 @@ export function SideMenu({
       color: 'text-primary',
       bgColor: 'bg-primary-soft',
       action: onNavigateToEventMissionPanel,
-  badge: claimableEvents > 0 ? String(claimableEvents) : undefined
+      badge: 'NEW'
     },
     {
-      icon: Flame,
-      label: '연속 접속',
-      description: '스트릭 진행 현황',
-      color: 'text-success',
-      bgColor: 'bg-success-soft',
-      action: onNavigateToEventMissionPanel,
-      badge: streakDays > 0 ? String(streakDays) : undefined
-    },
-  {
       icon: Settings,
       label: '설정',
       description: '앱 설정 및 환경설정',
@@ -99,17 +74,6 @@ export function SideMenu({
       action: handleExternalLink,
       isExternal: true,
       badge: '+P'
-    },
-    // 결제 진행 상황 표시용 (WS 일원화 배지)
-    {
-      icon: TrendingUp,
-      label: '결제 진행',
-      description: '진행 중 결제 상태'
-      ,
-      color: 'text-primary',
-      bgColor: 'bg-primary-soft',
-      action: () => onAddNotification('🧾 결제 진행 현황은 상단 배지/토스트를 확인하세요.'),
-      badge: pendingPurchases > 0 ? String(pendingPurchases) : undefined
     },
     {
       icon: HelpCircle,
@@ -202,8 +166,7 @@ export function SideMenu({
                   
                   <div className="grid grid-cols-2 gap-3">
                     <div className="bg-secondary/30 rounded-lg p-3 text-center">
-                      {/* Realtime gold (selector) */}
-                      <GoldDisplay />
+                      <div className="text-lg font-bold text-gold">{user.goldBalance.toLocaleString()}G</div>
                       <div className="text-xs text-muted-foreground">골드</div>
                     </div>
                     <div className="bg-secondary/30 rounded-lg p-3 text-center">
@@ -295,10 +258,3 @@ export function SideMenu({
     </AnimatePresence>
   );
 }
-
-// 내부 표시용: RealtimeSync 기반 골드 표시 위젯
-function GoldDisplay() {
-  const gold = useGold();
-  return (
-    <div className="text-lg font-bold text-gold">{gold.toLocaleString()}G</div>
-  );}

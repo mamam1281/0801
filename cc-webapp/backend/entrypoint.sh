@@ -58,12 +58,6 @@ if [ "$USERS_EXISTS" = "f" ] && [ "$CUR_VER" = "79b9722f373c" ]; then
   PGPASSWORD=$DB_PASSWORD psql -h $DB_HOST -U $DB_USER -p $DB_PORT -d $DB_NAME -c "DELETE FROM alembic_version;" || true
 fi
 
-# If core tables already exist but alembic_version is empty, stamp to initial base to avoid DuplicateTable
-if [ "$USERS_EXISTS" = "t" ] && [ -z "$CUR_VER" ]; then
-  echo "Existing schema detected without Alembic version; stamping base revision 79b9722f373c before upgrade..."
-  alembic stamp 79b9722f373c || { echo "Alembic stamp failed"; exit 1; }
-fi
-
 # Alembic 마이그레이션 실행
 echo "Running database migrations..."
 alembic upgrade head || { echo "Alembic migration failed"; exit 1; }

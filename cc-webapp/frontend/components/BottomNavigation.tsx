@@ -13,7 +13,6 @@ import {
   ExternalLink,
   Video
 } from 'lucide-react';
-import { useGold } from '@/hooks/useSelectors';
 
 interface BottomNavigationProps {
   currentScreen: string;
@@ -23,7 +22,6 @@ interface BottomNavigationProps {
 
 export function BottomNavigation({ currentScreen, onNavigate, user }: BottomNavigationProps) {
   const { pendingCount } = useRealtimePurchaseBadge();
-  const gold = useGold();
   const handleModelNavigation = () => {
     // 본사 사이트로 리다이렉트
     window.open('https://md-01.com', '_blank');
@@ -175,14 +173,14 @@ export function BottomNavigation({ currentScreen, onNavigate, user }: BottomNavi
       </div>
 
       {/* Gold balance quick view */}
-    {user && (
+      {user && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.2 }}
           className="absolute top-1 right-2 bg-gradient-gold text-black px-2 py-1 rounded text-xs font-bold"
         >
-      {gold.toLocaleString()}G
+          {user.goldBalance.toLocaleString()}G
         </motion.div>
       )}
       

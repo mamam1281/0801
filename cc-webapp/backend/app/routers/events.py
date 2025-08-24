@@ -44,7 +44,6 @@ async def get_active_events(
     """활성 이벤트 목록 조회"""
     auth = "y" if current_user else "n"
     try:
-        # Event.deleted_at 컬럼이 현재 스키마에 없으므로 서비스 레벨에서 해당 필터를 제거하여 500 회피
         events = EventService.get_active_events(db)
         _metric("events", "list", "success", auth)
         # 사용자 참여 정보 추가
@@ -75,7 +74,7 @@ class EventAdminCreate(EventCreate):
 class EventAdminUpdate(EventUpdate):
     pass
 
-@router.post("/admin", response_model=EventResponse, include_in_schema=False)
+@router.post("/admin", response_model=EventResponse)
 async def admin_create_event(
     data: EventAdminCreate,
     current_user: User = Depends(get_current_user),
@@ -89,7 +88,7 @@ async def admin_create_event(
     db.refresh(ev)
     return ev
 
-@router.get("/admin/list", response_model=List[EventResponse], include_in_schema=False)
+@router.get("/admin/list", response_model=List[EventResponse])
 async def admin_list_events(
     include_deleted: bool = Query(False),
     current_user: User = Depends(get_current_user),
@@ -103,7 +102,7 @@ async def admin_list_events(
         pass
     return q.order_by(Event.id.desc()).all()
 
-@router.put("/admin/{event_id}", response_model=EventResponse, include_in_schema=False)
+@router.put("/admin/{event_id}", response_model=EventResponse)
 async def admin_update_event(
     event_id: int,
     data: EventAdminUpdate,
@@ -121,7 +120,7 @@ async def admin_update_event(
     db.refresh(ev)
     return ev
 
-@router.delete("/admin/{event_id}", include_in_schema=False)
+@router.delete("/admin/{event_id}")
 async def admin_soft_delete_event(
     event_id: int,
     current_user: User = Depends(get_current_user),
@@ -140,7 +139,7 @@ async def admin_soft_delete_event(
     # return {"deleted": True, "deleted_at": ev.deleted_at}
     return {"message": "Soft delete temporarily disabled"}
 
-@router.post("/admin/{event_id}/restore", include_in_schema=False)
+@router.post("/admin/{event_id}/restore")
 async def admin_restore_event(
     event_id: int,
     current_user: User = Depends(get_current_user),

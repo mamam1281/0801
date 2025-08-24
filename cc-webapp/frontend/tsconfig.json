@@ -23,7 +23,6 @@
         "name": "next"
       }
     ],
-  "types": ["node"],
     "baseUrl": ".",
     "paths": {
       "@/*": [
@@ -77,7 +76,6 @@
   "hooks/**/*",
     "pages/**/*",
     "src/**/*",
-  "tests/**/*",
     "types/**/*.d.ts",
     ".next/types/**/*.ts",
     "types/react-namespace-compat.d.ts",

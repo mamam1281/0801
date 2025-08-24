@@ -25,7 +25,6 @@ import { GameBackground } from './games/GameBackground';
 import { GameCard } from './games/GameCard';
 import { createLeaderboardData } from '../constants/gameConstants';
 import { createGameNavigator, handleModelNavigation } from '../utils/gameUtils';
-import { useGold } from '@/hooks/useSelectors';
 
 export interface GameDashboardProps {
   user: User;
@@ -52,7 +51,6 @@ export function GameDashboard({
 }: GameDashboardProps) {
   const [popularityIndex, setPopularityIndex] = useState(85);
   const [totalPlayTime] = useState(245);
-  const gold = useGold();
 
   // 로컬 게임 데이터 (API 호출 없이)
   const games: GameDashboardGame[] = [
@@ -122,7 +120,7 @@ export function GameDashboard({
   const leaderboardData = createLeaderboardData(user);
   
   // 게임 네비게이터
-  const navigateToGame = createGameNavigator(games, gold, onAddNotification ?? (() => {}), {
+  const navigateToGame = createGameNavigator(games, user.goldBalance, onAddNotification ?? (() => {}), {
     onNavigateToSlot: onNavigateToSlot ?? (() => {}),
     onNavigateToRPS: onNavigateToRPS ?? (() => {}),
     onNavigateToGacha: onNavigateToGacha ?? (() => {}),
@@ -180,7 +178,9 @@ export function GameDashboard({
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-2 px-4 py-2 bg-black/50 backdrop-blur-sm rounded-full border border-yellow-500/50">
                   <Coins className="w-5 h-5 text-yellow-400" />
-                  <span className="font-bold text-yellow-400">{gold.toLocaleString()}</span>
+                  <span className="font-bold text-yellow-400">
+                    {user.goldBalance.toLocaleString()}
+                  </span>
                 </div>
 
                 <div className="flex items-center gap-2 px-4 py-2 bg-black/50 backdrop-blur-sm rounded-full border border-purple-500/50">
@@ -265,7 +265,7 @@ export function GameDashboard({
                 <GameCard
                   game={game}
                   index={index}
-                  userGoldBalance={gold}
+                  userGoldBalance={user.goldBalance}
                   onGameClick={navigateToGame}
                 />
               </div>

@@ -40,7 +40,7 @@ export function ProfileScreen({
     
     try {
       const [rawProfile, rawStats, rawBalance] = await Promise.all([
-  unifiedApi.get('users/me'),
+        unifiedApi.get('users/profile'),
         unifiedApi.get('users/stats'),
         unifiedApi.get('users/balance'),
       ]);

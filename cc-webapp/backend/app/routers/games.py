@@ -1,6 +1,5 @@
 """Game Collection API Endpoints (Updated & Unified)"""
 import logging
-import time
 import json as _json
 from fastapi import APIRouter, Depends, HTTPException, Response, WebSocket, WebSocketDisconnect, Query
 from sqlalchemy.orm import Session
@@ -64,16 +63,6 @@ try:
 except Exception:  # pragma: no cover
     _legacy_ws_conn_total = None  # type: ignore
     _legacy_ws_conn_by_result = None  # type: ignore
-
-# Game stats latency histogram (optional)
-try:  # pragma: no cover
-    from prometheus_client import Histogram  # type: ignore
-    _game_stats_update_latency_ms = Histogram(
-        "game_stats_update_latency_ms",
-        "Latency of updating and broadcasting game stats (ms)"
-    )
-except Exception:  # pragma: no cover
-    _game_stats_update_latency_ms = None  # type: ignore
 
 # ---------------------------------------------------------------------------
 # 표준 사용자 액션 로깅 헬퍼
@@ -1197,30 +1186,15 @@ async def place_crash_bet(
             logger.warning(f"crash game stats update failed: {e}")
 
         # Server-authoritative aggregate stats (user_game_stats)
-        _t0_stats = time.perf_counter()
-        _stats_for_ws: Dict[str, Any] | None = None
         try:
             from ..services.game_stats_service import GameStatsService as _GSS
             gss = _GSS(db)
-            _auth_stats = gss.update_from_round(
+            gss.update_from_round(
                 user_id=current_user.id,
                 bet_amount=bet_amount,
                 win_amount=win_amount,
                 final_multiplier=float(auto_cashout_multiplier or multiplier)
             )
-            # prepare WS payload
-            try:
-                _stats_for_ws = {
-                    "user_id": _auth_stats.user_id,
-                    "total_bets": int(_auth_stats.total_bets or 0),
-                    "total_wins": int(_auth_stats.total_wins or 0),
-                    "total_losses": int(_auth_stats.total_losses or 0),
-                    "total_profit": float(_auth_stats.total_profit or 0),
-                    "highest_multiplier": float(_auth_stats.highest_multiplier) if _auth_stats.highest_multiplier is not None else None,
-                    "updated_at": _auth_stats.updated_at.isoformat() if _auth_stats.updated_at else None,
-                }
-            except Exception:
-                _stats_for_ws = None
         except Exception as e:  # pragma: no cover
             logger.warning("GameStatsService.update_from_round failed user=%s err=%s", current_user.id, e)
 
@@ -1267,21 +1241,6 @@ async def place_crash_bet(
             "win": win_amount,
             "status": status,
         })
-        # Also broadcast authoritative stats update
-        if _stats_for_ws is not None:
-            await hub.broadcast({
-                "type": "stats_update",
-                "user_id": current_user.id,
-                "game_type": "crash",
-                "stats": _stats_for_ws,
-            })
-        # Observe latency (update + broadcast)
-        try:
-            if _game_stats_update_latency_ms is not None:
-                _dt_ms = (time.perf_counter() - _t0_stats) * 1000.0
-                _game_stats_update_latency_ms.observe(_dt_ms)
-        except Exception:
-            pass
     except Exception:
         pass
 
@@ -1310,8 +1269,37 @@ async def place_crash_bet(
 
 # -------------------------------------------------------------------------
 # ================= Integrated Unified Game API (from game_api.py) =================
-# NOTE: 정적 경로("/stats/me")가 동적 경로("/stats/{user_id}")보다 먼저 등록되어야
-#       'me'가 int 파라미터로 파싱 시도되어 422가 발생하는 문제를 방지할 수 있다.
+@router.get("/stats/{user_id}", response_model=GameStats)
+def get_game_stats(user_id: int, db: Session = Depends(get_db)):
+    """사용자 전체 게임 통계 (슬롯/룰렛/가챠 등)"""
+    total_spins = db.query(models.UserAction).filter(
+        models.UserAction.user_id == user_id,
+        models.UserAction.action_type.in_(['SLOT_SPIN', 'ROULETTE_SPIN', 'GACHA_PULL'])
+    ).count()
+
+    # TODO: 보상 테이블 존재 여부 검증 후 reward 집계 로직 조정 필요
+    total_coins_won = 0
+    total_gold_won = 0
+    special_items_won = 0
+    jackpots_won = db.query(models.UserAction).filter(
+        models.UserAction.user_id == user_id,
+        models.UserAction.action_data.contains('jackpot')
+    ).count()
+
+    return GameStats(
+        user_id=user_id,
+        total_spins=total_spins,
+    total_coins_won=total_coins_won,
+    total_gold_won=total_gold_won,
+        special_items_won=special_items_won,
+        jackpots_won=jackpots_won,
+        bonus_spins_won=0,
+        best_streak=0,
+        current_streak=calculate_user_streak(user_id, db),
+        last_spin_date=None
+    )
+
+# -------------------------------------------------------------------------
 # Server-authoritative per-user aggregated crash stats (user_game_stats)
 @router.get("/stats/me")
 def get_my_authoritative_game_stats(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
@@ -1336,36 +1324,6 @@ def get_my_authoritative_game_stats(current_user: models.User = Depends(get_curr
     except Exception as e:  # pragma: no cover
         logger.error("get_my_authoritative_game_stats failed user=%s err=%s", current_user.id, e)
         raise HTTPException(status_code=500, detail="GameStats 조회 실패")
-
-@router.get("/stats/{user_id}", response_model=GameStats)
-def get_game_stats(user_id: int, db: Session = Depends(get_db)):
-    """사용자 전체 게임 통계 (슬롯/룰렛/가챠 등)"""
-    total_spins = db.query(models.UserAction).filter(
-        models.UserAction.user_id == user_id,
-        models.UserAction.action_type.in_(['SLOT_SPIN', 'ROULETTE_SPIN', 'GACHA_PULL'])
-    ).count()
-
-    # TODO: 보상 테이블 존재 여부 검증 후 reward 집계 로직 조정 필요
-    total_coins_won = 0
-    total_gold_won = 0
-    special_items_won = 0
-    jackpots_won = db.query(models.UserAction).filter(
-        models.UserAction.user_id == user_id,
-        models.UserAction.action_data.contains('jackpot')
-    ).count()
-
-    return GameStats(
-        user_id=user_id,
-        total_spins=total_spins,
-        total_coins_won=total_coins_won,
-        total_gold_won=total_gold_won,
-        special_items_won=special_items_won,
-        jackpots_won=jackpots_won,
-        bonus_spins_won=0,
-        best_streak=0,
-        current_streak=calculate_user_streak(user_id, db),
-        last_spin_date=None
-    )
 
 @router.get("/profile/{user_id}/stats", response_model=ProfileGameStats)
 def get_profile_game_stats(user_id: int, db: Session = Depends(get_db)):

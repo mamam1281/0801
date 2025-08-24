@@ -403,9 +403,7 @@ app.include_router(metrics.router)  # Global metrics endpoint
 # app.include_router(abtest.router, tags=["ABTest"])
 
 # Events/Missions (ENABLED - required for container environment)
-# NOTE: events router is already included above via `events_router.router`.
-# Avoid duplicate inclusion to prevent duplicate OpenAPI operationId warnings.
-# app.include_router(events.router)
+app.include_router(events.router)
 # app.include_router(kafka_api.router)
 
 # Realtime sync (ENABLED)

@@ -112,7 +112,7 @@ export function useAuth() {
                     return res.user as AuthUser;
                 }
                 // Fallback: profile fetch
-                const profile = await api.get<AuthUser>('users/me');
+                const profile = await api.get<AuthUser>('auth/profile');
                 setUser(profile);
                 return profile;
             } catch (e: any) {
@@ -142,7 +142,7 @@ export function useAuth() {
                     return res.user as AuthUser;
                 }
                 // Fallback: profile fetch
-                const profile = await api.get<AuthUser>('users/me');
+                const profile = await api.get<AuthUser>('auth/profile');
                 setUser(profile);
                 return profile;
             } catch (e: any) {
@@ -197,7 +197,7 @@ export function useAuth() {
     useEffect(() => {
         const { token } = readLegacyToken();
         if (token) {
-            api.get<AuthUser>('users/me').then((u: any) => setUser(u as AuthUser)).catch(() => logout());
+            api.get<AuthUser>('auth/profile').then((u: any) => setUser(u as AuthUser)).catch(() => logout());
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
