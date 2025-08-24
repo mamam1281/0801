@@ -14,74 +14,13 @@ branch_labels = None
 depends_on = None
 
 def upgrade():
+    # 임시 no-op: 트랜잭셔널 DDL 환경(PostgreSQL)에서 중복/상태 불일치로 인한 실패를 방지하기 위해
+    # 본 리비전의 인덱스/제약 추가를 비활성화합니다. 추후 안전한 IF NOT EXISTS + 메타검사 방식으로 별도 리비전에서 재적용.
     bind = op.get_bind()
-    dialect = bind.dialect.name
-    inspector = sa.inspect(bind)
-
-    # Core composite indexes (idempotent)
-    try:
-        gs_indexes = {ix.get('name') for ix in inspector.get_indexes('game_sessions')} if inspector.has_table('game_sessions') else set()
-    except Exception:
-        gs_indexes = set()
-    if inspector.has_table('game_sessions') and 'ix_game_sessions_user_created' not in gs_indexes:
-        try:
-            op.create_index('ix_game_sessions_user_created', 'game_sessions', ['user_id', 'created_at'], unique=False)
-        except Exception:
-            pass
-
-    try:
-        st_indexes = {ix.get('name') for ix in inspector.get_indexes('shop_transactions')} if inspector.has_table('shop_transactions') else set()
-    except Exception:
-        st_indexes = set()
-    if inspector.has_table('shop_transactions') and 'ix_shop_transactions_user_created' not in st_indexes:
-        try:
-            op.create_index('ix_shop_transactions_user_created', 'shop_transactions', ['user_id', 'created_at'], unique=False)
-        except Exception:
-            pass
-
-    # Unique constraints
-    if inspector.has_table('user_rewards'):
-        try:
-            op.create_unique_constraint('uq_user_rewards_user_reward', 'user_rewards', ['user_id', 'reward_id'])
-        except Exception:
-            pass
-    if inspector.has_table('mission_progress'):
-        try:
-            op.create_unique_constraint('uq_mission_progress_user_mission', 'mission_progress', ['user_id', 'mission_id'])
-        except Exception:
-            pass
-
-    # Partial index (PostgreSQL only)
-    if dialect == 'postgresql' and inspector.has_table('notifications'):
-        op.execute("CREATE INDEX IF NOT EXISTS ix_notifications_user_unread ON notifications (user_id, created_at) WHERE is_read = false")
-
-    # Chat / analytics
-    if inspector.has_table('chat_messages'):
-        op.create_index('ix_chat_messages_room_created', 'chat_messages', ['room_id', 'created_at'], unique=False)
-    if inspector.has_table('analytics_events'):
-        op.create_index('ix_analytics_events_date_user', 'analytics_events', ['event_date', 'user_id'], unique=False)
+    _ = bind  # quiet linter
+    return
 
 
 def downgrade():
-    bind = op.get_bind()
-    dialect = bind.dialect.name
-    inspector = sa.inspect(bind)
-
-    if inspector.has_table('analytics_events'):
-        try: op.drop_index('ix_analytics_events_date_user', table_name='analytics_events')
-        except Exception: pass
-    if inspector.has_table('chat_messages'):
-        try: op.drop_index('ix_chat_messages_room_created', table_name='chat_messages')
-        except Exception: pass
-    if dialect == 'postgresql' and inspector.has_table('notifications'):
-        op.execute("DROP INDEX IF EXISTS ix_notifications_user_unread")
-    if inspector.has_table('mission_progress'):
-        try: op.drop_constraint('uq_mission_progress_user_mission', 'mission_progress', type_='unique')
-        except Exception: pass
-    if inspector.has_table('user_rewards'):
-        try: op.drop_constraint('uq_user_rewards_user_reward', 'user_rewards', type_='unique')
-        except Exception: pass
-    try: op.drop_index('ix_shop_transactions_user_created', table_name='shop_transactions')
-    except Exception: pass
-    try: op.drop_index('ix_game_sessions_user_created', table_name='game_sessions')
-    except Exception: pass
+    # upgrade가 no-op이므로 downgrade도 no-op으로 둡니다.
+    return
