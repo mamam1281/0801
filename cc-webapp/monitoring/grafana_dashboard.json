@@ -323,6 +323,33 @@
       "title": "Buy Conversion (Auth /api/shop/buy)",
       "type": "timeseries"
     }
+    ,
+    {
+      "datasource": { "type": "prometheus", "uid": null },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "drawStyle": "line", "fillOpacity": 20, "lineWidth": 2 },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 7, "w": 24, "x": 0, "y": 35 },
+      "id": 20,
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      },
+      "targets": [
+        {
+          "expr": "sum(kafka_consumergroup_lag) by (consumergroup, topic)",
+          "legendFormat": "{{consumergroup}} {{topic}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Kafka Consumer Lag (by group/topic)",
+      "type": "timeseries"
+    }
   ],
   "refresh": "10s",
   "schemaVersion": 36,
@@ -334,6 +361,6 @@
   "timezone": "browser",
   "title": "CC Webapp Backend Overview",
   "uid": "cc-webapp-backend-auto",
-  "version": 2,
+  "version": 3,
   "weekStart": ""
 }

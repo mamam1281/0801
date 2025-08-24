@@ -15,8 +15,8 @@ groups:
           severity: warning
           team: shop
         annotations:
-          summary: "援щℓ ?ㅽ뙣???곸듅"
-          description: "理쒓렐 5遺??됯퇏 ?ㅽ뙣?⑥씠 2%瑜?珥덇낵?섍퀬 10遺?吏?? 寃곗젣???ㅽ듃?뚰겕/?ㅽ겕由쏀듃 ?ㅻ쪟 ?먭? ?꾩슂."
+          summary: "Purchase failure rate rising"
+          description: "5m average failure rate > 2% for 10m. Check PSP/network/scripts."
 
       - alert: PurchasePendingSpike
         expr: |
@@ -28,8 +28,8 @@ groups:
           severity: critical
           team: shop
         annotations:
-          summary: "援щℓ 蹂대쪟 嫄?湲됱쬆"
-          description: "10遺???pending 嫄댁닔媛 ?꾧퀎 珥덇낵. ?뱁썒/?뺤궛 吏???먮뒗 ?몃? 寃곗젣 ?곹깭 ?댁긽 媛?μ꽦."
+          summary: "Purchase pending spike"
+          description: "Pending delta exceeds threshold for 10m. Investigate webhooks/settlement delays/external PSP state."
 
       - alert: Http5xxRateHigh
         expr: |
@@ -42,8 +42,8 @@ groups:
           severity: warning
           team: backend
         annotations:
-          summary: "HTTP 5xx ?ㅻ쪟???곸듅"
-          description: "理쒓렐 5遺꾧컙 5xx 鍮꾩쑉 > 2%. 理쒓렐 諛고룷/DB/罹먯떆 ?곹깭 ?뺤씤 ?꾩슂."
+          summary: "HTTP 5xx rate high"
+          description: "5m 5xx ratio > 2%. Check recent deploy/DB/cache."
 
       - alert: HttpLatencyP95High
         expr: |
@@ -53,5 +53,5 @@ groups:
           severity: warning
           team: backend
         annotations:
-          summary: "HTTP P95 吏???꾧퀎 珥덇낵"
-          description: "理쒓렐 10遺꾧컙 P95 > 0.8s. ?먮┛ 荑쇰━/?몃? API/??寃쏀빀 ?먭?."
+          summary: "HTTP P95 latency high"
+          description: "10m P95 > 0.8s. Inspect slow queries/external APIs/locks."

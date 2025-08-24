@@ -1,39 +1,3 @@
-# 변경 요약 / 검증 / 다음 단계 (2025-08-23)
-
-변경 요약
-- 모니터링 네트워크 정합: Prometheus/Grafana를 애플리케이션 네트워크(0801_ccnet)에 연결. Prometheus scrape 타깃 cc_backend:8000 정상화.
-- OpenAPI 재수출: backend 컨테이너에서 python -m app.export_openapi 실행, 스냅샷 갱신 완료.
-- 테스트 수정: backend/tests/conftest.py에 db_engine 픽스처 추가로 pytest 실패 픽스.
-- SSE 스트림 오류 수정: /api/metrics/stream에서 UserReward 필드 오기 사용( created_at, amount_gold )을 모델 정의(claimed_at, gold_amount)로 교정.
-
-## 2025-08-23 모니터링/리얼타임 보강 (WS 라벨 메트릭 + 브로드캐스트 테스트)
-
-변경 요약
-- 레거시 게임 WS 접속 카운터 보강: `ws_legacy_games_connections_by_result_total{result=accepted|rejected}` 추가. 기존 `ws_legacy_games_connections_total`은 유지(역호환).
-- 리얼타임 허브 단위 테스트 추가: `app/tests/test_realtime_broadcast_stub.py`에서 `hub.broadcast`가 `user_id` 타겟 채널로 올바른 payload를 전달하는지 검증(StubWS로 send_text 캡처).
-
-검증 결과
-- 컨테이너 내 단일 테스트 통과: `pytest -q app/tests/test_realtime_broadcast_stub.py` → 1 passed.
-- OpenAPI/Alembic 스키마 변경 없음(head 단일 유지). `/metrics` 노출 구성 그대로 유지.
-
-다음 단계
-- Grafana 패널에 신규 라벨 메트릭 반영: `sum by (result) (ws_legacy_games_connections_by_result_total)`로 accepted vs rejected 구분 시각화.
-- 로컬 검증: `/api/games/ws` 허용/차단 시나리오를 각각 1회 이상 시도 후 `/metrics`에서 두 카운터 라벨 증가 확인.
-- 필요 시 `api docs/20250808.md`에 메트릭 설명/운영 가이드(허용/차단 플래그와 대시보드 쿼리 예시) 추가.
-
-검증
-- Prometheus Targets: cc-webapp-backend(cc_backend:8000) health=up 확인(HTTP API /api/v1/targets).
-- Pytest: app/tests/test_openapi_diff_ci.py, tests/test_openapi_diff_ci.py, tests/test_main.py 합계 13개 테스트 전부 통과.
-- Alembic: heads=current=86171b66491f (단일 head) 확인.
-- SSE 스모크: 컨테이너 내 curl -N로 /api/metrics/stream 2초 간격 수신 확인(event: metrics 프레임 연속 수신).
-
-다음 단계
-- WS 스모크(상점/정산/웹훅): 브라우저에서 배지/토스트 표시 동작 체크 및 스크린샷 캡처.
-- Grafana 대시보드: 구매 지표 패널에 실데이터 유입 확인 및 경보룰 세부 튜닝.
-- CI: OpenAPI diff CI를 워크플로에 통합(스냅샷 아티팩트 업로드/PR 코멘트).
-
----
-
 # Casino-Club F2P 프로젝트 Final 체크 & 트러블슈팅 기록
 
 **생성일**: 2025-08-19  
@@ -75,6 +39,84 @@ Grafana에서 purchase_attempt_total 등 커스텀 카운터 실데이터 반영
 - Prometheus: http://localhost:9090  (Targets 페이지에서 `job_name="cc-webapp-backend"` 활성 여부 확인)
 - Grafana: http://localhost:3003  (대시보드 프로비저닝 정상 렌더 확인)
 - Backend Metrics: http://localhost:8000/metrics  (응답 200 + 기본 Python/HTTP 지표 노출)
+
+## 2025-08-24 Compose 복구 + Prometheus 타깃 안정화 + OpenAPI 스모크
+
+변경 요약
+- 깨진 docker-compose.yml의 중복 services 키 제거 및 버전 선언을 상단으로 이동, ccnet 네트워크를 external:true로 전환하여 모니터링 스택과 일관 연결.
+- 각 서비스에 ccnet 별칭(backend/frontend/postgres/redis/kafka/zookeeper/clickhouse/olap_worker/mailpit) 유지해 도커 DNS 안정화. Prometheus는 cc_backend:8000 대상으로 정상 스크랩.
+- 컨테이너 내부에서 OpenAPI 재수출 수행(app/export_openapi)로 current_openapi.json과 스냅샷 갱신.
+
+검증 결과
+- docker compose ps 정상, backend/frontend/postgres/redis/kafka/grafana/metabase/prometheus 모두 UP(olap_worker는 재시도 중).
+- Prometheus /api/v1/targets에서 job=cc-webapp-backend, instance=cc_backend:8000 상태 up 확인. 호스트에서 /metrics 응답 200.
+- OpenAPI 스모크(app/tests/test_openapi_diff_ci.py) 2 passed. Alembic heads 단일 유지: c6a1b5e2e2b1 (문서 표기와 다르나 단일 head).
+
+다음 단계
+- Grafana 대시보드 실데이터 확인 및 알람 임계치 튜닝(purchase_attempt_total, HTTP/WS 패널). 필요 시 json 프로비저닝 업데이트.
+- 백엔드 전체 pytest는 현재 실패 다수 → 범위 축소 스모크 정의 후 점진적 복구(결제/스트릭/카프카/이벤트 모듈별 분리 수복).
+- 필요 시 OpenAPI 재수출 후 docs 스키마 재수출(컨테이너 내부 app.export_openapi)과 변경 요약을 api docs/20250808.md에 누적.
+
+### 2025-08-24 모니터링 튜닝 1차(대시보드/알림)
+
+변경 요약
+- Grafana 대시보드(`cc-webapp/monitoring/grafana_dashboard.json`):
+   - 구매 실패 사유 패널 라벨 수정 failed→fail, 성공율 패널에 Prometheus 데이터소스 명시 및 임계치(빨강<95, 주황<98, 초록≥98) 추가.
+- Prometheus 알림 규칙(`cc-webapp/monitoring/purchase_alerts.yml`):
+   - HTTP 5xx 비율 경보(Http5xxRateHigh, 5분간 2% 초과 시 5분 지속 → warning).
+   - HTTP P95 지연 경보(HttpLatencyP95High, 0.8s 초과 10분 지속 → warning).
+
+검증 결과
+- 정적 검토: PromQL 구문 및 라벨 일치 확인(purchase_attempt_total{result in [success|fail|pending|start]} 기준).
+- docker-compose.monitoring.yml 프로비저닝 경로 변화 없음(리로드 시 반영 예상). 컨테이너 내 Prometheus rule_files 경로 `/etc/prometheus/rules/*.yml` 일치.
+- OpenAPI/Alembic 영향 없음(head 단일 유지).
+
+다음 단계
+- Grafana UI에서 패널 색상/임계 동작 실측 검증 후 필요 시 임계 재조정(트래픽 수준 반영: 성공율 초록 기준 99%로 상향 검토).
+- 구매 Pending 스파이크 룰을 환경별 기준값으로 분리(.env 또는 룰 변수화) 계획 수립.
+- pytest 빠른 승리 케이스 선별 실행 후 실패 모듈 순차 수복 및 문서 반영.
+
+### 2025-08-24 알림 임계 외부화(ENV) 도입
+### 2025-08-24 Kafka 운영 항목 마무리(Exporter/알림/마운트)
+
+변경 요약
+- Prometheus에 `kafka_alerts.yml` 규칙 파일을 마운트하도록 `docker-compose.monitoring.yml` 수정(경로: `/etc/prometheus/rules/kafka_alerts.yml`).
+- 손상된 `purchase_alerts.yml`의 중첩 YAML 구조를 정상 규칙 형식으로 교정(labels 아래 잘못된 groups 블록 제거).
+
+검증 결과
+- Compose YAML 들여쓰기 오류 제거. 규칙 파일이 `/etc/prometheus/rules/*.yml`에서 로드 가능 상태.
+- 다음 재기동 후 `/api/v1/rules`에서 `kafka_consumer_health` 그룹 확인 예정.
+
+다음 단계
+- 모니터링 스택 재시작(`./cc-manage.ps1 tools stop; ./cc-manage.ps1 tools start`) 후 규칙 로드/타겟 up 확인.
+- Kafka Lag 패널 실데이터/알림 트리거 조건 관찰 후 임계 재조정.
+
+변경 요약
+- Prometheus 구매 알림 룰을 템플릿(`cc-webapp/monitoring/purchase_alerts.tmpl.yml`)로 분리하고, PowerShell 렌더 스크립트 `scripts/render_prometheus_rules.ps1` 추가.
+- `cc-manage.ps1 tools start` 시 템플릿을 렌더링하여 실제 룰 파일(`purchase_alerts.yml`) 생성. ENV `ALERT_PENDING_SPIKE_THRESHOLD` 미설정 시 기본 20 사용.
+
+검증 결과
+- 로컬에서 `ALERT_PENDING_SPIKE_THRESHOLD=30` 설정 후 렌더 실행 → 생성 파일 헤더와 식에 30 반영 확인. Prometheus 재기동 시 룰 로드 OK.
+
+다음 단계
+- 환경별(dev/tools/prod) 기본값을 `.env.*`에 명시하고 CI 문서에 반영. 성공율 초록 임계 99% 상향은 스테이징 관찰 후 진행.
+
+## 2025-08-24 전역 가이드(F 섹션) 체크리스트 업데이트
+
+변경 요약
+- `api docs/20250823_GLOBAL_EVAL_GUIDE.md`의 F.데이터/스키마/계약 섹션을 실제 코드/스키마 증거 기반으로 갱신:
+   - Postgres: 핵심 인덱스 및 FK/UNIQUE 무결성 항목 체크. 백업 SQL에서 `user_actions` 인덱스들과 `ShopTransaction` 복합 UNIQUE(`uq_shop_tx_user_product_idem`) 확인.
+   - Redis: 키 네이밍/TTL 정책 항목 체크. `backend/app/utils/redis.py`의 스트릭/출석/세션 TTL 정책 및 `shop.py`의 멱등/락 키 스킴 확인.
+   - ClickHouse: 파티션/정렬키 적용 항목 체크. `backend/app/olap/clickhouse_client.py`의 MergeTree 스키마와 월 파티션 확인.
+   - Kafka: 오프셋/재소비 전략 문서화는 미완으로 보류 주석 추가.
+
+검증 결과
+- 코드 근거 수집 완료: Redis/ClickHouse/Shop 멱등/인덱스 증거 파일 경로와 세부 라벨 일치 확인.
+- 모니터링/테스트 영향 없음(Alembic head 단일 유지, OpenAPI 무변).
+
+다음 단계
+- Kafka consumer lag 패널 추가 및 소비 그룹/offset reset 정책 문서화(재시작 재소비 전략 명시).
+- `.env.*`에 Kafka 토픽/그룹 기본값 표준화 및 README/가이드 반영.
 
 
 ## 2025-08-23 백엔드 헬스 이슈 해소 + 스케줄러 가드 추가
@@ -1281,5 +1323,3 @@ Outbox + Kafka + Metrics → Dashboard 캐시/ETag → 부하 테스트
 ClickHouse 적재 검증 → Rate Limit/보안 → 릴리즈 자동 체크 스크립트
 문서/플레이북 정리 → Deprecated 관찰 기간 → 최종 Go/No-Go
 필요하면 위 단계 중 첫 작업을 바로 진행할 수 있으니 “중복 스캔 시작” / “RewardService 통합” 등 한 문장으로 지시 주세요.
-
-2025-08-24 11:29:59 ����: docker-compose.yml ����(duplicate services ����, version ���, ccnet external). ����: docker compose ps OK, Prometheus activeTargets UP. ����: OpenAPI ����� �� pytest, Grafana Ʃ��.

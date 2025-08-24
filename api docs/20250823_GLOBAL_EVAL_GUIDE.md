@@ -87,7 +87,14 @@
 ### F. 데이터/스키마/계약
 - [x] Postgres: 핵심 인덱스(`user_actions(user_id, created_at)` 등) 및 FK/UNIQUE 무결성. (증거: `cc_webapp_backup.sql` 내 `ix_user_actions_user_id`, `ix_user_actions_action_type`, `(action_type,"timestamp"), (user_id,"timestamp")` 인덱스 및 `ShopTransaction` 복합 UNIQUE `uq_shop_tx_user_product_idem` 확인)
 - [x] Redis: 키 네이밍/TTL 정책, 멱등키/재고/스트릭 키 충돌 없음. (증거: `backend/app/utils/redis.py` 키 스킴 `user:{id}:streak:{action}` TTL=24h, `attendance:{YYYYMM}` TTL=120d, `session:{session_id}` TTL=1h; `shop.py` 멱등키/락키 `shop:idemp:*`, `shop:limited:idemp*` 일관)
-- [ ] Kafka: 토픽 존재/오프셋 모니터링, 재시작 시 재소비 전략 명시. (보류: 소비 그룹/offset 정책 문서화 및 Grafana consumer lag 패널 미구현)
+- [x] Kafka: 토픽 존재/오프셋 모니터링, 재시작 시 재소비 전략 명시. (증거: `docker-compose.monitoring.yml`에 kafka_exporter 포함 및 `cc-webapp/monitoring/kafka_alerts.yml` 마운트, Prometheus job `kafka-exporter`, Grafana 대시보드 소비 지연 패널)
+
+#### Kafka 운영 정책 요약(완료)
+- 소비 그룹 네이밍: `cc.<domain>.<purpose>.<env>` 표준. 신규 그룹은 `auto_offset_reset=earliest`.
+- 재시작/재소비: 일반 재시작은 동일 group.id 유지, 대규모 재소비는 전용 replay 그룹(`...replay.YYYYMMDDHH`).
+- 오프셋 리셋: 장애 시 `--to-datetime` 우선, 필요 시 `--to-earliest`. 리셋 전/후 Lag 스냅샷과 알람 일시중지 포함.
+- 모니터링: Grafana 패널 "Kafka Consumer Lag (by group/topic)" 지표 `sum(kafka_consumergroup_lag) by (consumergroup, topic)`.
+- 알림: `KafkaHighConsumerLag`(5m lag>1000), `KafkaExporterDown`(2m) 활성. compose에 `kafka_alerts.yml` 마운트 완료.
 - [x] ClickHouse: 파티션/정렬키 적용, 적재 지연/누락 모니터링. (증거: `backend/app/olap/clickhouse_client.py` MergeTree `PARTITION BY toYYYYMM(day)`/`ORDER BY` 구현; 모니터링 패널은 추후 보강)
 - [x] 이벤트/HTTP 계약: OpenAPI 단일 소스, 메시지 스키마 문서와 일치(WS 스키마 표준 적용, OpenAPI 스냅샷 스크립트 준비).
 
