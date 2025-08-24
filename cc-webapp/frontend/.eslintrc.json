@@ -1,4 +1,28 @@
 {
+  "extends": ["next/core-web-vitals"],
+  "rules": {
+    "no-restricted-syntax": [
+      "error,",
+      {
+        "selector": "Literal[value='users/profile']",
+        "message": "'/api/users/profile' 직접 호출 금지: '/api/users/me'를 사용하거나 어댑터를 통하세요."
+      },
+      {
+        "selector": "Literal[value='auth/profile']",
+        "message": "'/api/auth/profile' 직접 호출 금지: '/api/users/me'를 사용하세요."
+      },
+      {
+        "selector": "TemplateLiteral[quasis.raw=/.*users\\/profile.*/]",
+        "message": "'/api/users/profile' 직접 호출 금지(템플릿 문자열): '/api/users/me' 사용."
+      },
+      {
+        "selector": "TemplateLiteral[quasis.raw=/.*auth\\/profile.*/]",
+        "message": "'/api/auth/profile' 직접 호출 금지(템플릿 문자열): '/api/users/me' 사용."
+      }
+    ]
+  }
+}
+{
   "extends": [
     "next/core-web-vitals",
     "plugin:@typescript-eslint/recommended"

@@ -163,10 +163,11 @@ export function NeonCrashGame({
 
       // 사용자 잔액 업데이트 (서버에서 처리된 결과)
       try {
-        const updatedProfile = await api.get<any>('auth/profile');
+        const updatedProfile = await api.get<any>('users/me');
+        const newGold = (updatedProfile as any)?.gold ?? (updatedProfile as any)?.gold_balance;
         onUpdateUser({
           ...user,
-          goldBalance: updatedProfile.gold_balance || user.goldBalance,
+          goldBalance: (typeof newGold === 'number' ? newGold : undefined) || user.goldBalance,
           gameStats: updatedProfile.game_stats || user.gameStats,
         });
       } catch (error) {
@@ -387,10 +388,11 @@ export function NeonCrashGame({
     // 로컬 상태 업데이트는 일시적이며, 실제 게임 통계는 서버에서 관리됩니다
     try {
       // 프로필을 다시 로드하여 서버에서 업데이트된 게임 통계를 가져옵니다
-  const updatedProfile = await api.get<any>('auth/profile');
+  const updatedProfile = await api.get<any>('users/me');
+  const newGold = (updatedProfile as any)?.gold ?? (updatedProfile as any)?.gold_balance;
       onUpdateUser({
         ...user,
-        goldBalance: user.goldBalance + winnings,
+    goldBalance: typeof newGold === 'number' ? newGold : user.goldBalance + winnings,
         gameStats: updatedProfile.game_stats || user.gameStats,
       });
     } catch (error) {

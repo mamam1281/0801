@@ -28,7 +28,7 @@ test.describe('Auth Smoke', () => {
     expect(token).toBeTruthy();
 
     // 프로필
-    const profile = await request.get(`${apiBase}/api/auth/profile`, {
+  const profile = await request.get(`${apiBase}/api/users/me`, {
       headers: { Authorization: `Bearer ${token}` }
     });
     expect(profile.ok()).toBeTruthy();

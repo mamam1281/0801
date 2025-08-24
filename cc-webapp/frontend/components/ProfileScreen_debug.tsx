@@ -60,7 +60,7 @@ export function ProfileScreen({ onBack, onAddNotification }: ProfileScreenProps)
 
         // 2. 프로필 데이터 가져오기
         console.log('[ProfileScreen] 프로필 데이터 요청 시작');
-        const profileResponse = await unifiedApi.get('users/profile');
+  const profileResponse = await unifiedApi.get('users/me');
         console.log('[ProfileScreen] 프로필 응답:', profileResponse);
         
         setUser(profileResponse);

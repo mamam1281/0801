@@ -63,7 +63,7 @@
 	- 결제/멱등/Fraud: `backend/app/services/payment_service.py`(예상), Redis 키 전략 문서
 	- 경제 단일화: 관련 모델/서비스에서 gold-only 정책(문서: `api docs/20250808.md` 단일화 섹션)
 - 검증 방법
-	- REST: `/api/shop/catalog`, `/api/shop/buy`, 보상 지급 후 `/api/users/profile` 잔액 증가
+	- REST: `/api/shop/catalog`, `/api/shop/buy`, 보상 지급 후 `/api/users/me` 잔액 증가
 	- 멱등: 동일 receipt/idempotency 키 재시도 → 단일 success 보장
 	- Fraud: 짧은 윈도우 다회 요청 시 429 또는 정책 응답
 - 로그 포인트
@@ -82,6 +82,19 @@
 - 로그 포인트
 	- `actions.log_action` 저장/브로드캐스트 INFO, Kafka 실패 WARN
 	- 라운드 결과 처리 시 stats 업데이트 INFO
+
+#### D-bis. 게임별 횟수 기록(권위/갱신/프론트 소비)
+- 권위 소스(Backend)
+	- 단건 액션은 `/api/actions`(또는 게임별 `/api/games/*`) 처리 시 DB에 `user_actions`로 적재되고, `GameStatsService`가 집계 테이블(예: `user_game_stats`)에 승/패/플레이 수를 upsert.
+	- 집계 완료 후 WS `stats_update` 이벤트를 브로드캐스트. 메시지 예: `{ type: 'stats_update', user_id, stats: { crash: { plays, wins, losses }, slot: { ... } } }`.
+	- 참조 엔드포인트: `GET /api/games/stats/me`(현재 사용자), `GET /api/games/stats/{user_id}`(권한 제한), 관리/재계산: `POST /api/games/stats/recalculate/{user_id}`.
+- 프론트 소비(Selectors)
+	- 초기 진입/재연결 시 `RealtimeSyncContext.refreshProfile()`과 함께 `GET /api/games/stats/me`로 초기 값을 로드.
+	- 이후 실시간은 WS `stats_update`로 동기화되며, 화면에서는 `useStats(gameType?)` 셀렉터로 접근. gameType이 없으면 전 장르 맵을, 있으면 해당 장르 통계를 반환.
+- 검증 포인트
+	- REST: `POST /api/actions` 또는 게임 라운드 수행 후 `GET /api/games/stats/me`의 플레이 수/승패 증가 확인.
+	- WS: 라운드 직후 `stats_update` 수신으로 DOM 반영(`useStats`) 확인. 유실 시 재연결 후 초기 상태 일치.
+	- 성능/일관성: 단일 트랜잭션 내 액션 기록→집계→WS 송신까지 지연 `game_stats_update_latency_ms` 모니터링.
 
 ### E. 리얼타임(WS) 표준
 - 구현 위치
@@ -301,6 +314,7 @@ useAuthToken.ts: “MVP 임시” 주석(로컬 스토리지 토큰 관리)
 ### 문제 요약
 - 골드 표기가 화면별로 혼재: 일부는 `user.goldBalance` 직접 렌더링, RealtimeSyncContext는 `profile.gold` 관리.
 - 데이터 소스 혼용: 대시보드/프로필이 `/api/users/profile` 또는 `/api/dashboard`를 혼용, RealtimeSync는 `/api/users/me` 기반 갱신.
+  
 
 ### 단기 가이드(코드 변경 전 즉시 적용)
 - 골드 표시의 단일 소스: RealtimeSyncContext.state.profile.gold만 사용.
@@ -326,3 +340,11 @@ useAuthToken.ts: “MVP 임시” 주석(로컬 스토리지 토큰 관리)
 - [ ] 셀렉터 적용 PR에서 `goldBalance` 직접 사용 grep → 전량 교체.
 - [ ] `/api/users/me` 전환 이후 `/api/users/profile` 호출 카운트 모니터링(프론트 로그/메트릭) → 0 수렴 확인.
 - [ ] 스모크: 구매/스트릭 진행 후 UI 골드/카운트 일치 스크린샷 캡처 및 첨부.
+
+
+컨테이너 내부에서 다음 검증 루틴 실행
+프론트 빌드/타입체크/테스트(E2E 스모크 포함)
+백엔드 영향 없음 확인(Alembic heads 단일, /docs 정상)
+필요 시 OpenAPI 재수출
+UI 일관성 스냅샷 수집(구매 전/후 골드 표기): 20250823_GLOBAL_EVAL_GUIDE.md에 첨부
+재유입 방지: /api/users/profile 직접 호출 금지 ESLint 규칙 추가 검토

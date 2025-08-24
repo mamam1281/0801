@@ -1,5 +1,20 @@
 # Casino-Club F2P 프로젝트 Final 체크 & 트러블슈팅 기록
  
+## 2025-08-24 프로필 엔드포인트 표준화(auth/profile·users/profile → users/me)
+
+변경 요약
+- 프론트 전역에서 레거시 프로필 엔드포인트 사용을 `/api/users/me`로 표준화: `frontend/hooks/useAuth.ts`, `frontend/components/games/NeonCrashGame.tsx`, `frontend/components/ProfileScreen.tsx`, `frontend/components/ProfileScreen_debug.tsx`, `frontend/tests/playwright-smoke.spec.ts` 수정.
+- Crash 게임 내 잔액 동기화 시 `users/me`의 `gold`/`gold_balance` 키를 호환 처리하여 로컬 상태 반영 안정화.
+
+검증 결과
+- 소스(.ts/.tsx) 기준 `auth/profile`/`users/profile` 참조 제거 확인(빌드 산출물/.next 및 OpenAPI 스냅샷 파일 제외). RealtimeSyncContext는 이미 `/api/users/me` 사용 유지.
+- 로컬 타입/빌드 풀런은 보류(의존성 설치/컨테이너 환경 필요). 변경 범위가 경로 교체 수준으로 리스크 낮음.
+
+다음 단계
+- 프론트 재빌드 후 런타임 스모크: 로그인→`/api/users/me` 호출→Shop 구매→WS `profile_update` 반영 확인 및 스크린샷 수집.
+- `api docs/20250823_GLOBAL_EVAL_GUIDE.md`에 UI 값 일관성 스크린샷 추가, `/api/users/profile`는 어댑터 경로만 잔존하도록 차단 룰(lint) 검토.
+- E2E(Playwright)에서 `auth/profile`→`users/me`로 전환된 스모크 테스트 재실행 및 CI 반영.
+
 ## 2025-08-24 UI 골드 표기 일관성 – 셀렉터 2차 적용(5개 컴포넌트)
 
 변경 요약
@@ -43,6 +58,12 @@
 다음 단계
 - 프론트 전역 셀렉터/어댑터 적용 PR에서 `goldBalance` 직접 사용 전량 치환(grep 기반 검출→교체).
 - `/api/users/profile` 호출 경로 제거 또는 하위 호환 어댑터만 잔존 정리 및 로그로 호출 수 감소 추적.
+
+---
+2025-08-24 업데이트(문서 정합 + 게임별 통계 흐름 명시)
+- GLOBAL_EVAL_GUIDE: 상점 검증 경로에서 `/api/users/profile` 표기를 `/api/users/me`로 정정.
+- GLOBAL_EVAL_GUIDE: "게임별 횟수 기록" 섹션 신설 — 권위 소스(DB 집계 + `stats_update` WS), 조회 엔드포인트(`/api/games/stats/me`), 프론트 소비(`useStats`)와 검증 포인트를 명확화.
+- 품질 게이트: 통계 갱신 지표 `game_stats_update_latency_ms` 모니터링 권고 추가.
 - 구매/스트릭 스모크 재가동 후 UI 값 일관성 스크린샷을 문서에 첨부.
 
 ## 2025-08-24 Admin Shop: 할인/랭크 패치 모달/폼 UX 적용 및 TS 오류 정리
