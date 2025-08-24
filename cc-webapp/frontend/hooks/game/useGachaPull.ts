@@ -13,11 +13,16 @@ export function useGachaPull(authToken: string | null) {
   const pull = useCallback(async (count: 1 | 10 = 1) => {
     setLoading(true); setError(null);
     try {
-    // Backend expects field name pull_count at games/gacha/pull
-    const res = await api.post<GachaPullResponse>('games/gacha/pull', { pull_count: count });
+      // Backend expects field name pull_count at games/gacha/pull
+      const res = await api.post<GachaPullResponse>('games/gacha/pull', { pull_count: count });
       setLastResult(res);
-    } catch (e: any) { setError(e.message); }
-    finally { setLoading(false); }
+      return res;
+    } catch (e: any) {
+      setError(e.message);
+      throw e;
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   return { pull, lastResult, loading, error };

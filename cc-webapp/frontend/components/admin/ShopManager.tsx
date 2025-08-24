@@ -21,6 +21,7 @@ import {
   Image as ImageIcon
 } from 'lucide-react';
 import { ShopItem } from '../../types/admin';
+import { adminApi, AdminCatalogItemOut } from '@/lib/adminApi';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Textarea } from '../ui/textarea';
@@ -42,58 +43,42 @@ export function ShopManager({ onAddNotification }: ShopManagerProps) {
   const [editingItem, setEditingItem] = useState(null as ShopItem | null);
   const [isLoading, setIsLoading] = useState(false as boolean);
 
-  // Mock shop items
+  // 서버 데이터 매핑 유틸: AdminCatalogItemOut -> ShopItem(뷰 전용)
+  const mapAdminItem = (it: AdminCatalogItemOut): ShopItem => ({
+    id: String(it.id),
+    name: it.name,
+    description: '',
+    // UI에서는 G(골드) 기준 표기 → 지급 골드(gold)를 가격처럼 노출
+    price: it.gold,
+    category: 'currency',
+    rarity: 'common',
+    isActive: true,
+    stock: undefined,
+    discount: it.discount_percent ?? 0,
+    icon: '💰',
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    sales: 0,
+    tags: [it.sku, ...(it.min_rank ? [it.min_rank] : [])],
+  });
+
+  // Read-only 목록 로딩
   useEffect(() => {
-    const mockItems: ShopItem[] = [
-      {
-        id: '1',
-        name: '골든 스킨 팩',
-        description: '화려한 골든 테마의 스킨 컬렉션',
-        price: 50000,
-        category: 'skin',
-        rarity: 'legendary',
-        isActive: true,
-        stock: 100,
-        discount: 20,
-        icon: '✨',
-        createdAt: new Date('2024-12-01'),
-        updatedAt: new Date('2024-12-30'),
-        sales: 234,
-        tags: ['golden', 'premium', 'limited']
-      },
-      {
-        id: '2',
-        name: '더블 경험치 부스터',
-        description: '1시간 동안 경험치 2배 획득',
-        price: 10000,
-        category: 'powerup',
-        rarity: 'rare',
-        isActive: true,
-        stock: 500,
-        icon: '⚡',
-        createdAt: new Date('2024-11-15'),
-        updatedAt: new Date('2024-12-28'),
-        sales: 567,
-        tags: ['boost', 'exp', 'temporary']
-      },
-      {
-        id: '3',
-        name: '럭키 코인',
-        description: '행운 확률을 일시적으로 증가시킵니다',
-        price: 25000,
-        category: 'powerup',
-        rarity: 'epic',
-        isActive: false,
-        stock: 50,
-        icon: '🍀',
-        createdAt: new Date('2024-12-20'),
-        updatedAt: new Date('2024-12-29'),
-        sales: 89,
-        tags: ['luck', 'rare', 'gambling']
+    let mounted = true;
+    (async () => {
+      setIsLoading(true);
+      try {
+        const list = await adminApi.listShopItems();
+        if (!mounted) return;
+        setShopItems(list.map(mapAdminItem));
+      } catch (e:any) {
+        onAddNotification(`❌ 상점 목록 불러오기 실패: ${e?.message ?? e}`);
+      } finally {
+        if (mounted) setIsLoading(false);
       }
-    ];
-    setShopItems(mockItems);
-  }, []);
+    })();
+    return () => { mounted = false; };
+  }, [onAddNotification]);
 
   // Filter items
   const filteredItems = shopItems.filter((item: ShopItem) => {
@@ -107,80 +92,18 @@ export function ShopManager({ onAddNotification }: ShopManagerProps) {
   });
 
   // Handle create/edit item
-  const handleSaveItem = async (itemData: Partial<ShopItem>) => {
-    setIsLoading(true);
-    
-    try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      if (editingItem) {
-        // Update existing item
-        setShopItems((prev: ShopItem[]) => prev.map((item: ShopItem) => 
-          item.id === editingItem.id 
-            ? { ...item, ...itemData, updatedAt: new Date() }
-            : item
-        ));
-        onAddNotification(`✅ "${itemData.name}" 아이템이 수정되었습니다.`);
-      } else {
-        // Create new item
-        const newItem: ShopItem = {
-          id: Date.now().toString(),
-          name: itemData.name || '',
-          description: itemData.description || '',
-          price: itemData.price || 0,
-          category: itemData.category || 'skin',
-          rarity: itemData.rarity || 'common',
-          isActive: itemData.isActive ?? true,
-          stock: itemData.stock,
-          discount: itemData.discount,
-          icon: itemData.icon || '📦',
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          sales: 0,
-          tags: itemData.tags || []
-        };
-        
-  setShopItems((prev: ShopItem[]) => [newItem, ...prev]);
-        onAddNotification(`✅ "${newItem.name}" 아이템이 생성되었습니다.`);
-      }
-      
-      setShowCreateModal(false);
-      setEditingItem(null);
-    } catch (error) {
-      onAddNotification('❌ 아이템 저장에 실패했습니다.');
-    } finally {
-      setIsLoading(false);
-    }
+  const handleSaveItem = async () => {
+    onAddNotification('ℹ️ 현재 관리 화면은 읽기 전용입니다. 생성/수정은 추후 연동됩니다.');
   };
 
   // Handle delete item
-  const handleDeleteItem = async (itemId: string) => {
-    if (!confirm('정말로 이 아이템을 삭제하시겠습니까?')) return;
-    
-    setIsLoading(true);
-    
-    try {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-  setShopItems((prev: ShopItem[]) => prev.filter((item: ShopItem) => item.id !== itemId));
-      onAddNotification('🗑️ 아이템이 삭제되었습니다.');
-    } catch (error) {
-      onAddNotification('❌ 아이템 삭제에 실패했습니다.');
-    } finally {
-      setIsLoading(false);
-    }
+  const handleDeleteItem = async () => {
+    onAddNotification('ℹ️ 현재 관리 화면은 읽기 전용입니다. 삭제는 추후 연동됩니다.');
   };
 
   // Toggle item active status
-  const toggleItemStatus = async (itemId: string) => {
-    setShopItems((prev: ShopItem[]) => prev.map((item: ShopItem) => 
-      item.id === itemId 
-        ? { ...item, isActive: !item.isActive, updatedAt: new Date() }
-        : item
-    ));
-    
-    const item = shopItems.find((i: ShopItem) => i.id === itemId);
-    onAddNotification(`${item?.isActive ? '⏸️' : '▶️'} "${item?.name}" 상태가 변경되었습니다.`);
+  const toggleItemStatus = async () => {
+    onAddNotification('ℹ️ 현재 관리 화면은 읽기 전용입니다. 활성/비활성 전환은 추후 연동됩니다.');
   };
 
   // Get rarity color
@@ -231,7 +154,7 @@ export function ShopManager({ onAddNotification }: ShopManagerProps) {
             가져오기
           </Button>
           <Button 
-            onClick={() => setShowCreateModal(true)}
+            onClick={() => onAddNotification('ℹ️ 읽기 전용: 생성은 추후 연동 예정입니다.')}
             className="bg-gradient-game btn-hover-lift"
           >
             <Plus className="w-4 h-4 mr-2" />
@@ -353,7 +276,7 @@ export function ShopManager({ onAddNotification }: ShopManagerProps) {
               
               <Switch
                 checked={item.isActive}
-                onCheckedChange={() => toggleItemStatus(item.id)}
+                onCheckedChange={() => toggleItemStatus()}
               />
             </div>
 
@@ -413,10 +336,7 @@ export function ShopManager({ onAddNotification }: ShopManagerProps) {
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => {
-                  setEditingItem(item);
-                  setShowCreateModal(true);
-                }}
+                onClick={() => onAddNotification('ℹ️ 읽기 전용: 수정은 추후 연동 예정입니다.')}
                 className="flex-1"
               >
                 <Edit className="w-4 h-4 mr-1" />
@@ -425,7 +345,7 @@ export function ShopManager({ onAddNotification }: ShopManagerProps) {
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => handleDeleteItem(item.id)}
+                onClick={() => handleDeleteItem()}
                 className="border-error text-error hover:bg-error hover:text-white"
               >
                 <Trash2 className="w-4 h-4" />

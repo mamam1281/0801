@@ -252,3 +252,45 @@
 3) Grafana 실데이터 확인과 알람 임계치 튜닝: `purchase_attempt_total` 등 핵심 카운터 패널 점검.
 
 참고: Alembic head 단일 유지(문서 기준 f79d04ea1016), 스키마 변경 없음.
+
+
+프론트의 실데이터 미연결(하드코딩/폴백) 지점을 빠르게 스캔해 목록화했습니다. 다음은 “게임 횟수/통계” 외 추가로 실제 API/WS에 닿지 않는 주요 포인트입니다.
+
+추가 하드코딩/모의 데이터 사용처
+대시보드(홈)
+
+dashboardData.ts의 QUICK_ACTIONS/ACHIEVEMENTS_DATA를 그대로 사용
+사용처: HomeDashboard.tsx (빠른 액션/업적 섹션 전부 상수 기반)
+업적 달성 판정도 로컬 유저 상태로만 계산(실제 업적 API 미연동)
+HomeDashboard.tsx
+treasureProgress 상수(65) 하드코딩
+랭킹 모달 “준비중” 상태(실 데이터 없음)
+일부 상태(dailyClaimed, vipPoints)는 통합 응답 매핑 시도 있으나, 불충분 시 로컬 폴백
+게임 설정/구성
+
+useGameConfig.ts의 DEFAULT_CONFIG 폴백 유지(서버 미응답 시 하드코딩 값 적용)
+가챠/상점/스트릭 설정이 서버 미노출이면 상수 유효화
+가챠/보상
+
+rewardUtils.js의 GACHA_ITEMS_CLIENT 샘플 로컬 룻테이블 + 클라이언트 선택 로직
+서버 POST /api/gacha/spin 대신 폴백로직 가능성
+이벤트/미션
+
+EventMissionPanel.tsx 주석: “하드코딩 Mock 제거” 표기
+패널 내부 목록/진행도 일부 임시 처리 흔적(서버 이벤트 전부 연동되지 않음)
+사이드 메뉴
+
+SideMenu.tsx
+메뉴 항목/색상/배지 전부 정적 배열
+유저 업적 수(user.achievements.length) 등 표시가 로컬 유저 모델 전제(실제 업적 API 미연동 시 오차)
+관리자/상점
+
+ShopManager.tsx에서 mockItems 사용(목록을 모의 데이터로 채움)
+Admin/Shop API(/api/admin/shop/items 등) 미연동
+폴백 동기화/로컬 기록
+
+fallbackPolling.ts: WS 실패 시 폴백 폴링(구조상 문제는 아니나, 일부 화면이 WS 갱신 아닌 폴링 의존)
+uiActionRecorder.js: UI 액션 로컬 히스토리(서버 전송 없음)
+인증/임시 훅
+
+useAuthToken.ts: “MVP 임시” 주석(로컬 스토리지 토큰 관리)

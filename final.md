@@ -1,5 +1,22 @@
 # Casino-Club F2P 프로젝트 Final 체크 & 트러블슈팅 기록
 
+## 2025-08-24 Admin Shop(프론트) 읽기 전용 연동 및 가챠/대시보드 후속 정리
+
+변경 요약
+- Shop 관리 화면(`frontend/components/admin/ShopManager.tsx`)의 모의 데이터(mockItems) 제거, 실제 API(`/api/admin/shop/items`)로 목록 조회하는 읽기 전용(read-only) 연동 적용.
+- 공용 관리자 API 래퍼(`frontend/lib/adminApi.ts`)에 상점 엔드포인트 메서드 추가: `listShopItems`, `createShopItem`, `updateShopItem`, `deleteShopItem`, `setDiscount`, `setRank`(후자들은 아직 UI에서 호출하지 않음). OpenAPI 스키마에 맞춘 타입(`AdminCatalogItemIn/Out`) 정의 포함.
+- 현재 UI는 목록 조회만 활성화하고 생성/수정/삭제/토글은 안내 토스트로 비활성 처리(서버 계약 및 권한/검증 흐름 확정 전 안전 가드).
+- 선행 작업으로 대시보드 정적 상수 제거 및 업적/퀵액션 API 연동, 가챠 클라이언트 폴백 제거(서버 전용) 완료 상태 유지.
+
+검증 결과
+- 타입/빌드 오류 없음(프론트 TypeScript 오류 0). 라우팅/구성 변경 없음으로 OpenAPI/Alembic 영향 없음. 백엔드 스키마는 기존 `/api/admin/shop/items` 문서와 일치.
+- 로컬에서 관리자 토큰 상태로 접근 시 상점 목록이 서버 응답 기반으로 표시되는지 확인 필요(권한 요구). 읽기 전용 알림 토스트 동작 확인.
+
+다음 단계
+- 생성/수정/삭제/랭크/할인 패치 엔드포인트 실제 연동(Optimistic UI + 에러 토스트), 권한 에러(403) 처리 및 재시도 UX.
+- 이벤트 패널 서버 진행도 연동, 사이드메뉴 공용 훅/WS 전환, `useGameConfig` 폴백 축소와 런타임 경고 로그 추가.
+- 컨테이너 내부에서 pytest 스모크(결제/스트릭) 실행 및 OpenAPI 재수출 여부 점검 후 `api docs/20250808.md` 변경 요약 추가.
+
 ## 2025-08-24 Alembic 마이그레이션 방어 로직 보정(중복 인덱스/제약 예외 회피)
 
 변경 요약
