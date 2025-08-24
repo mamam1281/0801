@@ -16,7 +16,7 @@
 	- 모니터링 정상: Prometheus 기동/정상, 룰 로드 OK(purchase-health 4개, kafka_consumer_health 2개), /targets up.
 	- Kafka Exporter up, Grafana Consumer Lag 패널 동작.
 	- OpenAPI 스모크 통과(수동 수출 기준), Alembic head 단일 유지.
-- 뱃지: [상점/관리자: 미완(프론트 목/연동 대기)] – 본 커밋부터 Shop UI(/api/shop/catalog,/api/shop/buy) 및 Admin Shop CRUD 연동 착수.
+- 뱃지: [상점/관리자: 기본 연동 완료(실 API, CRUD/패치); 활성/비활성 토글 API 대기] – Shop UI(`/api/shop/catalog`,`/api/shop/buy`) 멱등 재시도·WS 폴백 적용, Admin Shop CRUD/할인·랭크 PATCH 실연동.
 - 남은 것(우선순위)
 	1) pytest 스모크: 결제(/api/shop/buy), 스트릭 경계 케이스 복구/검증.
 	2) ALERT_PENDING_SPIKE_THRESHOLD 환경별 튜닝(.env.* 반영) 및 관찰값 기반 재보정.
@@ -295,3 +295,34 @@ uiActionRecorder.js: UI 액션 로컬 히스토리(서버 전송 없음)
 인증/임시 훅
 
 useAuthToken.ts: “MVP 임시” 주석(로컬 스토리지 토큰 관리)
+
+## 11) UI 골드 표기 일관성 — 즉시 가이드/전환 계획(2025-08-24)
+
+### 문제 요약
+- 골드 표기가 화면별로 혼재: 일부는 `user.goldBalance` 직접 렌더링, RealtimeSyncContext는 `profile.gold` 관리.
+- 데이터 소스 혼용: 대시보드/프로필이 `/api/users/profile` 또는 `/api/dashboard`를 혼용, RealtimeSync는 `/api/users/me` 기반 갱신.
+
+### 단기 가이드(코드 변경 전 즉시 적용)
+- 골드 표시의 단일 소스: RealtimeSyncContext.state.profile.gold만 사용.
+- `/api/users/profile` 응답을 사용할 경우에도 어댑터로 정규화: `goldBalance := profile.gold` 매핑.
+- 구매 성공/보상 수신 시 화면 업데이트는 WS `profile_update` 이벤트만 신뢰(폴백 폴링은 수렴용 보조 수단).
+
+### 다음 커밋에서 진행할 변경(코드 작업 계획)
+- 공용 셀렉터 도입: `selectGold()`, `selectStats()`.
+- HomeDashboard, SideMenu, ShopScreen, 게임 컴포넌트 등에서 `user.goldBalance` 직접 참조 제거 → 셀렉터 사용 전환.
+- 프로필 로딩 경로를 `/api/users/me` 우선으로 전환, `/api/users/profile`은 하위 호환 어댑터만 유지.
+- RealtimeSyncContext.refreshProfile 호출 시점 보강: 로그인 직후/WS 재연결 직후 강제 리프레시.
+
+### 검증 방법(수용 기준)
+- 로그인 직후: 모든 화면의 골드 카드 값이 동일(= RealtimeSyncContext.profile.gold).
+- 구매 성공 직후: WS 대기가 없어도 폴백 폴링으로 값 수렴(최대 3s 내).
+- 대시보드 통계 vs 상세 통계: 문서화된 기간/필드 기준과 일치.
+
+### 상태
+- OpenAPI 중복 문제 해결 상태 유지(이벤트 라우터 중복 include 제거). 
+- 계약 테스트 2 passed, Alembic head 단일(c6a1b5e2e2b1) 확인.
+
+### 실행 체크리스트(운영)
+- [ ] 셀렉터 적용 PR에서 `goldBalance` 직접 사용 grep → 전량 교체.
+- [ ] `/api/users/me` 전환 이후 `/api/users/profile` 호출 카운트 모니터링(프론트 로그/메트릭) → 0 수렴 확인.
+- [ ] 스모크: 구매/스트릭 진행 후 UI 골드/카운트 일치 스크린샷 캡처 및 첨부.

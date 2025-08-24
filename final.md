@@ -1,5 +1,35 @@
 # Casino-Club F2P 프로젝트 Final 체크 & 트러블슈팅 기록
 
+## 2025-08-24 Shop/Admin 연동 고도화 + OpenAPI 중복 제거
+
+변경 요약
+- Shop 페이지를 실 API에 연결: `GET /api/shop/catalog`, `POST /api/shop/buy` 멱등키 재사용 기반 재시도 지원, WS 연결 불가 시 폴백 폴링으로 프로필 동기화 유지.
+- Admin Shop 관리 화면 CRUD/패치(할인/랭크) 실 엔드포인트 연동 및 Optimistic UI 표준화, 권한/에러 토스트 분기 정리.
+- 백엔드 `events` 라우터 중복 include 제거로 OpenAPI duplicate operationId 경고 해소.
+
+검증 결과
+- 프론트 타입 오류 0, 수동 플로우 점검 통과. 컨테이너 내부 `python -m app.export_openapi` 재수출 성공(경고 해소), Alembic head 단일 유지(c6a1b5e2e2b1).
+
+다음 단계
+- Admin Shop 활성/비활성 토글 API(백엔드) 도입 및 UI 연결.
+- pytest 스모크(결제/스트릭) 확장 및 CI 통합, 문서 자동 업데이트.
+
+## 2025-08-24 UI 골드 일관성 가이드 + 전환 계획 연결
+
+변경 요약
+- 전역 가이드(`api docs/20250823_GLOBAL_EVAL_GUIDE.md`)에 "UI 골드 표기 일관성 — 즉시 가이드/전환 계획" 섹션 추가.
+- 단기 가이드: RealtimeSyncContext.state.profile.gold만 사용, `/api/users/profile` 응답은 어댑터로 `goldBalance := profile.gold` 매핑, 구매/보상은 WS `profile_update`만 신뢰.
+- 다음 커밋 계획: `selectGold()/selectStats()` 셀렉터 도입, `user.goldBalance` 직접 참조 제거, `/api/users/me` 우선 전환 및 `refreshProfile` 호출 타이밍 보강(로그인/재연결 직후).
+
+검증 결과
+- OpenAPI 계약 테스트 유지: 2 passed.
+- Alembic head 단일 유지: c6a1b5e2e2b1.
+
+다음 단계
+- 프론트 전역 셀렉터/어댑터 적용 PR에서 `goldBalance` 직접 사용 전량 치환(grep 기반 검출→교체).
+- `/api/users/profile` 호출 경로 제거 또는 하위 호환 어댑터만 잔존 정리 및 로그로 호출 수 감소 추적.
+- 구매/스트릭 스모크 재가동 후 UI 값 일관성 스크린샷을 문서에 첨부.
+
 ## 2025-08-24 Admin Shop: 할인/랭크 패치 모달/폼 UX 적용 및 TS 오류 정리
 
 변경 요약
