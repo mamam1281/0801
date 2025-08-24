@@ -1,5 +1,47 @@
 # Casino-Club F2P 프로젝트 Final 체크 & 트러블슈팅 기록
  
+## 2025-08-24 Frontend ESLint 에러 해소(경고만 잔존) + 홈 대시보드 린트 수선
+
+변경 요약
+- `frontend/.eslintrc.json`: auto-generated 타입 파일(`src/types/openapi.d.ts`)을 ESLint 무시 목록에 추가하여 금지 규칙(no-restricted-syntax)이 생성물에 적용되지 않도록 조정.
+- `frontend/components/HomeDashboard.tsx`: 삼항식 표현식으로 인한 `no-unused-expressions` 에러 구간을 if/else 형태로 치환(동작 불변, 가독성 향상).
+
+검증 결과
+- 컨테이너 내부 `npm run lint` 재실행: 에러 0, 워닝 다수(타입 any/unused-vars 등)로 종료 코드 0 확인.
+- 헬스 스모크: `GET http://localhost:8000/health` 200, `GET http://localhost:3000/` 200.
+
+다음 단계
+- 워닝 정리(우선순위: react-hooks/exhaustive-deps, any 제거)와 타입 보강을 점진 수행.
+- 프론트/백엔드 컨테이너 스모크 확장(로그인→구매→WS profile_update 반영) 및 스크린샷 수집.
+- 필요 시 OpenAPI 재수출 및 `api docs/20250808.md` 동기화 지속.
+
+## 2025-08-24 실시간 프로필 정규화(골드/경험치/티어/총지출) — UI 0 고정 이슈 해결
+
+변경 요약
+- `frontend/contexts/RealtimeSyncContext.tsx`에 WS/API 경계 정규화 어댑터 추가.
+   - gold|gold_balance|new_gold_balance|balance|currency_balance.tokens → state.profile.gold로 통일
+   - exp|experience|xp, tier|vip_tier, total_spent|totalSpent → 통일 매핑
+   - 적용 지점: WS `profile_update` 수신, `/api/users/me` 폴링/수동 새로고침
+
+검증 결과(계획)
+- 로그인 → 이벤트 보상 수령 → WS profile_update 수신 즉시 UI 골드 증가 확인
+- WS 단절 상태: 30초 폴백 폴링 내 `/api/users/me` 재조회로 UI 반영
+
+다음 단계
+- 남은 컴포넌트의 `user.goldBalance` 직접 갱신 최소화(셀렉터 `useGold` 단일 소스 유지)
+- E2E 스모크: 로그인→보상/게임/구매 플로우에서 골드 값 일관성 캡처 후 문서화
+
+### 2025-08-24 보강: 키 미존재 시 금액 덮어쓰기 방지
+
+변경 요약
+- `RealtimeSyncContext.normalizeProfileUpdate`: 서버 페이로드에 잔액 관련 키가 존재하지 않을 때 gold를 0으로 초기화하지 않도록 가드 추가(`gold|gold_balance|new_gold_balance|balance|currency_balance.tokens` 중 하나 존재 시에만 gold 세팅).
+
+검증 결과(스모크)
+- 보상 이후 `profile_update`에 gold 키가 생략된 경우에도 기존 UI 잔액 유지, gold 키 포함 시에만 증가 반영.
+
+다음 단계
+- WS 미수신 케이스 30초 폴백 폴링 경로 재확인 및 배포 전 최종 스모크 캡처 첨부.
+
 ## 2025-08-24 프로필 엔드포인트 표준화(auth/profile·users/profile → users/me)
 
 변경 요약
@@ -14,6 +56,21 @@
 - 프론트 재빌드 후 런타임 스모크: 로그인→`/api/users/me` 호출→Shop 구매→WS `profile_update` 반영 확인 및 스크린샷 수집.
 - `api docs/20250823_GLOBAL_EVAL_GUIDE.md`에 UI 값 일관성 스크린샷 추가, `/api/users/profile`는 어댑터 경로만 잔존하도록 차단 룰(lint) 검토.
 - E2E(Playwright)에서 `auth/profile`→`users/me`로 전환된 스모크 테스트 재실행 및 CI 반영.
+
+## 2025-08-24 ESLint 금지 규칙/폴백 폴링 표준화
+
+변경 요약
+- `frontend/.eslintrc.json`을 단일 유효 JSON으로 정리하고 `no-restricted-syntax`로 `/api/users/profile` 및 `/api/auth/profile` 직접 사용을 금지. 템플릿 리터럴 패턴도 포함.
+- `frontend/utils/fallbackPolling.ts`의 `createSyncPollingTasks` 간격을 프로필/스트릭/이벤트 모두 30초로 표준화하여 WS 폴백 동작 일관성 확보.
+
+검증 결과
+- ESLint 구성 파싱 오류 제거(중복 JSON+오타 정리). 규칙 위반 시 에러 리포트됨.
+- 코드 레벨에서 폴링 생성 시 간격이 30초로 적용됨(런타임 검증은 컨테이너 환경에서 진행 예정).
+
+다음 단계
+- 컨테이너 내부에서 `npm run lint`/`npm run build` 및 브라우저 스모크로 폴백 폴링 로그 확인.
+- `/docs` 스키마 영향 없음 확인, Alembic heads 단일 유지 재점검.
+- EventMissionPanel의 진행도 표시를 RealtimeSyncContext 이벤트 상태로 일원화(조인/클레임 후 즉시 반영).
 
 ## 2025-08-24 UI 골드 표기 일관성 – 셀렉터 2차 적용(5개 컴포넌트)
 

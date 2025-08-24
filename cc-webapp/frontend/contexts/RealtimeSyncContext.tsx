@@ -344,6 +344,31 @@ export function RealtimeSyncProvider({ children, apiBaseUrl }: RealtimeSyncProvi
   const { push } = useToast();
   const lastPurchaseByReceiptRef = useRef(new Map<string, { status: string; at: number }>());
 
+  // WS/API 경계 정규화: 백엔드 응답/이벤트의 케이스/필드명이 혼재하므로 단일 형태로 변환
+  const normalizeProfileUpdate = useCallback((data: any) => {
+    if (!data || typeof data !== 'object') return {} as SyncEventData['profile_update'];
+    const hasGoldKey =
+      'gold' in data ||
+      'gold_balance' in data ||
+      'new_gold_balance' in data ||
+      'balance' in data ||
+      (data?.currency_balance && 'tokens' in (data.currency_balance as any));
+    const goldValue = hasGoldKey
+      ? (data.gold ?? data.gold_balance ?? data.new_gold_balance ?? data.balance ?? data?.currency_balance?.tokens)
+      : undefined;
+    const exp = data.exp ?? data.experience ?? data.xp;
+    const tier = data.tier ?? data.vip_tier ?? data.vipTier;
+    const total_spent = data.total_spent ?? data.totalSpent ?? data.total_spending;
+    const user_id = data.user_id ?? data.id ?? data.userId;
+    return {
+      ...(user_id !== undefined ? { user_id } : {}),
+      ...(goldValue !== undefined ? { gold: Number(goldValue) } : {}),
+      ...(exp !== undefined ? { exp: Number(exp) } : {}),
+      ...(tier !== undefined ? { tier: String(tier) } : {}),
+      ...(total_spent !== undefined ? { total_spent: Number(total_spent) } : {}),
+    } as SyncEventData['profile_update'];
+  }, []);
+
   const baseUrl =
     apiBaseUrl ||
     (typeof window !== 'undefined'
@@ -356,7 +381,7 @@ export function RealtimeSyncProvider({ children, apiBaseUrl }: RealtimeSyncProvi
 
     switch (message.type) {
       case 'profile_update':
-        dispatch({ type: 'UPDATE_PROFILE', payload: message.data });
+        dispatch({ type: 'UPDATE_PROFILE', payload: normalizeProfileUpdate(message.data) });
         break;
 
       case 'purchase_update': {
@@ -425,7 +450,7 @@ export function RealtimeSyncProvider({ children, apiBaseUrl }: RealtimeSyncProvi
       default:
         console.warn('[RealtimeSync] Unknown message type:', message.type);
     }
-  }, [push]);
+  }, [push, normalizeProfileUpdate]);
 
   // WebSocket 연결
   const connect = useCallback(async () => {
@@ -521,20 +546,12 @@ export function RealtimeSyncProvider({ children, apiBaseUrl }: RealtimeSyncProvi
   const refreshProfile = useCallback(async () => {
     try {
       const profile = await apiCall('/api/users/me');
-      dispatch({
-        type: 'UPDATE_PROFILE',
-        payload: {
-          user_id: profile.id,
-          gold: profile.gold,
-          exp: profile.exp,
-          tier: profile.tier,
-          total_spent: profile.total_spent,
-        },
-      });
+      // 다양한 키를 허용하여 통일된 형태로 반영
+      dispatch({ type: 'UPDATE_PROFILE', payload: normalizeProfileUpdate(profile) });
     } catch (error) {
       console.error('[RealtimeSync] Failed to refresh profile:', error);
     }
-  }, [apiCall]);
+  }, [apiCall, normalizeProfileUpdate]);
 
   const refreshAchievements = useCallback(async () => {
     try {

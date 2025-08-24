@@ -414,12 +414,18 @@ export function HomeDashboard({
             onNavigateToGames();
             break;
           case '상점':
-            onNavigateToShop ? onNavigateToShop() : onAddNotification('🛍️ 상점 기능 준비중!');
+            if (onNavigateToShop) {
+              onNavigateToShop();
+            } else {
+              onAddNotification('🛍️ 상점 기능 준비중!');
+            }
             break;
           case '방송보기':
-            onNavigateToStreaming
-              ? onNavigateToStreaming()
-              : onAddNotification('📺 방송보기 기능 준비중!');
+            if (onNavigateToStreaming) {
+              onNavigateToStreaming();
+            } else {
+              onAddNotification('📺 방송보기 기능 준비중!');
+            }
             break;
           case '랭킹':
             setShowRankingModal(true);
