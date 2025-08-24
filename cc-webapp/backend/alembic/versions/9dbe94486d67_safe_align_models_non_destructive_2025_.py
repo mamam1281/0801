@@ -183,11 +183,31 @@ def upgrade() -> None:
                existing_type=postgresql.TIMESTAMP(),
                nullable=True,
                existing_server_default=sa.text('CURRENT_TIMESTAMP'))
-    op.drop_index('ix_token_blacklist_jti', table_name='token_blacklist')
-    op.create_index(op.f('ix_token_blacklist_jti'), 'token_blacklist', ['jti'], unique=True)
-    op.drop_index('ix_token_blacklist_token', table_name='token_blacklist')
-    op.create_index(op.f('ix_token_blacklist_token'), 'token_blacklist', ['token'], unique=True)
-    op.create_index(op.f('ix_token_blacklist_id'), 'token_blacklist', ['id'], unique=False)
+    # token_blacklist indexes: ensure unique on jti/token, non-unique on id; be idempotent
+    tb_indexes = insp.get_indexes('token_blacklist')
+    tb_index_map = {i['name']: i for i in tb_indexes}
+    # jti unique index
+    jti_idx_name = op.f('ix_token_blacklist_jti')
+    if 'ix_token_blacklist_jti' in tb_index_map or jti_idx_name in tb_index_map:
+        info = tb_index_map.get('ix_token_blacklist_jti') or tb_index_map.get(jti_idx_name)
+        if not info.get('unique'):
+            op.drop_index(info['name'], table_name='token_blacklist')
+            op.create_index(jti_idx_name, 'token_blacklist', ['jti'], unique=True)
+    else:
+        op.create_index(jti_idx_name, 'token_blacklist', ['jti'], unique=True)
+    # token unique index
+    token_idx_name = op.f('ix_token_blacklist_token')
+    if 'ix_token_blacklist_token' in tb_index_map or token_idx_name in tb_index_map:
+        info = tb_index_map.get('ix_token_blacklist_token') or tb_index_map.get(token_idx_name)
+        if not info.get('unique'):
+            op.drop_index(info['name'], table_name='token_blacklist')
+            op.create_index(token_idx_name, 'token_blacklist', ['token'], unique=True)
+    else:
+        op.create_index(token_idx_name, 'token_blacklist', ['token'], unique=True)
+    # id non-unique index: SKIP creating explicit index on primary key column 'id'
+    # Postgres automatically creates an index for the primary key (token_blacklist_pkey).
+    # Creating an additional ix_token_blacklist_id is redundant and caused DuplicateIndex in drifted environments.
+    # If some environments already have this index, leave it as-is; otherwise, do nothing.
     existing_ua_indexes = {i['name'] for i in insp.get_indexes('user_actions')}
     if 'ix_user_actions_id' not in existing_ua_indexes:
         op.create_index(op.f('ix_user_actions_id'), 'user_actions', ['id'], unique=False)
@@ -267,9 +287,24 @@ def upgrade() -> None:
                existing_type=postgresql.TIMESTAMP(),
                nullable=True,
                existing_server_default=sa.text('now()'))
-    op.create_index(op.f('ix_users_id'), 'users', ['id'], unique=False)
-    op.create_index(op.f('ix_users_site_id'), 'users', ['site_id'], unique=True)
-    op.create_unique_constraint(None, 'users', ['phone_number'])
+    # Defensive: only create users indexes/constraints if missing
+    existing_users_indexes = {i['name']: i for i in insp.get_indexes('users')}
+    ix_users_id_name = op.f('ix_users_id')
+    if 'ix_users_id' not in existing_users_indexes and ix_users_id_name not in existing_users_indexes:
+        op.create_index(ix_users_id_name, 'users', ['id'], unique=False)
+    ix_users_site_id_name = op.f('ix_users_site_id')
+    if 'ix_users_site_id' not in existing_users_indexes and ix_users_site_id_name not in existing_users_indexes:
+        op.create_index(ix_users_site_id_name, 'users', ['site_id'], unique=True)
+    # Unique on phone_number: skip if any unique index/constraint already covers it
+    existing_user_uniques = {uc.get('name'): uc for uc in insp.get_unique_constraints('users')}
+    has_unique_phone_uc = any(
+        set((uc.get('column_names') or [])) == {'phone_number'} for uc in existing_user_uniques.values()
+    )
+    has_unique_phone_idx = any(
+        (idx.get('unique') and idx.get('column_names') == ['phone_number']) for idx in existing_users_indexes.values()
+    )
+    if not has_unique_phone_uc and not has_unique_phone_idx:
+        op.create_unique_constraint('uq_users_phone_number', 'users', ['phone_number'])
     # ### end Alembic commands ###
 
 

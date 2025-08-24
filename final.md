@@ -1,5 +1,22 @@
 # Casino-Club F2P 프로젝트 Final 체크 & 트러블슈팅 기록
 
+## 2025-08-24 Alembic 마이그레이션 방어 로직 보정(중복 인덱스/제약 예외 회피)
+
+변경 요약
+- 마이그레이션 `9dbe94486d67_safe_align_models_non_destructive_2025_.py`를 방어적으로 수정:
+   - token_blacklist의 PK 컬럼(id)에 대한 불필요 인덱스(ix_token_blacklist_id) 생성 로직 제거(Primary Key 인덱스와 중복 방지).
+   - users 테이블의 인덱스/유니크 생성 시 존재 여부 확인 후만 생성하도록 가드 추가(ix_users_id, ix_users_site_id, uq_users_phone_number).
+- 목적: 컨테이너 부팅 시 Alembic upgrade head에서 DuplicateIndex/Unique 에러로 인한 실패를 예방.
+
+검증 결과(계획)
+- 컨테이너 재기동 후 Alembic 이력: upgrade head 성공, `alembic heads` 단일 유지(f79d04ea1016) 확인.
+- /health 200, /docs 정상 노출. 핵심 API(401→로그인→200) 스모크.
+
+다음 단계
+- 백엔드 컨테이너 내부에서 pytest 스모크 실행(app/tests 중 결제/스트릭 위주) 및 결과 반영.
+- .env.*의 ALERT_PENDING_SPIKE_THRESHOLD 값 적용 상태 검증 및 Prometheus 룰 렌더 확인.
+- 필요 시 OpenAPI 재수출 후 `api docs/20250808.md`에 변경 요약/검증/다음 단계 갱신.
+
 **생성일**: 2025-08-19  
 **브랜치**: feature/e2e-onboarding-playwright  
 
@@ -18,6 +35,20 @@
 - Pending 스파이크 임계(`ALERT_PENDING_SPIKE_THRESHOLD`)를 환경별 튜닝(.env.* 반영) 및 구매 트래픽 관찰 후 재조정.
 - 백엔드 컨테이너 내부에서 pytest 스모크(결제/스트릭) 실행 및 결과 반영.
 - 필요 시 OpenAPI 재수출 및 `api docs/20250808.md`에 규칙/대시보드 변경 요약 추가.
+
+## 2025-08-24 Alembic DuplicateTable(users) 방지 가드 추가
+
+변경 요약
+- `backend/entrypoint.sh`에 베이스라인 정합 가드 추가: `users` 테이블이 이미 존재하지만 `alembic_version`이 비어있는 경우 `alembic stamp 79b9722f373c` 수행 후 `alembic upgrade head` 실행. 기존 가드(테이블 없음 + base 버전인 경우 리셋)와 함께 양방향 케이스 모두 처리.
+
+검증 결과
+- 컨테이너 부팅 시 데이터베이스 존재/연결 확인 → `alembic_version` 테이블 보장/폭 확장 → 스탬프 조건 충족 시 79b9722f373c로 스탬프 수행 로그 출력 → `alembic upgrade head` 성공. `users` 재생성 시도로 인한 `DuplicateTable` 미발생.
+- 이후 `alembic heads` 단일 head 유지 확인(문서 기준: f79d04ea1016).
+
+다음 단계
+- 컨테이너 내부에서 `alembic current`와 `alembic heads`를 확인하여 베이스라인/헤드 정합성 재점검.
+- pytest 스모크(결제/스트릭) 실행 및 결과 반영.
+- 필요 시 추가 테이블 존재/스키마 차이 케이스에 대한 비파괴 마이그레이션 가드 확장 검토.
 
 ## 2025-08-23 모니터링 네트워크/도구 가동 + 백엔드 /metrics 노출(계측) + OpenAPI 테스트 상태
 
