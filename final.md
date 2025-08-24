@@ -3,6 +3,22 @@
 **생성일**: 2025-08-19  
 **브랜치**: feature/e2e-onboarding-playwright  
 
+## 2025-08-24 Prometheus 룰 파싱 오류 복구 + Kafka 알림/대시보드 검증
+
+변경 요약
+- `purchase_alerts.tmpl.yml`의 expr 멀티라인 파이프를 단일 라인으로 정리하고 전체 들여쓰기를 정상화. 템플릿 렌더 스크립트(`scripts/render_prometheus_rules.ps1`)로 `purchase_alerts.yml`을 재생성.
+- 손상되었던 `purchase_alerts.yml`에서 `labels` 아래 잘못 중첩된 `groups`/`rules` 블록을 제거하고 규칙 4개만 유지.
+- `docker-compose.monitoring.yml`는 기존 마운트 유지. 툴즈 재시작 시 렌더 → 기동 순으로 보장.
+
+검증 결과
+- Prometheus 컨테이너 기동 정상. `/api/v1/rules` 응답에서 `purchase-health` 그룹과 4개 규칙 로드, `kafka_consumer_health` 그룹 로드 확인. `/targets` 페이지 up.
+- Kafka Exporter up. Grafana 대시보드의 Consumer Lag 패널 쿼리 동작, `KafkaExporterDown` 알림 규칙 pending→inactive 전환 확인.
+
+다음 단계
+- Pending 스파이크 임계(`ALERT_PENDING_SPIKE_THRESHOLD`)를 환경별 튜닝(.env.* 반영) 및 구매 트래픽 관찰 후 재조정.
+- 백엔드 컨테이너 내부에서 pytest 스모크(결제/스트릭) 실행 및 결과 반영.
+- 필요 시 OpenAPI 재수출 및 `api docs/20250808.md`에 규칙/대시보드 변경 요약 추가.
+
 ## 2025-08-23 모니터링 네트워크/도구 가동 + 백엔드 /metrics 노출(계측) + OpenAPI 테스트 상태
 
 스크랩 타깃 고정화

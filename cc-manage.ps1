@@ -85,6 +85,12 @@ function Start-Environment {
                     [System.IO.File]::WriteAllText((Join-Path (Get-Location) $envPath), $text, (New-Object System.Text.UTF8Encoding($false)))
                     Write-Host "Rewrote .env as UTF-8 (no BOM)" -ForegroundColor Yellow
                 }
+                elseif ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF) {
+                    # UTF-8 BOM detected → rewrite without BOM
+                    $text = [System.Text.Encoding]::UTF8.GetString($bytes, 3, $bytes.Length - 3)
+                    [System.IO.File]::WriteAllText((Join-Path (Get-Location) $envPath), $text, (New-Object System.Text.UTF8Encoding($false)))
+                    Write-Host "Stripped UTF-8 BOM from .env (rewritten as UTF-8 without BOM)" -ForegroundColor Yellow
+                }
             }
         }
     } catch {}

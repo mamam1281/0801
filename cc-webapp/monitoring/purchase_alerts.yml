@@ -5,11 +5,7 @@ groups:
     interval: 30s
     rules:
       - alert: PurchaseFailureRateHigh
-        expr: |
-          sum(rate(purchase_attempt_total{result="fail"}[5m]))
-            /
-          clamp_min(sum(rate(purchase_attempt_total{result=~"success|fail"}[5m])), 1e-9)
-            > 0.02
+        expr: sum(rate(purchase_attempt_total{result="fail"}[5m])) / clamp_min(sum(rate(purchase_attempt_total{result=~"success|fail"}[5m])), 1e-9) > 0.02
         for: 10m
         labels:
           severity: warning
@@ -19,10 +15,7 @@ groups:
           description: "5m average failure rate > 2% for 10m. Check PSP/network/scripts."
 
       - alert: PurchasePendingSpike
-        expr: |
-          sum(increase(purchase_attempt_total{result="start"}[10m]))
-            - sum(increase(purchase_attempt_total{result="success"}[10m]))
-            - sum(increase(purchase_attempt_total{result="fail"}[10m])) > 20
+        expr: sum(increase(purchase_attempt_total{result="start"}[10m])) - sum(increase(purchase_attempt_total{result="success"}[10m])) - sum(increase(purchase_attempt_total{result="fail"}[10m])) > 20
         for: 10m
         labels:
           severity: critical
@@ -32,11 +25,7 @@ groups:
           description: "Pending delta exceeds threshold for 10m. Investigate webhooks/settlement delays/external PSP state."
 
       - alert: Http5xxRateHigh
-        expr: |
-          sum(rate(http_requests_total{job="cc-webapp-backend",status=~"5.."}[5m]))
-            /
-          clamp_min(sum(rate(http_requests_total{job="cc-webapp-backend"}[5m])), 1e-9)
-            > 0.02
+        expr: sum(rate(http_requests_total{job="cc-webapp-backend",status=~"5.."}[5m])) / clamp_min(sum(rate(http_requests_total{job="cc-webapp-backend"}[5m])), 1e-9) > 0.02
         for: 5m
         labels:
           severity: warning
@@ -46,8 +35,7 @@ groups:
           description: "5m 5xx ratio > 2%. Check recent deploy/DB/cache."
 
       - alert: HttpLatencyP95High
-        expr: |
-          histogram_quantile(0.95, sum(rate(http_requests_duration_seconds_bucket{job="cc-webapp-backend"}[5m])) by (le)) > 0.8
+        expr: histogram_quantile(0.95, sum(rate(http_requests_duration_seconds_bucket{job="cc-webapp-backend"}[5m])) by (le)) > 0.8
         for: 10m
         labels:
           severity: warning

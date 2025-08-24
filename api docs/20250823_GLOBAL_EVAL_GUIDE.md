@@ -11,6 +11,16 @@
 - 성능: p95 API < 250ms(읽기), < 400ms(쓰기), WS 이벤트 전달 지연 p95 < 500ms.
 - 데이터 일관: 경제(골드) 음수 잔액 0건, 멱등 키 재진행 성공률 100%(TTL 내), 클릭하우스 적재 누락률 < 0.5%.
 
+## 2-bis) 최신 상태 요약(2025-08-24)
+- 지금 되는 것
+	- 모니터링 정상: Prometheus 기동/정상, 룰 로드 OK(purchase-health 4개, kafka_consumer_health 2개), /targets up.
+	- Kafka Exporter up, Grafana Consumer Lag 패널 동작.
+	- OpenAPI 스모크 통과(수동 수출 기준), Alembic head 단일 유지.
+- 남은 것(우선순위)
+	1) pytest 스모크: 결제(/api/shop/buy), 스트릭 경계 케이스 복구/검증.
+	2) ALERT_PENDING_SPIKE_THRESHOLD 환경별 튜닝(.env.* 반영) 및 관찰값 기반 재보정.
+	3) OpenAPI 재수출/CI 연계(PR 디프 코멘트), Kafka Lag 임계 재튜닝(관찰 후).
+
 ## 3) 아키텍처 표준 요약
 - 설정: `app.core.config.settings` 단일 소스. 레거시 `app/config.py`는 shim(확장 금지).
 - 라우터: games 관련 엔드포인트는 `app/routers/games.py` 단일화.
@@ -115,6 +125,11 @@
 - [x] Grafana 대시보드 프로비저닝: 기본 패널(HTTP/WS/구매 지표) 적용
 - [x] Alert rules 마운트: `invite_code_alerts.yml` 로드 및 rule_files 활성화
 - [x] 라이브 데이터 검증: 패널 실데이터 렌더 확인 및 임계치 1차 튜닝(5xx/P95 경보 추가, 구매 실패 사유 라벨 보정)
+
+#### 관측성 업데이트(2025-08-24)
+- [x] Prometheus 룰 파싱 오류 복구: `purchase_alerts.tmpl.yml` 들여쓰기/expr 정리 → 렌더 → `purchase_alerts.yml` 정상 로드.
+- [x] Kafka 알림/패널 검증: `kafka_consumer_health` 그룹 로드, Kafka Exporter up, Grafana Consumer Lag 패널 동작.
+- [ ] ENV 임계 튜닝: `ALERT_PENDING_SPIKE_THRESHOLD` 환경별 값 반영 및 관찰 후 재보정(다음 단계).
 
 ##### 알림 임계 및 외부화 계획(2025-08-24)
 - 성공율 임계 98%→99% 상향 검토: 실데이터 추이 확인 후 `grafana_dashboard.json` thresholds green 기준 99로 상향 예정(스테이징에서 먼저 적용).
