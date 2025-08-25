@@ -1,22 +1,38 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { TrendingUp, TrendingDown, Coins, AlertTriangle } from 'lucide-react';
+import useBalanceSync from '@/hooks/useBalanceSync';
 
 interface TokenBalanceProps {
   amount: number;
   status?: 'normal' | 'warning' | 'critical';
   change?: 'none' | 'increase' | 'decrease';
   className?: string;
+  // 선택: 공용 상태와 동기화하고 싶을 때 전달
+  sharedUser?: { goldBalance?: number } | null;
+  onUpdateUser?: (next: any) => void;
+  onAddNotification?: (msg: string) => void;
 }
 
 export function TokenBalanceWidget({ 
   amount, 
   status = 'normal', 
   change = 'none',
-  className = '' 
+  className = '',
+  sharedUser,
+  onUpdateUser,
+  onAddNotification,
 }: TokenBalanceProps) {
+  const { reconcileBalance } = useBalanceSync({ sharedUser, onUpdateUser, onAddNotification });
+  // 마운트 시 1회 권위 동기화(옵션: sharedUser 전달된 경우에만)
+  useEffect(() => {
+    if (sharedUser && onUpdateUser) {
+      reconcileBalance().catch(() => {});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const formatAmount = (num: number) => {
     if (num >= 1000000) {
       return (num / 1000000).toFixed(1) + 'M';

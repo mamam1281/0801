@@ -1,7 +1,33 @@
+## 2025-08-25 컨테이너 기반 Playwright 러너 도입
+
+- 변경 요약: mcr.microsoft.com/playwright:v1.55.0-jammy 이미지를 사용하는 `docker-compose.playwright.yml` 추가. 프론트 `package.json`에 `test:e2e` 스크립트 정리. 러너는 ccnet 네트워크에 붙어 `frontend:3000`/`backend:8000`을 직접 참조하도록 구성.
+- 검증 결과: 프론트엔드 빌드 성공(경고 다수, 에러 없음), 백엔드 핵심 pytest 그린(9/9). 러너 컨테이너는 compose 기준으로 `npm ci && npx playwright test` 실행 준비 완료.
+- 다음 단계: (1) docker compose -f docker-compose.yml -f docker-compose.playwright.yml run --rm playwright 로 E2E 실행 자동화, (2) CI 파이프라인에 동일 오버레이 적용, (3) 경고 정리(미사용 아이콘/any 타입/훅 deps).
+
 # Casino-Club F2P 프로젝트 Final 체크 & 트러블슈팅 기록
 
 **생성일**: 2025-08-19  
 **브랜치**: feature/e2e-onboarding-playwright  
+
+## 2025-08-25 프론트 골드 동기화 정합화 (users/balance 권위 소스 반영)
+
+변경 요약
+- useAuth: 로그인/회원가입/초기화 시 `/api/users/balance`를 추가 조회하여 `cyber_token_balance`를 `gold_balance`로 미러링 저장. 토큰 적용 직후 및 init 로드 시 병합 동작.
+- NeonCrashGame: 베팅 시작/캐시아웃 후 `auth/profile`과 로컬 가산을 제거하고 `GET /api/users/balance` 값으로 잔액을 동기화. 게임 통계는 기존 별도 경로 유지.
+ - 공통 훅 `useBalanceSync` 신설: `/api/users/balance`를 권위로 삼아 공용 user.goldBalance를 갱신하고, DEV 모드에서는 불일치 시 토스트/콘솔 경고를 1회 표출.
+ - ProfileScreen/HomeDashboard에서 훅을 사용하도록 적용. 프로필 번들 로드 후와 대시보드 마운트 시 1회 동기화 수행.
+
+검증 결과
+- UI 잔액이 `/api/users/balance`의 `cyber_token_balance`와 일치(로그인 직후/게임 후 모두). OpenAPI/Alembic 스키마 변경 없음, 라우터 중복 추가 없음.
+- Realtime 브로드캐스트(`profile_update`)와의 충돌 없음(권위 잔액 소스 일원화 효과).
+ - 컨테이너 로그 기준 `/health` 200 연속 확인. 백엔드 Uvicorn 정상, Alembic/Redis 연결 OK.
+ - ENV 점검: SSR/컨테이너에서는 `NEXT_PUBLIC_API_URL_INTERNAL`을 `http://backend:8000`으로 유지(프론트 SSR 내부 통신 경로), 브라우저는 `NEXT_PUBLIC_API_ORIGIN`으로 `http://localhost:8000` 사용.
+
+다음 단계
+- 크래시 외 다른 게임/상점 경로에서도 `users/balance`를 표준 소스로 사용하도록 잔여 참조 점검(`auth/profile` 기반 잔액 업데이트 제거).
+- Playwright 스모크 보강: 로그인→프로필→크래시 베팅→잔액 일치 검증 케이스 추가.
+- 필요 시 OpenAPI 재수출 점검 및 `api docs/20250808.md` 동기화 유지.
+ - 중앙 훅 사용처를 ShopScreen/TokenBalanceWidget 등으로 확대하여 중복 로직 제거.
 
 ## 2025-08-25 Frontend ESLint 규칙 추가(금지 경로)
 

@@ -359,11 +359,13 @@ export default function App() {
           </React.Fragment>
         )}
 
-        {currentScreen === 'profile' && (
+    {currentScreen === 'profile' && (
           <React.Fragment key="profile">
             <ProfileScreen
               onBack={navigationHandlers.backToHome}
               onAddNotification={addNotification}
+      sharedUser={user}
+      onUpdateUser={updateUser}
             />
           </React.Fragment>
         )}

@@ -1,0 +1,29 @@
+services:
+  playwright:
+    image: mcr.microsoft.com/playwright:v1.55.0-jammy
+    container_name: cc_playwright
+    working_dir: /workspace/cc-webapp/frontend
+    environment:
+      BASE_URL: http://frontend:3000
+      API_BASE_URL: http://backend:8000
+      CI: "1"
+      HEADLESS: "1"
+    volumes:
+      - ./:/workspace
+      - ./logs/playwright:/workspace/cc-webapp/frontend/test-results:rw
+      - playwright_node_modules:/workspace/cc-webapp/frontend/node_modules
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      ccnet:
+        aliases:
+          - playwright
+    entrypoint: ["bash", "-lc", "npm install --no-audit --no-fund && npx playwright test --config=playwright.config.ts"]
+
+networks:
+  ccnet:
+    external: true
+
+volumes:
+  playwright_node_modules:

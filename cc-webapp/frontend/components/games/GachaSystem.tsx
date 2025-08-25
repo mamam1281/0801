@@ -139,7 +139,7 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
     let serverUsed = false;
     try {
       // Auth token retrieval (temporary: reading localStorage like slot game)
-  const res = await api.post<GachaPullApiResponse>('games/gacha/pull', { pull_count: 1 });
+      const res = await api.post<GachaPullApiResponse>('games/gacha/pull', { pull_count: 1 });
       fromApi(res);
       if (res?.items?.length) {
         serverUsed = true;
@@ -154,19 +154,19 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
               rate: 0,
               quantity: 1,
               value: 0,
-            }) as unknown as GachaItem
+            } as unknown as GachaItem)
         );
         setPullResults(mapped);
         setCurrentPullIndex(0);
         setShowResults(true);
         // Update user from authoritative balance & stats
+        // 우선 서버 응답 balance 사용, 이후 /users/balance로 최종 동기화 시도
         const newBalance = res.balance ?? res.currency_balance?.tokens;
         const first = mapped[0];
         const updatedUser = updateUserInventory(
           {
             ...user,
-            goldBalance:
-              typeof newBalance === 'number' ? newBalance : user.goldBalance - cost,
+            goldBalance: typeof newBalance === 'number' ? newBalance : user.goldBalance - cost,
             gameStats: {
               ...user.gameStats,
               gacha: {
@@ -183,7 +183,16 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
           } as User,
           first
         );
-        onUpdateUser(updatedUser as User);
+        try {
+          const bal = await api.get<any>('users/balance');
+          const cyber = bal?.cyber_token_balance;
+          onUpdateUser({
+            ...(updatedUser as User),
+            goldBalance: typeof cyber === 'number' ? cyber : (updatedUser as User).goldBalance,
+          });
+        } catch {
+          onUpdateUser(updatedUser as User);
+        }
         onAddNotification(getRarityMessage(first));
       }
     } catch (e) {
@@ -236,7 +245,7 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
     setPullAnimation('revealing');
     let serverUsed = false;
     try {
-  const res = await api.post<GachaPullApiResponse>('games/gacha/pull', { pull_count: 10 });
+      const res = await api.post<GachaPullApiResponse>('games/gacha/pull', { pull_count: 10 });
       fromApi(res);
       if (res?.items?.length) {
         serverUsed = true;
@@ -250,7 +259,7 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
               rate: 0,
               quantity: 1,
               value: 0,
-            }) as unknown as GachaItem
+            } as unknown as GachaItem)
         );
         setPullResults(mapped);
         setCurrentPullIndex(0);
@@ -289,7 +298,16 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
             },
           } as User
         );
-        onUpdateUser(updatedUser as User);
+        try {
+          const bal = await api.get<any>('users/balance');
+          const cyber = bal?.cyber_token_balance;
+          onUpdateUser({
+            ...(updatedUser as User),
+            goldBalance: typeof cyber === 'number' ? cyber : (updatedUser as User).goldBalance,
+          });
+        } catch {
+          onUpdateUser(updatedUser as User);
+        }
         onAddNotification(getTenPullMessage(mapped));
       }
     } catch (e) {

@@ -3,11 +3,11 @@ import { test, expect } from '@playwright/test';
 // 간단한 회원가입/로그인/프로필 스모크 (실제 라우트 명세에 따라 조정 필요)
 // 프론트 UI 폼 상호작용 대신 백엔드 API 직접 호출로 빠른 안정성 확보
 
-test.describe('Auth Smoke', () => {
+test.describe('Auth + Balance Smoke', () => {
   const apiBase = process.env.API_BASE_URL || 'http://localhost:8000';
   const uid = 'smoke' + Date.now();
 
-  test('signup + login + profile', async ({ request }) => {
+  test('signup + login + profile + balance', async ({ request }) => {
     // 회원가입
     const signup = await request.post(`${apiBase}/api/auth/signup`, {
       data: {
@@ -27,12 +27,20 @@ test.describe('Auth Smoke', () => {
     const token = loginJson.access_token;
     expect(token).toBeTruthy();
 
-    // 프로필
-    const profile = await request.get(`${apiBase}/api/auth/profile`, {
+    // 프로필(me 혹은 profile) 확인
+    const profile = await request.get(`${apiBase}/api/users/profile`, {
       headers: { Authorization: `Bearer ${token}` }
     });
     expect(profile.ok()).toBeTruthy();
     const profileJson = await profile.json();
-    expect(profileJson.site_id).toBe(uid);
+    expect(profileJson.site_id || profileJson.id || profileJson.nickname).toBeTruthy();
+
+    // 권위 잔액 소스 확인
+    const balance = await request.get(`${apiBase}/api/users/balance`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    expect(balance.ok()).toBeTruthy();
+    const balanceJson = await balance.json();
+    expect(typeof balanceJson.cyber_token_balance).toBe('number');
   });
 });

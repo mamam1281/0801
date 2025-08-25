@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft,
@@ -23,6 +23,8 @@ import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { Badge } from './ui/badge';
 import { User, GameItem } from '../types';
+import useBalanceSync from '@/hooks/useBalanceSync';
+import { api } from '@/lib/unifiedApi';
 
 interface ShopScreenProps {
   user: User;
@@ -154,6 +156,13 @@ export function ShopScreen({
 }: ShopScreenProps) {
   const [showPurchaseModal, setShowPurchaseModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null as import('../types').GameItem | null);
+  const { reconcileBalance } = useBalanceSync({ sharedUser: user, onUpdateUser, onAddNotification });
+
+  // 마운트 시 1회 권위 잔액으로 정합화
+  useEffect(() => {
+    reconcileBalance().catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // 🎨 등급별 스타일링 (글래스메탈 버전)
   const getRarityStyles = (rarity: string) => {
@@ -197,9 +206,9 @@ export function ShopScreen({
   };
 
   // 💰 아이템 구매 처리
-  const handlePurchase = (item: any) => {
+  const handlePurchase = async (item: any) => {
     const finalPrice = Math.floor(item.price * (1 - item.discount / 100));
-    
+
     if (user.goldBalance < finalPrice) {
       onAddNotification('❌ 골드가 부족합니다!');
       return;
@@ -213,29 +222,92 @@ export function ShopScreen({
       quantity: item.type === 'currency' ? item.value : 1,
       description: item.description,
       icon: item.icon,
-      value: item.value
+      value: item.value,
     };
 
     let updatedUser = { ...user };
 
     // 골드 타입 아이템은 즉시 골드로 변환
-    if (item.type === 'currency') {
-      updatedUser = {
-        ...updatedUser,
-        goldBalance: user.goldBalance - finalPrice + item.value
-      };
-      onAddNotification(`💰 ${item.value.toLocaleString()}G를 획득했습니다!`);
+  if (item.type === 'currency') {
+      // 서버 구매 경로 시도 -> 성공 시 /users/balance 권위값 적용
+      try {
+        // 통합 상점 구매 API가 있는 경우 사용 (없다면 예외로 폴백 처리)
+        // 예: POST /api/shop/buy { item_id, price }
+        // 여기선 경로명만 통일, 실제 백엔드가 없으면 catch로 이동
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const res: any = await api.post('shop/buy', {
+          item_id: item.id,
+          price: finalPrice,
+        });
+        try {
+          // 성공 후 권위 잔액 재조회
+          const bal = await api.get('users/balance');
+          const cyber = bal?.cyber_token_balance;
+          if (typeof cyber === 'number') {
+            updatedUser = { ...updatedUser, goldBalance: cyber };
+          } else {
+            // 서버 응답에 new balance가 있으면 사용
+            const nb = res?.new_gold_balance;
+            updatedUser = {
+              ...updatedUser,
+              goldBalance: typeof nb === 'number' ? nb : user.goldBalance - finalPrice + item.value,
+            };
+          }
+        } catch {
+          updatedUser = { ...updatedUser, goldBalance: user.goldBalance - finalPrice + item.value };
+        }
+        onAddNotification(`💰 ${item.value.toLocaleString()}G를 획득했습니다!`);
+      } catch {
+        // 폴백: 로컬 업데이트
+        updatedUser = {
+          ...updatedUser,
+          goldBalance: user.goldBalance - finalPrice + item.value,
+        };
+        onAddNotification(`💰 ${item.value.toLocaleString()}G를 획득했습니다!`);
+      }
     } else {
       // 일반 아이템은 인벤토리에 추가
-      updatedUser = {
-        ...updatedUser,
-        goldBalance: user.goldBalance - finalPrice,
-        inventory: [...user.inventory, newItem]
-      };
-      onAddNotification(`✅ ${item.name}을(를) 구매했습니다!`);
+      try {
+        // 서버 구매 호출 시도
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const res: any = await api.post('shop/buy', {
+          item_id: item.id,
+          price: finalPrice,
+        });
+        // 권위 잔액 재조회
+        try {
+          const bal = await api.get('users/balance');
+          const cyber = bal?.cyber_token_balance;
+          updatedUser = {
+            ...updatedUser,
+            goldBalance:
+              typeof cyber === 'number'
+                ? cyber
+                : res?.new_gold_balance ?? user.goldBalance - finalPrice,
+            inventory: [...user.inventory, newItem],
+          };
+        } catch {
+          updatedUser = {
+            ...updatedUser,
+            goldBalance: user.goldBalance - finalPrice,
+            inventory: [...user.inventory, newItem],
+          };
+        }
+        onAddNotification(`✅ ${item.name}을(를) 구매했습니다!`);
+      } catch {
+        // 폴백: 로컬 처리
+        updatedUser = {
+          ...updatedUser,
+          goldBalance: user.goldBalance - finalPrice,
+          inventory: [...user.inventory, newItem],
+        };
+        onAddNotification(`✅ ${item.name}을(를) 구매했습니다!`);
+      }
     }
 
-    onUpdateUser(updatedUser);
+  onUpdateUser(updatedUser);
+  // 구매 후 권위 잔액 재조회로 최종 정합 유지
+  try { await reconcileBalance(); } catch {}
     setShowPurchaseModal(false);
   };
 

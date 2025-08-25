@@ -372,89 +372,108 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
     }
 
     // Process final result after all reels stop
-    setTimeout(async () => {
-      if (result.winAmount > 0) {
-        setIsWin(true);
-        setWinAmount(result.winAmount);
-        setWinningPositions(result.winningPositions);
-        setConsecutiveWins((prev: number) => prev + 1);
+  setTimeout(async () => {
+    if (result.winAmount > 0) {
+      setIsWin(true);
+      setWinAmount(result.winAmount);
+      setWinningPositions(result.winningPositions);
+      setConsecutiveWins((prev: number) => prev + 1);
 
-        // Enhanced particle effects based on win type
-        if (result.isJackpot) {
-          generateParticles('jackpot');
-        } else if (result.isBigWin) {
-          generateParticles('bigwin');
-        } else {
-          generateParticles('win');
-        }
-
-        generateCoinDrops();
-
-        // Update user stats (use server authoritative balance if present)
-        const updatedUser = {
-          ...user,
-          goldBalance:
-            serverResult && serverResult.success
-              ? serverResult.balance
-              : user.goldBalance - costAmount + result.winAmount,
-          gameStats: {
-            ...user.gameStats,
-            slot: {
-              ...user.gameStats.slot,
-              totalSpins: user.gameStats.slot.totalSpins + 1,
-              totalWinnings: user.gameStats.slot.totalWinnings + result.winAmount,
-              biggestWin: Math.max(user.gameStats.slot.biggestWin, result.winAmount),
-              jackpotHits: result.isJackpot
-                ? user.gameStats.slot.jackpotHits + 1
-                : user.gameStats.slot.jackpotHits,
-            },
-          },
-          stats: {
-            ...user.stats,
-            gamesPlayed: user.stats.gamesPlayed + 1,
-            gamesWon: user.stats.gamesWon + 1,
-            totalEarnings: user.stats.totalEarnings + (result.winAmount - costAmount),
-            winStreak: user.stats.winStreak + 1,
-          },
-        };
-        onUpdateUser(updatedUser);
-
-        // Only important notifications
-        if (result.isJackpot) {
-          setShowWinModal(true);
-          onAddNotification(`🎰 JACKPOT! ${result.winAmount.toLocaleString()}G 획득!`);
-        } else if (result.isBigWin) {
-          onAddNotification(`🔥 BIG WIN! ${result.winAmount.toLocaleString()}G 획득!`);
-        }
+      // Enhanced particle effects based on win type
+      if (result.isJackpot) {
+        generateParticles('jackpot');
+      } else if (result.isBigWin) {
+        generateParticles('bigwin');
       } else {
-        setConsecutiveWins(0);
-
-        const updatedUser = {
-          ...user,
-          goldBalance:
-            serverResult && serverResult.success
-              ? serverResult.balance
-              : user.goldBalance - costAmount,
-          gameStats: {
-            ...user.gameStats,
-            slot: {
-              ...user.gameStats.slot,
-              totalSpins: user.gameStats.slot.totalSpins + 1, // spins -> totalSpins
-            },
-          },
-          stats: {
-            ...user.stats,
-            gamesPlayed: user.stats.gamesPlayed + 1,
-            winStreak: 0,
-          },
-        };
-        onUpdateUser(updatedUser);
-        // 실패 스핀도 서버 feedback이 push 되었을 수 있음 (serverResult)
+        generateParticles('win');
       }
 
-      setIsSpinning(false);
-      setReelStopOrder([]); // Reset for next spin
-    }, 3000);
+      generateCoinDrops();
+
+      // Update user stats (prefer authoritative balance from server; fallback to serverResult or local)
+      let latestBalance: number | undefined;
+      try {
+        const bal = await api.get<any>('users/balance');
+        latestBalance = bal?.cyber_token_balance;
+      } catch {
+        latestBalance = undefined;
+      }
+      const resolvedBalance =
+        latestBalance ??
+        (serverResult && serverResult.success
+          ? serverResult.balance
+          : user.goldBalance - costAmount + result.winAmount);
+      const updatedUser = {
+        ...user,
+        goldBalance: resolvedBalance,
+        gameStats: {
+          ...user.gameStats,
+          slot: {
+            ...user.gameStats.slot,
+            totalSpins: user.gameStats.slot.totalSpins + 1,
+            totalWinnings: user.gameStats.slot.totalWinnings + result.winAmount,
+            biggestWin: Math.max(user.gameStats.slot.biggestWin, result.winAmount),
+            jackpotHits: result.isJackpot
+              ? user.gameStats.slot.jackpotHits + 1
+              : user.gameStats.slot.jackpotHits,
+          },
+        },
+        stats: {
+          ...user.stats,
+          gamesPlayed: user.stats.gamesPlayed + 1,
+          gamesWon: user.stats.gamesWon + 1,
+          totalEarnings: user.stats.totalEarnings + (result.winAmount - costAmount),
+          winStreak: user.stats.winStreak + 1,
+        },
+      };
+      onUpdateUser(updatedUser);
+
+      // Only important notifications
+      if (result.isJackpot) {
+        setShowWinModal(true);
+        onAddNotification(`🎰 JACKPOT! ${result.winAmount.toLocaleString()}G 획득!`);
+      } else if (result.isBigWin) {
+        onAddNotification(`🔥 BIG WIN! ${result.winAmount.toLocaleString()}G 획득!`);
+      }
+    } else {
+      setConsecutiveWins(0);
+
+      // 패배 시에도 동일하게 권위 잔액을 우선 조회
+      let latestBalanceLose: number | undefined;
+      try {
+        const bal = await api.get<any>('users/balance');
+        latestBalanceLose = bal?.cyber_token_balance;
+      } catch {
+        latestBalanceLose = undefined;
+      }
+      const resolvedBalanceLose =
+        latestBalanceLose ??
+        (serverResult && serverResult.success
+          ? serverResult.balance
+          : user.goldBalance - costAmount);
+      const updatedUser = {
+        ...user,
+        goldBalance: resolvedBalanceLose,
+        gameStats: {
+          ...user.gameStats,
+          slot: {
+            ...user.gameStats.slot,
+            totalSpins: user.gameStats.slot.totalSpins + 1, // spins -> totalSpins
+          },
+        },
+        stats: {
+          ...user.stats,
+          gamesPlayed: user.stats.gamesPlayed + 1,
+          winStreak: 0,
+        },
+      };
+      onUpdateUser(updatedUser);
+      // 실패 스핀도 서버 feedback이 push 되었을 수 있음 (serverResult)
+    }
+
+    setIsSpinning(false);
+    setReelStopOrder([]); // Reset for next spin
+  }, 3000);
   };
 
   return (

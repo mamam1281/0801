@@ -119,8 +119,8 @@ export function NeonCrashGame({
 
     try {
       // 서버에 크래시 베팅 요청
-  // Unified API paths
-  const gameResult = await api.post<any>('games/crash/bet', {
+      // Unified API paths
+      const gameResult = await api.post<any>('games/crash/bet', {
         bet_amount: betAmount,
         auto_cashout_multiplier:
           showAdvancedSettings && manualAutoCashout > 0 ? manualAutoCashout : null,
@@ -159,16 +159,16 @@ export function NeonCrashGame({
 
       fetchAuthoritativeStats();
 
-      // 사용자 잔액 업데이트 (서버에서 처리된 결과)
+      // 사용자 잔액 업데이트 (서버 권위 소스: /users/balance)
       try {
-        const updatedProfile = await api.get<any>('auth/profile');
+        const balance = await api.get<any>('users/balance');
+        const cyber = balance?.cyber_token_balance ?? user.goldBalance;
         onUpdateUser({
           ...user,
-          goldBalance: updatedProfile.gold_balance || user.goldBalance,
-          gameStats: updatedProfile.game_stats || user.gameStats,
+          goldBalance: cyber,
         });
       } catch (error) {
-        console.error('프로필 업데이트 실패:', error);
+        console.error('잔액 동기화 실패:', error);
       }
     } catch (error) {
       console.error('크래시 게임 시작 실패:', error);
@@ -381,24 +381,16 @@ export function NeonCrashGame({
     const winnings = Math.floor(betAmount * multiplier);
     setWinAmount(winnings);
 
-    // 서버에서 업데이트된 유저 데이터를 다시 가져와야 합니다
-    // 로컬 상태 업데이트는 일시적이며, 실제 게임 통계는 서버에서 관리됩니다
+    // 서버에서 권위 잔액을 재조회하여 반영 (로컬 가산 금지)
     try {
-      // 프로필을 다시 로드하여 서버에서 업데이트된 게임 통계를 가져옵니다
-  const updatedProfile = await api.get<any>('auth/profile');
+      const balance = await api.get<any>('users/balance');
+      const cyber = balance?.cyber_token_balance ?? user.goldBalance;
       onUpdateUser({
         ...user,
-        goldBalance: user.goldBalance + winnings,
-        gameStats: updatedProfile.game_stats || user.gameStats,
+        goldBalance: cyber,
       });
     } catch (error) {
-      console.error('Failed to fetch updated profile:', error);
-      // 에러 시 로컬 상태만 업데이트
-      const updatedUser = {
-        ...user,
-        goldBalance: user.goldBalance + winnings,
-      };
-      onUpdateUser(updatedUser);
+      console.error('잔액 재조회 실패:', error);
     }
 
     // 게임 상태 업데이트

@@ -1,18 +1,19 @@
 'use client';
 
 import React, { useState } from 'react';
+import { api } from '@/lib/unifiedApi';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  ArrowLeft, 
-  Coins, 
-  Trophy, 
+import {
+  ArrowLeft,
+  Coins,
+  Trophy,
   Timer,
   RotateCcw,
   Volume2,
   VolumeX,
   Flame,
   Crown,
-  Sparkles
+  Sparkles,
 } from 'lucide-react';
 import { User } from '../../types';
 import { Button } from '../ui/button';
@@ -44,7 +45,7 @@ interface SoundEffect {
 const CHOICES = {
   rock: { emoji: '✊', name: '바위', beats: 'scissors', color: 'text-orange-400' },
   paper: { emoji: '✋', name: '보', beats: 'rock', color: 'text-blue-400' },
-  scissors: { emoji: '✌️', name: '가위', beats: 'paper', color: 'text-red-400' }
+  scissors: { emoji: '✌️', name: '가위', beats: 'paper', color: 'text-red-400' },
 };
 
 const SOUND_EFFECTS: Record<string, SoundEffect> = {
@@ -56,14 +57,14 @@ const SOUND_EFFECTS: Record<string, SoundEffect> = {
   defeat: { name: '패배', duration: 800, visual: '😵' },
   draw: { name: '무승부', duration: 600, visual: '🤝' },
   combo: { name: '콤보', duration: 1200, visual: '🔥' },
-  perfect: { name: '퍼펙트', duration: 1500, visual: '⭐' }
+  perfect: { name: '퍼펙트', duration: 1500, visual: '⭐' },
 };
 
-export function RockPaperScissorsGame({ 
-  user, 
-  onBack, 
-  onUpdateUser, 
-  onAddNotification 
+export function RockPaperScissorsGame({
+  user,
+  onBack,
+  onUpdateUser,
+  onAddNotification,
 }: RockPaperScissorsGameProps) {
   const [playerChoice, setPlayerChoice] = useState(null as Choice | null);
   const [aiChoice, setAiChoice] = useState(null as Choice | null);
@@ -76,14 +77,16 @@ export function RockPaperScissorsGame({
   const [showResult, setShowResult] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [currentSoundEffect, setCurrentSoundEffect] = useState(null as string | null);
-  const [particles, setParticles] = useState([] as Array<{ id: number; x: number; y: number; color: string }>);
+  const [particles, setParticles] = useState(
+    [] as Array<{ id: number; x: number; y: number; color: string }>
+  );
   const [comboCount, setComboCount] = useState(0);
   const [isSpecialMove, setIsSpecialMove] = useState(false);
 
   // Play sound effect (visual simulation)
   const playSoundEffect = (effectName: string) => {
     if (!soundEnabled) return;
-    
+
     const effect = SOUND_EFFECTS[effectName];
     if (effect) {
       setCurrentSoundEffect(effect.visual);
@@ -96,16 +99,16 @@ export function RockPaperScissorsGame({
     const colors = {
       win: ['#00ff88', '#ffeb3b', '#ff006e'],
       lose: ['#ff3366', '#666'],
-      draw: ['#ffaa00', '#00ccff']
+      draw: ['#ffaa00', '#00ccff'],
     };
-    
+
     const newParticles = Array.from({ length: 15 }, (_, i) => ({
       id: Date.now() + i,
       x: Math.random() * 100,
       y: Math.random() * 100,
-      color: colors[result][Math.floor(Math.random() * colors[result].length)]
+      color: colors[result][Math.floor(Math.random() * colors[result].length)],
     }));
-    
+
     setParticles(newParticles);
     setTimeout(() => setParticles([]), 2000);
   };
@@ -126,7 +129,7 @@ export function RockPaperScissorsGame({
   // Handle game play with improved timing
   const playGame = async (choice: Choice) => {
     if (isPlaying) return;
-    
+
     if (user.goldBalance < betAmount) {
       onAddNotification('❌ 골드가 부족합니다!');
       return;
@@ -143,7 +146,7 @@ export function RockPaperScissorsGame({
     playSoundEffect('countdown');
     for (let i = 3; i > 0; i--) {
       setCountdown(i);
-      await new Promise(resolve => setTimeout(resolve, 600));
+      await new Promise((resolve) => setTimeout(resolve, 600));
     }
     setCountdown(null);
 
@@ -154,6 +157,7 @@ export function RockPaperScissorsGame({
 
     // Calculate result
     const result: GameResult = determineWinner(choice, ai);
+    setGameResult(result);
 
     // Game stats for display
     const totalGames = user.gameStats.rps.totalGames;
@@ -174,7 +178,7 @@ export function RockPaperScissorsGame({
       winnings = betAmount * 2;
       // Streak bonuses
       if (streak >= 2) {
-        comboMultiplier = 1 + (streak * 0.2);
+        comboMultiplier = 1 + streak * 0.2;
         setComboCount(streak + 1);
         playSoundEffect('combo');
       }
@@ -188,25 +192,36 @@ export function RockPaperScissorsGame({
     }
 
     // Update user stats
+    // 권위 잔액 동기화 시도 (/users/balance), 실패 시 로컬 계산 폴백
+    let latestBalance: number | undefined;
+    try {
+      const bal = await api.get<any>('users/balance');
+      latestBalance = bal?.cyber_token_balance;
+    } catch {
+      latestBalance = undefined;
+    }
+    const resolvedBalance =
+      typeof latestBalance === 'number' ? latestBalance : user.goldBalance - betAmount + winnings;
+
     const updatedUser = {
       ...user,
-      goldBalance: user.goldBalance - betAmount + winnings,
+      goldBalance: resolvedBalance,
       gameStats: {
         ...user.gameStats,
         rps: {
           ...user.gameStats.rps,
           totalGames: user.gameStats.rps.totalGames + 1,
           wins: result === 'win' ? user.gameStats.rps.wins + 1 : user.gameStats.rps.wins,
-          currentStreak: result === 'win' ? user.gameStats.rps.currentStreak + 1 : 0
-        }
+          currentStreak: result === 'win' ? user.gameStats.rps.currentStreak + 1 : 0,
+        },
       },
       stats: {
         ...user.stats,
         gamesPlayed: user.stats.gamesPlayed + 1,
         gamesWon: result === 'win' ? user.stats.gamesWon + 1 : user.stats.gamesWon,
         totalEarnings: user.stats.totalEarnings + (winnings - betAmount),
-        winStreak: result === 'win' ? user.stats.winStreak + 1 : 0
-      }
+        winStreak: result === 'win' ? user.stats.winStreak + 1 : 0,
+      },
     };
 
     // Update streak
@@ -228,9 +243,9 @@ export function RockPaperScissorsGame({
       aiChoice: ai,
       result,
       winnings: winnings - betAmount,
-      isSpecialMove: isSpecial
+      isSpecialMove: isSpecial,
     };
-  setRoundHistory((prev: GameRound[]) => [round, ...prev.slice(0, 9)]);
+    setRoundHistory((prev: GameRound[]) => [round, ...prev.slice(0, 9)]);
 
     onUpdateUser(updatedUser);
 
@@ -261,9 +276,10 @@ export function RockPaperScissorsGame({
   };
 
   // gameStats 속성 이름 수정
-  const winRate = user.gameStats.rps.totalGames > 0   // matches -> totalGames
-    ? Math.round((user.gameStats.rps.wins / user.gameStats.rps.totalGames) * 100)
-    : 0;
+  const winRate =
+    user.gameStats.rps.totalGames > 0 // matches -> totalGames
+      ? Math.round((user.gameStats.rps.wins / user.gameStats.rps.totalGames) * 100)
+      : 0;
 
   // losses 변수 정의 추가
   const losses = user.gameStats.rps.totalGames - user.gameStats.rps.wins;
@@ -273,22 +289,22 @@ export function RockPaperScissorsGame({
     <div className="min-h-screen bg-gradient-to-br from-background via-black to-success/10 relative overflow-hidden">
       {/* Particle Effects */}
       <AnimatePresence>
-  {particles.map((particle: { id: number; x: number; y: number; color: string }) => (
+        {particles.map((particle: { id: number; x: number; y: number; color: string }) => (
           <motion.div
             key={particle.id}
-            initial={{ 
+            initial={{
               opacity: 0,
               scale: 0,
               x: `${particle.x}vw`,
-              y: `${particle.y}vh`
+              y: `${particle.y}vh`,
             }}
-            animate={{ 
+            animate={{
               opacity: [0, 1, 0],
               scale: [0, 1.5, 0],
-              y: `${particle.y - 20}vh`
+              y: `${particle.y - 20}vh`,
             }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 1.5, ease: "easeOut" }}
+            transition={{ duration: 1.5, ease: 'easeOut' }}
             className="fixed w-3 h-3 rounded-full pointer-events-none z-30"
             style={{ backgroundColor: particle.color }}
           />
@@ -326,20 +342,20 @@ export function RockPaperScissorsGame({
               className="relative"
             >
               <motion.div
-                animate={{ 
+                animate={{
                   scale: [1, 1.3, 1],
                   textShadow: [
                     '0 0 20px rgba(255,0,110,0.5)',
                     '0 0 40px rgba(255,0,110,1)',
-                    '0 0 20px rgba(255,0,110,0.5)'
-                  ]
+                    '0 0 20px rgba(255,0,110,0.5)',
+                  ],
                 }}
                 transition={{ duration: 0.6 }}
                 className="text-9xl font-black text-primary"
               >
                 {countdown}
               </motion.div>
-              
+
               <motion.div
                 initial={{ scale: 0, rotate: 0 }}
                 animate={{ scale: 1.2, rotate: 360 }}
@@ -367,10 +383,8 @@ export function RockPaperScissorsGame({
               <ArrowLeft className="w-4 h-4 mr-2" />
               뒤로가기
             </Button>
-            
-            <h1 className="text-xl lg:text-2xl font-bold text-gradient-primary">
-              가위바위보 대전
-            </h1>
+
+            <h1 className="text-xl lg:text-2xl font-bold text-gradient-primary">가위바위보 대전</h1>
           </div>
 
           <div className="flex items-center gap-4">
@@ -382,7 +396,7 @@ export function RockPaperScissorsGame({
             >
               {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
             </Button>
-            
+
             <div className="glass-effect rounded-xl p-3 border border-gold/20">
               <div className="text-right">
                 <div className="text-sm text-muted-foreground">보유 골드</div>
@@ -424,7 +438,7 @@ export function RockPaperScissorsGame({
               <Coins className="w-5 h-5 text-gold" />
               배팅액 설정
             </h3>
-            
+
             <div className="flex items-center justify-center gap-4 mb-4">
               <Button
                 variant="outline"
@@ -435,11 +449,11 @@ export function RockPaperScissorsGame({
               >
                 -50G
               </Button>
-              
+
               <div className="bg-gradient-to-r from-gold to-gold-light text-black px-6 py-3 rounded-lg font-bold text-xl min-w-[120px]">
                 {betAmount.toLocaleString()}G
               </div>
-              
+
               <Button
                 variant="outline"
                 size="sm"
@@ -450,7 +464,7 @@ export function RockPaperScissorsGame({
                 +50G
               </Button>
             </div>
-            
+
             <div className="flex gap-2 justify-center flex-wrap">
               {[10, 50, 100, 200, 500].map((amount) => (
                 <Button
@@ -467,7 +481,7 @@ export function RockPaperScissorsGame({
                 </Button>
               ))}
             </div>
-            
+
             <div className="text-sm text-muted-foreground mt-2">
               승리 시 2배 지급 • 무승부 시 베팅금 반환
             </div>
@@ -489,26 +503,47 @@ export function RockPaperScissorsGame({
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 className={`absolute inset-0 pointer-events-none z-10 ${
-                  gameResult === 'win' ? 'bg-success/10' : 
-                  gameResult === 'lose' ? 'bg-error/10' : 'bg-warning/10'
+                  gameResult === 'win'
+                    ? 'bg-success/10'
+                    : gameResult === 'lose'
+                    ? 'bg-error/10'
+                    : 'bg-warning/10'
                 }`}
               >
                 <motion.div
-                  animate={{ 
+                  animate={{
                     scale: [1, 1.05, 1],
                     boxShadow: [
-                      `0 0 20px ${gameResult === 'win' ? 'rgba(0,255,136,0.3)' : 
-                                  gameResult === 'lose' ? 'rgba(255,51,102,0.3)' : 'rgba(255,170,0,0.3)'}`,
-                      `0 0 40px ${gameResult === 'win' ? 'rgba(0,255,136,0.6)' : 
-                                  gameResult === 'lose' ? 'rgba(255,51,102,0.6)' : 'rgba(255,170,0,0.6)'}`,
-                      `0 0 20px ${gameResult === 'win' ? 'rgba(0,255,136,0.3)' : 
-                                  gameResult === 'lose' ? 'rgba(255,51,102,0.3)' : 'rgba(255,170,0,0.3)'}`
-                    ]
+                      `0 0 20px ${
+                        gameResult === 'win'
+                          ? 'rgba(0,255,136,0.3)'
+                          : gameResult === 'lose'
+                          ? 'rgba(255,51,102,0.3)'
+                          : 'rgba(255,170,0,0.3)'
+                      }`,
+                      `0 0 40px ${
+                        gameResult === 'win'
+                          ? 'rgba(0,255,136,0.6)'
+                          : gameResult === 'lose'
+                          ? 'rgba(255,51,102,0.6)'
+                          : 'rgba(255,170,0,0.6)'
+                      }`,
+                      `0 0 20px ${
+                        gameResult === 'win'
+                          ? 'rgba(0,255,136,0.3)'
+                          : gameResult === 'lose'
+                          ? 'rgba(255,51,102,0.3)'
+                          : 'rgba(255,170,0,0.3)'
+                      }`,
+                    ],
                   }}
                   transition={{ duration: 1, repeat: Infinity }}
                   className={`absolute inset-0 border-4 rounded-3xl ${
-                    gameResult === 'win' ? 'border-success' : 
-                    gameResult === 'lose' ? 'border-error' : 'border-warning'
+                    gameResult === 'win'
+                      ? 'border-success'
+                      : gameResult === 'lose'
+                      ? 'border-error'
+                      : 'border-warning'
                   }`}
                 />
               </motion.div>
@@ -526,10 +561,12 @@ export function RockPaperScissorsGame({
               </div>
               <motion.div
                 animate={
-                  playerChoice ? { 
-                    scale: [1, 1.3, 1],
-                    rotate: [0, 10, -10, 0]
-                  } : {}
+                  playerChoice
+                    ? {
+                        scale: [1, 1.3, 1],
+                        rotate: [0, 10, -10, 0],
+                      }
+                    : {}
                 }
                 transition={{ duration: 0.6 }}
                 className={`w-40 h-40 mx-auto bg-gradient-to-br from-primary to-primary-light rounded-full flex items-center justify-center text-8xl mb-6 shadow-2xl border-4 border-primary/30 ${
@@ -537,7 +574,7 @@ export function RockPaperScissorsGame({
                 }`}
               >
                 {playerChoice ? CHOICES[playerChoice as Choice].emoji : '❓'}
-                
+
                 {isSpecialMove && (
                   <motion.div
                     animate={{ opacity: [0.5, 1, 0.5], scale: [1, 1.2, 1] }}
@@ -546,7 +583,11 @@ export function RockPaperScissorsGame({
                   />
                 )}
               </motion.div>
-              <div className={`text-lg font-bold ${playerChoice ? CHOICES[playerChoice as Choice].color : 'text-muted-foreground'}`}>
+              <div
+                className={`text-lg font-bold ${
+                  playerChoice ? CHOICES[playerChoice as Choice].color : 'text-muted-foreground'
+                }`}
+              >
                 {playerChoice ? CHOICES[playerChoice as Choice].name : '선택하세요'}
               </div>
             </div>
@@ -560,24 +601,32 @@ export function RockPaperScissorsGame({
               </div>
               <motion.div
                 animate={
-                  aiChoice ? { 
-                    scale: [1, 1.3, 1],
-                    rotate: [0, -10, 10, 0]
-                  } : isPlaying ? { 
-                    rotate: [0, 360],
-                    scale: [1, 1.1, 1]
-                  } : {}
+                  aiChoice
+                    ? {
+                        scale: [1, 1.3, 1],
+                        rotate: [0, -10, 10, 0],
+                      }
+                    : isPlaying
+                    ? {
+                        rotate: [0, 360],
+                        scale: [1, 1.1, 1],
+                      }
+                    : {}
                 }
-                transition={{ 
-                  duration: isPlaying ? 2 : 0.6, 
+                transition={{
+                  duration: isPlaying ? 2 : 0.6,
                   repeat: isPlaying ? Infinity : 0,
-                  ease: isPlaying ? "linear" : "easeInOut"
+                  ease: isPlaying ? 'linear' : 'easeInOut',
                 }}
                 className="w-40 h-40 mx-auto bg-gradient-to-br from-warning to-gold rounded-full flex items-center justify-center text-8xl mb-6 shadow-2xl border-4 border-warning/30"
               >
                 {aiChoice ? CHOICES[aiChoice as Choice].emoji : '🤖'}
               </motion.div>
-              <div className={`text-lg font-bold ${aiChoice ? CHOICES[aiChoice as Choice].color : 'text-muted-foreground'}`}>
+              <div
+                className={`text-lg font-bold ${
+                  aiChoice ? CHOICES[aiChoice as Choice].color : 'text-muted-foreground'
+                }`}
+              >
                 {aiChoice ? CHOICES[aiChoice as Choice].name : isPlaying ? '생각 중...' : 'AI 대기'}
               </div>
             </div>
@@ -586,13 +635,13 @@ export function RockPaperScissorsGame({
           {/* VS */}
           <div className="text-center mb-8">
             <motion.div
-              animate={{ 
+              animate={{
                 scale: [1, 1.2, 1],
                 textShadow: [
                   '0 0 20px rgba(255,0,110,0.5)',
                   '0 0 40px rgba(255,0,110,1)',
-                  '0 0 20px rgba(255,0,110,0.5)'
-                ]
+                  '0 0 20px rgba(255,0,110,0.5)',
+                ],
               }}
               transition={{ duration: 2, repeat: Infinity }}
               className="text-4xl font-black text-gradient-primary"
@@ -611,27 +660,48 @@ export function RockPaperScissorsGame({
                 className="text-center mb-6"
               >
                 <motion.div
-                  animate={{ 
+                  animate={{
                     scale: [1, 1.2, 1],
                     textShadow: [
-                      `0 0 20px ${gameResult === 'win' ? 'rgba(0,255,136,0.5)' : 
-                                  gameResult === 'lose' ? 'rgba(255,51,102,0.5)' : 'rgba(255,170,0,0.5)'}`,
-                      `0 0 40px ${gameResult === 'win' ? 'rgba(0,255,136,1)' : 
-                                  gameResult === 'lose' ? 'rgba(255,51,102,1)' : 'rgba(255,170,0,1)'}`,
-                      `0 0 20px ${gameResult === 'win' ? 'rgba(0,255,136,0.5)' : 
-                                  gameResult === 'lose' ? 'rgba(255,51,102,0.5)' : 'rgba(255,170,0,0.5)'}`
-                    ]
+                      `0 0 20px ${
+                        gameResult === 'win'
+                          ? 'rgba(0,255,136,0.5)'
+                          : gameResult === 'lose'
+                          ? 'rgba(255,51,102,0.5)'
+                          : 'rgba(255,170,0,0.5)'
+                      }`,
+                      `0 0 40px ${
+                        gameResult === 'win'
+                          ? 'rgba(0,255,136,1)'
+                          : gameResult === 'lose'
+                          ? 'rgba(255,51,102,1)'
+                          : 'rgba(255,170,0,1)'
+                      }`,
+                      `0 0 20px ${
+                        gameResult === 'win'
+                          ? 'rgba(0,255,136,0.5)'
+                          : gameResult === 'lose'
+                          ? 'rgba(255,51,102,0.5)'
+                          : 'rgba(255,170,0,0.5)'
+                      }`,
+                    ],
                   }}
                   transition={{ duration: 0.8, repeat: 3, type: 'tween' }}
                   className={`text-4xl font-black mb-2 ${
-                    gameResult === 'win' ? 'text-success' : 
-                    gameResult === 'lose' ? 'text-error' : 'text-warning'
+                    gameResult === 'win'
+                      ? 'text-success'
+                      : gameResult === 'lose'
+                      ? 'text-error'
+                      : 'text-warning'
                   }`}
                 >
-                  {gameResult === 'win' ? '🎉 VICTORY!' : 
-                   gameResult === 'lose' ? '💀 DEFEAT!' : '🤝 DRAW!'}
+                  {gameResult === 'win'
+                    ? '🎉 VICTORY!'
+                    : gameResult === 'lose'
+                    ? '💀 DEFEAT!'
+                    : '🤝 DRAW!'}
                 </motion.div>
-                
+
                 {streak > 1 && gameResult === 'win' && (
                   <motion.div
                     animate={{ scale: [1, 1.1, 1] }}
@@ -641,7 +711,7 @@ export function RockPaperScissorsGame({
                     🔥 {streak}연승 콤보! 🔥
                   </motion.div>
                 )}
-                
+
                 {isSpecialMove && (
                   <motion.div
                     animate={{ opacity: [0.5, 1, 0.5] }}
@@ -658,11 +728,7 @@ export function RockPaperScissorsGame({
           {/* Choice Buttons */}
           <div className="grid grid-cols-3 gap-6">
             {(Object.keys(CHOICES) as Choice[]).map((choice) => (
-              <motion.div
-                key={choice}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
+              <motion.div key={choice} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                 <Button
                   onClick={() => playGame(choice)}
                   disabled={isPlaying || user.goldBalance < betAmount}
@@ -673,7 +739,7 @@ export function RockPaperScissorsGame({
                     transition={{ duration: 2, repeat: Infinity }}
                     className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent"
                   />
-                  
+
                   <span className="text-5xl relative z-10">{CHOICES[choice].emoji}</span>
                   <span className="text-lg relative z-10">{CHOICES[choice].name}</span>
                 </Button>
@@ -701,9 +767,7 @@ export function RockPaperScissorsGame({
                 <div className="text-sm text-muted-foreground">승리</div>
               </div>
               <div className="text-center p-3 rounded-lg bg-error/10 border border-error/20">
-                <div className="text-xl font-bold text-error">
-                  {losses}
-                </div>
+                <div className="text-xl font-bold text-error">{losses}</div>
                 <div className="text-sm text-muted-foreground">패배</div>
               </div>
               <div className="text-center p-3 rounded-lg bg-warning/10 border border-warning/20">
@@ -738,9 +802,11 @@ export function RockPaperScissorsGame({
                   <div
                     key={index}
                     className={`flex items-center justify-between p-2 rounded-lg text-sm ${
-                      round.result === 'win' ? 'bg-success/10 border border-success/20' :
-                      round.result === 'lose' ? 'bg-error/10 border border-error/20' :
-                      'bg-warning/10 border border-warning/20'
+                      round.result === 'win'
+                        ? 'bg-success/10 border border-success/20'
+                        : round.result === 'lose'
+                        ? 'bg-error/10 border border-error/20'
+                        : 'bg-warning/10 border border-warning/20'
                     }`}
                   >
                     <div className="flex items-center gap-2">
@@ -748,10 +814,15 @@ export function RockPaperScissorsGame({
                       <span className="text-muted-foreground">vs</span>
                       <span>{CHOICES[round.aiChoice].emoji}</span>
                     </div>
-                    <div className={`font-bold ${
-                      round.result === 'win' ? 'text-success' :
-                      round.result === 'lose' ? 'text-error' : 'text-warning'
-                    }`}>
+                    <div
+                      className={`font-bold ${
+                        round.result === 'win'
+                          ? 'text-success'
+                          : round.result === 'lose'
+                          ? 'text-error'
+                          : 'text-warning'
+                      }`}
+                    >
                       {round.result === 'win' ? '+' : round.result === 'lose' ? '-' : ''}
                       {Math.abs(round.winnings).toLocaleString()}G
                     </div>

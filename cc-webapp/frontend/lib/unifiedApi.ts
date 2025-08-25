@@ -11,6 +11,11 @@
 
 import { getTokens, setTokens, clearTokens } from '../utils/tokenStorage';
 
+// 간단 토큰 유무 확인 유틸
+export function hasAccessToken(): boolean {
+  try { return !!getTokens()?.access_token; } catch { return false; }
+}
+
 // Node 타입 미설치 환경 대비 간단 선언
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 declare const process: any;
@@ -30,26 +35,34 @@ export interface UnifiedRequestOptions<T=any> {
 const DEFAULT_RETRY_STATUS = new Set([408, 429, 500, 502, 503, 504]);
 
 function resolveOrigin(): string {
-  // Next.js 환경이면 process.env 존재하지만 타입 정의 없을 수 있어 any 캐스팅
-  // (로컬 빌드에서 @types/node 미설치 상태 대비)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const env = (typeof process !== 'undefined' ? (process as any).env?.NEXT_PUBLIC_API_ORIGIN : undefined);
-  if (env && /^https?:\/\//.test(env)) return env.replace(/\/$/, '');
-  if (typeof window !== 'undefined') {
-    // dev fallback (프론트 3000/3001, 백 8000)
-    const fallback = (window.location.port === '3000' || window.location.port === '3001') ? 'http://localhost:8000' : `${window.location.origin}`;
-    if (!env) console.warn('[unifiedApi] NEXT_PUBLIC_API_ORIGIN 미설정 → fallback:', fallback);
-    return fallback.replace(/\/$/, '');
+  const penv: any = (typeof process !== 'undefined' ? (process as any).env : undefined);
+  const envOrigin = penv?.NEXT_PUBLIC_API_ORIGIN;
+  const envInternal = penv?.NEXT_PUBLIC_API_URL_INTERNAL;
+  const isServer = typeof window === 'undefined';
+
+  if (isServer) {
+    if (envInternal && /^https?:\/\//.test(envInternal)) return envInternal.replace(/\/$/, '');
+    if (envOrigin && /^https?:\/\//.test(envOrigin)) return envOrigin.replace(/\/$/, '');
+    return 'http://backend:8000';
   }
-  return 'http://localhost:8000';
+
+  if (envOrigin && /^https?:\/\//.test(envOrigin)) return envOrigin.replace(/\/$/, '');
+  const fallback = (window.location.port === '3000' || window.location.port === '3001') ? 'http://localhost:8000' : `${window.location.origin}`;
+  if (!envOrigin) console.warn('[unifiedApi] NEXT_PUBLIC_API_ORIGIN 미설정 → fallback:', fallback);
+  return fallback.replace(/\/$/, '');
 }
 
 const ORIGIN = resolveOrigin();
 // 다른 모듈에서 재사용할 수 있도록 공개
 export const API_ORIGIN = ORIGIN;
 
-// 디버깅을 위한 ORIGIN 로깅
-console.log('[unifiedApi] 초기화됨 - API_ORIGIN:', ORIGIN);
+// 초기화 로그(실행 컨텍스트/빌드 ID 포함)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const __env: any = (typeof process !== 'undefined' ? (process as any).env : undefined) || {};
+const __build = __env.NEXT_PUBLIC_BUILD_ID || 'dev';
+const __ctx = (typeof window === 'undefined') ? 'SSR' : 'CSR';
+console.log(`[unifiedApi] 초기화 - ctx=${__ctx} build=${__build} origin=${ORIGIN}`);
 
 async function refreshOnce(): Promise<boolean> {
   try {
