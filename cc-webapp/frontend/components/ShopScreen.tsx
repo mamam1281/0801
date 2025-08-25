@@ -38,116 +38,7 @@ interface ShopScreenProps {
   onAddNotification: (message: string) => void;
 }
 
-// 🏪 상점 아이템 데이터
-const SHOP_ITEMS = [
-  {
-    id: 'gold_pack_small',
-    name: '골드 팩 (소)',
-    type: 'currency' as const,
-    rarity: 'common' as const,
-    price: 1000,
-    description: '5,000G를 즉시 획득하세요',
-    value: 5000,
-    icon: '💰',
-    category: 'currency',
-    isLimited: false,
-    discount: 0,
-    popular: false
-  },
-  {
-    id: 'gold_pack_medium',
-    name: '골드 팩 (중)',
-    type: 'currency' as const,
-    rarity: 'rare' as const,
-    price: 2500,
-    description: '15,000G를 즉시 획득하세요',
-    value: 15000,
-    icon: '💎',
-    category: 'currency',
-    isLimited: false,
-    discount: 20,
-    popular: true
-  },
-  {
-    id: 'gold_pack_large',
-    name: '골드 팩 (대)',
-    type: 'currency' as const,
-    rarity: 'epic' as const,
-    price: 5000,
-    description: '35,000G를 즉시 획득하세요',
-    value: 35000,
-    icon: '💸',
-    category: 'currency',
-    isLimited: false,
-    discount: 30,
-    popular: false
-  },
-  {
-    id: 'vip_skin_neon',
-    name: '네온 VIP 스킨',
-    type: 'skin' as const,
-    rarity: 'legendary' as const,
-    price: 3000,
-    description: '특별한 네온 효과가 적용된 VIP 전용 스킨',
-    icon: '👑',
-    category: 'cosmetic',
-    isLimited: true,
-    discount: 0,
-    popular: false
-  },
-  {
-    id: 'lucky_charm',
-    name: '행운의 부적',
-    type: 'powerup' as const,
-    rarity: 'epic' as const,
-    price: 2000,
-    description: '모든 게임에서 승률 +15% (24시간)',
-    icon: '🍀',
-    category: 'powerup',
-    isLimited: false,
-    discount: 0,
-    popular: true
-  },
-  {
-    id: 'exp_booster',
-    name: '경험치 부스터',
-    type: 'powerup' as const,
-    rarity: 'rare' as const,
-    price: 1500,
-    description: '획득 경험치 +100% (12시간)',
-    icon: '⚡',
-    category: 'powerup',
-    isLimited: false,
-    discount: 0,
-    popular: false
-  },
-  {
-    id: 'premium_gacha_ticket',
-    name: '프리미엄 가챠 티켓',
-    type: 'collectible' as const,
-    rarity: 'legendary' as const,
-    price: 2500,
-    description: '전설급 아이템 확률 +50%',
-    icon: '🎫',
-    category: 'special',
-    isLimited: true,
-    discount: 25,
-    popular: true
-  },
-  {
-    id: 'slot_multiplier',
-    name: '슬롯 멀티플라이어',
-    type: 'powerup' as const,
-    rarity: 'epic' as const,
-    price: 3500,
-    description: '슬롯 게임 당첨금 2배 (1시간)',
-    icon: '🎰',
-    category: 'powerup',
-    isLimited: false,
-    discount: 15,
-    popular: false
-  }
-];
+// 서버 카탈로그(useGameConfig.shop) 사용. 하드코딩된 상점 아이템은 제거되었습니다.
 
 export function ShopScreen({
   user,
@@ -224,8 +115,10 @@ export function ShopScreen({
     }
 
     try {
+      // OpenAPI에 따르면 product_id는 문자열이며, 카탈로그의 sku를 사용합니다.
+      const productId = (item.sku ?? item.id ?? '').toString();
       await withReconcile(async (idemKey: string) =>
-        api.post('shop/buy', { product_id: item.id, quantity: 1 }, { headers: { 'X-Idempotency-Key': idemKey } })
+        api.post('shop/buy', { product_id: productId, quantity: 1 }, { headers: { 'X-Idempotency-Key': idemKey } })
       );
       onAddNotification(`✅ ${item.name}을(를) 구매했습니다!`);
     } catch (e) {
@@ -556,17 +449,23 @@ export function ShopScreen({
             >
               <div className="text-center mb-8">
                 {(() => {
-                  const styles = getRarityStyles(selectedItem.rarity);
+                  const rarity = ((selectedItem as any)?.rarity ?? ((selectedItem as any)?.min_rank ? 'rare' : 'common')) as string;
+                  const styles = getRarityStyles(rarity);
                   return (
                     <div className={`glass-metal ${styles.bgColor} rounded-2xl w-24 h-24 mx-auto mb-6 flex items-center justify-center text-5xl border ${styles.borderColor} metal-shine`}>
-                      {selectedItem.icon}
+                      {(selectedItem as any)?.icon ?? '🛒'}
                     </div>
                   );
                 })()}
                 
-                <h3 className={`text-2xl font-bold ${getRarityStyles(selectedItem.rarity).textColor} mb-3`}>
-                  {selectedItem.name}
-                </h3>
+                {(() => {
+                  const rarity = ((selectedItem as any)?.rarity ?? ((selectedItem as any)?.min_rank ? 'rare' : 'common')) as string;
+                  return (
+                    <h3 className={`text-2xl font-bold ${getRarityStyles(rarity).textColor} mb-3`}>
+                      {selectedItem.name}
+                    </h3>
+                  );
+                })()}
                 <p className="text-muted-foreground mb-6">
                   정말로 구매하시겠습니까?
                 </p>
