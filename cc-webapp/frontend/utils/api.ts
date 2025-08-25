@@ -1,3 +1,5 @@
+"use client";
+
 /**
  * API 클라이언트 
  * 백엔드와의 통신을 처리하는 함수들
@@ -8,7 +10,6 @@ const API_BASE_URL = 'http://127.0.0.1:8000'; // 백엔드 API 주소 (필요에
 
 // 개발 모드 여부 확인
 const IS_DEV = process.env.NODE_ENV === 'development';
- 'use client';
  /**
   * DEPRECATION NOTICE (통합 예정)
   * 이 파일은 unifiedApi(../lib/unifiedApi.ts) 도입으로 단계적 제거 예정입니다.

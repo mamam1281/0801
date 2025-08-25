@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft,
@@ -23,6 +23,9 @@ import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { Badge } from './ui/badge';
 import { User, GameItem } from '../types';
+import useBalanceSync from '@/hooks/useBalanceSync';
+import { api } from '@/lib/unifiedApi';
+import { useWithReconcile } from '@/lib/sync';
 
 interface ShopScreenProps {
   user: User;
@@ -154,6 +157,14 @@ export function ShopScreen({
 }: ShopScreenProps) {
   const [showPurchaseModal, setShowPurchaseModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null as import('../types').GameItem | null);
+  const { reconcileBalance } = useBalanceSync({ sharedUser: user, onUpdateUser, onAddNotification });
+  const withReconcile = useWithReconcile();
+
+  // 마운트 시 1회 권위 잔액으로 정합화
+  useEffect(() => {
+    reconcileBalance().catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // 🎨 등급별 스타일링 (글래스메탈 버전)
   const getRarityStyles = (rarity: string) => {
@@ -197,9 +208,9 @@ export function ShopScreen({
   };
 
   // 💰 아이템 구매 처리
-  const handlePurchase = (item: any) => {
+  const handlePurchase = async (item: any) => {
     const finalPrice = Math.floor(item.price * (1 - item.discount / 100));
-    
+
     if (user.goldBalance < finalPrice) {
       onAddNotification('❌ 골드가 부족합니다!');
       return;
@@ -213,29 +224,24 @@ export function ShopScreen({
       quantity: item.type === 'currency' ? item.value : 1,
       description: item.description,
       icon: item.icon,
-      value: item.value
+      value: item.value,
     };
 
-    let updatedUser = { ...user };
-
-    // 골드 타입 아이템은 즉시 골드로 변환
-    if (item.type === 'currency') {
-      updatedUser = {
-        ...updatedUser,
-        goldBalance: user.goldBalance - finalPrice + item.value
-      };
-      onAddNotification(`💰 ${item.value.toLocaleString()}G를 획득했습니다!`);
-    } else {
-      // 일반 아이템은 인벤토리에 추가
-      updatedUser = {
-        ...updatedUser,
-        goldBalance: user.goldBalance - finalPrice,
-        inventory: [...user.inventory, newItem]
-      };
-      onAddNotification(`✅ ${item.name}을(를) 구매했습니다!`);
+    try {
+      await withReconcile(async (idemKey: string) =>
+        api.post('shop/buy', { item_id: item.id, price: finalPrice }, { headers: { 'X-Idempotency-Key': idemKey } })
+      );
+      // 아이템 지급은 서버 측 인벤토리 동기화를 신뢰, 필요시 WS/polling으로 반영됨
+      onAddNotification(item.type === 'currency'
+        ? `💰 ${item.value.toLocaleString()}G를 획득했습니다!`
+        : `✅ ${item.name}을(를) 구매했습니다!`
+      );
+    } catch (e) {
+      // 실패 시에도 최종적으로 권위 잔액과 동기화 시도
+      onAddNotification('구매 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
     }
-
-    onUpdateUser(updatedUser);
+    // 구매 후 권위 잔액 재조회로 최종 정합 유지
+    try { await reconcileBalance(); } catch {}
     setShowPurchaseModal(false);
   };
 

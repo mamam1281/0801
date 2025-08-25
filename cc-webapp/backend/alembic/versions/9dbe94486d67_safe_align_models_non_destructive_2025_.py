@@ -167,6 +167,7 @@ def upgrade() -> None:
                nullable=True,
                existing_server_default=sa.text('true'))
     existing_spc_indexes = {i['name'] for i in insp.get_indexes('shop_promo_codes')}
+    # Guard unique index on shop_promo_codes(code)
     if 'ix_shop_promo_codes_code' not in existing_spc_indexes:
         op.create_index(op.f('ix_shop_promo_codes_code'), 'shop_promo_codes', ['code'], unique=True)
     existing_spu_indexes = {i['name'] for i in insp.get_indexes('shop_promo_usage')}
@@ -183,11 +184,17 @@ def upgrade() -> None:
                existing_type=postgresql.TIMESTAMP(),
                nullable=True,
                existing_server_default=sa.text('CURRENT_TIMESTAMP'))
-    op.drop_index('ix_token_blacklist_jti', table_name='token_blacklist')
-    op.create_index(op.f('ix_token_blacklist_jti'), 'token_blacklist', ['jti'], unique=True)
-    op.drop_index('ix_token_blacklist_token', table_name='token_blacklist')
-    op.create_index(op.f('ix_token_blacklist_token'), 'token_blacklist', ['token'], unique=True)
-    op.create_index(op.f('ix_token_blacklist_id'), 'token_blacklist', ['id'], unique=False)
+    # Guard token_blacklist indexes to avoid duplicates in drifted schemas
+    existing_tb_indexes = {i['name'] for i in insp.get_indexes('token_blacklist')}
+    # Ensure unique index on jti exists
+    if 'ix_token_blacklist_jti' not in existing_tb_indexes:
+        op.create_index(op.f('ix_token_blacklist_jti'), 'token_blacklist', ['jti'], unique=True)
+    # Ensure unique index on token exists
+    if 'ix_token_blacklist_token' not in existing_tb_indexes:
+        op.create_index(op.f('ix_token_blacklist_token'), 'token_blacklist', ['token'], unique=True)
+    # Ensure id index exists (non-unique)
+    if 'ix_token_blacklist_id' not in existing_tb_indexes:
+        op.create_index(op.f('ix_token_blacklist_id'), 'token_blacklist', ['id'], unique=False)
     existing_ua_indexes = {i['name'] for i in insp.get_indexes('user_actions')}
     if 'ix_user_actions_id' not in existing_ua_indexes:
         op.create_index(op.f('ix_user_actions_id'), 'user_actions', ['id'], unique=False)
@@ -228,7 +235,10 @@ def upgrade() -> None:
         op.create_index(op.f('ix_user_segments_id'), 'user_segments', ['id'], unique=False)
     if 'ix_user_segments_rfm_group' not in existing_us_indexes:
         op.create_index(op.f('ix_user_segments_rfm_group'), 'user_segments', ['rfm_group'], unique=False)
-    op.create_unique_constraint(None, 'user_segments', ['user_id'])
+    # Guard unique(user_id) on user_segments
+    existing_us_uniques = insp.get_unique_constraints('user_segments')
+    if not any(set(u.get('column_names') or []) == {'user_id'} for u in existing_us_uniques):
+        op.create_unique_constraint(None, 'user_segments', ['user_id'])
     op.alter_column('user_sessions', 'created_at',
                existing_type=postgresql.TIMESTAMP(),
                nullable=True,
@@ -267,9 +277,14 @@ def upgrade() -> None:
                existing_type=postgresql.TIMESTAMP(),
                nullable=True,
                existing_server_default=sa.text('now()'))
-    op.create_index(op.f('ix_users_id'), 'users', ['id'], unique=False)
-    op.create_index(op.f('ix_users_site_id'), 'users', ['site_id'], unique=True)
-    op.create_unique_constraint(None, 'users', ['phone_number'])
+    existing_users_indexes = {i['name'] for i in insp.get_indexes('users')}
+    if 'ix_users_id' not in existing_users_indexes:
+        op.create_index(op.f('ix_users_id'), 'users', ['id'], unique=False)
+    if 'ix_users_site_id' not in existing_users_indexes:
+        op.create_index(op.f('ix_users_site_id'), 'users', ['site_id'], unique=True)
+    existing_users_uniques = insp.get_unique_constraints('users')
+    if not any(set(u.get('column_names') or []) == {'phone_number'} for u in existing_users_uniques):
+        op.create_unique_constraint(None, 'users', ['phone_number'])
     # ### end Alembic commands ###
 
 

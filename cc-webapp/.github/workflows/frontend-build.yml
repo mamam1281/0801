@@ -29,3 +29,11 @@ jobs:
           FRONTEND_URL: ${{ env.FRONTEND_URL }}
         run: |
           npm run test:smoke
+      - name: Set API_BASE_URL from repo variable
+        run: echo "API_BASE_URL=${{ vars.OPENAPI_BASE_URL }}" >> $GITHUB_ENV
+      - name: OpenAPI drift check
+        run: |
+          node scripts/check-openapi-drift.mjs || {
+            echo "OpenAPI drift detected; failing job.";
+            exit 1;
+          }

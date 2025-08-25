@@ -2,7 +2,9 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import useFeedback from '../../hooks/useFeedback';
+import useBalanceSync from '../../hooks/useBalanceSync';
 import { api } from '@/lib/unifiedApi';
+import { useWithReconcile } from '@/lib/sync';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft,
@@ -97,7 +99,13 @@ interface SlotSpinApiResponse {
 export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: NeonSlotGameProps) {
   const { fromApi } = useFeedback();
   const { config: gameConfig, loading: configLoading } = useGameConfig();
-  
+  const { reconcileBalance } = useBalanceSync({
+    sharedUser: user,
+    onUpdateUser,
+    onAddNotification,
+  });
+  const withReconcile = useWithReconcile();
+
   // unifiedApi: call games endpoints with relative paths
   const [reels, setReels] = useState([
     SLOT_SYMBOLS[0],
@@ -290,16 +298,21 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
     const costAmount = betAmount;
 
     let serverResult: SlotSpinApiResponse | null = null;
-    // Attempt authoritative server spin
+    // Attempt authoritative server spin with reconcile + idempotency
     try {
-      // Backend endpoint: POST /api/games/slot/spin
-      const raw = await api.post<SlotSpinApiResponse>('games/slot/spin', { bet_amount: betAmount });
+      const raw = await withReconcile(async (idemKey: string) =>
+        api.post<SlotSpinApiResponse>(
+          'games/slot/spin',
+          { bet_amount: betAmount },
+          { headers: { 'X-Idempotency-Key': idemKey } }
+        )
+      );
       serverResult = raw;
       if (serverResult?.feedback) {
         fromApi(serverResult as any);
       }
     } catch (_e) {
-      serverResult = null; // fallback to local simulation
+      serverResult = null; // fallback to local simulation (no local balance mutation)
     }
 
     // Helper to map server unicode symbol to local symbol
@@ -390,13 +403,12 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
 
         generateCoinDrops();
 
-        // Update user stats (use server authoritative balance if present)
+        // 🎯 백엔드에서 최신 잔액을 받아온 후 전역 동기화
+        await reconcileBalance();
+
+        // 게임 통계만 업데이트 (잔액은 reconcileBalance에서 처리됨)
         const updatedUser = {
           ...user,
-          goldBalance:
-            serverResult && serverResult.success
-              ? serverResult.balance
-              : user.goldBalance - costAmount + result.winAmount,
           gameStats: {
             ...user.gameStats,
             slot: {
@@ -429,12 +441,12 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
       } else {
         setConsecutiveWins(0);
 
+        // 🎯 패배 시에도 백엔드에서 최신 잔액을 받아온 후 전역 동기화
+        await reconcileBalance();
+
+        // 게임 통계만 업데이트 (잔액은 reconcileBalance에서 처리됨)
         const updatedUser = {
           ...user,
-          goldBalance:
-            serverResult && serverResult.success
-              ? serverResult.balance
-              : user.goldBalance - costAmount,
           gameStats: {
             ...user.gameStats,
             slot: {
@@ -482,8 +494,8 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
               particle.type === 'jackpot'
                 ? 'bg-gradient-gold'
                 : particle.type === 'bigwin'
-                  ? 'bg-gradient-to-r from-primary to-gold'
-                  : 'bg-gradient-to-r from-primary to-primary-light'
+                ? 'bg-gradient-to-r from-primary to-gold'
+                : 'bg-gradient-to-r from-primary to-primary-light'
             }`}
           />
         ))}
@@ -663,11 +675,11 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
                             y: [30, -10, 0],
                           }
                         : winningPositions[index]
-                          ? {
-                              scale: [1, 1.2, 1],
-                              rotate: [0, 5, -5, 0],
-                            }
-                          : {}
+                        ? {
+                            scale: [1, 1.2, 1],
+                            rotate: [0, 5, -5, 0],
+                          }
+                        : {}
                     }
                     transition={
                       reelStopOrder.includes(index) || winningPositions[index]

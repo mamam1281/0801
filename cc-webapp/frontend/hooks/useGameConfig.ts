@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { api } from '../lib/unifiedApi';
+import { hasAccessToken } from '@/lib/unifiedApi';
 
 export interface GachaConfig {
   rarity_table: [string, number][];
@@ -51,14 +52,14 @@ const DEFAULT_CONFIG: Omit<GameConfig, 'gacha' | 'shop' | 'streak'> = {
 };
 
 export function useGameConfig() {
-  const [config, setConfig] = useState<GameConfig>({
+  const [config, setConfig] = useState({
     gacha: null,
     shop: null,
     streak: null,
     ...DEFAULT_CONFIG
-  });
+  } as GameConfig);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState(null as string | null);
 
   const fetchConfig = async () => {
     setLoading(true);
@@ -66,6 +67,12 @@ export function useGameConfig() {
     
     try {
       console.log('[useGameConfig] 게임 설정 로딩 중...');
+      // 비로그인 상태면 서버 호출 생략 (기본값 유지)
+      if (!hasAccessToken()) {
+        console.warn('[useGameConfig] 비인증 상태 → 서버 설정 호출을 건너뜀');
+        setConfig((prev: GameConfig)=>({ ...prev, ...DEFAULT_CONFIG }));
+        return;
+      }
       
       // 병렬로 모든 설정 가져오기
       const [gachaRes, shopRes, streakRes] = await Promise.allSettled([

@@ -1,43 +1,96 @@
-# 변경 요약 / 검증 / 다음 단계 (2025-08-23)
+## 2025-08-25 전역 동기화 개선안(v1) 작성 및 정리
 
-변경 요약
-- 모니터링 네트워크 정합: Prometheus/Grafana를 애플리케이션 네트워크(0801_ccnet)에 연결. Prometheus scrape 타깃 cc_backend:8000 정상화.
-- OpenAPI 재수출: backend 컨테이너에서 python -m app.export_openapi 실행, 스냅샷 갱신 완료.
-- 테스트 수정: backend/tests/conftest.py에 db_engine 픽스처 추가로 pytest 실패 픽스.
-- SSE 스트림 오류 수정: /api/metrics/stream에서 UserReward 필드 오기 사용( created_at, amount_gold )을 모델 정의(claimed_at, gold_amount)로 교정.
+### 문서 정리(중복/표기/로그 이동)
+- `개선안.md` 중복 섹션 통합: “완성형 개선안”을 기준으로 유지, 과거 “일관성 개선안 v1” 중복 내용 제거.
+- 엔드포인트 표기 통일: 클라이언트는 `unifiedApi.get('/users/profile')`로 고정(‘/api’ 접두는 클라이언트가 자동 부여). ‘/users/me’ 대안은 사용하지 않음.
+- Alembic head 표기: 단일 head는 f79d04ea1016로 문서 기준 유지, 과거 해시 표기는 혼동 방지로 제거.
+- 말미 운영 로그(컨테이너 E2E 등)는 본 문서(final.md)로 이동하여 변경 이력 일원화.
 
-## 2025-08-23 모니터링/리얼타임 보강 (WS 라벨 메트릭 + 브로드캐스트 테스트)
+## 2025-08-25 개선안.md 운영 로그 이동/정리
 
-변경 요약
-- 레거시 게임 WS 접속 카운터 보강: `ws_legacy_games_connections_by_result_total{result=accepted|rejected}` 추가. 기존 `ws_legacy_games_connections_total`은 유지(역호환).
-- 리얼타임 허브 단위 테스트 추가: `app/tests/test_realtime_broadcast_stub.py`에서 `hub.broadcast`가 `user_id` 타겟 채널로 올바른 payload를 전달하는지 검증(StubWS로 send_text 캡처).
+- 변경 요약: `개선안.md` 말미에 있던 운영 로그(컨테이너 E2E, 프론트 정합성/라우팅, 모니터링/운영, 백엔드 안정화, 실시간 브로드캐스트/프론트 소비, 클라이언트 품질/가드, 현재 검증 상태)를 본 문서로 이동하여 연대기 형태로 보존.
+- 검증 결과: 문서 중복 제거 및 기준 문서 일원화(개선안.md는 설계/규약만 유지). Alembic head 표기는 문서 기준으로 f79d04ea1016으로 통일.
+- 다음 단계: 기준 문서(개선안.md)대로 GlobalStore/RealtimeSync 구현을 진행하고, 각 단계 완료 시 본 문서에 “변경 요약/검증/다음 단계” 3블록을 누적 기록.
 
-검증 결과
-- 컨테이너 내 단일 테스트 통과: `pytest -q app/tests/test_realtime_broadcast_stub.py` → 1 passed.
-- OpenAPI/Alembic 스키마 변경 없음(head 단일 유지). `/metrics` 노출 구성 그대로 유지.
+- 변경 요약: `개선안.md`를 보강해 서버 권위(Users/Balances/Stats) + WS 브로드캐스트(profile_update/purchase_update/reward_granted/game_update) 기반의 GlobalStore/RealtimeSync 설계, 페이지/컴포넌트별 체크리스트, 테스트/모니터링/롤아웃 계획을 상세화. 로컬 가산/하드코딩 전면 금지 및 withReconcile 패턴을 표준으로 명시.
+- 검증 결과: 코드 변경은 아직 적용 전(설계 문서 단계). 기존 컨테이너 상태 정상(/health 200). Alembic heads 단일 유지(f79d04ea1016, 문서 기준). OpenAPI 스키마 영향 없음.
+- 다음 단계: (1) frontend/store/userStore.ts와 lib/sync.ts 신설 후 App.tsx에 hydrate 적용, (2) 게임 4종/Shop/Profile 순으로 withReconcile 전환, (3) Playwright에 잔액/통계 일치 시나리오 추가하여 컨테이너에서 실행 및 그린 확보.
 
-다음 단계
-- Grafana 패널에 신규 라벨 메트릭 반영: `sum by (result) (ws_legacy_games_connections_by_result_total)`로 accepted vs rejected 구분 시각화.
-- 로컬 검증: `/api/games/ws` 허용/차단 시나리오를 각각 1회 이상 시도 후 `/metrics`에서 두 카운터 라벨 증가 확인.
-- 필요 시 `api docs/20250808.md`에 메트릭 설명/운영 가이드(허용/차단 플래그와 대시보드 쿼리 예시) 추가.
+## 2025-08-25 컨테이너 기반 Playwright 러너 도입
 
-검증
-- Prometheus Targets: cc-webapp-backend(cc_backend:8000) health=up 확인(HTTP API /api/v1/targets).
-- Pytest: app/tests/test_openapi_diff_ci.py, tests/test_openapi_diff_ci.py, tests/test_main.py 합계 13개 테스트 전부 통과.
-- Alembic: heads=current=86171b66491f (단일 head) 확인.
-- SSE 스모크: 컨테이너 내 curl -N로 /api/metrics/stream 2초 간격 수신 확인(event: metrics 프레임 연속 수신).
+- 변경 요약: mcr.microsoft.com/playwright:v1.55.0-jammy 이미지를 사용하는 `docker-compose.playwright.yml` 추가. 프론트 `package.json`에 `test:e2e` 스크립트 정리. 러너는 ccnet 네트워크에 붙어 `frontend:3000`/`backend:8000`을 직접 참조하도록 구성.
+- 검증 결과: 프론트엔드 빌드 성공(경고 다수, 에러 없음), 백엔드 핵심 pytest 그린(9/9). 러너 컨테이너는 compose 기준으로 `npm ci && npx playwright test` 실행 준비 완료.
+- 다음 단계: (1) docker compose -f docker-compose.yml -f docker-compose.playwright.yml run --rm playwright 로 E2E 실행 자동화, (2) CI 파이프라인에 동일 오버레이 적용, (3) 경고 정리(미사용 아이콘/any 타입/훅 deps).
 
-다음 단계
-- WS 스모크(상점/정산/웹훅): 브라우저에서 배지/토스트 표시 동작 체크 및 스크린샷 캡처.
-- Grafana 대시보드: 구매 지표 패널에 실데이터 유입 확인 및 경보룰 세부 튜닝.
-- CI: OpenAPI diff CI를 워크플로에 통합(스냅샷 아티팩트 업로드/PR 코멘트).
+# 2025-08-25 전역 동기화 개선 계획 문서 추가
 
----
+- 변경 요약
+   - `개선안.md` 신규 추가: 서버 권위 소스(users/balance, users/profile, games/stats/me)와 WS 브로드캐스트(profile_update, purchase_update, reward_granted, game_update)를 GlobalStore로 일원화하는 계획 수립.
+   - 프론트에서 로컬 가산/감산 금지, 모든 쓰기 이후 balance 재조정(reconcile) 표준화.
+   - 페이지/컴포넌트별 체크리스트 포함(메인/게임/프로필/상점/이벤트/어드민) 및 E2E 항목 정의.
+- 검증 결과(예정)
+   - 컨테이너 기반 Playwright로 동기화 시나리오 추가 실행 → GREEN 목표.
+   - 백엔드 pytest 기존 그린 유지, Alembic heads 단일 유지(f79d04ea1016).
+- 다음 단계
+   - GlobalStore/RealtimeSyncContext 구현 후 게임4종/상점/프로필/이벤트/어드민 순 연결 PR 분리 적용.
+   - 구매/보상/어드민 골드 경로에 WS 이벤트-스토어 반영 검증 케이스 보강.
+   - Grafana 구매 성공률/지연 P95 대시보드와 연계 모니터링.
 
 # Casino-Club F2P 프로젝트 Final 체크 & 트러블슈팅 기록
 
 **생성일**: 2025-08-19  
 **브랜치**: feature/e2e-onboarding-playwright  
+
+## 2025-08-25 프론트 골드 동기화 정합화 (users/balance 권위 소스 반영)
+
+변경 요약
+- useAuth: 로그인/회원가입/초기화 시 `/api/users/balance`를 추가 조회하여 `cyber_token_balance`를 `gold_balance`로 미러링 저장. 토큰 적용 직후 및 init 로드 시 병합 동작.
+- NeonCrashGame: 베팅 시작/캐시아웃 후 `auth/profile`과 로컬 가산을 제거하고 `GET /api/users/balance` 값으로 잔액을 동기화. 게임 통계는 기존 별도 경로 유지.
+ - 공통 훅 `useBalanceSync` 신설: `/api/users/balance`를 권위로 삼아 공용 user.goldBalance를 갱신하고, DEV 모드에서는 불일치 시 토스트/콘솔 경고를 1회 표출.
+ - ProfileScreen/HomeDashboard에서 훅을 사용하도록 적용. 프로필 번들 로드 후와 대시보드 마운트 시 1회 동기화 수행.
+
+검증 결과
+- UI 잔액이 `/api/users/balance`의 `cyber_token_balance`와 일치(로그인 직후/게임 후 모두). OpenAPI/Alembic 스키마 변경 없음, 라우터 중복 추가 없음.
+- Realtime 브로드캐스트(`profile_update`)와의 충돌 없음(권위 잔액 소스 일원화 효과).
+ - 컨테이너 로그 기준 `/health` 200 연속 확인. 백엔드 Uvicorn 정상, Alembic/Redis 연결 OK.
+ - ENV 점검: SSR/컨테이너에서는 `NEXT_PUBLIC_API_URL_INTERNAL`을 `http://backend:8000`으로 유지(프론트 SSR 내부 통신 경로), 브라우저는 `NEXT_PUBLIC_API_ORIGIN`으로 `http://localhost:8000` 사용.
+
+다음 단계
+- 크래시 외 다른 게임/상점 경로에서도 `users/balance`를 표준 소스로 사용하도록 잔여 참조 점검(`auth/profile` 기반 잔액 업데이트 제거).
+- Playwright 스모크 보강: 로그인→프로필→크래시 베팅→잔액 일치 검증 케이스 추가.
+- 필요 시 OpenAPI 재수출 점검 및 `api docs/20250808.md` 동기화 유지.
+ - 중앙 훅 사용처를 ShopScreen/TokenBalanceWidget 등으로 확대하여 중복 로직 제거.
+
+## 2025-08-25 Frontend ESLint 규칙 추가(금지 경로)
+
+변경 요약
+- 프론트엔드 ESLint에 '/api/users/profile' 문자열 사용 금지 규칙 추가. 대안: '/api/users/me'.
+- 루트 .eslintrc.json에도 동일 규칙 반영(편차 방지).
+
+검증 결과
+- `npm run lint` 기준 프론트엔드에서 해당 문자열 사용 시 에러 발생 확인 예상. CI 연동 시 자동 차단.
+- OpenAPI/Alembic 영향 없음.
+
+다음 단계
+- 기존 코드에서 해당 문자열 사용 여부 grep 후 필요 시 수정 PR 생성.
+- WS selector 마이그레이션 및 폴링 표준화 진행.
+- 컨테이너 내부 pytest 스모크(결제/스트릭) 실행 및 결과 반영.
+
+## 2025-08-24 Prometheus 룰 파싱 오류 복구 + Kafka 알림/대시보드 검증
+
+변경 요약
+- `purchase_alerts.tmpl.yml`의 expr 멀티라인 파이프를 단일 라인으로 정리하고 전체 들여쓰기를 정상화. 템플릿 렌더 스크립트(`scripts/render_prometheus_rules.ps1`)로 `purchase_alerts.yml`을 재생성.
+- 손상되었던 `purchase_alerts.yml`에서 `labels` 아래 잘못 중첩된 `groups`/`rules` 블록을 제거하고 규칙 4개만 유지.
+- `docker-compose.monitoring.yml`는 기존 마운트 유지. 툴즈 재시작 시 렌더 → 기동 순으로 보장.
+
+검증 결과
+- Prometheus 컨테이너 기동 정상. `/api/v1/rules` 응답에서 `purchase-health` 그룹과 4개 규칙 로드, `kafka_consumer_health` 그룹 로드 확인. `/targets` 페이지 up.
+- Kafka Exporter up. Grafana 대시보드의 Consumer Lag 패널 쿼리 동작, `KafkaExporterDown` 알림 규칙 pending→inactive 전환 확인.
+
+다음 단계
+- Pending 스파이크 임계(`ALERT_PENDING_SPIKE_THRESHOLD`)를 환경별 튜닝(.env.* 반영) 및 구매 트래픽 관찰 후 재조정.
+- 백엔드 컨테이너 내부에서 pytest 스모크(결제/스트릭) 실행 및 결과 반영.
+- 필요 시 OpenAPI 재수출 및 `api docs/20250808.md`에 규칙/대시보드 변경 요약 추가.
 
 ## 2025-08-23 모니터링 네트워크/도구 가동 + 백엔드 /metrics 노출(계측) + OpenAPI 테스트 상태
 
@@ -75,6 +128,84 @@ Grafana에서 purchase_attempt_total 등 커스텀 카운터 실데이터 반영
 - Prometheus: http://localhost:9090  (Targets 페이지에서 `job_name="cc-webapp-backend"` 활성 여부 확인)
 - Grafana: http://localhost:3003  (대시보드 프로비저닝 정상 렌더 확인)
 - Backend Metrics: http://localhost:8000/metrics  (응답 200 + 기본 Python/HTTP 지표 노출)
+
+## 2025-08-24 Compose 복구 + Prometheus 타깃 안정화 + OpenAPI 스모크
+
+변경 요약
+- 깨진 docker-compose.yml의 중복 services 키 제거 및 버전 선언을 상단으로 이동, ccnet 네트워크를 external:true로 전환하여 모니터링 스택과 일관 연결.
+- 각 서비스에 ccnet 별칭(backend/frontend/postgres/redis/kafka/zookeeper/clickhouse/olap_worker/mailpit) 유지해 도커 DNS 안정화. Prometheus는 cc_backend:8000 대상으로 정상 스크랩.
+- 컨테이너 내부에서 OpenAPI 재수출 수행(app/export_openapi)로 current_openapi.json과 스냅샷 갱신.
+
+검증 결과
+- docker compose ps 정상, backend/frontend/postgres/redis/kafka/grafana/metabase/prometheus 모두 UP(olap_worker는 재시도 중).
+- Prometheus /api/v1/targets에서 job=cc-webapp-backend, instance=cc_backend:8000 상태 up 확인. 호스트에서 /metrics 응답 200.
+- OpenAPI 스모크(app/tests/test_openapi_diff_ci.py) 2 passed. Alembic heads 단일 유지: c6a1b5e2e2b1 (문서 표기와 다르나 단일 head).
+
+다음 단계
+- Grafana 대시보드 실데이터 확인 및 알람 임계치 튜닝(purchase_attempt_total, HTTP/WS 패널). 필요 시 json 프로비저닝 업데이트.
+- 백엔드 전체 pytest는 현재 실패 다수 → 범위 축소 스모크 정의 후 점진적 복구(결제/스트릭/카프카/이벤트 모듈별 분리 수복).
+- 필요 시 OpenAPI 재수출 후 docs 스키마 재수출(컨테이너 내부 app.export_openapi)과 변경 요약을 api docs/20250808.md에 누적.
+
+### 2025-08-24 모니터링 튜닝 1차(대시보드/알림)
+
+변경 요약
+- Grafana 대시보드(`cc-webapp/monitoring/grafana_dashboard.json`):
+   - 구매 실패 사유 패널 라벨 수정 failed→fail, 성공율 패널에 Prometheus 데이터소스 명시 및 임계치(빨강<95, 주황<98, 초록≥98) 추가.
+- Prometheus 알림 규칙(`cc-webapp/monitoring/purchase_alerts.yml`):
+   - HTTP 5xx 비율 경보(Http5xxRateHigh, 5분간 2% 초과 시 5분 지속 → warning).
+   - HTTP P95 지연 경보(HttpLatencyP95High, 0.8s 초과 10분 지속 → warning).
+
+검증 결과
+- 정적 검토: PromQL 구문 및 라벨 일치 확인(purchase_attempt_total{result in [success|fail|pending|start]} 기준).
+- docker-compose.monitoring.yml 프로비저닝 경로 변화 없음(리로드 시 반영 예상). 컨테이너 내 Prometheus rule_files 경로 `/etc/prometheus/rules/*.yml` 일치.
+- OpenAPI/Alembic 영향 없음(head 단일 유지).
+
+다음 단계
+- Grafana UI에서 패널 색상/임계 동작 실측 검증 후 필요 시 임계 재조정(트래픽 수준 반영: 성공율 초록 기준 99%로 상향 검토).
+- 구매 Pending 스파이크 룰을 환경별 기준값으로 분리(.env 또는 룰 변수화) 계획 수립.
+- pytest 빠른 승리 케이스 선별 실행 후 실패 모듈 순차 수복 및 문서 반영.
+
+### 2025-08-24 알림 임계 외부화(ENV) 도입
+### 2025-08-24 Kafka 운영 항목 마무리(Exporter/알림/마운트)
+
+변경 요약
+- Prometheus에 `kafka_alerts.yml` 규칙 파일을 마운트하도록 `docker-compose.monitoring.yml` 수정(경로: `/etc/prometheus/rules/kafka_alerts.yml`).
+- 손상된 `purchase_alerts.yml`의 중첩 YAML 구조를 정상 규칙 형식으로 교정(labels 아래 잘못된 groups 블록 제거).
+
+검증 결과
+- Compose YAML 들여쓰기 오류 제거. 규칙 파일이 `/etc/prometheus/rules/*.yml`에서 로드 가능 상태.
+- 다음 재기동 후 `/api/v1/rules`에서 `kafka_consumer_health` 그룹 확인 예정.
+
+다음 단계
+- 모니터링 스택 재시작(`./cc-manage.ps1 tools stop; ./cc-manage.ps1 tools start`) 후 규칙 로드/타겟 up 확인.
+- Kafka Lag 패널 실데이터/알림 트리거 조건 관찰 후 임계 재조정.
+
+변경 요약
+- Prometheus 구매 알림 룰을 템플릿(`cc-webapp/monitoring/purchase_alerts.tmpl.yml`)로 분리하고, PowerShell 렌더 스크립트 `scripts/render_prometheus_rules.ps1` 추가.
+- `cc-manage.ps1 tools start` 시 템플릿을 렌더링하여 실제 룰 파일(`purchase_alerts.yml`) 생성. ENV `ALERT_PENDING_SPIKE_THRESHOLD` 미설정 시 기본 20 사용.
+
+검증 결과
+- 로컬에서 `ALERT_PENDING_SPIKE_THRESHOLD=30` 설정 후 렌더 실행 → 생성 파일 헤더와 식에 30 반영 확인. Prometheus 재기동 시 룰 로드 OK.
+
+다음 단계
+- 환경별(dev/tools/prod) 기본값을 `.env.*`에 명시하고 CI 문서에 반영. 성공율 초록 임계 99% 상향은 스테이징 관찰 후 진행.
+
+## 2025-08-24 전역 가이드(F 섹션) 체크리스트 업데이트
+
+변경 요약
+- `api docs/20250823_GLOBAL_EVAL_GUIDE.md`의 F.데이터/스키마/계약 섹션을 실제 코드/스키마 증거 기반으로 갱신:
+   - Postgres: 핵심 인덱스 및 FK/UNIQUE 무결성 항목 체크. 백업 SQL에서 `user_actions` 인덱스들과 `ShopTransaction` 복합 UNIQUE(`uq_shop_tx_user_product_idem`) 확인.
+   - Redis: 키 네이밍/TTL 정책 항목 체크. `backend/app/utils/redis.py`의 스트릭/출석/세션 TTL 정책 및 `shop.py`의 멱등/락 키 스킴 확인.
+   - ClickHouse: 파티션/정렬키 적용 항목 체크. `backend/app/olap/clickhouse_client.py`의 MergeTree 스키마와 월 파티션 확인.
+   - Kafka: 오프셋/재소비 전략 문서화는 미완으로 보류 주석 추가.
+
+검증 결과
+- 코드 근거 수집 완료: Redis/ClickHouse/Shop 멱등/인덱스 증거 파일 경로와 세부 라벨 일치 확인.
+- 모니터링/테스트 영향 없음(Alembic head 단일 유지, OpenAPI 무변).
+
+다음 단계
+- Kafka consumer lag 패널 추가 및 소비 그룹/offset reset 정책 문서화(재시작 재소비 전략 명시).
+- `.env.*`에 Kafka 토픽/그룹 기본값 표준화 및 README/가이드 반영.
 
 
 ## 2025-08-23 백엔드 헬스 이슈 해소 + 스케줄러 가드 추가
