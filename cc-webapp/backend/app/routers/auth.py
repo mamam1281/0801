@@ -100,7 +100,7 @@ class _RegisterResponse(BaseModel):
     gold_balance: int | None = None
 
 @router.post("/register", response_model=_RegisterResponse, summary="Register user (temporary minimal endpoint)")
-async def minimal_register(req: _RegisterRequest, db: Session = Depends(get_db)):
+async def minimal_register(req: _RegisterRequest, request: Request, db: Session = Depends(get_db)):
     """Lightweight register endpoint added for interim E2E tests.
     Uses AuthService.register_with_invite_code if available; falls back to legacy user creation otherwise.
     """
@@ -110,6 +110,17 @@ async def minimal_register(req: _RegisterRequest, db: Session = Depends(get_db))
         else:
             raise HTTPException(status_code=501, detail="register_with_invite_code not implemented")
         access_token = AuthService.create_access_token({"sub": user.site_id, "user_id": user.id})
+        # Record a session so downstream dependencies relying on active sessions pass in stricter modes
+        try:
+            AuthService.create_session(db, user, access_token, request)
+        except Exception:
+            logger.exception("create_session (minimal_register) failed (non-fatal)")
+        # Create a lightweight session so downstream session checks pass in all environments
+        try:
+            AuthService.create_session(db, user, access_token, request=None)
+        except Exception:
+            # Non-fatal: tolerate session persistence issues in dev/test
+            logger.exception("minimal_register: create_session failed (non-fatal)")
         # simple refresh token generation (reuse access for now if manager absent)
         refresh_token = None
         if hasattr(AuthService, 'create_refresh_token'):

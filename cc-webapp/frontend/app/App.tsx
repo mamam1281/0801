@@ -209,8 +209,8 @@ export default function App() {
 
   // 🏠 하단 네비게이션 표시 여부 결정 (메모이제이션)
   const showBottomNavigation = useMemo(() => {
-    return SCREENS_WITH_BOTTOM_NAV.includes(currentScreen as any) && user;
-  }, [currentScreen, user]);
+    return SCREENS_WITH_BOTTOM_NAV.includes(currentScreen as any);
+  }, [currentScreen]);
 
   // ---------------------------------------------------------------------------
   // Daily Reward Claimed Dialog 상태 (이미 수령한 경우 노출)
@@ -258,7 +258,6 @@ export default function App() {
             <SideMenu
               isOpen={isSideMenuOpen}
               onClose={closeSideMenu}
-              user={user}
               onNavigateToAdminPanel={navigationHandlers.toAdminPanel}
               onNavigateToEventMissionPanel={navigationHandlers.toEventMissionPanel}
               onNavigateToSettings={navigationHandlers.toSettings}
@@ -454,7 +453,6 @@ export default function App() {
               <BottomNavigation
                 currentScreen={currentScreen}
                 onNavigate={handleBottomNavigation}
-                user={user}
               />
             )}
 
