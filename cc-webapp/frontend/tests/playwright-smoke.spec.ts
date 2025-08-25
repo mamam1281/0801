@@ -17,8 +17,8 @@ test.describe('Auth + Balance Smoke', () => {
     const token = regJson.access_token as string;
     expect(token).toBeTruthy();
 
-    // 프로필 확인
-    const profile = await request.get(`${apiBase}/api/users/profile`, {
+  // 프로필 확인 (표준 엔드포인트로 정렬)
+  const profile = await request.get(`${apiBase}/api/auth/me`, {
       headers: { Authorization: `Bearer ${token}` }
     });
     expect(profile.ok()).toBeTruthy();

@@ -16,11 +16,11 @@ import {
 export async function hydrateProfile(dispatch: ReturnType<typeof useGlobalStore>["dispatch"]) {
   try {
     // 최초 진입 병렬 hydrate:
-    // - /users/profile (필수)
+  // - /auth/me (필수)
     // - /users/balance (권위 잔액)
     // - /games/stats/me (통계 – 전역 저장은 아직 없으나, 워밍업/요건 충족용 호출)
     const [profileRes, balanceRes] = await Promise.all([
-      api.get("users/profile"),
+      api.get("auth/me"),
       api.get("users/balance").catch(() => null),
       // 통계는 실패/401 무시 (호출만 수행)
       api.get("games/stats/me").catch(() => null),

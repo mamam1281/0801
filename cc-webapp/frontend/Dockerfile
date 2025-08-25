@@ -32,6 +32,27 @@ COPY --from=builder /app/package.json ./package.json
 # Standalone 모드 지원
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
+## 일부 런타임 경로가 .next/*.json 매니페스트를 직접 참조하는 케이스 방지
+## (standalone 모드에서는 일반적으로 필요 없으나 ENOENT 회피용으로 동봉)
+RUN mkdir -p .next
+COPY --from=builder /app/.next/BUILD_ID ./.next/BUILD_ID
+COPY --from=builder /app/.next/routes-manifest.json ./.next/routes-manifest.json
+COPY --from=builder /app/.next/prerender-manifest.json ./.next/prerender-manifest.json
+COPY --from=builder /app/.next/server/app-paths-manifest.json ./.next/server/app-paths-manifest.json
+COPY --from=builder /app/.next/server/middleware-manifest.json ./.next/server/middleware-manifest.json
+
+# Next.js 런타임이 참조하는 주요 매니페스트/메타 파일 복사
+# (일부 버전에서 standalone 서버가 .next/* 파일을 직접 요구함)
+COPY --from=builder /app/.next/BUILD_ID ./.next/BUILD_ID
+COPY --from=builder /app/.next/routes-manifest.json ./.next/routes-manifest.json
+COPY --from=builder /app/.next/app-build-manifest.json ./.next/app-build-manifest.json
+COPY --from=builder /app/.next/build-manifest.json ./.next/build-manifest.json
+COPY --from=builder /app/.next/middleware-manifest.json ./.next/middleware-manifest.json
+COPY --from=builder /app/.next/font-manifest.json ./.next/font-manifest.json
+# server 참조 매니페스트(존재 시)
+COPY --from=builder /app/.next/server-reference-manifest.json ./.next/server-reference-manifest.json
+# App Router 경로 매니페스트(존재 시)
+COPY --from=builder /app/.next/server/app-paths-manifest.json ./.next/server/app-paths-manifest.json
 
 # 포트 노출
 EXPOSE 3000

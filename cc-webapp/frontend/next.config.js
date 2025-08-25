@@ -8,6 +8,8 @@ const nextConfig = {
   images: {
     domains: ['images.unsplash.com'],
   },
+  // Produce standalone output for Docker runtime (copies minimal server + node_modules)
+  output: 'standalone',
   typescript: {
   ignoreBuildErrors: false,
   },

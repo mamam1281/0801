@@ -11,6 +11,7 @@ import { User, UserStats, UserBalance } from '../types/user';
 import { api as unifiedApi } from '@/lib/unifiedApi';
 import useBalanceSync from '@/hooks/useBalanceSync';
 import { getTokens, setTokens } from '../utils/tokenStorage';
+import { useRealtimeProfile, useRealtimeStats } from '@/hooks/useRealtimeData';
 
 interface ProfileScreenProps {
   onBack: () => void;
@@ -37,6 +38,9 @@ export function ProfileScreen({
     onUpdateUser,
     onAddNotification,
   });
+  // Realtime 전역 상태 구독(골드 등 핵심 값은 전역 프로필 우선 사용)
+  const { profile: rtProfile, refresh: refreshRtProfile } = useRealtimeProfile();
+  const { allStats: rtAllStats } = useRealtimeStats();
   const [user, setUser] = useState(null);
   const [stats, setStats] = useState(null);
   const [balance, setBalance] = useState(null);
@@ -51,7 +55,7 @@ export function ProfileScreen({
     
     try {
       const [rawProfile, rawStats, rawBalance] = await Promise.all([
-        unifiedApi.get('users/profile'),
+        unifiedApi.get('auth/me'),
         unifiedApi.get('users/stats'),
         unifiedApi.get('users/balance'),
       ]);
@@ -249,7 +253,8 @@ export function ProfileScreen({
   useEffect(() => {
     const handler = () => {
       if (document.visibilityState === 'visible') {
-        fetchProfileBundle().catch(() => {});
+  // 전역 프로필과 로컬 번들 동시 갱신(누락 값 폴백 유지)
+  Promise.allSettled([refreshRtProfile(), fetchProfileBundle()]).then(() => {});
       }
     };
     document.addEventListener('visibilitychange', handler);
@@ -259,7 +264,8 @@ export function ProfileScreen({
   // 주기 갱신 타이머
   useEffect(() => {
     const id = setInterval(() => {
-      fetchProfileBundle().catch(() => {});
+  // 전역 프로필과 로컬 보조 데이터 동시 갱신
+  Promise.allSettled([refreshRtProfile(), fetchProfileBundle()]).then(() => {});
     }, AUTO_REFRESH_MS);
     return () => clearInterval(id);
   }, []);
@@ -373,10 +379,32 @@ export function ProfileScreen({
   const progressToNext =
     user?.experience && user?.maxExperience ? (user.experience / user.maxExperience) * 100 : 0;
 
-  // GOLD 표시값: 공용 상태 우선 → 로컬 balance 폴백
-  const displayGold:
-    | number
-    | string = (sharedUser?.goldBalance ?? balance?.cyber_token_balance ?? 0) as any;
+  // GOLD 표시값: Realtime 전역 상태(우선) → 공용 상태 → 로컬 balance 폴백
+  const displayGold: number | string = (
+    (rtProfile?.gold as any) ?? (sharedUser?.goldBalance as any) ?? (balance?.cyber_token_balance as any) ?? 0
+  );
+
+  // 실시간 통계 파생값: 전역 stats 우선, 없으면 기존 로컬 stats 사용
+  const pickNumber = (obj: Record<string, any> | undefined, keys: string[]): number => {
+    if (!obj) return 0;
+    for (const k of keys) {
+      const v = obj[k];
+      if (typeof v === 'number' && !Number.isNaN(v)) return v;
+    }
+    return 0;
+  };
+  const computeRtTotals = (): { totalGames?: number; totalWins?: number } => {
+    try {
+      const entries = Object.values(rtAllStats || {}) as Array<{ data?: Record<string, any> }>;
+      if (!entries?.length) return {};
+      const totalGames = entries.reduce((acc, e) => acc + pickNumber(e?.data, ['total_games_played','total_games','games','plays','spins']), 0);
+      const totalWins = entries.reduce((acc, e) => acc + pickNumber(e?.data, ['total_wins','wins']), 0);
+      return { totalGames, totalWins };
+    } catch { return {}; }
+  };
+  const rtTotals = computeRtTotals();
+  const displayTotalGames = (rtTotals.totalGames ?? 0) || (stats?.total_games_played ?? 0) || 0;
+  const displayTotalWins = (rtTotals.totalWins ?? 0) || (stats?.total_wins ?? 0) || 0;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-black/95 to-primary/5 relative">
@@ -512,7 +540,7 @@ export function ProfileScreen({
                     </div>
                     <div className="text-right">
                       <div className="text-lg font-bold text-primary">
-                        {stats?.total_games_played || 0}회
+                        {displayTotalGames}회
                       </div>
                       <div className="text-xs text-gold">
                         최고: {user?.gameStats?.slot?.biggestWin?.toLocaleString() || 0}G
@@ -585,14 +613,14 @@ export function ProfileScreen({
                   <div className="grid grid-cols-1 gap-3">
                     <div className="text-center p-4 rounded-lg bg-primary/5 border border-primary/10">
                       <div className="text-2xl font-bold text-primary">
-                        {stats?.total_games_played || 0}
+                        {displayTotalGames}
                       </div>
                       <div className="text-sm text-muted-foreground">총 게임 수</div>
                     </div>
 
                     <div className="text-center p-4 rounded-lg bg-gold/5 border border-gold/10">
                       <div className="text-2xl font-bold text-gradient-gold">
-                        {stats?.total_wins || 0} 승
+                        {displayTotalWins} 승
                       </div>
                       <div className="text-sm text-muted-foreground">총 수익</div>
                     </div>
@@ -640,7 +668,7 @@ export function ProfileScreen({
                           <div className="text-xs text-muted-foreground">100,000G 모으기</div>
                         </div>
                         <Badge className="bg-muted/20 text-muted-foreground border-muted/30 text-xs">
-                          {Math.min(100, Math.floor((Number(sharedUser?.goldBalance ?? balance?.cyber_token_balance ?? 0)) / 1000))}%
+                          {Math.min(100, Math.floor((Number(displayGold || 0)) / 1000))}%
                         </Badge>
                       </div>
                     </div>

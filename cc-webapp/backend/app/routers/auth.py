@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Body, Request
 from pydantic import BaseModel, Field
 from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError, OperationalError
 
 from ..database import get_db
 from ..schemas.auth import UserCreate, UserLogin, AdminLogin, UserResponse, Token
@@ -125,9 +126,18 @@ async def minimal_register(req: _RegisterRequest, db: Session = Depends(get_db))
             gold_balance=getattr(user, 'gold_balance', 0)
         )
     except HTTPException:
+        # Propagate known client errors (e.g., invalid invite, env-forbidden)
         raise
+    except (IntegrityError, OperationalError) as e:
+        # Common DB schema/constraint issues during early bootstrap should not surface as 500
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        logger.exception("minimal_register DB error: %s", e)
+        raise HTTPException(status_code=400, detail="Registration temporarily unavailable")
     except Exception as e:
-        logger.error(f"minimal_register failed: {e}")
+        logger.exception("minimal_register failed")
         raise HTTPException(status_code=500, detail="Registration failed")
 
 @router.get("/profile", response_model=UserResponse, summary="Get current user profile (temporary minimal endpoint)")

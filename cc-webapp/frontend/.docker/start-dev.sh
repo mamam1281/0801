@@ -32,5 +32,17 @@ if [ ! -d node_modules/react ] || [ ! -d node_modules/react-dom ]; then
   npm install react@19.1.0 react-dom@19.1.0 --no-audit --no-fund
 fi
 
+# Fix: stale or partial .next cache causing routes-manifest.json ENOENT in dev
+if [ -d .next ] && [ ! -f .next/routes-manifest.json ]; then
+  echo "[start-dev] detected stale .next without routes-manifest.json → cleaning .next ..."
+  rm -rf .next || true
+fi
+
+# Safety: if .next exists but critical manifests are missing, clean it up
+if [ -d .next ] && [ ! -f .next/BUILD_ID ]; then
+  echo "[start-dev] missing .next/BUILD_ID → cleaning .next ..."
+  rm -rf .next || true
+fi
+
 echo "[start-dev] starting Next dev server..."
 exec npm run dev -- -H 0.0.0.0

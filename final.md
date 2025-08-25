@@ -1,3 +1,20 @@
+### 2025-08-25 (핵심) 회원가입 500 제거, 프로필 엔드포인트 정리, OpenAPI/알림 점검
+변경 요약
+- /api/auth/register: DB 스키마/제약 초기화 불완전 등으로 발생하는 예외(IntegrityError/OperationalError)를 500 대신 400으로 매핑. 운영/테스트 중 간헐 500로 스모크가 막히던 문제를 4xx로 전환해 원인 파악/재시도 루프로 흡수 가능하게 조정. 비정형 예외는 500 유지.
+- 프론트 전역 프로필 조회: unifiedApi 경로를 'users/profile'에서 'auth/me'로 교체. 핵심 진입 하이드레이트(lib/sync.ts) 및 주요 화면(ProfileScreen.tsx, ProfileScreen_debug.tsx) 반영.
+- ESLint 강화: '/api/users/profile' 뿐 아니라 unifiedApi 사용 패턴('users/profile')도 금지하도록 룰 확장. 대체 경로 가이드는 '/api/auth/me' 또는 'auth/me'.
+- OpenAPI 재수출/PR 디프: 백엔드에 export_openapi.py, CI에 openapi-diff.yml/openapi-drift-guard.yml 이미 구성됨(백엔드 current_openapi.json 스냅샷 + PR 코멘트). 이번 변경은 스키마 변경 없음(경로/스키마 유지), 재수출 시 드리프트 없음 예상.
+- ALERT_PENDING_SPIKE_THRESHOLD: env별(dev=20, staging=25, prod=30) 이미 템플릿 렌더링/배포 파이프에 반영되어 있으며 추가 튜닝은 실제 지표 관찰 후 조정 예정.
+
+검증/주의
+- 회원가입(register) 경로는 dev/local/test 에서만 간이 헬퍼(register_with_invite_code) 활성. 운영 ENVIRONMENT에서는 403.
+- 프론트 테스트 일부는 아직 '/api/users/profile'을 사용(Playwright 스모크). 추후 '/api/auth/me'로 마이그레이션 예정. 현재는 주석으로 안내만 추가.
+
+다음 단계
+1) 컨테이너(또는 로컬)에서 간단 스모크: signup/login → auth/me → streak/claim 흐름 한 사이클 재검증.
+2) 프론트 테스트(s) '/api/auth/me'로 전환 및 타입 정의 업데이트.
+3) 모니터링: PurchasePendingSpike 임계값 운영/스테이징에서 24~48h 관찰 후 미세조정.
+
 ## 2025-08-25 전역 동기화 개선안(v1) 작성 및 정리
 
 ### 문서 정리(중복/표기/로그 이동)

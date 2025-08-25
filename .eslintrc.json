@@ -14,7 +14,7 @@
       "error",
       {
         "selector": "Literal[value='/api/users/profile']",
-        "message": "'/api/users/profile' 경로는 금지됩니다. 대신 '/api/users/me'를 사용하세요."
+        "message": "'/api/users/profile' 경로는 금지됩니다. 대신 '/api/auth/me'를 사용하세요."
       }
     ]
   },

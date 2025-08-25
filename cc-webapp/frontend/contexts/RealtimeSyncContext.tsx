@@ -520,7 +520,7 @@ export function RealtimeSyncProvider({ children, apiBaseUrl }: RealtimeSyncProvi
   // 수동 데이터 새로고침 함수들
   const refreshProfile = useCallback(async () => {
     try {
-      const profile = await apiCall('/api/users/me');
+      const profile = await apiCall('/api/auth/me');
       dispatch({
         type: 'UPDATE_PROFILE',
         payload: {
