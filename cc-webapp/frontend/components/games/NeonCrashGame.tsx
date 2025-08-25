@@ -32,6 +32,7 @@ import { Button } from '../ui/button';
 import { Slider } from '../ui/slider';
 import { api } from '@/lib/unifiedApi';
 import { useWithReconcile } from '@/lib/sync';
+import { useUserGold } from '@/hooks/useSelectors';
 
 interface NeonCrashGameProps {
   user: User;
@@ -47,6 +48,7 @@ export function NeonCrashGame({
   onAddNotification,
 }: NeonCrashGameProps) {
   const withReconcile = useWithReconcile();
+  const gold = useUserGold();
   const [betAmount, setBetAmount] = useState(10);
   const [multiplier, setMultiplier] = useState(1.0);
   const [isRunning, setIsRunning] = useState(false);
@@ -109,7 +111,7 @@ export function NeonCrashGame({
 
   // 게임 시작 - 서버에서 실제 베팅 처리 (서버 권위; withReconcile로 멱등+재동기화)
   const startGame = async () => {
-    if (user.goldBalance < betAmount) {
+  if (gold < betAmount) {
       onAddNotification('베팅할 골드가 부족합니다.');
       return;
     }
@@ -540,7 +542,7 @@ export function NeonCrashGame({
               }`}
             />
           </Button>
-          <div className="text-xl font-bold">{user.goldBalance.toLocaleString()} G</div>
+          <div className="text-xl font-bold">{gold.toLocaleString()} G</div>
         </div>
       </motion.header>
 
@@ -745,7 +747,7 @@ export function NeonCrashGame({
                 <div className="py-2 px-1">
                   <Slider
                     min={1}
-                    max={Math.min(user.goldBalance, 1000)}
+                    max={Math.min(gold, 1000)}
                     step={1}
                     value={[betAmount]}
                     onValueChange={(values: number[]) => changeBetAmount(values[0])}
@@ -880,7 +882,7 @@ export function NeonCrashGame({
                     size="lg"
                     className="bg-primary text-white hover:bg-primary/80 h-14 rounded-xl text-lg font-bold"
                     onClick={startGame}
-                    disabled={user.goldBalance < betAmount}
+                    disabled={gold < betAmount}
                   >
                     <TrendingUp className="w-5 h-5 mr-2" />
                     게임 시작

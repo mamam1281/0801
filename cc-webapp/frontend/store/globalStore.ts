@@ -27,7 +27,8 @@ type GlobalState = {
 type Actions =
     | { type: "SET_PROFILE"; profile: GlobalUserProfile | null }
     | { type: "SET_HYDRATED"; value: boolean }
-    | { type: "PATCH_BALANCES"; delta: { gold?: number; gems?: number } };
+    | { type: "PATCH_BALANCES"; delta: { gold?: number; gems?: number } }
+    | { type: "MERGE_PROFILE"; patch: Partial<GlobalUserProfile> & Record<string, unknown> };
 
 const initialState: GlobalState = {
     profile: null,
@@ -53,6 +54,13 @@ function reducer(state: GlobalState, action: Actions): GlobalState {
                     gemsBalance: gems + (action.delta.gems ?? 0),
                 } as GlobalUserProfile,
             };
+        }
+        case "MERGE_PROFILE": {
+            if (!state.profile) {
+                // If profile isn't set yet, create one from patch minimally
+                return { ...state, profile: { goldBalance: 0, nickname: "", id: "unknown", ...(action.patch as any) } };
+            }
+            return { ...state, profile: { ...state.profile, ...(action.patch as any) } as GlobalUserProfile };
         }
         default:
             return state;
@@ -93,4 +101,8 @@ export function setHydrated(dispatch: DispatchFn, value: boolean) {
 
 export function patchBalances(dispatch: DispatchFn, delta: { gold?: number; gems?: number }) {
     dispatch({ type: "PATCH_BALANCES", delta });
+}
+
+export function mergeProfile(dispatch: DispatchFn, patch: Partial<GlobalUserProfile> & Record<string, unknown>) {
+    dispatch({ type: "MERGE_PROFILE", patch });
 }

@@ -5,6 +5,7 @@ import useFeedback from '../../hooks/useFeedback';
 import useBalanceSync from '../../hooks/useBalanceSync';
 import { api } from '@/lib/unifiedApi';
 import { useWithReconcile } from '@/lib/sync';
+import { useUserGold } from '@/hooks/useSelectors';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft,
@@ -105,6 +106,8 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
     onAddNotification,
   });
   const withReconcile = useWithReconcile();
+  // 전역 권위 잔액(셀렉터)
+  const gold = useUserGold();
 
   // unifiedApi: call games endpoints with relative paths
   const [reels, setReels] = useState([
@@ -283,7 +286,8 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
 
   // Handle spin with enhanced animation
   const handleSpin = async () => {
-    if (user.goldBalance < betAmount) {
+    // 권위 잔액 기준으로 사전 가드
+    if (gold < betAmount) {
       onAddNotification('❌ 골드가 부족합니다!');
       return;
     }
@@ -564,7 +568,7 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
               <div className="text-right">
                 <div className="text-sm text-muted-foreground">보유 골드</div>
                 <div className="text-xl font-black text-gradient-gold">
-                  {user.goldBalance.toLocaleString()}G
+                  {gold.toLocaleString()}G
                 </div>
               </div>
             </div>
@@ -763,7 +767,7 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
                 <Slider
                   value={[betAmount]}
                   onValueChange={(value: number[]) => setBetAmount(value[0])}
-                  max={Math.min(user.goldBalance, 10000)}
+                  max={Math.min(gold, 10000)}
                   min={50}
                   step={50}
                   className="flex-1"
@@ -775,13 +779,13 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
               </div>
 
               <div className="grid grid-cols-4 gap-2">
-                {[100, 500, 1000, 5000].map((amount) => (
+        {[100, 500, 1000, 5000].map((amount) => (
                   <Button
                     key={amount}
                     size="sm"
                     variant="outline"
-                    onClick={() => setBetAmount(Math.min(amount, user.goldBalance))}
-                    disabled={isSpinning || isAutoSpinning || user.goldBalance < amount}
+          onClick={() => setBetAmount(Math.min(amount, gold))}
+          disabled={isSpinning || isAutoSpinning || gold < amount}
                     className="border-border-secondary hover:border-primary text-xs btn-hover-lift"
                   >
                     {amount}G
@@ -800,7 +804,7 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <Button
               onClick={handleSpin}
-              disabled={isSpinning || isAutoSpinning || user.goldBalance < betAmount}
+              disabled={isSpinning || isAutoSpinning || gold < betAmount}
               className="bg-gradient-game hover:opacity-90 text-white font-bold py-4 text-lg relative overflow-hidden btn-hover-glow"
             >
               {isSpinning ? (
@@ -827,7 +831,7 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
                   setAutoSpinCount(10);
                   setIsAutoSpinning(true);
                 }}
-                disabled={isSpinning || isAutoSpinning || user.goldBalance < betAmount * 5}
+                disabled={isSpinning || isAutoSpinning || gold < betAmount * 5}
                 variant="outline"
                 className="border-border-secondary hover:border-primary text-sm btn-hover-lift"
               >

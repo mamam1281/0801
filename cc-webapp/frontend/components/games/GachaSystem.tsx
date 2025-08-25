@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '@/lib/unifiedApi';
 import { useWithReconcile } from '@/lib/sync';
+import { useUserGold } from '@/hooks/useSelectors';
 import useAuthToken from '../../hooks/useAuthToken';
 import useFeedback from '../../hooks/useFeedback';
 import useBalanceSync from '../../hooks/useBalanceSync';
@@ -63,6 +64,7 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
     onAddNotification,
   });
   const withReconcile = useWithReconcile();
+  const gold = useUserGold();
 
   const [selectedBanner, setSelectedBanner] = useState(GACHA_BANNERS[0] as GachaBanner);
   const [isPulling, setIsPulling] = useState(false);
@@ -135,8 +137,8 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
 
   // Perform single pull
   const performSinglePull = async () => {
-    const cost = getSinglePullCost();
-    if (user.goldBalance < cost) {
+  const cost = getSinglePullCost();
+  if (gold < cost) {
       onAddNotification('❌ 골드가 부족합니다!');
       return;
     }
@@ -175,7 +177,8 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
         const updatedUser = updateUserInventory(
           {
             ...user,
-            goldBalance: typeof newBalance === 'number' ? newBalance : user.goldBalance - cost,
+            // 잔액은 서버 응답/재동기화에만 의존
+            goldBalance: typeof newBalance === 'number' ? newBalance : user.goldBalance,
             gameStats: {
               ...user.gameStats,
               gacha: {
@@ -224,8 +227,8 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
 
   // Perform 10-pull
   const performTenPull = async () => {
-    const discountedCost = getTenPullCost();
-    if (user.goldBalance < discountedCost) {
+  const discountedCost = getTenPullCost();
+  if (gold < discountedCost) {
       onAddNotification('❌ 골드가 부족합니다!');
       return;
     }
@@ -276,8 +279,8 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
           (acc, item) => updateUserInventory(acc as User, item) as User,
           {
             ...user,
-            goldBalance:
-              typeof newBalance === 'number' ? newBalance : user.goldBalance - discountedCost,
+            // 잔액은 서버 응답/재동기화에만 의존
+            goldBalance: typeof newBalance === 'number' ? newBalance : user.goldBalance,
             gameStats: {
               ...user.gameStats,
               gacha: {
@@ -442,7 +445,7 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
             <div className="text-right">
               <div className="text-sm text-pink-300/60">보유 골드</div>
               <div className="text-xl font-bold text-yellow-400">
-                {user.goldBalance.toLocaleString()}G
+                {gold.toLocaleString()}G
               </div>
             </div>
           </div>
@@ -570,7 +573,7 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
               <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                 <Button
                   onClick={performSinglePull}
-                  disabled={isPulling || user.goldBalance < getSinglePullCost()}
+                  disabled={isPulling || gold < getSinglePullCost()}
                   className="w-full h-20 bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-400 hover:to-purple-400 text-white font-bold text-lg relative overflow-hidden border-0"
                   style={{ boxShadow: '0 0 20px rgba(236, 72, 153, 0.5)' }}
                 >
@@ -603,7 +606,7 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
               <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                 <Button
                   onClick={performTenPull}
-                  disabled={isPulling || user.goldBalance < getTenPullCost()}
+                  disabled={isPulling || gold < getTenPullCost()}
                   className="w-full h-20 bg-gradient-to-r from-yellow-500 to-red-500 hover:from-yellow-400 hover:to-red-400 text-white font-bold text-lg relative overflow-hidden border-0"
                   style={{ boxShadow: '0 0 20px rgba(245, 158, 11, 0.5)' }}
                 >

@@ -18,6 +18,7 @@ import {
 import { User } from '../../types';
 import { Button } from '../ui/button';
 import { useWithReconcile } from '@/lib/sync';
+import { useUserGold } from '@/hooks/useSelectors';
 
 interface RockPaperScissorsGameProps {
   user: User;
@@ -84,6 +85,7 @@ export function RockPaperScissorsGame({
   const [comboCount, setComboCount] = useState(0);
   const [isSpecialMove, setIsSpecialMove] = useState(false);
   const withReconcile = useWithReconcile();
+  const gold = useUserGold();
 
   // Play sound effect (visual simulation)
   const playSoundEffect = (effectName: string) => {
@@ -132,7 +134,7 @@ export function RockPaperScissorsGame({
   const playGame = async (choice: Choice) => {
     if (isPlaying) return;
 
-    if (user.goldBalance < betAmount) {
+  if (gold < betAmount) {
       onAddNotification('❌ 골드가 부족합니다!');
       return;
     }
@@ -326,7 +328,7 @@ export function RockPaperScissorsGame({
               <div className="text-right">
                 <div className="text-sm text-muted-foreground">보유 골드</div>
                 <div className="text-xl font-black text-gradient-gold">
-                  {user.goldBalance.toLocaleString()}G
+                  {gold.toLocaleString()}G
                 </div>
               </div>
             </div>
@@ -656,7 +658,7 @@ export function RockPaperScissorsGame({
               <motion.div key={choice} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                 <Button
                   onClick={() => playGame(choice)}
-                  disabled={isPlaying || user.goldBalance < betAmount}
+                  disabled={isPlaying || gold < betAmount}
                   className="h-32 w-full bg-gradient-to-r from-secondary to-secondary-hover hover:from-primary hover:to-primary-light text-white font-bold text-xl flex flex-col items-center gap-3 relative overflow-hidden btn-hover-glow"
                 >
                   <motion.div

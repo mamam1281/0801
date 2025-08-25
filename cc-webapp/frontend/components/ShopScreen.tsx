@@ -26,6 +26,8 @@ import { User, GameItem } from '../types';
 import useBalanceSync from '@/hooks/useBalanceSync';
 import { api } from '@/lib/unifiedApi';
 import { useWithReconcile } from '@/lib/sync';
+import { useUserGold } from '@/hooks/useSelectors';
+import { useGlobalStore, mergeProfile } from '@/store/globalStore';
 
 interface ShopScreenProps {
   user: User;
@@ -159,6 +161,8 @@ export function ShopScreen({
   const [selectedItem, setSelectedItem] = useState(null as import('../types').GameItem | null);
   const { reconcileBalance } = useBalanceSync({ sharedUser: user, onUpdateUser, onAddNotification });
   const withReconcile = useWithReconcile();
+  const gold = useUserGold();
+  const { dispatch } = useGlobalStore();
 
   // 마운트 시 1회 권위 잔액으로 정합화
   useEffect(() => {
@@ -211,7 +215,7 @@ export function ShopScreen({
   const handlePurchase = async (item: any) => {
     const finalPrice = Math.floor(item.price * (1 - item.discount / 100));
 
-    if (user.goldBalance < finalPrice) {
+    if (gold < finalPrice) {
       onAddNotification('❌ 골드가 부족합니다!');
       return;
     }
@@ -228,9 +232,14 @@ export function ShopScreen({
     };
 
     try {
-      await withReconcile(async (idemKey: string) =>
+      const res: any = await withReconcile(async (idemKey: string) =>
         api.post('shop/buy', { item_id: item.id, price: finalPrice }, { headers: { 'X-Idempotency-Key': idemKey } })
       );
+      // 서버 응답에 new balance가 있으면 즉시 전역 프로필에 병합(시각적 지연 최소화)
+      const newBal = res?.new_balance ?? res?.balance ?? res?.gold ?? res?.gold_balance ?? res?.cyber_token_balance;
+      if (typeof newBal === 'number' && Number.isFinite(newBal)) {
+        mergeProfile(dispatch, { goldBalance: Number(newBal) });
+      }
       // 아이템 지급은 서버 측 인벤토리 동기화를 신뢰, 필요시 WS/polling으로 반영됨
       onAddNotification(item.type === 'currency'
         ? `💰 ${item.value.toLocaleString()}G를 획득했습니다!`
@@ -302,7 +311,7 @@ export function ShopScreen({
             <div className="text-right">
               <div className="text-sm text-muted-foreground">보유 골드</div>
               <div className="text-xl font-black text-gradient-gold">
-                {user.goldBalance.toLocaleString()}G
+                {gold.toLocaleString()}G
               </div>
             </div>
           </div>
@@ -438,7 +447,7 @@ export function ShopScreen({
           {SHOP_ITEMS.map((item, index) => {
             const styles = getRarityStyles(item.rarity);
             const finalPrice = Math.floor(item.price * (1 - item.discount / 100));
-            const canAfford = user.goldBalance >= finalPrice;
+            const canAfford = gold >= finalPrice;
             
             return (
               <motion.div
