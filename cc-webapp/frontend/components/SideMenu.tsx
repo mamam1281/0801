@@ -17,7 +17,6 @@ import {
   Target,
   TrendingUp
 } from 'lucide-react';
-import { User as UserType } from '../types';
 import { Button } from './ui/button';
 
 interface SideMenuProps {

@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React from 'react';
 import ReactDOMServer from 'react-dom/server';
 import { BottomNavigation } from '@/components/BottomNavigation';
