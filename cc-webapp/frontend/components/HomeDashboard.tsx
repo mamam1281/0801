@@ -41,6 +41,7 @@ import useDashboard from '@/hooks/useDashboard';
 import useRecentActions from '@/hooks/useRecentActions';
 import { API_ORIGIN } from '@/lib/unifiedApi';
 import { createWSClient, WSClient, WebSocketMessage } from '@/utils/wsClient';
+import useBalanceSync from '@/hooks/useBalanceSync';
 
 interface HomeDashboardProps {
   user: User;
@@ -68,6 +69,11 @@ export function HomeDashboard({
   onToggleSideMenu,
 }: HomeDashboardProps) {
   const router = useRouter();
+  const { reconcileBalance } = useBalanceSync({
+    sharedUser: user,
+    onUpdateUser,
+    onAddNotification,
+  });
   
   // 게임 설정 로드 (하드코딩 대체)
   const { config: gameConfig, loading: configLoading } = useGameConfig();
@@ -228,6 +234,12 @@ export function HomeDashboard({
   const experiencePercentage = calculateExperiencePercentage(user);
   const winRate = calculateWinRate(user);
 
+  // 마운트 시 1회 권위 잔액으로 동기화(DEV 토스트 포함)
+  useEffect(() => {
+    reconcileBalance().catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // 최근 액션 로드 (user.id는 문자열로 정의되어 있어 숫자 변환 시도)
   const numericUserId = (() => {
     const n = Number((user as any)?.id);
@@ -308,7 +320,16 @@ export function HomeDashboard({
         setShowLevelUpModal(true);
         onAddNotification(`🆙 레벨업! ${finalUser.level}레벨 달성!`);
       }
-      onUpdateUser(finalUser);
+      try {
+        const bal = await unifiedApi.get('users/balance');
+        const cyber = (bal as any)?.cyber_token_balance;
+        onUpdateUser({
+          ...finalUser,
+          goldBalance: typeof cyber === 'number' ? cyber : finalUser.goldBalance,
+        });
+      } catch {
+        onUpdateUser(finalUser);
+      }
       onAddNotification(
         rewardMessages.success(
           data.awarded_gold || 0,

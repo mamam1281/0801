@@ -1,19 +1,14 @@
 services:
   backend:
     environment:
-      KAFKA_ENABLED: "1"
-      CLICKHOUSE_ENABLED: "1"
+      ENABLE_LEGACY_GAMES_WS: "0"
     ports:
       - "8001:8000"
   frontend:
-    ports:
-      - "3001:3000"
     environment:
       NODE_OPTIONS: "--max-old-space-size=2048"
+    ports:
+      - "3001:3000"
   postgres:
     ports:
       - "5433:5432"
-  olap_worker:
-    environment:
-      KAFKA_ENABLED: "1"
-      CLICKHOUSE_ENABLED: "1"

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { api as unifiedApi } from '@/lib/unifiedApi';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft,
@@ -50,20 +51,56 @@ const EXCLUSIVE_VJ = {
   isLive: true,
   status: '💃 섹시 댄스 라이브쇼',
   profileImage: 'https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=400&h=600&fit=crop',
-  streamThumbnail: 'https://images.unsplash.com/photo-1516914943479-89db7d9ae7f2?w=800&h=600&fit=crop',
+  streamThumbnail:
+    'https://images.unsplash.com/photo-1516914943479-89db7d9ae7f2?w=800&h=600&fit=crop',
   bio: '매일 밤 9시 특별한 시간을 함께해요 💕 개인 메시지 환영!',
   specialties: ['댄스', '토크', '게임', '노래'],
   vipPrice: 5000,
-  privatePrice: 10000
+  privatePrice: 10000,
 };
 
 // 선물 목록
 const GIFTS = [
-  { id: 'heart', name: '하트', icon: '❤️', price: 100, effect: 'hearts', benefit: '기본 애정 표현' },
-  { id: 'rose', name: '장미', icon: '🌹', price: 500, effect: 'roses', benefit: '특별한 인사 + VJ 멘션' },
-  { id: 'kiss', name: '키스', icon: '💋', price: 1000, effect: 'kisses', benefit: '개인 메시지 + 에어키스' },
-  { id: 'diamond', name: '다이아몬드', icon: '💎', price: 5000, effect: 'diamonds', benefit: '프리미엄 댄스 + 개인 영상' },
-  { id: 'crown', name: '왕관', icon: '👑', price: 10000, effect: 'crowns', benefit: 'VIP 대우 + 커스텀 쇼' },
+  {
+    id: 'heart',
+    name: '하트',
+    icon: '❤️',
+    price: 100,
+    effect: 'hearts',
+    benefit: '기본 애정 표현',
+  },
+  {
+    id: 'rose',
+    name: '장미',
+    icon: '🌹',
+    price: 500,
+    effect: 'roses',
+    benefit: '특별한 인사 + VJ 멘션',
+  },
+  {
+    id: 'kiss',
+    name: '키스',
+    icon: '💋',
+    price: 1000,
+    effect: 'kisses',
+    benefit: '개인 메시지 + 에어키스',
+  },
+  {
+    id: 'diamond',
+    name: '다이아몬드',
+    icon: '💎',
+    price: 5000,
+    effect: 'diamonds',
+    benefit: '프리미엄 댄스 + 개인 영상',
+  },
+  {
+    id: 'crown',
+    name: '왕관',
+    icon: '👑',
+    price: 10000,
+    effect: 'crowns',
+    benefit: 'VIP 대우 + 커스텀 쇼',
+  },
 ];
 
 // 영상 갤러리
@@ -77,7 +114,7 @@ const VIDEO_GALLERY = [
     hearts: 8920,
     date: '2일 전',
     isHot: true,
-    price: 1000
+    price: 1000,
   },
   {
     id: 2,
@@ -88,7 +125,7 @@ const VIDEO_GALLERY = [
     hearts: 12400,
     date: '1주 전',
     isPrivate: true,
-    price: 3000
+    price: 3000,
   },
   {
     id: 3,
@@ -99,7 +136,7 @@ const VIDEO_GALLERY = [
     hearts: 6850,
     date: '3일 전',
     isNew: true,
-    price: 1500
+    price: 1500,
   },
   {
     id: 4,
@@ -109,7 +146,7 @@ const VIDEO_GALLERY = [
     views: 19800,
     hearts: 5940,
     date: '5일 전',
-    price: 800
+    price: 800,
   },
   {
     id: 5,
@@ -120,7 +157,7 @@ const VIDEO_GALLERY = [
     hearts: 9240,
     date: '1주 전',
     isVip: true,
-    price: 5000
+    price: 5000,
   },
   {
     id: 6,
@@ -130,13 +167,18 @@ const VIDEO_GALLERY = [
     views: 41200,
     hearts: 7650,
     date: '4일 전',
-    price: 700
-  }
+    price: 700,
+  },
 ];
 
 type HeartAnim = { id: number; x: number; y: number; type: string };
 
-export function StreamingScreen({ user, onBack, onUpdateUser, onAddNotification }: StreamingScreenProps) {
+export function StreamingScreen({
+  user,
+  onBack,
+  onUpdateUser,
+  onAddNotification,
+}: StreamingScreenProps) {
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [isPlaying, setIsPlaying] = useState(true);
   const [currentViewers, setCurrentViewers] = useState(EXCLUSIVE_VJ.currentViewers as number);
@@ -161,12 +203,14 @@ export function StreamingScreen({ user, onBack, onUpdateUser, onAddNotification 
       id: Date.now() + i,
       x: Math.random() * 100,
       y: Math.random() * 100,
-      type
+      type,
     }));
-    
+
     setHeartAnimations((prev: HeartAnim[]) => [...prev, ...newHearts]);
     setTimeout(() => {
-      setHeartAnimations((prev: HeartAnim[]) => prev.filter((heart: HeartAnim) => !newHearts.find(h => h.id === heart.id)));
+      setHeartAnimations((prev: HeartAnim[]) =>
+        prev.filter((heart: HeartAnim) => !newHearts.find((h) => h.id === heart.id))
+      );
     }, 3000);
   };
 
@@ -177,59 +221,73 @@ export function StreamingScreen({ user, onBack, onUpdateUser, onAddNotification 
   };
 
   // 선물 보내기
-  const sendGift = (gift: typeof GIFTS[0]) => {
+  const sendGift = async (gift: (typeof GIFTS)[0]) => {
     if (user.goldBalance < gift.price) {
       onAddNotification(`❌ ${gift.price}G가 필요합니다!`);
       return;
     }
 
-    const updatedUser = {
-      ...user,
-      goldBalance: user.goldBalance - gift.price
-    };
-    
-    onUpdateUser(updatedUser);
+    // 권위 잔액 우선 동기화
+    try {
+      const bal = await unifiedApi.get('users/balance');
+      const cyber = (bal as any)?.cyber_token_balance;
+      onUpdateUser({
+        ...user,
+        goldBalance: typeof cyber === 'number' ? cyber : user.goldBalance - gift.price,
+      });
+    } catch {
+      onUpdateUser({ ...user, goldBalance: user.goldBalance - gift.price });
+    }
     generateHeartEffect(gift.effect);
     onAddNotification(`${gift.icon} ${gift.name}을 보냈습니다! (${gift.price}G)`);
     setShowGiftMenu(false);
   };
 
   // VIP 구독
-  const subscribeVip = () => {
+  const subscribeVip = async () => {
     if (user.goldBalance < EXCLUSIVE_VJ.vipPrice) {
       onAddNotification(`❌ VIP 구독에 ${EXCLUSIVE_VJ.vipPrice}G가 필요합니다!`);
       return;
     }
 
-    const updatedUser = {
-      ...user,
-      goldBalance: user.goldBalance - EXCLUSIVE_VJ.vipPrice
-    };
-    
-    onUpdateUser(updatedUser);
+    try {
+      const bal = await unifiedApi.get('users/balance');
+      const cyber = (bal as any)?.cyber_token_balance;
+      onUpdateUser({
+        ...user,
+        goldBalance: typeof cyber === 'number' ? cyber : user.goldBalance - EXCLUSIVE_VJ.vipPrice,
+      });
+    } catch {
+      onUpdateUser({ ...user, goldBalance: user.goldBalance - EXCLUSIVE_VJ.vipPrice });
+    }
     onAddNotification(`👑 VIP 구독 완료! 특별 혜택을 누리세요!`);
     generateHeartEffect('crowns');
   };
 
   // 개인방 신청
-  const requestPrivate = () => {
+  const requestPrivate = async () => {
     if (user.goldBalance < EXCLUSIVE_VJ.privatePrice) {
       onAddNotification(`❌ 개인방에 ${EXCLUSIVE_VJ.privatePrice}G가 필요합니다!`);
       return;
     }
 
-    const updatedUser = {
-      ...user,
-      goldBalance: user.goldBalance - EXCLUSIVE_VJ.privatePrice
-    };
-    
-    onUpdateUser(updatedUser);
+    try {
+      const bal = await unifiedApi.get('users/balance');
+      const cyber = (bal as any)?.cyber_token_balance;
+      onUpdateUser({
+        ...user,
+        goldBalance:
+          typeof cyber === 'number' ? cyber : user.goldBalance - EXCLUSIVE_VJ.privatePrice,
+      });
+    } catch {
+      onUpdateUser({ ...user, goldBalance: user.goldBalance - EXCLUSIVE_VJ.privatePrice });
+    }
     onAddNotification(`💎 개인방 신청 완료! 곧 연결됩니다...`);
     generateHeartEffect('diamonds');
   };
 
   // 영상 구매/시청
-  const watchVideo = (video: typeof VIDEO_GALLERY[0]) => {
+  const watchVideo = async (video: (typeof VIDEO_GALLERY)[0]) => {
     if (video.isVip && user.level < 30) {
       onAddNotification(`❌ VIP 영상은 레벨 30 이상부터 시청 가능합니다!`);
       return;
@@ -240,12 +298,16 @@ export function StreamingScreen({ user, onBack, onUpdateUser, onAddNotification 
       return;
     }
 
-    const updatedUser = {
-      ...user,
-      goldBalance: user.goldBalance - video.price
-    };
-    
-    onUpdateUser(updatedUser);
+    try {
+      const bal = await unifiedApi.get('users/balance');
+      const cyber = (bal as any)?.cyber_token_balance;
+      onUpdateUser({
+        ...user,
+        goldBalance: typeof cyber === 'number' ? cyber : user.goldBalance - video.price,
+      });
+    } catch {
+      onUpdateUser({ ...user, goldBalance: user.goldBalance - video.price });
+    }
     setSelectedVideo(video);
     onAddNotification(`🎬 영상 시청 시작! ${video.price}G 차감`);
     generateHeartEffect('hearts');
@@ -258,20 +320,20 @@ export function StreamingScreen({ user, onBack, onUpdateUser, onAddNotification 
         {heartAnimations.map((heart: HeartAnim) => (
           <motion.div
             key={heart.id}
-            initial={{ 
+            initial={{
               opacity: 0,
               scale: 0,
               x: `${heart.x}vw`,
-              y: `${heart.y}vh`
+              y: `${heart.y}vh`,
             }}
-            animate={{ 
+            animate={{
               opacity: [0, 1, 0],
               scale: [0, 2, 0],
               y: `${heart.y - 30}vh`,
-              rotate: [0, 360]
+              rotate: [0, 360],
             }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 3, ease: "easeOut" }}
+            transition={{ duration: 3, ease: 'easeOut' }}
             className="fixed text-pink-400 pointer-events-none z-20"
           >
             {heart.type === 'hearts' && '❤️'}
@@ -299,7 +361,7 @@ export function StreamingScreen({ user, onBack, onUpdateUser, onAddNotification 
               <ArrowLeft className="w-4 h-4 mr-2" />
               뒤로가기
             </Button>
-            
+
             <div>
               <h1 className="text-xl lg:text-2xl font-bold text-gradient-primary">
                 💕 전속 VJ 루나의 방
@@ -316,7 +378,7 @@ export function StreamingScreen({ user, onBack, onUpdateUser, onAddNotification 
             >
               {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
             </Button>
-            
+
             <div className="text-right">
               <div className="text-sm text-muted-foreground">보유 골드</div>
               <div className="text-xl font-bold text-gold">
@@ -329,7 +391,6 @@ export function StreamingScreen({ user, onBack, onUpdateUser, onAddNotification 
 
       {/* 메인 콘텐츠 */}
       <div className="relative z-20 p-4 max-w-7xl mx-auto space-y-6">
-        
         {/* 라이브 스트림 섹션 */}
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
@@ -339,25 +400,23 @@ export function StreamingScreen({ user, onBack, onUpdateUser, onAddNotification 
         >
           {/* 방송 화면 */}
           <div className="relative aspect-video bg-gradient-to-br from-pink-900/20 to-purple-900/20">
-            <img 
+            <img
               src={EXCLUSIVE_VJ.streamThumbnail}
               alt="Live Stream"
               className="w-full h-full object-cover"
             />
-            
+
             {/* 라이브 배지 */}
             <div className="absolute top-4 left-4">
-              <Badge className="bg-red-500 text-white animate-pulse px-3 py-1">
-                🔴 LIVE
-              </Badge>
+              <Badge className="bg-red-500 text-white animate-pulse px-3 py-1">🔴 LIVE</Badge>
             </div>
-            
+
             {/* 시청자 수 */}
             <div className="absolute top-4 right-4 bg-black/60 rounded-lg px-3 py-1 text-white text-sm">
               <Eye className="w-4 h-4 inline mr-1" />
               {currentViewers.toLocaleString()}
             </div>
-            
+
             {/* 재생 컨트롤 */}
             <div className="absolute bottom-4 left-4">
               <Button
@@ -377,18 +436,18 @@ export function StreamingScreen({ user, onBack, onUpdateUser, onAddNotification 
                   animate={{
                     y: [0, -100],
                     opacity: [0, 1, 0],
-                    scale: [0.5, 1.5, 0.5]
+                    scale: [0.5, 1.5, 0.5],
                   }}
                   transition={{
                     duration: 3,
                     repeat: Infinity,
                     delay: i * 0.6,
-                    ease: "easeOut"
+                    ease: 'easeOut',
                   }}
                   className="absolute text-pink-400 text-2xl"
                   style={{
                     left: `${20 + i * 15}%`,
-                    bottom: '10%'
+                    bottom: '10%',
                   }}
                 >
                   ❤️
@@ -401,13 +460,13 @@ export function StreamingScreen({ user, onBack, onUpdateUser, onAddNotification 
           <div className="p-6">
             <div className="flex items-start gap-4 mb-6">
               <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-pink-400">
-                <img 
+                <img
                   src={EXCLUSIVE_VJ.profileImage}
                   alt={EXCLUSIVE_VJ.name}
                   className="w-full h-full object-cover"
                 />
               </div>
-              
+
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-2">
                   <h2 className="text-xl font-bold text-foreground">{EXCLUSIVE_VJ.name}</h2>
@@ -419,12 +478,12 @@ export function StreamingScreen({ user, onBack, onUpdateUser, onAddNotification 
                     </Badge>
                   )}
                 </div>
-                
+
                 <p className="text-sm text-muted-foreground mb-3">{EXCLUSIVE_VJ.bio}</p>
-                
+
                 <div className="flex flex-wrap gap-2 mb-4">
                   {EXCLUSIVE_VJ.specialties.map((specialty, idx) => (
-                    <span 
+                    <span
                       key={idx}
                       className="bg-pink-500/20 text-pink-300 px-2 py-1 rounded-full text-xs"
                     >
@@ -449,7 +508,7 @@ export function StreamingScreen({ user, onBack, onUpdateUser, onAddNotification 
             {/* 액션 버튼들 */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {/* 선물하기 카드 */}
-              <Card 
+              <Card
                 className="cursor-pointer hover:scale-105 transition-transform border-pink-500/30 bg-gradient-to-br from-pink-500/10 to-purple-500/10"
                 onClick={() => showBenefits('gift')}
               >
@@ -467,7 +526,7 @@ export function StreamingScreen({ user, onBack, onUpdateUser, onAddNotification 
               </Card>
 
               {/* VIP 구독 카드 */}
-              <Card 
+              <Card
                 className="cursor-pointer hover:scale-105 transition-transform border-purple-500/30 bg-gradient-to-br from-purple-500/10 to-gold/10"
                 onClick={() => showBenefits('vip')}
               >
@@ -476,16 +535,18 @@ export function StreamingScreen({ user, onBack, onUpdateUser, onAddNotification 
                     <Crown className="w-4 h-4 text-purple-400" />
                     VIP 구독
                     <Info className="w-3 h-3 text-muted-foreground ml-auto" />
-                  </CardTitle>     
+                  </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-xs text-muted-foreground mb-2">{EXCLUSIVE_VJ.vipPrice}G / 월</p>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    {EXCLUSIVE_VJ.vipPrice}G / 월
+                  </p>
                   <p className="text-xs">독점 콘텐츠와 특별 혜택을 누리세요!</p>
                 </CardContent>
               </Card>
 
               {/* 개인방 카드 */}
-              <Card 
+              <Card
                 className="cursor-pointer hover:scale-105 transition-transform border-gold/30 bg-gradient-to-br from-gold/10 to-pink-500/10"
                 onClick={() => showBenefits('private')}
               >
@@ -497,7 +558,9 @@ export function StreamingScreen({ user, onBack, onUpdateUser, onAddNotification 
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-xs text-muted-foreground mb-2">{EXCLUSIVE_VJ.privatePrice}G / 세션</p>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    {EXCLUSIVE_VJ.privatePrice}G / 세션
+                  </p>
                   <p className="text-xs">1:1 프라이빗 세션을 경험해보세요!</p>
                 </CardContent>
               </Card>
@@ -516,7 +579,7 @@ export function StreamingScreen({ user, onBack, onUpdateUser, onAddNotification 
             <Video className="w-5 h-5 text-pink-400" />
             💕 루나의 영상 모음
           </h3>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {VIDEO_GALLERY.map((video) => (
               <motion.div
@@ -527,20 +590,10 @@ export function StreamingScreen({ user, onBack, onUpdateUser, onAddNotification 
               >
                 {/* 배지들 */}
                 <div className="absolute top-2 left-2 z-10 flex flex-col gap-1">
-                  {video.isHot && (
-                    <Badge className="bg-red-500 text-white text-xs">
-                      🔥 HOT
-                    </Badge>
-                  )}
-                  {video.isNew && (
-                    <Badge className="bg-green-500 text-white text-xs">
-                      ✨ NEW
-                    </Badge>
-                  )}
+                  {video.isHot && <Badge className="bg-red-500 text-white text-xs">🔥 HOT</Badge>}
+                  {video.isNew && <Badge className="bg-green-500 text-white text-xs">✨ NEW</Badge>}
                   {video.isVip && (
-                    <Badge className="bg-purple-500 text-white text-xs">
-                      👑 VIP
-                    </Badge>
+                    <Badge className="bg-purple-500 text-white text-xs">👑 VIP</Badge>
                   )}
                   {video.isPrivate && (
                     <Badge className="bg-gold text-black text-xs">
@@ -559,12 +612,12 @@ export function StreamingScreen({ user, onBack, onUpdateUser, onAddNotification 
 
                 {/* 썸네일 */}
                 <div className="relative overflow-hidden">
-                  <img 
-                    src={video.thumbnail} 
+                  <img
+                    src={video.thumbnail}
                     alt={video.title}
                     className="w-full h-32 object-cover transition-transform duration-300 group-hover:scale-110"
                   />
-                  
+
                   {/* 재생 오버레이 */}
                   <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/50">
                     <div className="w-12 h-12 bg-pink-500 rounded-full flex items-center justify-center">
@@ -583,7 +636,7 @@ export function StreamingScreen({ user, onBack, onUpdateUser, onAddNotification 
                   <h4 className="font-medium text-sm mb-2 line-clamp-2 text-foreground">
                     {video.title}
                   </h4>
-                  
+
                   <div className="flex items-center justify-between text-xs text-muted-foreground">
                     <div className="flex items-center gap-3">
                       <div className="flex items-center gap-1">
@@ -650,10 +703,14 @@ export function StreamingScreen({ user, onBack, onUpdateUser, onAddNotification 
                   </div>
 
                   <div className="flex gap-3">
-                    <Button variant="outline" onClick={() => setShowBenefitsModal(false)} className="flex-1">
+                    <Button
+                      variant="outline"
+                      onClick={() => setShowBenefitsModal(false)}
+                      className="flex-1"
+                    >
                       닫기
                     </Button>
-                    <Button 
+                    <Button
                       onClick={() => {
                         setShowBenefitsModal(false);
                         setShowGiftMenu(true);
@@ -673,21 +730,31 @@ export function StreamingScreen({ user, onBack, onUpdateUser, onAddNotification 
                       <Crown className="w-10 h-10 text-white" />
                     </div>
                     <h3 className="text-xl font-bold text-foreground mb-2">VIP 구독 혜택</h3>
-                    <p className="text-muted-foreground text-sm">월 {EXCLUSIVE_VJ.vipPrice}G로 프리미엄 경험을!</p>
+                    <p className="text-muted-foreground text-sm">
+                      월 {EXCLUSIVE_VJ.vipPrice}G로 프리미엄 경험을!
+                    </p>
                   </div>
 
                   <div className="space-y-3 mb-6">
                     <div className="bg-secondary/30 rounded-lg p-3">
-                      <div className="text-sm font-medium text-purple-400 mb-1">👑 VIP 전용 콘텐츠</div>
-                      <div className="text-xs text-muted-foreground">일반 회원이 볼 수 없는 특별 영상</div>
+                      <div className="text-sm font-medium text-purple-400 mb-1">
+                        👑 VIP 전용 콘텐츠
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        일반 회원이 볼 수 없는 특별 영상
+                      </div>
                     </div>
                     <div className="bg-secondary/30 rounded-lg p-3">
                       <div className="text-sm font-medium text-purple-400 mb-1">💎 우선 채팅</div>
-                      <div className="text-xs text-muted-foreground">VJ가 먼저 확인하는 특별 채팅</div>
+                      <div className="text-xs text-muted-foreground">
+                        VJ가 먼저 확인하는 특별 채팅
+                      </div>
                     </div>
                     <div className="bg-secondary/30 rounded-lg p-3">
                       <div className="text-sm font-medium text-purple-400 mb-1">🎁 월간 선물</div>
-                      <div className="text-xs text-muted-foreground">매달 특별 선물과 보너스 골드</div>
+                      <div className="text-xs text-muted-foreground">
+                        매달 특별 선물과 보너스 골드
+                      </div>
                     </div>
                     <div className="bg-secondary/30 rounded-lg p-3">
                       <div className="text-sm font-medium text-purple-400 mb-1">⭐ 개인방 할인</div>
@@ -696,10 +763,14 @@ export function StreamingScreen({ user, onBack, onUpdateUser, onAddNotification 
                   </div>
 
                   <div className="flex gap-3">
-                    <Button variant="outline" onClick={() => setShowBenefitsModal(false)} className="flex-1">
+                    <Button
+                      variant="outline"
+                      onClick={() => setShowBenefitsModal(false)}
+                      className="flex-1"
+                    >
                       닫기
                     </Button>
-                    <Button 
+                    <Button
                       onClick={() => {
                         setShowBenefitsModal(false);
                         subscribeVip();
@@ -719,17 +790,23 @@ export function StreamingScreen({ user, onBack, onUpdateUser, onAddNotification 
                       <Diamond className="w-10 h-10 text-white" />
                     </div>
                     <h3 className="text-xl font-bold text-foreground mb-2">개인방 혜택</h3>
-                    <p className="text-muted-foreground text-sm">세션당 {EXCLUSIVE_VJ.privatePrice}G로 1:1 프라이빗!</p>
+                    <p className="text-muted-foreground text-sm">
+                      세션당 {EXCLUSIVE_VJ.privatePrice}G로 1:1 프라이빗!
+                    </p>
                   </div>
 
                   <div className="space-y-3 mb-6">
                     <div className="bg-secondary/30 rounded-lg p-3">
                       <div className="text-sm font-medium text-gold mb-1">💎 완전 개인 공간</div>
-                      <div className="text-xs text-muted-foreground">오직 당신만을 위한 전용 방송</div>
+                      <div className="text-xs text-muted-foreground">
+                        오직 당신만을 위한 전용 방송
+                      </div>
                     </div>
                     <div className="bg-secondary/30 rounded-lg p-3">
                       <div className="text-sm font-medium text-gold mb-1">🎭 커스텀 쇼</div>
-                      <div className="text-xs text-muted-foreground">원하는 컨셉과 스타일로 진행</div>
+                      <div className="text-xs text-muted-foreground">
+                        원하는 컨셉과 스타일로 진행
+                      </div>
                     </div>
                     <div className="bg-secondary/30 rounded-lg p-3">
                       <div className="text-sm font-medium text-gold mb-1">💬 실시간 소통</div>
@@ -737,15 +814,21 @@ export function StreamingScreen({ user, onBack, onUpdateUser, onAddNotification 
                     </div>
                     <div className="bg-secondary/30 rounded-lg p-3">
                       <div className="text-sm font-medium text-gold mb-1">📹 녹화 서비스</div>
-                      <div className="text-xs text-muted-foreground">개인방 영상을 저장해드려요</div>
+                      <div className="text-xs text-muted-foreground">
+                        개인방 영상을 저장해드려요
+                      </div>
                     </div>
                   </div>
 
                   <div className="flex gap-3">
-                    <Button variant="outline" onClick={() => setShowBenefitsModal(false)} className="flex-1">
+                    <Button
+                      variant="outline"
+                      onClick={() => setShowBenefitsModal(false)}
+                      className="flex-1"
+                    >
                       닫기
                     </Button>
-                    <Button 
+                    <Button
                       onClick={() => {
                         setShowBenefitsModal(false);
                         requestPrivate();
@@ -774,11 +857,7 @@ export function StreamingScreen({ user, onBack, onUpdateUser, onAddNotification 
             <div className="glass-effect rounded-xl p-4">
               <h3 className="font-bold text-foreground mb-3 flex items-center justify-between">
                 💝 선물 보내기
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => setShowGiftMenu(false)}
-                >
+                <Button variant="outline" size="sm" onClick={() => setShowGiftMenu(false)}>
                   닫기
                 </Button>
               </h3>
@@ -820,7 +899,7 @@ export function StreamingScreen({ user, onBack, onUpdateUser, onAddNotification 
               className="glass-effect rounded-2xl overflow-hidden max-w-2xl w-full"
             >
               <div className="relative aspect-video">
-                <img 
+                <img
                   src={selectedVideo.thumbnail}
                   alt={selectedVideo.title}
                   className="w-full h-full object-cover"

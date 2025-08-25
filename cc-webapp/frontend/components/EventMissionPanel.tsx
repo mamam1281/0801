@@ -34,6 +34,7 @@ import { eventMissionApi } from '../utils/eventMissionApi';
 import { useEvents } from '../hooks/useEvents';
 import useAuthGate from '../hooks/useAuthGate';
 import useTelemetry from '../hooks/useTelemetry';
+import { api as unifiedApi } from '../lib/unifiedApi';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
@@ -144,8 +145,8 @@ export function EventMissionPanel({
             status: missionData.completed
               ? 'completed'
               : missionData.current_progress > 0
-                ? 'in-progress'
-                : 'available',
+              ? 'in-progress'
+              : 'available',
             target: mission.target_value,
             progress: missionData.current_progress,
             rewards: Object.entries(mission.rewards || {}).map(([type, amount]) => ({
@@ -260,11 +261,20 @@ export function EventMissionPanel({
         const totalGold = response.rewards.gold || 0;
         const totalExp = response.rewards.exp || 0;
 
-        const updatedUser = {
+        // 경험치는 로컬로 반영하되, 잔액은 서버 권위 소스로 동기화
+        let updatedUser = {
           ...user,
-          goldBalance: user.goldBalance + totalGold,
           experience: user.experience + totalExp,
-        };
+        } as User;
+
+        try {
+          const bal = await unifiedApi.get<any>('users/balance');
+          const cyber = bal?.cyber_token_balance ?? updatedUser.goldBalance ?? 0;
+          updatedUser = { ...updatedUser, goldBalance: cyber };
+        } catch (e) {
+          // 네트워크 오류 시 잔액은 일단 변경 없이 유지
+          console.warn('users/balance 동기화 실패(미션 보상):', e);
+        }
 
         // Check for level up
         if (updatedUser.experience >= updatedUser.maxExperience) {
@@ -333,11 +343,18 @@ export function EventMissionPanel({
         const totalGold = response.rewards.gold || 0;
         const totalGems = response.rewards.gems || 0;
 
-        onUpdateUser({
-          ...user,
-          goldBalance: user.goldBalance + totalGold,
-          // 젬은 사용자 타입에 없으면 추가해야 함
-        });
+        // 잔액은 서버 권위 소스로 동기화
+        try {
+          const bal = await unifiedApi.get<any>('users/balance');
+          const cyber = bal?.cyber_token_balance ?? user.goldBalance;
+          onUpdateUser({
+            ...user,
+            goldBalance: cyber,
+          });
+        } catch (e) {
+          console.warn('users/balance 동기화 실패(이벤트 보상):', e);
+          onUpdateUser({ ...user });
+        }
 
         // 데이터 다시 로드
         refreshEvents();
@@ -556,15 +573,17 @@ export function EventMissionPanel({
                 >
                   {/* Event Status Badge */}
                   <div
-                    className={`absolute top-4 right-4 px-2 py-1 rounded-full text-xs font-bold text-white ${getStatusColor(String(event.status || ''))}`}
+                    className={`absolute top-4 right-4 px-2 py-1 rounded-full text-xs font-bold text-white ${getStatusColor(
+                      String(event.status || '')
+                    )}`}
                   >
                     {event.status === 'active'
                       ? '진행중'
                       : event.status === 'scheduled'
-                        ? '예정'
-                        : event.status === 'ended'
-                          ? '종료'
-                          : event.status || ''}
+                      ? '예정'
+                      : event.status === 'ended'
+                      ? '종료'
+                      : event.status || ''}
                   </div>
 
                   {/* Event Header */}
@@ -608,7 +627,9 @@ export function EventMissionPanel({
                       />
                       <div className="text-xs text-muted-foreground mt-1 text-center">
                         {event.participants && event.maxParticipants
-                          ? `${Math.round((event.participants / event.maxParticipants) * 100)}% 달성`
+                          ? `${Math.round(
+                              (event.participants / event.maxParticipants) * 100
+                            )}% 달성`
                           : '0% 달성'}
                       </div>
                     </div>
@@ -623,8 +644,8 @@ export function EventMissionPanel({
                           {reward.type === 'gold'
                             ? `${reward.amount.toLocaleString()}G`
                             : reward.type === 'exp'
-                              ? `${reward.amount.toLocaleString()}XP`
-                              : reward.name || `아이템 x${reward.amount}`}
+                            ? `${reward.amount.toLocaleString()}XP`
+                            : reward.name || `아이템 x${reward.amount}`}
                         </Badge>
                       ))}
                     </div>
@@ -656,17 +677,17 @@ export function EventMissionPanel({
                       event.type === 'limited'
                         ? 'bg-gradient-to-r from-error to-warning'
                         : event.type === 'special'
-                          ? 'bg-gradient-gold text-black'
-                          : event.type === 'seasonal'
-                            ? 'bg-gradient-to-r from-success to-info'
-                            : 'bg-gradient-game'
+                        ? 'bg-gradient-gold text-black'
+                        : event.type === 'seasonal'
+                        ? 'bg-gradient-to-r from-success to-info'
+                        : 'bg-gradient-game'
                     }`}
                   >
                     {event.status === 'active'
                       ? '참여하기'
                       : event.status === 'scheduled'
-                        ? '곧 시작'
-                        : '종료됨'}
+                      ? '곧 시작'
+                      : '종료됨'}
                   </Button>
 
                   {/* Admin Controls */}
@@ -715,10 +736,10 @@ export function EventMissionPanel({
                       {type === 'daily'
                         ? '📅'
                         : type === 'weekly'
-                          ? '📆'
-                          : type === 'achievement'
-                            ? '🏆'
-                            : '✨'}
+                        ? '📆'
+                        : type === 'achievement'
+                        ? '🏆'
+                        : '✨'}
                     </div>
                     <div className="text-lg font-bold text-foreground">
                       {completed}/{typeMissions.length}
@@ -727,10 +748,10 @@ export function EventMissionPanel({
                       {type === 'daily'
                         ? '일일'
                         : type === 'weekly'
-                          ? '주간'
-                          : type === 'achievement'
-                            ? '업적'
-                            : '특별'}{' '}
+                        ? '주간'
+                        : type === 'achievement'
+                        ? '업적'
+                        : '특별'}{' '}
                       미션
                     </div>
                   </div>
@@ -750,8 +771,8 @@ export function EventMissionPanel({
                     mission.status === 'completed'
                       ? 'border-2 border-gold/30 gold-soft-glow'
                       : mission.status === 'locked'
-                        ? 'opacity-60'
-                        : ''
+                      ? 'opacity-60'
+                      : ''
                   } card-hover-float`}
                 >
                   <div className="flex items-center justify-between">
@@ -764,25 +785,29 @@ export function EventMissionPanel({
 
                           <Badge
                             variant="outline"
-                            className={`text-xs ${getDifficultyColor(String(mission.difficulty || ''))}`}
+                            className={`text-xs ${getDifficultyColor(
+                              String(mission.difficulty || '')
+                            )}`}
                           >
                             {mission.difficulty === 'easy'
                               ? '쉬움'
                               : mission.difficulty === 'medium'
-                                ? '보통'
-                                : mission.difficulty === 'hard'
-                                  ? '어려움'
-                                  : '극한'}
+                              ? '보통'
+                              : mission.difficulty === 'hard'
+                              ? '어려움'
+                              : '극한'}
                           </Badge>
 
                           <Badge
-                            className={`text-xs text-white ${getStatusColor(String(mission.status || ''))}`}
+                            className={`text-xs text-white ${getStatusColor(
+                              String(mission.status || '')
+                            )}`}
                           >
                             {mission.status === 'completed'
                               ? '완료'
                               : mission.status === 'locked'
-                                ? '잠금'
-                                : '진행중'}
+                              ? '잠금'
+                              : '진행중'}
                           </Badge>
                         </div>
 
@@ -813,8 +838,8 @@ export function EventMissionPanel({
                               {reward.type === 'gold'
                                 ? `${reward.amount.toLocaleString()}G`
                                 : reward.type === 'exp'
-                                  ? `${reward.amount.toLocaleString()}XP`
-                                  : reward.name || `아이템 x${reward.amount}`}
+                                ? `${reward.amount.toLocaleString()}XP`
+                                : reward.name || `아이템 x${reward.amount}`}
                             </Badge>
                           ))}
                         </div>

@@ -85,18 +85,38 @@ export function useAuth() {
         } catch { /* silent */ }
     }, [scheduleRefresh]);
 
+    // 권위 잔액 동기화: /users/balance → { cyber_token_balance }
+    const fetchAndMergeBalance = useCallback(async (baseUser: AuthUser | null): Promise<AuthUser | null> => {
+        if (!baseUser) return null;
+        try {
+            const bal = await api.get<any>('users/balance');
+            const cyber = bal?.cyber_token_balance ?? baseUser.cyber_token_balance ?? 0;
+            // gold_balance 백워드 호환 필드 채움
+            const merged: AuthUser = { ...baseUser, cyber_token_balance: cyber, gold_balance: cyber };
+            setUser(merged);
+            return merged;
+        } catch {
+            // 실패 시 기존 유저 유지하되 gold_balance 미러링만 보정
+            const cyber = baseUser.cyber_token_balance ?? baseUser.gold_balance ?? 0;
+            const merged: AuthUser = { ...baseUser, gold_balance: cyber };
+            setUser(merged);
+            return merged;
+        }
+    }, []);
+
     const signup = useCallback(async (data: SignupPayload) => {
         setLoading(true);
         try {
         const res = await api.post<SignupResponse>('auth/signup', data);
             // Backend returns flat structure: { access_token, token_type, user, refresh_token }
             applyTokens(res);
-            setUser(res.user);
-            return res.user;
+            // 잔액 병합
+            const merged = await fetchAndMergeBalance(res.user as AuthUser);
+            return merged as AuthUser;
         } finally {
             setLoading(false);
         }
-    }, [applyTokens]);
+    }, [applyTokens, fetchAndMergeBalance]);
 
     const login = useCallback(async (site_id: string, password: string) => {
         if (!site_id || !password) {
@@ -108,13 +128,13 @@ export function useAuth() {
                 const res = await api.post<any>('auth/login', { site_id: site_id.trim(), password });
                 applyTokens(res);
                 if (res && res.user) {
-                    setUser(res.user as AuthUser);
-                    return res.user as AuthUser;
+                    const merged = await fetchAndMergeBalance(res.user as AuthUser);
+                    return merged as AuthUser;
                 }
                 // Fallback: profile fetch
                 const profile = await api.get<AuthUser>('auth/profile');
-                setUser(profile);
-                return profile;
+                const merged = await fetchAndMergeBalance(profile as AuthUser);
+                return merged as AuthUser;
             } catch (e: any) {
                 const msg = e?.message || '';
                 if (/Invalid credentials/i.test(msg)) {
@@ -126,7 +146,7 @@ export function useAuth() {
                 throw e;
             }
         } finally { setLoading(false); }
-    }, [applyTokens]);
+    }, [applyTokens, fetchAndMergeBalance]);
 
     const adminLogin = useCallback(async (site_id: string, password: string) => {
         if (!site_id || !password) {
@@ -138,13 +158,13 @@ export function useAuth() {
                 const res = await api.post<any>('auth/admin/login', { site_id: site_id.trim(), password });
                 applyTokens(res);
                 if (res && res.user) {
-                    setUser(res.user as AuthUser);
-                    return res.user as AuthUser;
+                    const merged = await fetchAndMergeBalance(res.user as AuthUser);
+                    return merged as AuthUser;
                 }
                 // Fallback: profile fetch
                 const profile = await api.get<AuthUser>('auth/profile');
-                setUser(profile);
-                return profile;
+                const merged = await fetchAndMergeBalance(profile as AuthUser);
+                return merged as AuthUser;
             } catch (e: any) {
                 const msg = e?.message || '';
                 if (/Invalid credentials/i.test(msg)) {
@@ -159,7 +179,7 @@ export function useAuth() {
                 throw e;
             }
         } finally { setLoading(false); }
-    }, [applyTokens]);
+    }, [applyTokens, fetchAndMergeBalance]);
 
     // logout 먼저 선언 필요 (refresh 훅 의존 순서 문제 회피)
     const logout = useCallback(() => {
@@ -197,7 +217,12 @@ export function useAuth() {
     useEffect(() => {
         const { token } = readLegacyToken();
         if (token) {
-            api.get<AuthUser>('auth/profile').then((u: any) => setUser(u as AuthUser)).catch(() => logout());
+            api.get<AuthUser>('auth/profile')
+                .then(async (u: any) => {
+                    // 초기 진입 시에도 잔액 권위 소스와 동기화
+                    await fetchAndMergeBalance(u as AuthUser);
+                })
+                .catch(() => logout());
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);

@@ -9,6 +9,7 @@ import { Badge } from './ui/badge';
 import { Progress } from './ui/progress';
 import { User, UserStats, UserBalance } from '../types/user';
 import { api as unifiedApi } from '@/lib/unifiedApi';
+import useBalanceSync from '@/hooks/useBalanceSync';
 import { getTokens, setTokens } from '../utils/tokenStorage';
 
 interface ProfileScreenProps {
@@ -17,6 +18,9 @@ interface ProfileScreenProps {
   retryEnabled?: boolean; // 추가: 재시도 허용 여부 (기본 true)
   maxRetries?: number; // 추가: 최대 재시도 횟수 (기본 1)
   retryDelayMs?: number; // 추가: 재시도 사이 딜레이
+  // 공용 상태 연동: App의 user 상태를 전달 받아 일관된 GOLD 표시 및 갱신
+  sharedUser?: User | null;
+  onUpdateUser?: (next: User) => void;
 }
 
 export function ProfileScreen({
@@ -25,7 +29,14 @@ export function ProfileScreen({
   retryEnabled = true,
   maxRetries = 1,
   retryDelayMs = 800,
+  sharedUser,
+  onUpdateUser,
 }: ProfileScreenProps) {
+  const { reconcileWith } = useBalanceSync({
+    sharedUser,
+    onUpdateUser,
+    onAddNotification,
+  });
   const [user, setUser] = useState(null);
   const [stats, setStats] = useState(null);
   const [balance, setBalance] = useState(null);
@@ -83,9 +94,11 @@ export function ProfileScreen({
           (rawBalance as any).tokens ||
           0,
       };
-      setUser(profileData as any);
-      setStats(statsData as any);
-      setBalance(balanceData as any);
+  setUser(profileData as any);
+  setStats(statsData as any);
+  setBalance(balanceData as any);
+  // 공용 user 상태와 동기화: GOLD 일관성 확보(중앙 훅 사용)
+  reconcileWith((balanceData as any)?.cyber_token_balance);
     } catch (error) {
       console.error('[fetchProfileBundle] 오류:', error);
       throw error;
@@ -360,6 +373,11 @@ export function ProfileScreen({
   const progressToNext =
     user?.experience && user?.maxExperience ? (user.experience / user.maxExperience) * 100 : 0;
 
+  // GOLD 표시값: 공용 상태 우선 → 로컬 balance 폴백
+  const displayGold:
+    | number
+    | string = (sharedUser?.goldBalance ?? balance?.cyber_token_balance ?? 0) as any;
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-black/95 to-primary/5 relative">
       {/* 배경 효과 */}
@@ -454,7 +472,7 @@ export function ProfileScreen({
                   <div className="text-center">
                     <div className="text-sm text-muted-foreground mb-2">현재 보유 골드</div>
                     <div className="text-4xl font-black text-gradient-gold mb-2">
-                      {balance?.cyber_token_balance?.toLocaleString() || 0}
+                      {Number(displayGold || 0).toLocaleString()}
                     </div>
                     <div className="text-lg text-gold font-bold">GOLD</div>
                   </div>
@@ -622,7 +640,7 @@ export function ProfileScreen({
                           <div className="text-xs text-muted-foreground">100,000G 모으기</div>
                         </div>
                         <Badge className="bg-muted/20 text-muted-foreground border-muted/30 text-xs">
-                          {Math.min(100, Math.floor((balance?.cyber_token_balance || 0) / 1000))}%
+                          {Math.min(100, Math.floor((Number(sharedUser?.goldBalance ?? balance?.cyber_token_balance ?? 0)) / 1000))}%
                         </Badge>
                       </div>
                     </div>
