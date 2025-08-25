@@ -17,11 +17,14 @@ import {
 interface BottomNavigationProps {
   currentScreen: string;
   onNavigate: (screen: string) => void;
-  user: any;
 }
 
-export function BottomNavigation({ currentScreen, onNavigate, user }: BottomNavigationProps) {
+import { useUserGold, useUserLevel } from '@/hooks/useSelectors';
+
+export function BottomNavigation({ currentScreen, onNavigate }: BottomNavigationProps) {
   const { pendingCount } = useRealtimePurchaseBadge();
+  const gold = useUserGold();
+  const level = useUserLevel();
   const handleModelNavigation = () => {
     // 본사 사이트로 리다이렉트
     window.open('https://md-01.com', '_blank');
@@ -79,7 +82,7 @@ export function BottomNavigation({ currentScreen, onNavigate, user }: BottomNavi
       className="fixed bottom-0 left-0 right-0 z-50 bg-black/95 backdrop-blur-lg border-t border-primary/20"
     >
       {/* VIP Status Bar */}
-      {user?.level >= 10 && (
+  {level >= 10 && (
         <div className="bg-gradient-gold text-black text-center py-1 text-xs font-bold">
           <Crown className="w-3 h-3 inline mr-1" />
           VIP 회원 • 특별 혜택 적용중
@@ -136,7 +139,7 @@ export function BottomNavigation({ currentScreen, onNavigate, user }: BottomNavi
                   </motion.div>
                 )}
                 
-                {item.id === 'game-dashboard' && user?.stats.winStreak >= 5 && (
+                {false && (
                   <div className="absolute -top-2 -right-2 w-4 h-4 bg-warning rounded-full flex items-center justify-center">
                     <span className="text-black text-xs">🔥</span>
                   </div>
@@ -173,26 +176,26 @@ export function BottomNavigation({ currentScreen, onNavigate, user }: BottomNavi
       </div>
 
       {/* Gold balance quick view */}
-      {user && (
+    {gold > 0 && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.2 }}
           className="absolute top-1 right-2 bg-gradient-gold text-black px-2 py-1 rounded text-xs font-bold"
         >
-          {user.goldBalance.toLocaleString()}G
+      {gold.toLocaleString()}G
         </motion.div>
       )}
       
       {/* Level indicator */}
-      {user && (
+    {level > 0 && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.2 }}
           className="absolute top-1 left-2 bg-gradient-game text-white px-2 py-1 rounded text-xs font-bold"
         >
-          LV.{user.level}
+      LV.{level}
         </motion.div>
       )}
     </motion.div>

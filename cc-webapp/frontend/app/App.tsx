@@ -258,7 +258,6 @@ export default function App() {
             <SideMenu
               isOpen={isSideMenuOpen}
               onClose={closeSideMenu}
-              user={user}
               onNavigateToAdminPanel={navigationHandlers.toAdminPanel}
               onNavigateToEventMissionPanel={navigationHandlers.toEventMissionPanel}
               onNavigateToSettings={navigationHandlers.toSettings}
@@ -454,7 +453,6 @@ export default function App() {
               <BottomNavigation
                 currentScreen={currentScreen}
                 onNavigate={handleBottomNavigation}
-                user={user}
               />
             )}
 

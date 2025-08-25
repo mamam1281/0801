@@ -23,7 +23,6 @@ import { Button } from './ui/button';
 interface SideMenuProps {
   isOpen: boolean;
   onClose: () => void;
-  user: UserType | null;
   onNavigateToAdminPanel: () => void;
   onNavigateToEventMissionPanel: () => void;
   onNavigateToSettings: () => void;
@@ -31,16 +30,19 @@ interface SideMenuProps {
   onAddNotification: (message: string) => void;
 }
 
+import { useUserSummary, useIsAdmin } from '@/hooks/useSelectors';
+
 export function SideMenu({
   isOpen,
   onClose,
-  user,
   onNavigateToAdminPanel,
   onNavigateToEventMissionPanel,
   onNavigateToSettings,
   onLogout,
   onAddNotification
 }: SideMenuProps) {
+  const summary = useUserSummary();
+  const isAdmin = useIsAdmin();
   const handleExternalLink = () => {
     window.open('https://md-01.com', '_blank');
     onAddNotification('🌟 프리미엄 모델 페이지로 이동합니다!');
@@ -86,7 +88,7 @@ export function SideMenu({
   ];
 
   // 관리자 전용 메뉴 아이템
-  if (user?.isAdmin) {
+  if (isAdmin) {
     menuItems.unshift({
       icon: Shield,
       label: '관리자 패널',
@@ -143,34 +145,34 @@ export function SideMenu({
               </div>
 
               {/* User Info */}
-              {user && (
+              {summary?.nickname && (
                 <div className="p-6 border-b border-border-secondary">
                   <div className="flex items-center gap-3 mb-3">
                     <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
-                      user.isAdmin ? 'bg-gradient-to-r from-error to-warning' : 'bg-gradient-game'
+                      isAdmin ? 'bg-gradient-to-r from-error to-warning' : 'bg-gradient-game'
                     }`}>
                       <User className="w-6 h-6 text-white" />
                     </div>
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
-                        <h3 className="font-bold text-foreground">{user.nickname}</h3>
-                        {user.isAdmin && (
+                        <h3 className="font-bold text-foreground">{summary.nickname}</h3>
+                        {isAdmin && (
                           <div className="bg-error text-white text-xs px-2 py-0.5 rounded-full font-bold">
                             ADMIN
                           </div>
                         )}
                       </div>
-                      <p className="text-sm text-muted-foreground">레벨 {user.level}</p>
+                      <p className="text-sm text-muted-foreground">레벨 {summary.level}</p>
                     </div>
                   </div>
                   
                   <div className="grid grid-cols-2 gap-3">
                     <div className="bg-secondary/30 rounded-lg p-3 text-center">
-                      <div className="text-lg font-bold text-gold">{user.goldBalance.toLocaleString()}G</div>
+                      <div className="text-lg font-bold text-gold">{summary.gold.toLocaleString()}G</div>
                       <div className="text-xs text-muted-foreground">골드</div>
                     </div>
                     <div className="bg-secondary/30 rounded-lg p-3 text-center">
-                      <div className="text-lg font-bold text-primary">{user.dailyStreak}일</div>
+                      <div className="text-lg font-bold text-primary">{summary.dailyStreak}일</div>
                       <div className="text-xs text-muted-foreground">연속접속</div>
                     </div>
                   </div>
@@ -216,19 +218,19 @@ export function SideMenu({
               </div>
 
               {/* Stats Quick View */}
-              {user && (
+        {summary?.nickname && (
                 <div className="p-4 border-t border-border-secondary">
                   <div className="grid grid-cols-3 gap-2 text-center">
                     <div>
-                      <div className="text-sm font-bold text-success">{user.stats.gamesWon}</div>
+          <div className="text-sm font-bold text-success">0</div>
                       <div className="text-xs text-muted-foreground">승리</div>
                     </div>
                     <div>
-                      <div className="text-sm font-bold text-warning">{user.stats.winStreak}</div>
+          <div className="text-sm font-bold text-warning">0</div>
                       <div className="text-xs text-muted-foreground">연승</div>
                     </div>
                     <div>
-                      <div className="text-sm font-bold text-info">{user.achievements.length}</div>
+          <div className="text-sm font-bold text-info">0</div>
                       <div className="text-xs text-muted-foreground">업적</div>
                     </div>
                   </div>

@@ -42,6 +42,7 @@ import useRecentActions from '@/hooks/useRecentActions';
 import { API_ORIGIN } from '@/lib/unifiedApi';
 import { createWSClient, WSClient, WebSocketMessage } from '@/utils/wsClient';
 import useBalanceSync from '@/hooks/useBalanceSync';
+import { useUserGold, useUserLevel } from '@/hooks/useSelectors';
 
 interface HomeDashboardProps {
   user: User;
@@ -68,6 +69,9 @@ export function HomeDashboard({
   onAddNotification,
   onToggleSideMenu,
 }: HomeDashboardProps) {
+  // 전역 프로필 셀렉터(표시 우선)
+  const goldFromStore = useUserGold();
+  const levelFromStore = useUserLevel();
   const router = useRouter();
   const { reconcileBalance } = useBalanceSync({
     sharedUser: user,
@@ -609,7 +613,7 @@ export function HomeDashboard({
                 className="bg-gradient-gold text-black px-4 py-3 rounded-xl font-bold cursor-pointer btn-hover-lift"
               >
                 <Coins className="w-6 h-6 mx-auto mb-1" />
-                <div className="text-xl lg:text-2xl">{user.goldBalance.toLocaleString()}</div>
+                <div className="text-xl lg:text-2xl">{(goldFromStore ?? user.goldBalance).toLocaleString()}</div>
                 <div className="text-xs opacity-80">골드</div>
               </motion.div>
             </div>
@@ -617,7 +621,7 @@ export function HomeDashboard({
             <div className="text-center">
               <div className="bg-gradient-game text-white px-4 py-3 rounded-xl">
                 <Star className="w-6 h-6 mx-auto mb-1" />
-                <div className="text-xl lg:text-2xl">레벨 {user.level}</div>
+                <div className="text-xl lg:text-2xl">레벨 {levelFromStore ?? user.level}</div>
                 <div className="w-full bg-white/20 rounded-full h-1.5 mt-1">
                   <motion.div
                     initial={{ width: 0 }}

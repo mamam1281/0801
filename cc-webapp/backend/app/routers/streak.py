@@ -249,11 +249,12 @@ async def preview(
 
 @router.post("/claim", response_model=StreakClaimResponse)
 async def claim(
-    body: ClaimRequest,
+    body: Optional[ClaimRequest] = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    action_type = body.action_type or DEFAULT_ACTION
+    # Allow empty body (test clients may omit JSON) and default action_type
+    action_type = (body.action_type if body and body.action_type else DEFAULT_ACTION)
     # 진단 로깅: 요청 시작
     try:
         import logging
