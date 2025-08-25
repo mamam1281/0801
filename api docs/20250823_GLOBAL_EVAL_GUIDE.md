@@ -21,6 +21,16 @@
 	2) ALERT_PENDING_SPIKE_THRESHOLD 환경별 튜닝(.env.* 반영) 및 관찰값 기반 재보정.
 	3) OpenAPI 재수출/CI 연계(PR 디프 코멘트), Kafka Lag 임계 재튜닝(관찰 후).
 
+	## 2-ter) 최신 상태 추가(2025-08-25)
+	- 런타임/헬스: `/health` 200, `/docs` 200. Alembic heads 단일 유지(`c6a1b5e2e2b1`).
+	- 테스트: 제한/결제 스모크 9개 테스트 GREEN(경고는 기능 무영향).
+	- 레거시 WS 메트릭: `/metrics`에 아래 지표 노출 및 증가 검증.
+		- `ws_legacy_games_connections_total`: 총 연결 시도 카운터.
+		- `ws_legacy_games_connections_by_result_total{result="accepted|rejected"}`: 결과 라벨별 카운터.
+		- 비활성(ENABLE_LEGACY_GAMES_WS=0) 상태에서 스크립트 실행 시 `rejected` 증가 확인.
+		- 활성 상태에서 `accepted` 검증 예정.
+	 - 기준 브랜치: 업스트림 `7c07a00` 기준으로 재정렬 완료(`merge/upstream-base-7c07a00`).
+
 ## 3) 아키텍처 표준 요약
 - 설정: `app.core.config.settings` 단일 소스. 레거시 `app/config.py`는 shim(확장 금지).
 - 라우터: games 관련 엔드포인트는 `app/routers/games.py` 단일화.
@@ -93,6 +103,7 @@
 	- 유실 대비: 재연결 후 초기 상태 수신 확인
 - 로그 포인트
 	- 허브 register/unregister INFO, 브로드캐스트 DEBUG(샘플링), 스로틀 히트 카운트
+	- 레거시 WS(제거 예정) 계측: `ws_legacy_games_connections_total`, `ws_legacy_games_connections_by_result_total{result}` 증가 여부.
 
 ### F. 데이터/스키마/계약
 - [x] Postgres: 핵심 인덱스(`user_actions(user_id, created_at)` 등) 및 FK/UNIQUE 무결성. (증거: `cc_webapp_backup.sql` 내 `ix_user_actions_user_id`, `ix_user_actions_action_type`, `(action_type,"timestamp"), (user_id,"timestamp")` 인덱스 및 `ShopTransaction` 복합 UNIQUE `uq_shop_tx_user_product_idem` 확인)
@@ -119,6 +130,16 @@
 	- 사용자별 승/패 합계: `SELECT user_id, sum(wins) AS w, sum(losses) AS l FROM game_stats WHERE date >= today()-7 GROUP BY user_id ORDER BY w DESC LIMIT 50;`
 - Prometheus 지표(추가 권장)
 	- `ws_active_connections`, `realtime_event_lag_ms`, `shop_buy_success_total`, `shop_buy_failed_total`, `auth_login_locked_total`
+	- 레거시 WS 지표: `ws_legacy_games_connections_total`, `ws_legacy_games_connections_by_result_total{result}`
+
+#### 메트릭 검증(레거시 WS)
+- 비활성 검증(rejected):
+	1) backend에 `ENABLE_LEGACY_GAMES_WS=0` 적용(오버라이드 YAML backend.environment).
+	2) `docker compose restart backend` 후 컨테이너 내부에서 `python -m app.scripts.ws_touch_legacy --host http://localhost:8000 --once` 실행.
+	3) `/metrics`에서 `ws_legacy_games_connections_total`과 `{result="rejected"}` 증가 확인.
+- 활성 검증(accepted):
+	1) `ENABLE_LEGACY_GAMES_WS=1`로 전환 후 재시작.
+	2) 동일 스크립트 실행 → `{result="accepted"}` 증가 확인.
 
 #### 관측성 현황(2025-08-23)
 - [x] Prometheus scrape 정합: backend job 라벨 `cc-webapp-backend`로 통일
@@ -140,6 +161,7 @@
 - Backend(pytest)
 	- 로그인→/auth/me→스트릭 클레임→액션 생성→최근 액션 조회가 200/일관 JSON
 	- 골드 잔액 증가·스트릭 카운트 증가 assert
+	- 제한/결제 스모크: `app/tests/test_limited_holds_and_concurrency.py`, `app/tests/test_shop_buy.py`, `app/tests/test_limited_packages*.py` GREEN 유지
 - 진행도(2025-08-24):
 	- [ ] 결제 스모크: /api/shop/catalog → /api/shop/buy → profile 잔액 증가(멱등키 재시도 포함)
 	- [ ] 스트릭 스모크: 최초/재시도/동시 요청 경계 테스트 복구
@@ -155,7 +177,7 @@
 - [ ] 규정: PII 처리 구분, 성인콘텐츠 접근 연령검증 플로우.
 
 ### I. 신뢰성/마이그레이션/DR
-- [x] Alembic 단일 head, destructive 변경 시 shadow+rename 전략.
+- [x] Alembic 단일 head, destructive 변경 시 shadow+rename 전략. (현재 컨테이너 head: `c6a1b5e2e2b1`)
 - [ ] 백업: pg_dump + WAL 보관 정책(개발은 스냅샷/시드로 대체), Redis cold-start seed.
 - [ ] 롤백 절차/Compose 프로파일 분리(dev/tools/prod) 정리.
 
