@@ -19,6 +19,19 @@ const nextConfig = {
   reactStrictMode: false,
   useFileSystemPublicRoutes: true,
   pageExtensions: ['tsx', 'ts', 'jsx', 'js'],
+  async rewrites() {
+    // Proxy frontend /api/* to real backend API to support tests like page.request('/api/...')
+    // Prefer internal URL for server-side access inside Docker; fallback to public origin, then localhost
+    const internal = process.env.NEXT_PUBLIC_API_URL_INTERNAL;
+    const publicOrigin = process.env.NEXT_PUBLIC_API_ORIGIN;
+    const base = internal || publicOrigin || 'http://localhost:8000';
+    return [
+      {
+        source: '/api/:path*',
+        destination: `${base.replace(/\/$/, '')}/api/:path*`,
+      },
+    ];
+  },
   webpack: (config) => {
     config.resolve = config.resolve || {};
     config.resolve.alias = {

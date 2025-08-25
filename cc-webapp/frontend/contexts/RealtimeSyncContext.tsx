@@ -374,11 +374,9 @@ export function RealtimeSyncProvider({ children, apiBaseUrl }: RealtimeSyncProvi
   const { push } = useToast();
   const lastPurchaseByReceiptRef = useRef(new Map<string, { status: string; at: number }>());
 
-  const baseUrl =
-    apiBaseUrl ||
-    (typeof window !== 'undefined'
-      ? (window as any).process?.env?.NEXT_PUBLIC_API_BASE || 'http://localhost:8000'
-      : 'http://localhost:8000');
+  // Prefer the same origin resolution as unifiedApi to avoid cross-origin/SSR mismatches
+  const { API_ORIGIN } = require('../lib/unifiedApi');
+  const baseUrl = apiBaseUrl || API_ORIGIN || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8000');
 
   // WebSocket 메시지 핸들러
   const handleWebSocketMessage = useCallback((message: WebSocketMessage) => {
@@ -459,7 +457,7 @@ export function RealtimeSyncProvider({ children, apiBaseUrl }: RealtimeSyncProvi
 
   // WebSocket 연결
   const connect = useCallback(async () => {
-    const token = getAccessToken();
+  const token = getAccessToken() || (await getValidAccessToken());
     if (!token || !user) {
       console.log('[RealtimeSync] Cannot connect - no token or user');
       return;

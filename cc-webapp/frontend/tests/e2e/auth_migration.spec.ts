@@ -36,8 +36,8 @@ test.describe('Legacy 토큰 자동 마이그레이션', () => {
         });
         await page.goto('/');
 
-        // 번들 생성 대기
-        await page.waitForFunction(() => !!localStorage.getItem('cc_auth_tokens'));
+    // 번들 생성 대기 (최대 1.2s)
+    await page.waitForFunction(() => !!localStorage.getItem('cc_auth_tokens'), { timeout: 1200 });
 
         const bundleStr = await page.evaluate(() => localStorage.getItem('cc_auth_tokens'));
         expect(bundleStr).toBeTruthy();
@@ -55,6 +55,12 @@ test.describe('Legacy 토큰 자동 마이그레이션', () => {
             const s2 = await page.evaluate(() => localStorage.getItem('cc_auth_tokens'));
             let p2: any = null; try { p2 = s2 ? JSON.parse(s2) : null; } catch { p2 = null; }
             candidateToken = (p2 && typeof p2 === 'object') ? p2.access_token : (typeof s2 === 'string' ? s2 : '');
+            if (!candidateToken || candidateToken.length < 10) {
+                await page.waitForTimeout(250);
+                const s3 = await page.evaluate(() => localStorage.getItem('cc_auth_tokens'));
+                let p3: any = null; try { p3 = s3 ? JSON.parse(s3) : null; } catch { p3 = null; }
+                candidateToken = (p3 && typeof p3 === 'object') ? p3.access_token : (typeof s3 === 'string' ? s3 : '');
+            }
         }
         // 최소 길이만 보장하고, 가능하면 JWT 형태도 확인
         expect(candidateToken && candidateToken.length >= 10).toBeTruthy();

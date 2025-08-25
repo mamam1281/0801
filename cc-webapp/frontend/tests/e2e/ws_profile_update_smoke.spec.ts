@@ -7,7 +7,12 @@ test.describe('WS→UI 반영 스모크', () => {
     await page.goto('/');
     // 2) 토큰이 있는 상태로 가정: 서버의 권위 값 조회
     //    백엔드 베이스는 프록시/동일 오리진을 가정하여 상대 호출 사용 불가 → page 요청 기준으로 /api 프록시 사용
-    const authRes = await page.request.get('/api/auth/me');
+    let authRes = await page.request.get('/api/auth/me');
+    if (!authRes.ok()) {
+      // 초기 렌더 직후 번들/마이그레이션 타이밍 이슈 완화: 짧게 대기 후 1회 재시도
+      await page.waitForTimeout(300);
+      authRes = await page.request.get('/api/auth/me');
+    }
     expect(authRes.ok()).toBeTruthy();
     const me = await authRes.json();
     const balRes = await page.request.get('/api/users/balance');
