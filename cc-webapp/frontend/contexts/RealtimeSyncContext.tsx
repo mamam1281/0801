@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useContext, useEffect, useReducer, useCallback, useRef, createContext } from 'react';
+import { API_ORIGIN } from '../lib/unifiedApi';
 import { WSClient, createWSClient, WebSocketMessage, SyncEventData } from '../utils/wsClient';
 import { useAuth } from '../hooks/useAuth';
 import { useAuthToken } from '../hooks/useAuthToken';
@@ -375,7 +376,6 @@ export function RealtimeSyncProvider({ children, apiBaseUrl }: RealtimeSyncProvi
   const lastPurchaseByReceiptRef = useRef(new Map<string, { status: string; at: number }>());
 
   // Prefer the same origin resolution as unifiedApi to avoid cross-origin/SSR mismatches
-  const { API_ORIGIN } = require('../lib/unifiedApi');
   const baseUrl = apiBaseUrl || API_ORIGIN || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8000');
 
   // WebSocket 메시지 핸들러
