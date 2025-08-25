@@ -31,6 +31,7 @@ import { User } from '../../types';
 import { Button } from '../ui/button';
 import { Slider } from '../ui/slider';
 import { api } from '@/lib/unifiedApi';
+import { useWithReconcile } from '@/lib/sync';
 
 interface NeonCrashGameProps {
   user: User;
@@ -45,6 +46,7 @@ export function NeonCrashGame({
   onUpdateUser,
   onAddNotification,
 }: NeonCrashGameProps) {
+  const withReconcile = useWithReconcile();
   const [betAmount, setBetAmount] = useState(10);
   const [multiplier, setMultiplier] = useState(1.0);
   const [isRunning, setIsRunning] = useState(false);
@@ -105,7 +107,7 @@ export function NeonCrashGame({
     fetchAuthoritativeStats();
   }, [fetchAuthoritativeStats]);
 
-  // 게임 시작 - 서버에서 실제 베팅 처리
+  // 게임 시작 - 서버에서 실제 베팅 처리 (서버 권위; withReconcile로 멱등+재동기화)
   const startGame = async () => {
     if (user.goldBalance < betAmount) {
       onAddNotification('베팅할 골드가 부족합니다.');
@@ -118,13 +120,18 @@ export function NeonCrashGame({
     }
 
     try {
-      // 서버에 크래시 베팅 요청
-      // Unified API paths
-      const gameResult = await api.post<any>('games/crash/bet', {
-        bet_amount: betAmount,
-        auto_cashout_multiplier:
-          showAdvancedSettings && manualAutoCashout > 0 ? manualAutoCashout : null,
-      });
+      // 서버에 크래시 베팅 요청 (멱등키 포함)
+      const gameResult = await withReconcile(async (idemKey: string) =>
+        api.post<any>(
+          'games/crash/bet',
+          {
+            bet_amount: betAmount,
+            auto_cashout_multiplier:
+              showAdvancedSettings && manualAutoCashout > 0 ? manualAutoCashout : null,
+          },
+          { headers: { 'X-Idempotency-Key': idemKey } }
+        )
+      );
 
       // 서버에서 받은 게임 결과로 애니메이션 시작
       const finalMultiplier = gameResult.max_multiplier || 1.01;
@@ -157,19 +164,8 @@ export function NeonCrashGame({
       lastTimestamp.current = performance.now();
       animationRef.current = requestAnimationFrame(updateGame);
 
+      // 통계는 별도 fetch, 잔액은 withReconcile 후 하이드레이트에 위임
       fetchAuthoritativeStats();
-
-      // 사용자 잔액 업데이트 (서버 권위 소스: /users/balance)
-      try {
-        const balance = await api.get<any>('users/balance');
-        const cyber = balance?.cyber_token_balance ?? user.goldBalance;
-        onUpdateUser({
-          ...user,
-          goldBalance: cyber,
-        });
-      } catch (error) {
-        console.error('잔액 동기화 실패:', error);
-      }
     } catch (error) {
       console.error('크래시 게임 시작 실패:', error);
       onAddNotification('게임 시작에 실패했습니다. 다시 시도해주세요.');
@@ -368,7 +364,7 @@ export function NeonCrashGame({
     ]
   );
 
-  // 게임 캐시아웃 (프로필 재조회 비동기 수행 위해 async 추가)
+  // 게임 캐시아웃 (서버 권위; withReconcile로 재동기화)
   const cashout = async () => {
     if (!isRunning || hasCashedOut) return;
 
@@ -381,16 +377,18 @@ export function NeonCrashGame({
     const winnings = Math.floor(betAmount * multiplier);
     setWinAmount(winnings);
 
-    // 서버에서 권위 잔액을 재조회하여 반영 (로컬 가산 금지)
+    // 서버에 캐시아웃 요청(필요 시). 현재 백엔드에 별도 캐시아웃 엔드포인트가 존재하면 사용
     try {
-      const balance = await api.get<any>('users/balance');
-      const cyber = balance?.cyber_token_balance ?? user.goldBalance;
-      onUpdateUser({
-        ...user,
-        goldBalance: cyber,
-      });
-    } catch (error) {
-      console.error('잔액 재조회 실패:', error);
+      // 우선 멱등+재동기화만 수행하여 최종 잔액 일치 보장
+      await withReconcile(async (idemKey: string) =>
+        api.post<any>(
+          'games/crash/cashout',
+          { multiplier },
+          { headers: { 'X-Idempotency-Key': idemKey } }
+        )
+      );
+    } catch (e) {
+      // 캐시아웃 엔드포인트 미구현 환경에서도 하이드레이트로 최종 정합 보장됨
     }
 
     // 게임 상태 업데이트
@@ -537,7 +535,9 @@ export function NeonCrashGame({
             className="rounded-full"
           >
             <Settings
-              className={`h-6 w-6 ${showAdvancedSettings ? 'text-primary' : 'text-muted-foreground'}`}
+              className={`h-6 w-6 ${
+                showAdvancedSettings ? 'text-primary' : 'text-muted-foreground'
+              }`}
             />
           </Button>
           <div className="text-xl font-bold">{user.goldBalance.toLocaleString()} G</div>

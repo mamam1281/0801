@@ -159,8 +159,12 @@ export function RockPaperScissorsGame({
 
     // 서버 권위 플레이 호출 + 재동기화
     try {
-      await withReconcile(async (idemKey) => {
-        const res = await api.post<any>('games/rps/play', { hand: choice }, { headers: { 'X-Idempotency-Key': idemKey } });
+      await withReconcile(async (idemKey: string) => {
+        const res = await api.post<any>(
+          'games/rps/play',
+          { hand: choice },
+          { headers: { 'X-Idempotency-Key': idemKey } }
+        );
         // 서버 결과를 화면 연출에 사용하되, 잔액은 재동기화에 위임
         const result: GameResult = res?.result ?? determineWinner(choice, ai);
         setGameResult(result);
@@ -173,7 +177,7 @@ export function RockPaperScissorsGame({
           winnings: winnings - betAmount,
           isSpecialMove: false,
         };
-        setRoundHistory((prev) => [round, ...prev.slice(0, 9)]);
+        setRoundHistory((prev: GameRound[]) => [round, ...prev.slice(0, 9)]);
         return res;
       });
     } catch (e: any) {
@@ -719,37 +723,39 @@ export function RockPaperScissorsGame({
                   아직 게임 기록이 없습니다
                 </div>
               ) : (
-                roundHistory.slice(0, 5).map((round: GameRound, index: number) => (
-                  <div
-                    key={index}
-                    className={`flex items-center justify-between p-2 rounded-lg text-sm ${
-                      round.result === 'win'
-                        ? 'bg-success/10 border border-success/20'
-                        : round.result === 'lose'
-                        ? 'bg-error/10 border border-error/20'
-                        : 'bg-warning/10 border border-warning/20'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span>{CHOICES[round.playerChoice].emoji}</span>
-                      <span className="text-muted-foreground">vs</span>
-                      <span>{CHOICES[round.aiChoice].emoji}</span>
-                    </div>
+                <>
+                  {roundHistory.slice(0, 5).map((round: GameRound, index: number) => (
                     <div
-                      className={`font-bold ${
+                      key={index}
+                      className={`flex items-center justify-between p-2 rounded-lg text-sm ${
                         round.result === 'win'
-                          ? 'text-success'
+                          ? 'bg-success/10 border border-success/20'
                           : round.result === 'lose'
-                          ? 'text-error'
-                          : 'text-warning'
+                          ? 'bg-error/10 border border-error/20'
+                          : 'bg-warning/10 border border-warning/20'
                       }`}
                     >
-                      {round.result === 'win' ? '+' : round.result === 'lose' ? '-' : ''}
-                      {Math.abs(round.winnings).toLocaleString()}G
+                      <div className="flex items-center gap-2">
+                        <span>{CHOICES[round.playerChoice].emoji}</span>
+                        <span className="text-muted-foreground">vs</span>
+                        <span>{CHOICES[round.aiChoice].emoji}</span>
+                      </div>
+                      <div
+                        className={`font-bold ${
+                          round.result === 'win'
+                            ? 'text-success'
+                            : round.result === 'lose'
+                            ? 'text-error'
+                            : 'text-warning'
+                        }`}
+                      >
+                        {round.result === 'win' ? '+' : round.result === 'lose' ? '-' : ''}
+                        {Math.abs(round.winnings).toLocaleString()}G
+                      </div>
                     </div>
-                  </div>
-                ))
-              }
+                  ))}
+                </>
+              )}
             </div>
           </motion.div>
         </div>

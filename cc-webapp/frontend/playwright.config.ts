@@ -4,6 +4,8 @@ import { defineConfig } from '@playwright/test';
 export default defineConfig({
   testDir: './tests',
   timeout: 30_000,
+  // Ensure backend/front are up before tests begin
+  globalSetup: './tests/global-setup.js',
   use: {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   baseURL: ((globalThis as any).process?.env?.BASE_URL as string) || 'http://localhost:3000',

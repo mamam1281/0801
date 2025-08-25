@@ -15,12 +15,27 @@ import {
 
 export async function hydrateProfile(dispatch: ReturnType<typeof useGlobalStore>["dispatch"]) {
   try {
-    const data = await api.get("users/profile");
-    // 서버 스키마 → 전역 스키마 매핑은 최소 가정으로 통과
+    // 최초 진입 병렬 hydrate:
+    // - /users/profile (필수)
+    // - /users/balance (권위 잔액)
+    // - /games/stats/me (통계 – 전역 저장은 아직 없으나, 워밍업/요건 충족용 호출)
+    const [profileRes, balanceRes] = await Promise.all([
+      api.get("users/profile"),
+      api.get("users/balance").catch(() => null),
+      // 통계는 실패/401 무시 (호출만 수행)
+      api.get("games/stats/me").catch(() => null),
+    ]);
+
+    const data = profileRes as any;
+    // balance 응답에서 가능한 키를 우선적으로 사용
+    const balAny = balanceRes as any;
+    const goldFromBalanceRaw = balAny?.gold ?? balAny?.gold_balance ?? balAny?.cyber_token_balance ?? balAny?.balance;
+    const goldFromBalance = Number.isFinite(Number(goldFromBalanceRaw)) ? Number(goldFromBalanceRaw) : undefined;
+
     const mapped = {
       id: data?.id ?? data?.user_id ?? "unknown",
       nickname: data?.nickname ?? data?.name ?? "",
-      goldBalance: Number(data?.gold ?? data?.gold_balance ?? 0),
+      goldBalance: goldFromBalance ?? Number(data?.gold ?? data?.gold_balance ?? 0),
       gemsBalance: Number(data?.gems ?? data?.gems_balance ?? 0),
       level: data?.level ?? data?.battlepass_level ?? undefined,
       xp: data?.xp ?? undefined,

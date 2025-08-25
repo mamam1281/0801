@@ -29,15 +29,23 @@ test.describe('GOLD consistency across Profile and Dashboard', () => {
     // 기준 잔액 확보
     const authoritative = await apiGetBalance(ctx, token);
 
-    // 웹앱 접속 (토큰은 로컬 로그인 UI 경유 대신 API-only로 검증)
-    await page.goto('/');
+  // 웹앱 접속 (토큰은 로컬 로그인 UI 경유 대신 API-only로 검증)
+  await page.goto('/');
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForTimeout(300);
 
     // 프로필 화면으로 이동(메뉴 버튼/프로필 버튼 셀렉터는 프로젝트 기준으로 조정)
     // 가능한 텍스트 기반으로 접근
-    await page.getByRole('button', { name: /프로필|Profile/i }).first().click({ trial: true }).catch(()=>{});
-    // 프로필 컴포넌트가 렌더링되는 동안 대기 후, GOLD 텍스트 추출
-    // 포맷은 1,234G 형태이므로 숫자만 파싱
-    const profileGoldText = await page.locator('text=보유 골드').locator('..').locator('..').locator('text=/G$/').first().textContent().catch(()=>null);
+  // 요소 유무를 먼저 확인하여 불필요한 auto-wait을 방지
+  {
+    const btn = page.getByRole('button', { name: /프로필|Profile/i }).first();
+    if (await btn.count().catch(() => 0) > 0 && await btn.isVisible().catch(() => false)) {
+      await btn.click().catch(()=>{});
+      await page.waitForTimeout(150);
+    }
+  }
+  // 안정적인 숫자 추출을 위해 숫자+G 패턴 중 첫 번째를 사용
+  const profileGoldText = await page.locator('text=/\d[\d,]*\s*G$/').first().textContent({ timeout: 500 }).catch(()=>null);
     let profileGold = 0;
     if (profileGoldText) {
       const m = profileGoldText.replace(/[^0-9]/g, '');
@@ -45,10 +53,16 @@ test.describe('GOLD consistency across Profile and Dashboard', () => {
     }
 
     // 대시보드로 복귀
-    await page.getByRole('button', { name: /뒤로|Back|홈/i }).first().click({ trial: true }).catch(()=>{});
+  {
+    const back = page.getByRole('button', { name: /뒤로|Back|홈|Home/i }).first();
+    if (await back.count().catch(() => 0) > 0 && await back.isVisible().catch(() => false)) {
+      await back.click().catch(()=>{});
+      await page.waitForTimeout(150);
+    }
+  }
 
     // 대시보드 상단 배지/카드에서 GOLD 텍스트 추출(프로젝트 구조상 첫 번째 GOLD 숫자)
-    const dashGoldCandidate = await page.locator('text=/G$/').first().textContent().catch(()=>null);
+  const dashGoldCandidate = await page.locator('text=/\d[\d,]*\s*G$/').first().textContent({ timeout: 500 }).catch(()=>null);
     let dashboardGold = 0;
     if (dashGoldCandidate) {
       const m = dashGoldCandidate.replace(/[^0-9]/g, '');

@@ -7,33 +7,23 @@ test.describe('Auth + Balance Smoke', () => {
   const apiBase = process.env.API_BASE_URL || 'http://localhost:8000';
   const uid = 'smoke' + Date.now();
 
-  test('signup + login + profile + balance', async ({ request }) => {
-    // 회원가입
-    const signup = await request.post(`${apiBase}/api/auth/signup`, {
-      data: {
-        site_id: uid,
-        nickname: uid,
-        phone_number: '01099990000',
-        invite_code: '5858',
-        password: '1234'
-      }
+  test('register + profile + balance', async ({ request }) => {
+    // 회원 등록 (간소화된 공개 엔드포인트)
+    const reg = await request.post(`${apiBase}/api/auth/register`, {
+      data: { nickname: uid, invite_code: process.env.E2E_INVITE_CODE || '5858' }
     });
-    expect(signup.ok()).toBeTruthy();
-
-    // 로그인
-    const login = await request.post(`${apiBase}/api/auth/login`, { data: { site_id: uid, password: '1234' } });
-    expect(login.ok()).toBeTruthy();
-    const loginJson = await login.json();
-    const token = loginJson.access_token;
+    expect(reg.ok()).toBeTruthy();
+    const regJson = await reg.json();
+    const token = regJson.access_token as string;
     expect(token).toBeTruthy();
 
-    // 프로필(me 혹은 profile) 확인
+    // 프로필 확인
     const profile = await request.get(`${apiBase}/api/users/profile`, {
       headers: { Authorization: `Bearer ${token}` }
     });
     expect(profile.ok()).toBeTruthy();
     const profileJson = await profile.json();
-    expect(profileJson.site_id || profileJson.id || profileJson.nickname).toBeTruthy();
+    expect(profileJson.id || profileJson.nickname).toBeTruthy();
 
     // 권위 잔액 소스 확인
     const balance = await request.get(`${apiBase}/api/users/balance`, {
