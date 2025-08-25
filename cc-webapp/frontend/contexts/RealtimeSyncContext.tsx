@@ -82,6 +82,16 @@ export interface RealtimeSyncState {
     last_updated?: string;
   };
 
+  // 최근 구매 히스토리(WS 기반 경량 로그, 최대 20개)
+  recent_purchases: Array<{
+    id: string; // receipt_code 또는 합성 키
+    status: 'pending' | 'success' | 'failed' | 'idempotent_reuse';
+    product_id?: string;
+    amount?: number;
+    receipt_code?: string;
+    timestamp: string; // 수신 시각
+  }>;
+
   // WebSocket 연결 상태
   connection: {
     status: 'disconnected' | 'connecting' | 'connected' | 'reconnecting';
@@ -130,6 +140,7 @@ const initialState: RealtimeSyncState = {
   purchase: {
     pending_count: 0,
   },
+  recent_purchases: [],
   connection: {
     status: 'disconnected',
     reconnect_attempts: 0,
@@ -257,6 +268,24 @@ function syncStateReducer(state: RealtimeSyncState, action: SyncAction): Realtim
       if (p.status === 'success' || p.status === 'failed' || p.status === 'idempotent_reuse') {
         pending = Math.max(0, pending - 1);
       }
+      // 히스토리 업데이트(최근 20개 유지, receipt_code 기준 업데이트)
+      const key = p.receipt_code || `${p.user_id || 'me'}:${p.product_id || ''}`;
+      const history = [...state.recent_purchases];
+      const idx = history.findIndex((h) => h.id === key);
+      const entry = {
+        id: key,
+        status: p.status,
+        product_id: p.product_id,
+        amount: typeof p.amount === 'number' ? p.amount : undefined,
+        receipt_code: p.receipt_code,
+        timestamp,
+      } as const;
+      if (idx >= 0) {
+        history[idx] = { ...history[idx], ...entry, timestamp };
+      } else {
+        history.unshift(entry);
+      }
+      const trimmed = history.slice(0, 20);
       return {
         ...state,
         purchase: {
@@ -266,6 +295,7 @@ function syncStateReducer(state: RealtimeSyncState, action: SyncAction): Realtim
           last_receipt: p.receipt_code,
           last_updated: timestamp,
         },
+        recent_purchases: trimmed,
       };
     }
 

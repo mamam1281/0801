@@ -262,3 +262,15 @@ export function useRealtimePurchaseBadge() {
         lastProductId: state.purchase?.last_product_id
     };
 }
+
+/**
+ * 최근 구매 히스토리 훅(WS 기반 경량 로그)
+ */
+export function useRealtimePurchases() {
+    const { state } = useRealtimeSync();
+    return {
+        recentPurchases: state.recent_purchases,
+        hasHistory: (state.recent_purchases?.length ?? 0) > 0,
+        lastUpdated: state.purchase?.last_updated,
+    };
+}

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft,
@@ -28,6 +28,7 @@ import { api } from '@/lib/unifiedApi';
 import { useWithReconcile } from '@/lib/sync';
 import { useUserGold } from '@/hooks/useSelectors';
 import { useGlobalStore, mergeProfile, applyPurchase, mergeGameStats } from '@/store/globalStore';
+import ShopPurchaseHistory from './ShopPurchaseHistory';
 
 interface ShopScreenProps {
   user: User;
@@ -38,7 +39,7 @@ interface ShopScreenProps {
   onAddNotification: (message: string) => void;
 }
 
-// 🏪 상점 아이템 데이터
+// 🏪 상점 아이템 데이터 (서버 장애/초기 구동 시 폴백)
 const SHOP_ITEMS = [
   {
     id: 'gold_pack_small',
@@ -159,6 +160,7 @@ export function ShopScreen({
 }: ShopScreenProps) {
   const [showPurchaseModal, setShowPurchaseModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null as import('../types').GameItem | null);
+  const [catalog, setCatalog] = useState(null as any[] | null);
   const { reconcileBalance } = useBalanceSync({ sharedUser: user, onUpdateUser, onAddNotification });
   const withReconcile = useWithReconcile();
   const gold = useUserGold();
@@ -169,6 +171,48 @@ export function ShopScreen({
     reconcileBalance().catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // 서버 카탈로그 로드 (fallback: SHOP_ITEMS)
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        const res1: any = await api.get('shop/catalog');
+        if (!cancelled && Array.isArray(res1)) {
+          setCatalog(res1);
+          return;
+        }
+      } catch {}
+      try {
+        const res2: any = await api.get('shop/items');
+        if (!cancelled && Array.isArray(res2)) {
+          setCatalog(res2);
+          return;
+        }
+      } catch {}
+      if (!cancelled) setCatalog([]); // 빈 배열이면 아래에서 폴백 사용
+    }
+    load();
+    return () => { cancelled = true; };
+  }, []);
+
+  // 서버 → UI 매핑 (널 안전)
+  const itemsToRender = useMemo(() => {
+    const source = (catalog && catalog.length > 0) ? catalog : SHOP_ITEMS;
+    return source.map((it: any) => ({
+      id: String(it.id ?? it.item_id ?? it.slug ?? it.code ?? Math.random().toString(36).slice(2)),
+      name: String(it.name ?? '아이템'),
+      type: String(it.type ?? 'item'),
+      rarity: String(it.rarity ?? 'common'),
+      price: Number(it.price ?? it.cost ?? 0),
+      discount: Number(it.discount ?? it.sale_pct ?? 0),
+      description: String(it.description ?? it.desc ?? ''),
+      value: Number(it.value ?? it.amount ?? 0),
+      icon: String(it.icon ?? '🎁'),
+      isLimited: Boolean(it.isLimited ?? it.limited ?? false),
+      popular: Boolean(it.popular ?? it.isPopular ?? false),
+    }));
+  }, [catalog]);
 
   // 🎨 등급별 스타일링 (글래스메탈 버전)
   const getRarityStyles = (rarity: string) => {
@@ -460,7 +504,7 @@ export function ShopScreen({
 
         {/* 🛍️ 상점 아이템 그리드 (글래스메탈) */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-          {SHOP_ITEMS.map((item, index) => {
+          {itemsToRender.map((item: any, index: number) => {
             const styles = getRarityStyles(item.rarity);
             const finalPrice = Math.floor(item.price * (1 - item.discount / 100));
             const canAfford = gold >= finalPrice;
@@ -559,7 +603,10 @@ export function ShopScreen({
               </motion.div>
             );
           })}
-        </div>
+  </div>
+
+  {/* 🧾 최근 거래 히스토리 */}
+  <ShopPurchaseHistory />
       </div>
 
       {/* 🔮 구매 확인 모달 (글래스메탈) */}

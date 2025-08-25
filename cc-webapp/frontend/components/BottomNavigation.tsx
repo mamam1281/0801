@@ -135,7 +135,7 @@ export function BottomNavigation({ currentScreen, onNavigate }: BottomNavigation
                     transition={{ duration: 2, repeat: Infinity, type: 'tween' }}
                     className="absolute -top-2 -right-2 w-4 h-4 bg-gradient-to-r from-error to-warning rounded-full flex items-center justify-center"
                   >
-          <span className="text-white text-[10px] font-bold">{Math.min(9, pendingCount)}</span>
+          <span className="text-white text-[10px] font-bold">{pendingCount > 9 ? '9+' : String(pendingCount)}</span>
                   </motion.div>
                 )}
                 
