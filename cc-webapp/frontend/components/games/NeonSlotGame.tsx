@@ -2,7 +2,9 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import useFeedback from '../../hooks/useFeedback';
+import useBalanceSync from '../../hooks/useBalanceSync';
 import { api } from '@/lib/unifiedApi';
+import { useWithReconcile } from '@/lib/sync';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft,
@@ -97,7 +99,13 @@ interface SlotSpinApiResponse {
 export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: NeonSlotGameProps) {
   const { fromApi } = useFeedback();
   const { config: gameConfig, loading: configLoading } = useGameConfig();
-  
+  const { reconcileBalance } = useBalanceSync({
+    sharedUser: user,
+    onUpdateUser,
+    onAddNotification,
+  });
+  const withReconcile = useWithReconcile();
+
   // unifiedApi: call games endpoints with relative paths
   const [reels, setReels] = useState([
     SLOT_SYMBOLS[0],
@@ -290,16 +298,21 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
     const costAmount = betAmount;
 
     let serverResult: SlotSpinApiResponse | null = null;
-    // Attempt authoritative server spin
+    // Attempt authoritative server spin with reconcile + idempotency
     try {
-      // Backend endpoint: POST /api/games/slot/spin
-      const raw = await api.post<SlotSpinApiResponse>('games/slot/spin', { bet_amount: betAmount });
+      const raw = await withReconcile(async (idemKey: string) =>
+        api.post<SlotSpinApiResponse>(
+          'games/slot/spin',
+          { bet_amount: betAmount },
+          { headers: { 'X-Idempotency-Key': idemKey } }
+        )
+      );
       serverResult = raw;
       if (serverResult?.feedback) {
         fromApi(serverResult as any);
       }
     } catch (_e) {
-      serverResult = null; // fallback to local simulation
+      serverResult = null; // fallback to local simulation (no local balance mutation)
     }
 
     // Helper to map server unicode symbol to local symbol
@@ -372,108 +385,88 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
     }
 
     // Process final result after all reels stop
-  setTimeout(async () => {
-    if (result.winAmount > 0) {
-      setIsWin(true);
-      setWinAmount(result.winAmount);
-      setWinningPositions(result.winningPositions);
-      setConsecutiveWins((prev: number) => prev + 1);
+    setTimeout(async () => {
+      if (result.winAmount > 0) {
+        setIsWin(true);
+        setWinAmount(result.winAmount);
+        setWinningPositions(result.winningPositions);
+        setConsecutiveWins((prev: number) => prev + 1);
 
-      // Enhanced particle effects based on win type
-      if (result.isJackpot) {
-        generateParticles('jackpot');
-      } else if (result.isBigWin) {
-        generateParticles('bigwin');
+        // Enhanced particle effects based on win type
+        if (result.isJackpot) {
+          generateParticles('jackpot');
+        } else if (result.isBigWin) {
+          generateParticles('bigwin');
+        } else {
+          generateParticles('win');
+        }
+
+        generateCoinDrops();
+
+        // 🎯 백엔드에서 최신 잔액을 받아온 후 전역 동기화
+        await reconcileBalance();
+
+        // 게임 통계만 업데이트 (잔액은 reconcileBalance에서 처리됨)
+        const updatedUser = {
+          ...user,
+          gameStats: {
+            ...user.gameStats,
+            slot: {
+              ...user.gameStats.slot,
+              totalSpins: user.gameStats.slot.totalSpins + 1,
+              totalWinnings: user.gameStats.slot.totalWinnings + result.winAmount,
+              biggestWin: Math.max(user.gameStats.slot.biggestWin, result.winAmount),
+              jackpotHits: result.isJackpot
+                ? user.gameStats.slot.jackpotHits + 1
+                : user.gameStats.slot.jackpotHits,
+            },
+          },
+          stats: {
+            ...user.stats,
+            gamesPlayed: user.stats.gamesPlayed + 1,
+            gamesWon: user.stats.gamesWon + 1,
+            totalEarnings: user.stats.totalEarnings + (result.winAmount - costAmount),
+            winStreak: user.stats.winStreak + 1,
+          },
+        };
+        onUpdateUser(updatedUser);
+
+        // Only important notifications
+        if (result.isJackpot) {
+          setShowWinModal(true);
+          onAddNotification(`🎰 JACKPOT! ${result.winAmount.toLocaleString()}G 획득!`);
+        } else if (result.isBigWin) {
+          onAddNotification(`🔥 BIG WIN! ${result.winAmount.toLocaleString()}G 획득!`);
+        }
       } else {
-        generateParticles('win');
-      }
+        setConsecutiveWins(0);
 
-      generateCoinDrops();
+        // 🎯 패배 시에도 백엔드에서 최신 잔액을 받아온 후 전역 동기화
+        await reconcileBalance();
 
-      // Update user stats (prefer authoritative balance from server; fallback to serverResult or local)
-      let latestBalance: number | undefined;
-      try {
-        const bal = await api.get<any>('users/balance');
-        latestBalance = bal?.cyber_token_balance;
-      } catch {
-        latestBalance = undefined;
-      }
-      const resolvedBalance =
-        latestBalance ??
-        (serverResult && serverResult.success
-          ? serverResult.balance
-          : user.goldBalance - costAmount + result.winAmount);
-      const updatedUser = {
-        ...user,
-        goldBalance: resolvedBalance,
-        gameStats: {
-          ...user.gameStats,
-          slot: {
-            ...user.gameStats.slot,
-            totalSpins: user.gameStats.slot.totalSpins + 1,
-            totalWinnings: user.gameStats.slot.totalWinnings + result.winAmount,
-            biggestWin: Math.max(user.gameStats.slot.biggestWin, result.winAmount),
-            jackpotHits: result.isJackpot
-              ? user.gameStats.slot.jackpotHits + 1
-              : user.gameStats.slot.jackpotHits,
+        // 게임 통계만 업데이트 (잔액은 reconcileBalance에서 처리됨)
+        const updatedUser = {
+          ...user,
+          gameStats: {
+            ...user.gameStats,
+            slot: {
+              ...user.gameStats.slot,
+              totalSpins: user.gameStats.slot.totalSpins + 1, // spins -> totalSpins
+            },
           },
-        },
-        stats: {
-          ...user.stats,
-          gamesPlayed: user.stats.gamesPlayed + 1,
-          gamesWon: user.stats.gamesWon + 1,
-          totalEarnings: user.stats.totalEarnings + (result.winAmount - costAmount),
-          winStreak: user.stats.winStreak + 1,
-        },
-      };
-      onUpdateUser(updatedUser);
-
-      // Only important notifications
-      if (result.isJackpot) {
-        setShowWinModal(true);
-        onAddNotification(`🎰 JACKPOT! ${result.winAmount.toLocaleString()}G 획득!`);
-      } else if (result.isBigWin) {
-        onAddNotification(`🔥 BIG WIN! ${result.winAmount.toLocaleString()}G 획득!`);
-      }
-    } else {
-      setConsecutiveWins(0);
-
-      // 패배 시에도 동일하게 권위 잔액을 우선 조회
-      let latestBalanceLose: number | undefined;
-      try {
-        const bal = await api.get<any>('users/balance');
-        latestBalanceLose = bal?.cyber_token_balance;
-      } catch {
-        latestBalanceLose = undefined;
-      }
-      const resolvedBalanceLose =
-        latestBalanceLose ??
-        (serverResult && serverResult.success
-          ? serverResult.balance
-          : user.goldBalance - costAmount);
-      const updatedUser = {
-        ...user,
-        goldBalance: resolvedBalanceLose,
-        gameStats: {
-          ...user.gameStats,
-          slot: {
-            ...user.gameStats.slot,
-            totalSpins: user.gameStats.slot.totalSpins + 1, // spins -> totalSpins
+          stats: {
+            ...user.stats,
+            gamesPlayed: user.stats.gamesPlayed + 1,
+            winStreak: 0,
           },
-        },
-        stats: {
-          ...user.stats,
-          gamesPlayed: user.stats.gamesPlayed + 1,
-          winStreak: 0,
-        },
-      };
-      onUpdateUser(updatedUser);
-      // 실패 스핀도 서버 feedback이 push 되었을 수 있음 (serverResult)
-    }
+        };
+        onUpdateUser(updatedUser);
+        // 실패 스핀도 서버 feedback이 push 되었을 수 있음 (serverResult)
+      }
 
-    setIsSpinning(false);
-    setReelStopOrder([]); // Reset for next spin
-  }, 3000);
+      setIsSpinning(false);
+      setReelStopOrder([]); // Reset for next spin
+    }, 3000);
   };
 
   return (
@@ -501,8 +494,8 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
               particle.type === 'jackpot'
                 ? 'bg-gradient-gold'
                 : particle.type === 'bigwin'
-                  ? 'bg-gradient-to-r from-primary to-gold'
-                  : 'bg-gradient-to-r from-primary to-primary-light'
+                ? 'bg-gradient-to-r from-primary to-gold'
+                : 'bg-gradient-to-r from-primary to-primary-light'
             }`}
           />
         ))}
@@ -682,11 +675,11 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
                             y: [30, -10, 0],
                           }
                         : winningPositions[index]
-                          ? {
-                              scale: [1, 1.2, 1],
-                              rotate: [0, 5, -5, 0],
-                            }
-                          : {}
+                        ? {
+                            scale: [1, 1.2, 1],
+                            rotate: [0, 5, -5, 0],
+                          }
+                        : {}
                     }
                     transition={
                       reelStopOrder.includes(index) || winningPositions[index]

@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { User } from '../../types';
 import { Button } from '../ui/button';
+import { useWithReconcile } from '@/lib/sync';
 
 interface RockPaperScissorsGameProps {
   user: User;
@@ -82,6 +83,7 @@ export function RockPaperScissorsGame({
   );
   const [comboCount, setComboCount] = useState(0);
   const [isSpecialMove, setIsSpecialMove] = useState(false);
+  const withReconcile = useWithReconcile();
 
   // Play sound effect (visual simulation)
   const playSoundEffect = (effectName: string) => {
@@ -155,108 +157,27 @@ export function RockPaperScissorsGame({
     setPlayerChoice(choice);
     setAiChoice(ai);
 
-    // Calculate result
-    const result: GameResult = determineWinner(choice, ai);
-    setGameResult(result);
-
-    // Game stats for display
-    const totalGames = user.gameStats.rps.totalGames;
-    const wins = user.gameStats.rps.wins;
-    const losses = totalGames - wins;
-    const draws = totalGames - wins - losses; // draws가 별도 집계되지 않는다면 항상 0
-    const winRate = totalGames > 0 ? Math.round((wins / totalGames) * 100) : 0;
-
-    // Check for special moves
-    const isSpecial = streak >= 2 && result === 'win';
-    setIsSpecialMove(isSpecial);
-
-    // Calculate winnings with bonuses
-    let winnings = 0;
-    let comboMultiplier = 1;
-
-    if (result === 'win') {
-      winnings = betAmount * 2;
-      // Streak bonuses
-      if (streak >= 2) {
-        comboMultiplier = 1 + streak * 0.2;
-        setComboCount(streak + 1);
-        playSoundEffect('combo');
-      }
-      if (streak >= 4) {
-        comboMultiplier *= 1.5;
-        playSoundEffect('perfect');
-      }
-      winnings = Math.floor(winnings * comboMultiplier);
-    } else if (result === 'draw') {
-      winnings = betAmount; // Return bet
-    }
-
-    // Update user stats
-    // 권위 잔액 동기화 시도 (/users/balance), 실패 시 로컬 계산 폴백
-    let latestBalance: number | undefined;
+    // 서버 권위 플레이 호출 + 재동기화
     try {
-      const bal = await api.get<any>('users/balance');
-      latestBalance = bal?.cyber_token_balance;
-    } catch {
-      latestBalance = undefined;
-    }
-    const resolvedBalance =
-      typeof latestBalance === 'number' ? latestBalance : user.goldBalance - betAmount + winnings;
-
-    const updatedUser = {
-      ...user,
-      goldBalance: resolvedBalance,
-      gameStats: {
-        ...user.gameStats,
-        rps: {
-          ...user.gameStats.rps,
-          totalGames: user.gameStats.rps.totalGames + 1,
-          wins: result === 'win' ? user.gameStats.rps.wins + 1 : user.gameStats.rps.wins,
-          currentStreak: result === 'win' ? user.gameStats.rps.currentStreak + 1 : 0,
-        },
-      },
-      stats: {
-        ...user.stats,
-        gamesPlayed: user.stats.gamesPlayed + 1,
-        gamesWon: result === 'win' ? user.stats.gamesWon + 1 : user.stats.gamesWon,
-        totalEarnings: user.stats.totalEarnings + (winnings - betAmount),
-        winStreak: result === 'win' ? user.stats.winStreak + 1 : 0,
-      },
-    };
-
-    // Update streak
-    if (result === 'win') {
-      setStreak((prev: number) => prev + 1);
-    } else {
-      setStreak(0);
-      setComboCount(0);
-    }
-
-    // Generate visual effects
-    generateParticles(result);
-    // Play result sound
-    playSoundEffect(result);
-
-    // Add to round history
-    const round: GameRound = {
-      playerChoice: choice,
-      aiChoice: ai,
-      result,
-      winnings: winnings - betAmount,
-      isSpecialMove: isSpecial,
-    };
-    setRoundHistory((prev: GameRound[]) => [round, ...prev.slice(0, 9)]);
-
-    onUpdateUser(updatedUser);
-
-    // 🎯 중요한 알림만
-    if (result === 'win' && (comboMultiplier > 1.5 || winnings - betAmount >= 200)) {
-      const baseMessage = `🎉 승리! +${(winnings - betAmount).toLocaleString()}G`;
-      let finalMessage = baseMessage;
-      if (comboMultiplier > 1) {
-        finalMessage += ` (${comboMultiplier.toFixed(1)}x 콤보!)`;
-      }
-      onAddNotification(finalMessage);
+      await withReconcile(async (idemKey) => {
+        const res = await api.post<any>('games/rps/play', { hand: choice }, { headers: { 'X-Idempotency-Key': idemKey } });
+        // 서버 결과를 화면 연출에 사용하되, 잔액은 재동기화에 위임
+        const result: GameResult = res?.result ?? determineWinner(choice, ai);
+        setGameResult(result);
+        const winnings = Number(res?.win_amount ?? 0);
+        // 히스토리/이펙트만 반영(로컬 잔액 수학 금지)
+        const round: GameRound = {
+          playerChoice: choice,
+          aiChoice: ai,
+          result,
+          winnings: winnings - betAmount,
+          isSpecialMove: false,
+        };
+        setRoundHistory((prev) => [round, ...prev.slice(0, 9)]);
+        return res;
+      });
+    } catch (e: any) {
+      onAddNotification('플레이 실패. 네트워크 상태를 확인해주세요.');
     }
 
     setShowResult(true);
@@ -828,7 +749,7 @@ export function RockPaperScissorsGame({
                     </div>
                   </div>
                 ))
-              )}
+              }
             </div>
           </motion.div>
         </div>

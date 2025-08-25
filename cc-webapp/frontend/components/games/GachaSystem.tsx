@@ -2,8 +2,10 @@
 
 import React, { useState, useEffect } from 'react';
 import { api } from '@/lib/unifiedApi';
+import { useWithReconcile } from '@/lib/sync';
 import useAuthToken from '../../hooks/useAuthToken';
 import useFeedback from '../../hooks/useFeedback';
+import useBalanceSync from '../../hooks/useBalanceSync';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Coins, RefreshCw, Package, Heart, Crown } from 'lucide-react';
 import { User } from '../../types'; // App.tsx가 아닌 types에서 import
@@ -55,7 +57,13 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
   const { fromApi } = useFeedback();
   const { getAccessToken } = useAuthToken();
   const { config: gameConfig, loading: configLoading } = useGameConfig();
-  
+  const { reconcileBalance } = useBalanceSync({
+    sharedUser: user,
+    onUpdateUser,
+    onAddNotification,
+  });
+  const withReconcile = useWithReconcile();
+
   const [selectedBanner, setSelectedBanner] = useState(GACHA_BANNERS[0] as GachaBanner);
   const [isPulling, setIsPulling] = useState(false);
   const [pullResults, setPullResults] = useState([] as GachaItem[]);
@@ -72,7 +80,7 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
   const getSinglePullCost = () => {
     return gameConfig.gacha?.cost_single ?? selectedBanner.cost;
   };
-  
+
   const getTenPullCost = () => {
     return gameConfig.gacha?.cost_ten ?? Math.floor(getSinglePullCost() * 10 * 0.9);
   };
@@ -138,13 +146,14 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
     setPullAnimation('revealing');
     let serverUsed = false;
     try {
-      // Auth token retrieval (temporary: reading localStorage like slot game)
-      const res = await api.post<GachaPullApiResponse>('games/gacha/pull', { pull_count: 1 });
+      const res = await withReconcile(async (idemKey: string) =>
+        api.post<GachaPullApiResponse>('games/gacha/pull', { pull_count: 1 }, { headers: { 'X-Idempotency-Key': idemKey } })
+      );
       fromApi(res);
       if (res?.items?.length) {
         serverUsed = true;
         const mapped: GachaItem[] = res.items.map(
-          (it, idx) =>
+          (it: { name: string; rarity: string }, idx: number) =>
             ({
               id: `srv-${Date.now()}-${idx}`,
               name: it.name,
@@ -199,34 +208,15 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
       // Fallback to local simulation
     }
     if (!serverUsed) {
-      // Local fallback logic replicating previous behavior
-      let updatedUser = {
-        ...user,
-        goldBalance: user.goldBalance - cost,
-        gameStats: {
-          ...user.gameStats,
-          gacha: {
-            ...user.gameStats.gacha,
-            pulls: user.gameStats.gacha.pulls + 1,
-            totalSpent: user.gameStats.gacha.totalSpent + cost,
-          },
-        },
-      };
-      const item = getRandomItem(selectedBanner, updatedUser);
+      // Local fallback: preserve visuals only, avoid local balance mutation per authoritative rules
+      const item = getRandomItem(selectedBanner, user);
       const newParticles = generateParticles(item.rarity);
       setParticles(newParticles);
-      updatedUser = updateUserInventory(updatedUser as unknown as User, item);
-      if (item.rarity === 'epic') {
-        updatedUser.gameStats.gacha.epicCount = (updatedUser.gameStats.gacha.epicCount || 0) + 1;
-      } else if (item.rarity === 'legendary' || item.rarity === 'mythic') {
-        updatedUser.gameStats.gacha.legendaryCount =
-          (updatedUser.gameStats.gacha.legendaryCount || 0) + 1;
-      }
       setPullResults([item]);
       setCurrentPullIndex(0);
       setShowResults(true);
-      onUpdateUser(updatedUser as User);
       onAddNotification(getRarityMessage(item));
+      try { await reconcileBalance(); } catch {}
     }
     setIsPulling(false);
     setPullAnimation(null);
@@ -245,12 +235,14 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
     setPullAnimation('revealing');
     let serverUsed = false;
     try {
-      const res = await api.post<GachaPullApiResponse>('games/gacha/pull', { pull_count: 10 });
+      const res = await withReconcile(async (idemKey: string) =>
+        api.post<GachaPullApiResponse>('games/gacha/pull', { pull_count: 10 }, { headers: { 'X-Idempotency-Key': idemKey } })
+      );
       fromApi(res);
       if (res?.items?.length) {
         serverUsed = true;
         const mapped: GachaItem[] = res.items.map(
-          (it, idx) =>
+          (it: { name: string; rarity: string }, idx: number) =>
             ({
               id: `srv-${Date.now()}-${idx}`,
               name: it.name,
@@ -314,46 +306,19 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
       // swallow & fallback
     }
     if (!serverUsed) {
+      // Local fallback visuals only; avoid local economy mutation
       const items: GachaItem[] = [];
-      let updatedUser = {
-        ...user,
-        goldBalance: user.goldBalance - discountedCost,
-        gameStats: {
-          ...user.gameStats,
-          gacha: {
-            ...user.gameStats.gacha,
-            pulls: user.gameStats.gacha.pulls + 10,
-            totalSpent: user.gameStats.gacha.totalSpent + discountedCost,
-          },
-        },
-      };
       for (let i = 0; i < 10; i++) {
-        const item = getRandomItem(selectedBanner, updatedUser);
-        items.push(item);
-        updatedUser = updateUserInventory(updatedUser as unknown as User, item);
-        if (item.rarity === 'epic') {
-          updatedUser.gameStats.gacha.epicCount = (updatedUser.gameStats.gacha.epicCount || 0) + 1;
-        } else if (['legendary', 'mythic'].includes(item.rarity)) {
-          updatedUser.gameStats.gacha.legendaryCount =
-            (updatedUser.gameStats.gacha.legendaryCount || 0) + 1;
-        }
+        items.push(getRandomItem(selectedBanner, user));
       }
-      const rarityOrder: Record<string, number> = {
-        common: 1,
-        rare: 2,
-        epic: 3,
-        legendary: 4,
-        mythic: 5,
-      };
-      const bestItem = items.reduce((b, c) =>
-        rarityOrder[c.rarity] > rarityOrder[b.rarity] ? c : b
-      );
+      const rarityOrder: Record<string, number> = { common:1, rare:2, epic:3, legendary:4, mythic:5 };
+      const bestItem = items.reduce((b, c) => (rarityOrder[c.rarity] > rarityOrder[b.rarity] ? c : b));
       setParticles(generateParticles(bestItem.rarity));
       setPullResults(items);
       setCurrentPullIndex(0);
       setShowResults(true);
-      onUpdateUser(updatedUser as User);
       onAddNotification(getTenPullMessage(items));
+      try { await reconcileBalance(); } catch {}
     }
     setIsPulling(false);
     setPullAnimation(null);
@@ -652,9 +617,7 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
                       <Crown className="w-6 h-6 mr-2" />
                       <div className="flex flex-col">
                         <span>글래머 10연 뽑기</span>
-                        <span className="text-sm opacity-80">
-                          {getTenPullCost()}G (10% 할인!)
-                        </span>
+                        <span className="text-sm opacity-80">{getTenPullCost()}G (10% 할인!)</span>
                       </div>
                     </>
                   )}

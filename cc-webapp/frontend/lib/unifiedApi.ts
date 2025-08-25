@@ -64,6 +64,16 @@ const __build = __env.NEXT_PUBLIC_BUILD_ID || 'dev';
 const __ctx = (typeof window === 'undefined') ? 'SSR' : 'CSR';
 console.log(`[unifiedApi] 초기화 - ctx=${__ctx} build=${__build} origin=${ORIGIN}`);
 
+// 간단 UUIDv4 (라이브러리 무의존) - 멱등키 자동 주입용
+function __uuidv4() {
+  // eslint-disable-next-line no-bitwise
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
 async function refreshOnce(): Promise<boolean> {
   try {
     const tokens = getTokens();
@@ -115,6 +125,12 @@ export async function apiCall<T=any>(path: string, opts: UnifiedRequestOptions<T
     }
     if (body && !(body instanceof FormData)) {
       finalHeaders['Content-Type'] = finalHeaders['Content-Type'] || 'application/json';
+    }
+
+    // 멱등키 자동 주입: 쓰기 계열(POST/PUT/PATCH/DELETE)이고, 헤더에 없으면 생성
+    const m = method.toUpperCase();
+    if (m !== 'GET' && !finalHeaders['X-Idempotency-Key']) {
+      finalHeaders['X-Idempotency-Key'] = __uuidv4();
     }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

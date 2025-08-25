@@ -1,8 +1,40 @@
+## 2025-08-25 전역 동기화 개선안(v1) 작성 및 정리
+
+### 문서 정리(중복/표기/로그 이동)
+- `개선안.md` 중복 섹션 통합: “완성형 개선안”을 기준으로 유지, 과거 “일관성 개선안 v1” 중복 내용 제거.
+- 엔드포인트 표기 통일: 클라이언트는 `unifiedApi.get('/users/profile')`로 고정(‘/api’ 접두는 클라이언트가 자동 부여). ‘/users/me’ 대안은 사용하지 않음.
+- Alembic head 표기: 단일 head는 f79d04ea1016로 문서 기준 유지, 과거 해시 표기는 혼동 방지로 제거.
+- 말미 운영 로그(컨테이너 E2E 등)는 본 문서(final.md)로 이동하여 변경 이력 일원화.
+
+## 2025-08-25 개선안.md 운영 로그 이동/정리
+
+- 변경 요약: `개선안.md` 말미에 있던 운영 로그(컨테이너 E2E, 프론트 정합성/라우팅, 모니터링/운영, 백엔드 안정화, 실시간 브로드캐스트/프론트 소비, 클라이언트 품질/가드, 현재 검증 상태)를 본 문서로 이동하여 연대기 형태로 보존.
+- 검증 결과: 문서 중복 제거 및 기준 문서 일원화(개선안.md는 설계/규약만 유지). Alembic head 표기는 문서 기준으로 f79d04ea1016으로 통일.
+- 다음 단계: 기준 문서(개선안.md)대로 GlobalStore/RealtimeSync 구현을 진행하고, 각 단계 완료 시 본 문서에 “변경 요약/검증/다음 단계” 3블록을 누적 기록.
+
+- 변경 요약: `개선안.md`를 보강해 서버 권위(Users/Balances/Stats) + WS 브로드캐스트(profile_update/purchase_update/reward_granted/game_update) 기반의 GlobalStore/RealtimeSync 설계, 페이지/컴포넌트별 체크리스트, 테스트/모니터링/롤아웃 계획을 상세화. 로컬 가산/하드코딩 전면 금지 및 withReconcile 패턴을 표준으로 명시.
+- 검증 결과: 코드 변경은 아직 적용 전(설계 문서 단계). 기존 컨테이너 상태 정상(/health 200). Alembic heads 단일 유지(f79d04ea1016, 문서 기준). OpenAPI 스키마 영향 없음.
+- 다음 단계: (1) frontend/store/userStore.ts와 lib/sync.ts 신설 후 App.tsx에 hydrate 적용, (2) 게임 4종/Shop/Profile 순으로 withReconcile 전환, (3) Playwright에 잔액/통계 일치 시나리오 추가하여 컨테이너에서 실행 및 그린 확보.
+
 ## 2025-08-25 컨테이너 기반 Playwright 러너 도입
 
 - 변경 요약: mcr.microsoft.com/playwright:v1.55.0-jammy 이미지를 사용하는 `docker-compose.playwright.yml` 추가. 프론트 `package.json`에 `test:e2e` 스크립트 정리. 러너는 ccnet 네트워크에 붙어 `frontend:3000`/`backend:8000`을 직접 참조하도록 구성.
 - 검증 결과: 프론트엔드 빌드 성공(경고 다수, 에러 없음), 백엔드 핵심 pytest 그린(9/9). 러너 컨테이너는 compose 기준으로 `npm ci && npx playwright test` 실행 준비 완료.
 - 다음 단계: (1) docker compose -f docker-compose.yml -f docker-compose.playwright.yml run --rm playwright 로 E2E 실행 자동화, (2) CI 파이프라인에 동일 오버레이 적용, (3) 경고 정리(미사용 아이콘/any 타입/훅 deps).
+
+# 2025-08-25 전역 동기화 개선 계획 문서 추가
+
+- 변경 요약
+   - `개선안.md` 신규 추가: 서버 권위 소스(users/balance, users/profile, games/stats/me)와 WS 브로드캐스트(profile_update, purchase_update, reward_granted, game_update)를 GlobalStore로 일원화하는 계획 수립.
+   - 프론트에서 로컬 가산/감산 금지, 모든 쓰기 이후 balance 재조정(reconcile) 표준화.
+   - 페이지/컴포넌트별 체크리스트 포함(메인/게임/프로필/상점/이벤트/어드민) 및 E2E 항목 정의.
+- 검증 결과(예정)
+   - 컨테이너 기반 Playwright로 동기화 시나리오 추가 실행 → GREEN 목표.
+   - 백엔드 pytest 기존 그린 유지, Alembic heads 단일 유지(f79d04ea1016).
+- 다음 단계
+   - GlobalStore/RealtimeSyncContext 구현 후 게임4종/상점/프로필/이벤트/어드민 순 연결 PR 분리 적용.
+   - 구매/보상/어드민 골드 경로에 WS 이벤트-스토어 반영 검증 케이스 보강.
+   - Grafana 구매 성공률/지연 P95 대시보드와 연계 모니터링.
 
 # Casino-Club F2P 프로젝트 Final 체크 & 트러블슈팅 기록
 
