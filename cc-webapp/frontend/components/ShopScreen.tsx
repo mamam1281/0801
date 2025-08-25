@@ -26,8 +26,6 @@ import { User, GameItem } from '../types';
 import useBalanceSync from '@/hooks/useBalanceSync';
 import { api } from '@/lib/unifiedApi';
 import { useWithReconcile } from '@/lib/sync';
-import { useGlobalProfile } from '@/store/globalStore';
-import { useGameConfig } from '@/hooks/useGameConfig';
 
 interface ShopScreenProps {
   user: User;
@@ -38,7 +36,116 @@ interface ShopScreenProps {
   onAddNotification: (message: string) => void;
 }
 
-// 서버 카탈로그(useGameConfig.shop) 사용. 하드코딩된 상점 아이템은 제거되었습니다.
+// 🏪 상점 아이템 데이터
+const SHOP_ITEMS = [
+  {
+    id: 'gold_pack_small',
+    name: '골드 팩 (소)',
+    type: 'currency' as const,
+    rarity: 'common' as const,
+    price: 1000,
+    description: '5,000G를 즉시 획득하세요',
+    value: 5000,
+    icon: '💰',
+    category: 'currency',
+    isLimited: false,
+    discount: 0,
+    popular: false
+  },
+  {
+    id: 'gold_pack_medium',
+    name: '골드 팩 (중)',
+    type: 'currency' as const,
+    rarity: 'rare' as const,
+    price: 2500,
+    description: '15,000G를 즉시 획득하세요',
+    value: 15000,
+    icon: '💎',
+    category: 'currency',
+    isLimited: false,
+    discount: 20,
+    popular: true
+  },
+  {
+    id: 'gold_pack_large',
+    name: '골드 팩 (대)',
+    type: 'currency' as const,
+    rarity: 'epic' as const,
+    price: 5000,
+    description: '35,000G를 즉시 획득하세요',
+    value: 35000,
+    icon: '💸',
+    category: 'currency',
+    isLimited: false,
+    discount: 30,
+    popular: false
+  },
+  {
+    id: 'vip_skin_neon',
+    name: '네온 VIP 스킨',
+    type: 'skin' as const,
+    rarity: 'legendary' as const,
+    price: 3000,
+    description: '특별한 네온 효과가 적용된 VIP 전용 스킨',
+    icon: '👑',
+    category: 'cosmetic',
+    isLimited: true,
+    discount: 0,
+    popular: false
+  },
+  {
+    id: 'lucky_charm',
+    name: '행운의 부적',
+    type: 'powerup' as const,
+    rarity: 'epic' as const,
+    price: 2000,
+    description: '모든 게임에서 승률 +15% (24시간)',
+    icon: '🍀',
+    category: 'powerup',
+    isLimited: false,
+    discount: 0,
+    popular: true
+  },
+  {
+    id: 'exp_booster',
+    name: '경험치 부스터',
+    type: 'powerup' as const,
+    rarity: 'rare' as const,
+    price: 1500,
+    description: '획득 경험치 +100% (12시간)',
+    icon: '⚡',
+    category: 'powerup',
+    isLimited: false,
+    discount: 0,
+    popular: false
+  },
+  {
+    id: 'premium_gacha_ticket',
+    name: '프리미엄 가챠 티켓',
+    type: 'collectible' as const,
+    rarity: 'legendary' as const,
+    price: 2500,
+    description: '전설급 아이템 확률 +50%',
+    icon: '🎫',
+    category: 'special',
+    isLimited: true,
+    discount: 25,
+    popular: true
+  },
+  {
+    id: 'slot_multiplier',
+    name: '슬롯 멀티플라이어',
+    type: 'powerup' as const,
+    rarity: 'epic' as const,
+    price: 3500,
+    description: '슬롯 게임 당첨금 2배 (1시간)',
+    icon: '🎰',
+    category: 'powerup',
+    isLimited: false,
+    discount: 15,
+    popular: false
+  }
+];
 
 export function ShopScreen({
   user,
@@ -52,8 +159,6 @@ export function ShopScreen({
   const [selectedItem, setSelectedItem] = useState(null as import('../types').GameItem | null);
   const { reconcileBalance } = useBalanceSync({ sharedUser: user, onUpdateUser, onAddNotification });
   const withReconcile = useWithReconcile();
-  const profile = useGlobalProfile();
-  const { config: gameConfig } = useGameConfig();
 
   // 마운트 시 1회 권위 잔액으로 정합화
   useEffect(() => {
@@ -104,23 +209,33 @@ export function ShopScreen({
 
   // 💰 아이템 구매 처리
   const handlePurchase = async (item: any) => {
-    const discount = Number(item.discount_percent ?? 0);
-    const baseGold = Number(item.gold ?? 0);
-    const finalGold = Math.max(0, Math.floor(baseGold * (100 - discount) / 100));
-    const currentGold = Number((profile as any)?.goldBalance ?? user.goldBalance ?? 0);
+    const finalPrice = Math.floor(item.price * (1 - item.discount / 100));
 
-    if (currentGold < finalGold) {
+    if (user.goldBalance < finalPrice) {
       onAddNotification('❌ 골드가 부족합니다!');
       return;
     }
 
+    const newItem: GameItem = {
+      id: `${item.id}_${Date.now()}`,
+      name: item.name,
+      type: item.type,
+      rarity: item.rarity,
+      quantity: item.type === 'currency' ? item.value : 1,
+      description: item.description,
+      icon: item.icon,
+      value: item.value,
+    };
+
     try {
-      // OpenAPI에 따르면 product_id는 문자열이며, 카탈로그의 sku를 사용합니다.
-      const productId = (item.sku ?? item.id ?? '').toString();
       await withReconcile(async (idemKey: string) =>
-        api.post('shop/buy', { product_id: productId, quantity: 1 }, { headers: { 'X-Idempotency-Key': idemKey } })
+        api.post('shop/buy', { item_id: item.id, price: finalPrice }, { headers: { 'X-Idempotency-Key': idemKey } })
       );
-      onAddNotification(`✅ ${item.name}을(를) 구매했습니다!`);
+      // 아이템 지급은 서버 측 인벤토리 동기화를 신뢰, 필요시 WS/polling으로 반영됨
+      onAddNotification(item.type === 'currency'
+        ? `💰 ${item.value.toLocaleString()}G를 획득했습니다!`
+        : `✅ ${item.name}을(를) 구매했습니다!`
+      );
     } catch (e) {
       // 실패 시에도 최종적으로 권위 잔액과 동기화 시도
       onAddNotification('구매 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
@@ -187,7 +302,7 @@ export function ShopScreen({
             <div className="text-right">
               <div className="text-sm text-muted-foreground">보유 골드</div>
               <div className="text-xl font-black text-gradient-gold">
-                {Number((profile as any)?.goldBalance ?? user.goldBalance ?? 0).toLocaleString()}G
+                {user.goldBalance.toLocaleString()}G
               </div>
             </div>
           </div>
@@ -320,15 +435,10 @@ export function ShopScreen({
 
         {/* 🛍️ 상점 아이템 그리드 (글래스메탈) */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-          {(gameConfig?.shop ?? []).map((item: any, index: number) => {
-            // 서버 카탈로그 스키마: { id, name, gold, discount_percent, min_rank, ... }
-            const rarity = (item.min_rank ? 'rare' : 'common') as 'common' | 'rare' | 'epic' | 'legendary';
-            const discount = Number(item.discount_percent ?? 0);
-            const baseGold = Number(item.gold ?? 0);
-            const finalGold = Math.max(0, Math.floor(baseGold * (100 - discount) / 100));
-            const currentGold = Number((profile as any)?.goldBalance ?? user.goldBalance ?? 0);
-            const canAfford = currentGold >= finalGold;
-            const styles = getRarityStyles(rarity);
+          {SHOP_ITEMS.map((item, index) => {
+            const styles = getRarityStyles(item.rarity);
+            const finalPrice = Math.floor(item.price * (1 - item.discount / 100));
+            const canAfford = user.goldBalance >= finalPrice;
             
             return (
               <motion.div
@@ -341,12 +451,12 @@ export function ShopScreen({
                 <Card className={`glass-metal p-8 border-2 ${styles.borderColor} glass-metal-hover ${styles.glowColor} relative overflow-hidden metal-shine`}>
                   {/* 🏷️ 배지들 */}
                   <div className="absolute top-4 right-4 flex flex-col gap-2">
-          {discount > 0 && (
+                    {item.discount > 0 && (
                       <Badge className="glass-metal bg-error text-white font-bold text-xs px-3 py-2 rounded-full">
-            -{discount}%
+                        -{item.discount}%
                       </Badge>
                     )}
-          {item.isLimited && (
+                    {item.isLimited && (
                       <Badge className="glass-metal bg-gold text-white font-bold text-xs px-3 py-2 rounded-full">
                         <Timer className="w-3 h-3 mr-1" />
                         한정
@@ -365,8 +475,7 @@ export function ShopScreen({
 
                   {/* 🎨 아이템 아이콘 */}
                   <div className={`glass-metal ${styles.bgColor} rounded-2xl w-20 h-20 mx-auto mb-6 flex items-center justify-center text-4xl border ${styles.borderColor} metal-shine`}>
-                    {/* 서버 아이템에는 아이콘이 없을 수 있어 기본 이모지 */}
-                    {item.icon ?? '🛒'}
+                    {item.icon}
                   </div>
 
                   {/* 📝 아이템 정보 */}
@@ -374,34 +483,32 @@ export function ShopScreen({
                     <h3 className={`text-lg font-bold ${styles.textColor} mb-3`}>
                       {item.name}
                     </h3>
-                    {item.description && (
-                      <p className="text-sm text-muted-foreground mb-4 leading-relaxed">
-                        {item.description}
-                      </p>
-                    )}
+                    <p className="text-sm text-muted-foreground mb-4 leading-relaxed">
+                      {item.description}
+                    </p>
                     
                     <Badge className={`glass-metal text-white border ${styles.borderColor} bg-transparent px-3 py-1`}>
-                      {rarity === 'common' ? '일반' :
-                       rarity === 'rare' ? '레어' :
-                       rarity === 'epic' ? '에픽' : '전설'}
+                      {item.rarity === 'common' ? '일반' :
+                       item.rarity === 'rare' ? '레어' :
+                       item.rarity === 'epic' ? '에픽' : '전설'}
                     </Badge>
                   </div>
 
                   {/* 💰 가격 및 구매 */}
                   <div className="space-y-4">
                     <div className="text-center">
-                      {discount > 0 ? (
+                      {item.discount > 0 ? (
                         <div>
                           <div className="text-sm text-muted-foreground line-through mb-1">
-                            {baseGold.toLocaleString()}G
+                            {item.price.toLocaleString()}G
                           </div>
                           <div className="text-2xl font-bold text-error">
-                            {finalGold.toLocaleString()}G
+                            {finalPrice.toLocaleString()}G
                           </div>
                         </div>
                       ) : (
                         <div className="text-2xl font-bold text-gradient-gold">
-                          {baseGold.toLocaleString()}G
+                          {item.price.toLocaleString()}G
                         </div>
                       )}
                     </div>
@@ -413,9 +520,9 @@ export function ShopScreen({
                       }}
                       disabled={!canAfford}
                       className={`w-full glass-metal-hover ${
-                        rarity === 'legendary' ? 'bg-gradient-to-r from-gold to-gold-light' :
-                        rarity === 'epic' ? 'bg-gradient-to-r from-primary to-primary-light' :
-                        rarity === 'rare' ? 'bg-gradient-to-r from-info to-primary' :
+                        item.rarity === 'legendary' ? 'bg-gradient-to-r from-gold to-gold-light' :
+                        item.rarity === 'epic' ? 'bg-gradient-to-r from-primary to-primary-light' :
+                        item.rarity === 'rare' ? 'bg-gradient-to-r from-info to-primary' :
                         'bg-gradient-metal'
                       } hover:opacity-90 text-white font-bold py-3 disabled:opacity-50 disabled:cursor-not-allowed metal-shine`}
                     >
@@ -449,44 +556,29 @@ export function ShopScreen({
             >
               <div className="text-center mb-8">
                 {(() => {
-                  const rarity = ((selectedItem as any)?.rarity ?? ((selectedItem as any)?.min_rank ? 'rare' : 'common')) as string;
-                  const styles = getRarityStyles(rarity);
+                  const styles = getRarityStyles(selectedItem.rarity);
                   return (
                     <div className={`glass-metal ${styles.bgColor} rounded-2xl w-24 h-24 mx-auto mb-6 flex items-center justify-center text-5xl border ${styles.borderColor} metal-shine`}>
-                      {(selectedItem as any)?.icon ?? '🛒'}
+                      {selectedItem.icon}
                     </div>
                   );
                 })()}
                 
-                {(() => {
-                  const rarity = ((selectedItem as any)?.rarity ?? ((selectedItem as any)?.min_rank ? 'rare' : 'common')) as string;
-                  return (
-                    <h3 className={`text-2xl font-bold ${getRarityStyles(rarity).textColor} mb-3`}>
-                      {selectedItem.name}
-                    </h3>
-                  );
-                })()}
+                <h3 className={`text-2xl font-bold ${getRarityStyles(selectedItem.rarity).textColor} mb-3`}>
+                  {selectedItem.name}
+                </h3>
                 <p className="text-muted-foreground mb-6">
                   정말로 구매하시겠습니까?
                 </p>
                 
-                {(() => {
-                  const discount = Number((selectedItem as any).discount_percent ?? 0);
-                  const baseGold = Number((selectedItem as any).gold ?? 0);
-                  const finalGold = Math.max(0, Math.floor(baseGold * (100 - discount) / 100));
-                  return (
-                    <>
-                      <div className="text-3xl font-bold text-gradient-gold mb-2">
-                        {finalGold.toLocaleString()}G
-                      </div>
-                      {discount > 0 && (
-                        <div className="text-sm text-muted-foreground line-through">
-                          {baseGold.toLocaleString()}G
-                        </div>
-                      )}
-                    </>
-                  );
-                })()}
+                <div className="text-3xl font-bold text-gradient-gold mb-2">
+                  {Math.floor(selectedItem.price * (1 - selectedItem.discount / 100)).toLocaleString()}G
+                </div>
+                {selectedItem.discount > 0 && (
+                  <div className="text-sm text-muted-foreground line-through">
+                    {selectedItem.price.toLocaleString()}G
+                  </div>
+                )}
               </div>
 
               <div className="flex gap-4">

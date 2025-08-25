@@ -41,20 +41,17 @@ import useDashboard from '@/hooks/useDashboard';
 import useRecentActions from '@/hooks/useRecentActions';
 import { API_ORIGIN } from '@/lib/unifiedApi';
 import { createWSClient, WSClient, WebSocketMessage } from '@/utils/wsClient';
-// 전역 스토어 셀렉터/동기화 유틸
-import { useGlobalProfile, useGlobalStore } from '@/store/globalStore';
-import { useWithReconcile } from '@/lib/sync';
+import useBalanceSync from '@/hooks/useBalanceSync';
 
 interface HomeDashboardProps {
-  // user/onUpdateUser는 하위 호환을 위해 남기되, 표시/상태는 전역 스토어 셀렉터 사용
-  user?: User;
+  user: User;
   onLogout: () => void;
   onNavigateToGames: () => void;
   onNavigateToSettings?: () => void;
   onNavigateToShop?: () => void;
   onNavigateToStreaming?: () => void;
   onNavigateToEvents?: () => void;
-  onUpdateUser?: (user: User) => void;
+  onUpdateUser: (user: User) => void;
   onAddNotification: (message: string) => void;
   onToggleSideMenu: () => void;
 }
@@ -72,11 +69,11 @@ export function HomeDashboard({
   onToggleSideMenu,
 }: HomeDashboardProps) {
   const router = useRouter();
-  // 전역 프로필(서버 권위). 하이드레이트 전에는 null일 수 있으므로 prop user를 폴백으로 사용
-  const profile = useGlobalProfile();
-  const displayUser = (profile as any) || (user as any) || {};
-  const { state } = useGlobalStore();
-  const runWithReconcile = useWithReconcile();
+  const { reconcileBalance } = useBalanceSync({
+    sharedUser: user,
+    onUpdateUser,
+    onAddNotification,
+  });
   
   // 게임 설정 로드 (하드코딩 대체)
   const { config: gameConfig, loading: configLoading } = useGameConfig();
@@ -100,13 +97,13 @@ export function HomeDashboard({
   const [showRankingModal, setShowRankingModal] = useState(false);
   const [dailyClaimed, setDailyClaimed] = useState(false); // 서버 상태 기반 일일 보상 수령 여부
   const [treasureProgress, setTreasureProgress] = useState(65);
-  // vipPoints: 백엔드 UserResponse 필드 vip_points → 전역 프로필/폴백에서 추출
+  // vipPoints: 백엔드 UserResponse 필드 vip_points → 프론트 User 타입 camelCase 매핑 필요 시 fallback
   const [vipPoints, setVipPoints] = useState(
-    (displayUser as any)?.vip_points ?? (displayUser as any)?.vipPoints ?? 0
+    (user as any)?.vip_points ?? (user as any)?.vipPoints ?? 0
   );
   const [isAchievementsExpanded, setIsAchievementsExpanded] = useState(false);
   const [streak, setStreak] = useState({
-    count: (displayUser as any)?.dailyStreak ?? 0,
+    count: user?.dailyStreak ?? 0,
     ttl_seconds: null as number | null,
     next_reward: null as string | null,
   });
@@ -234,28 +231,18 @@ export function HomeDashboard({
     return () => clearInterval(timer);
   }, []);
 
-  // 경험치/승률 계산(프로필에 값이 없으면 0)
-  const experiencePercentage = (typeof (displayUser as any)?.experience === 'number' && typeof (displayUser as any)?.maxExperience === 'number')
-    ? calculateExperiencePercentage(displayUser as any)
-    : 0;
-  const winRate = (displayUser?.stats && typeof displayUser.stats.gamesPlayed === 'number')
-    ? calculateWinRate(displayUser as any)
-    : 0;
+  const experiencePercentage = calculateExperiencePercentage(user);
+  const winRate = calculateWinRate(user);
 
-  // 전역 하이드레이트 타임스탬프 변화 시 대시보드 데이터 재로딩(WS profile_update 이후 반영)
+  // 마운트 시 1회 권위 잔액으로 동기화(DEV 토스트 포함)
   useEffect(() => {
-    try {
-      if (state?.lastHydratedAt) {
-        invalidateDash?.();
-        reloadDash?.();
-      }
-    } catch {}
+    reconcileBalance().catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state?.lastHydratedAt]);
+  }, []);
 
-  // 최근 액션 로드 (user.id는 문자열일 수 있어 숫자 변환 시도)
+  // 최근 액션 로드 (user.id는 문자열로 정의되어 있어 숫자 변환 시도)
   const numericUserId = (() => {
-    const n = Number((displayUser as any)?.id);
+    const n = Number((user as any)?.id);
     return Number.isFinite(n) ? n : undefined;
   })();
   const { actions: recentActions, reload: reloadRecentActions } = useRecentActions(numericUserId, 10, true);
@@ -299,9 +286,9 @@ export function HomeDashboard({
 
   const claimDailyReward = async () => {
     // 기존 프로필 스냅샷(검증용)
-    const prevGold = (displayUser as any)?.goldBalance ?? 0;
-    const prevXP = (displayUser as any)?.experience ?? 0;
-    const prevStreak = (displayUser as any)?.dailyStreak ?? 0;
+    const prevGold = user.goldBalance;
+    const prevXP = user.experience;
+    const prevStreak = user.dailyStreak;
     const tokens = getTokens();
     if (!tokens?.access_token) {
       onAddNotification(rewardMessages.loginRequired);
@@ -320,20 +307,34 @@ export function HomeDashboard({
     }
 
     try {
-      // 멱등 + 성공 후 자동 재하이드레이트
-      const data = await runWithReconcile(async (idemKey: string) => {
-        return unifiedApi.post('streak/claim', { action_type: 'DAILY_LOGIN' }, { headers: { 'X-Idempotency-Key': idemKey } });
-      });
+      const data = await unifiedApi.post('streak/claim', { action_type: 'DAILY_LOGIN' });
       // data: { awarded_gold, awarded_xp, new_gold_balance, streak_count }
-      const awardedGold = (data as any)?.awarded_gold || 0;
-      const awardedXP = (data as any)?.awarded_xp || 0;
-      const newStreak = (data as any)?.streak_count ?? (streak.count ?? prevStreak);
-      // 레벨업 알림은 전역 하이드레이트 후 레벨 변화로 자연 반영됨. 간단 피드백만 유지
+      const fallback = {
+        ...user,
+        goldBalance: data.new_gold_balance ?? user.goldBalance,
+        experience: (user.experience || 0) + (data.awarded_xp || 0),
+        dailyStreak: data.streak_count ?? user.dailyStreak,
+      };
+      const { updatedUser: finalUser, leveledUp } = checkLevelUp(fallback);
+      if (leveledUp) {
+        setShowLevelUpModal(true);
+        onAddNotification(`🆙 레벨업! ${finalUser.level}레벨 달성!`);
+      }
+      try {
+        const bal = await unifiedApi.get('users/balance');
+        const cyber = (bal as any)?.cyber_token_balance;
+        onUpdateUser({
+          ...finalUser,
+          goldBalance: typeof cyber === 'number' ? cyber : finalUser.goldBalance,
+        });
+      } catch {
+        onUpdateUser(finalUser);
+      }
       onAddNotification(
         rewardMessages.success(
-          awardedGold,
-          awardedXP,
-          newStreak + 0
+          data.awarded_gold || 0,
+          data.awarded_xp || 0,
+          (streak.count || user.dailyStreak || 0) + 0
         )
       );
       setShowDailyReward(false);
@@ -419,15 +420,15 @@ export function HomeDashboard({
         case 'first_login':
           return true;
         case 'level_5':
-          return (displayUser as any)?.level >= 5;
+          return user.level >= 5;
         case 'win_10':
-          return (displayUser as any)?.stats?.gamesWon >= 10;
+          return user.stats.gamesWon >= 10;
         case 'treasure_hunt':
           return treasureProgress >= 50;
         case 'gold_100k':
-          return (displayUser as any)?.goldBalance >= 100000;
+          return user.goldBalance >= 100000;
         case 'daily_7':
-          return (streak.count ?? (displayUser as any)?.dailyStreak ?? 0) >= 7;
+          return (streak.count ?? user.dailyStreak) >= 7;
         default:
           return false;
       }
@@ -540,16 +541,14 @@ export function HomeDashboard({
             </motion.div>
             <div>
               <h1 className="text-xl lg:text-2xl font-bold text-gradient-primary">
-                {displayUser.nickname}
+                {user.nickname}
               </h1>
-              {((displayUser as any)?.isAdmin || (displayUser as any)?.is_admin) && (
-                <div className="text-xs text-error font-bold">🔐 관리자</div>
-              )}
+              {user.isAdmin && <div className="text-xs text-error font-bold">🔐 관리자</div>}
             </div>
           </div>
 
           <div className="flex items-center gap-3">
-            {(displayUser as any)?.is_admin || (displayUser as any)?.isAdmin ? (
+            {(user as any)?.is_admin || (user as any)?.isAdmin ? (
               <Button
                 variant="outline"
                 onClick={() => router.push('/admin')}
@@ -610,7 +609,7 @@ export function HomeDashboard({
                 className="bg-gradient-gold text-black px-4 py-3 rounded-xl font-bold cursor-pointer btn-hover-lift"
               >
                 <Coins className="w-6 h-6 mx-auto mb-1" />
-                <div className="text-xl lg:text-2xl">{Number((displayUser as any)?.goldBalance ?? 0).toLocaleString()}</div>
+                <div className="text-xl lg:text-2xl">{user.goldBalance.toLocaleString()}</div>
                 <div className="text-xs opacity-80">골드</div>
               </motion.div>
             </div>
@@ -618,22 +617,18 @@ export function HomeDashboard({
             <div className="text-center">
               <div className="bg-gradient-game text-white px-4 py-3 rounded-xl">
                 <Star className="w-6 h-6 mx-auto mb-1" />
-                <div className="text-xl lg:text-2xl">레벨 {Number((displayUser as any)?.level ?? 0)}</div>
-                {typeof (displayUser as any)?.experience === 'number' && typeof (displayUser as any)?.maxExperience === 'number' && (
-                  <>
-                    <div className="w-full bg-white/20 rounded-full h-1.5 mt-1">
-                      <motion.div
-                        initial={{ width: 0 }}
-                        animate={{ width: `${experiencePercentage}%` }}
-                        transition={{ duration: 1, delay: 0.5 }}
-                        className="bg-white h-full rounded-full"
-                      />
-                    </div>
-                    <div className="text-xs opacity-80 mt-1">
-                      {(displayUser as any)?.experience}/{(displayUser as any)?.maxExperience} XP
-                    </div>
-                  </>
-                )}
+                <div className="text-xl lg:text-2xl">레벨 {user.level}</div>
+                <div className="w-full bg-white/20 rounded-full h-1.5 mt-1">
+                  <motion.div
+                    initial={{ width: 0 }}
+                    animate={{ width: `${experiencePercentage}%` }}
+                    transition={{ duration: 1, delay: 0.5 }}
+                    className="bg-white h-full rounded-full"
+                  />
+                </div>
+                <div className="text-xs opacity-80 mt-1">
+                  {user.experience}/{user.maxExperience} XP
+                </div>
               </div>
             </div>
 
@@ -707,6 +702,41 @@ export function HomeDashboard({
                     <ChevronRight className="absolute bottom-4 right-4 w-4 h-4 text-muted-foreground" />
                   </motion.div>
                 ))}
+              </div>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.6 }}
+            >
+              <h2 className="text-xl font-bold text-foreground mb-4 flex items-center gap-2">
+                <BarChart3 className="w-5 h-5 text-success" />
+                게임 통계
+              </h2>
+              <div className="glass-effect rounded-xl p-6">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-primary">{user.stats.gamesPlayed}</div>
+                    <div className="text-sm text-muted-foreground">총 게임</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-success">{user.stats.gamesWon}</div>
+                    <div className="text-sm text-muted-foreground">승리</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-gold">
+                      {user.stats.totalEarnings.toLocaleString()}
+                    </div>
+                    <div className="text-sm text-muted-foreground">총 수익</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-warning">
+                      {user.stats.highestScore.toLocaleString()}
+                    </div>
+                    <div className="text-sm text-muted-foreground">최고 점수</div>
+                  </div>
+                </div>
               </div>
             </motion.div>
           </div>
@@ -951,16 +981,16 @@ export function HomeDashboard({
 
               <h3 className="text-2xl font-bold text-gold mb-2">일일 보상!</h3>
               <p className="text-muted-foreground mb-6">
-                연속 {streak.count ?? (displayUser as any)?.dailyStreak ?? 0}일 접속 보너스를 받으세요!
+                연속 {streak.count ?? user.dailyStreak}일 접속 보너스를 받으세요!
               </p>
 
               <div className="bg-gold-soft rounded-lg p-4 mb-6">
                 <div className="text-gold font-bold text-xl">
                   {/* 서버 설정 기반 일일 보너스 계산 */}
-                  {(gameConfig.dailyBonusBase + (streak.count ?? (displayUser as any)?.dailyStreak ?? 0) * gameConfig.dailyBonusPerStreak).toLocaleString()}G
+                  {(gameConfig.dailyBonusBase + (streak.count ?? user.dailyStreak) * gameConfig.dailyBonusPerStreak).toLocaleString()}G
                 </div>
                 <div className="text-sm text-muted-foreground">
-                  {/* 서버 설정 기반 XP 계산 */}+ {Math.floor(gameConfig.dailyBonusBase / 20) + (streak.count ?? (displayUser as any)?.dailyStreak ?? 0) * Math.floor(gameConfig.dailyBonusPerStreak / 8)} XP
+                  {/* 서버 설정 기반 XP 계산 */}+ {Math.floor(gameConfig.dailyBonusBase / 20) + (streak.count ?? user.dailyStreak) * Math.floor(gameConfig.dailyBonusPerStreak / 8)} XP
                 </div>
               </div>
 
@@ -1000,7 +1030,7 @@ export function HomeDashboard({
               </motion.div>
 
               <h3 className="text-3xl font-bold text-gradient-primary mb-2">레벨업!</h3>
-              <p className="text-xl text-gold font-bold mb-4">레벨 {Number((displayUser as any)?.level ?? 0)}</p>
+              <p className="text-xl text-gold font-bold mb-4">레벨 {user.level}</p>
               <p className="text-muted-foreground mb-6">축하합니다! 새로운 레벨에 도달했습니다!</p>
 
               <Button

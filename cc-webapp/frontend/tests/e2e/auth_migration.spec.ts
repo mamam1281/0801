@@ -27,50 +27,50 @@ test.describe('Legacy 토큰 자동 마이그레이션', () => {
             localStorage.setItem('cc_access_token', a);
         }, accessToken);
 
-        // 3) 홈 진입 -> migration 수행 (라우트 인터셉트 미사용: 환경/타이밍에 민감)
+        // 3) 홈 진입 -> migration 수행 & streak/status Authorization 헤더 인터셉트 검증
+        const intercepted: { auth?: string } = {};
+        await page.route('**/api/streak/status**', route => {
+            const headers = route.request().headers();
+            intercepted.auth = headers['authorization'];
+            route.continue();
+        });
         await page.goto('/');
 
         // 번들 생성 대기
         await page.waitForFunction(() => !!localStorage.getItem('cc_auth_tokens'));
-        await page.waitForTimeout(150); // 저장 전파 여유
 
         const bundleStr = await page.evaluate(() => localStorage.getItem('cc_auth_tokens'));
         expect(bundleStr).toBeTruthy();
-        // 일부 빌드/경로에서 번들이 문자열 또는 JSON 객체로 저장될 수 있어 방어적으로 처리
+        // 일부 빌드/경로에서 번들이 문자열 토큰으로 저장될 수 있어 방어적으로 처리
         let parsed: any = null;
         try { parsed = bundleStr ? JSON.parse(bundleStr) : null; } catch { parsed = null; }
-        let candidateToken: string | null = null;
-        if (parsed && typeof parsed === 'object' && typeof parsed.access_token === 'string' && parsed.access_token.length > 0) {
-            candidateToken = parsed.access_token;
-        } else if (typeof bundleStr === 'string' && bundleStr.length > 0) {
-            candidateToken = bundleStr;
+        const tokenFromBundle: string | undefined = (parsed && typeof parsed === 'object')
+            ? parsed.access_token
+            : (typeof bundleStr === 'string' ? bundleStr : undefined);
+        expect(typeof tokenFromBundle).toBe('string');
+        // 번들 토큰이 비어있게 보일 때가 있어 짧게 한 번 더 재시도하여 확보
+        let candidateToken = tokenFromBundle || '';
+        if (!candidateToken || candidateToken.length < 10) {
+            await page.waitForTimeout(250);
+            const s2 = await page.evaluate(() => localStorage.getItem('cc_auth_tokens'));
+            let p2: any = null; try { p2 = s2 ? JSON.parse(s2) : null; } catch { p2 = null; }
+            candidateToken = (p2 && typeof p2 === 'object') ? p2.access_token : (typeof s2 === 'string' ? s2 : '');
         }
-        // 선택적 모양 검증(soft): 점을 포함하면 JWT 형태만 가볍게 확인하되 실패해도 테스트를 중단하지 않음
-        if (candidateToken && candidateToken.includes('.')) {
-            expect.soft(candidateToken).toMatch(/^[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+$/);
+        // 최소 길이만 보장하고, 가능하면 JWT 형태도 확인
+        expect(candidateToken && candidateToken.length >= 10).toBeTruthy();
+        if (candidateToken.includes('.')) {
+            expect(candidateToken).toMatch(/^[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+$/);
         }
         if (parsed && typeof parsed === 'object' && refreshToken) {
             expect(parsed.refresh_token === null || typeof parsed.refresh_token === 'string').toBeTruthy();
         }
 
-        // 4) streak/status 200 검증: 마이그레이션된 토큰을 읽어 Playwright request로 백엔드에 직접 호출(프록시/리라이트 영향 제거)
-        const migratedToken = await page.evaluate(() => {
-            const raw = localStorage.getItem('cc_auth_tokens');
-            if (!raw) return null;
-            try {
-                const obj = JSON.parse(raw as string);
-                if (obj && typeof obj === 'object' && typeof obj.access_token === 'string') return obj.access_token;
-            } catch { /* 문자열 저장 케이스 */ }
-            return typeof raw === 'string' && raw.length > 0 ? raw : null;
-        });
-        // 마이그레이션 토큰이 엣지에서 잡히지 않으면, 최초 발급 토큰으로 폴백해 상태 확인만 보장
-        const finalToken = migratedToken || accessToken;
-        expect(finalToken).toBeTruthy();
-
-        const statusResp = await request.get(`${API}/api/streak/status`, {
-            headers: { Authorization: `Bearer ${finalToken}` }
-        });
-        expect(statusResp.status()).toBe(200);
-
+        // 4) streak/status 호출 결과 및 Authorization 헤더 브라우저 fetch 수준 검증
+        if (!intercepted.auth) {
+            await page.evaluate(() => fetch('/api/streak/status').catch(() => { }));
+            await page.waitForTimeout(300);
+        }
+        expect(intercepted.auth).toBeTruthy();
+        expect(intercepted.auth?.toLowerCase()).toMatch(/^bearer\s+.+/);
     });
 });

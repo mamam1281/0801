@@ -26,19 +26,15 @@ test('Shop buy reconciles via /users/balance', async () => {
     // Baseline balance
     const before = await getBalance(ctx, token);
 
-    // List shop catalog (server-authoritative)
-    const itemsRes = await ctx.get(`${API}/api/shop/catalog`, { headers });
-    test.skip(!itemsRes.ok(), `shop/catalog not available (${itemsRes.status()})`);
+    // List shop items
+    const itemsRes = await ctx.get(`${API}/api/shop/items`, { headers });
+    test.skip(!itemsRes.ok(), `shop/items not available (${itemsRes.status()})`);
     const items = await itemsRes.json();
     test.skip(!Array.isArray(items) || items.length === 0, 'no shop items');
-    const first = items[0];
+    const first = items.find((i: any) => i?.id != null) || items[0];
 
-    // Attempt buy via POST /api/shop/buy
-    const product_id = (first?.sku ?? first?.id ?? '').toString();
-    const buyRes = await ctx.post(`${API}/api/shop/buy`, {
-        headers,
-        data: { product_id, quantity: 1 }
-    });
+    // Attempt buy
+    const buyRes = await ctx.post(`${API}/api/shop/buy/${first.id}`, { headers });
     expect([200, 400, 404]).toContain(buyRes.status());
 
     // Reconcile balance
