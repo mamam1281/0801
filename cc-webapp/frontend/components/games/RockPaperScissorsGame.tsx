@@ -19,6 +19,8 @@ import { User } from '../../types';
 import { Button } from '../ui/button';
 import { useWithReconcile } from '@/lib/sync';
 import { useUserGold } from '@/hooks/useSelectors';
+import { useGlobalStore } from '@/store/globalStore';
+import { mergeGameStats } from '@/store/globalStore';
 
 interface RockPaperScissorsGameProps {
   user: User;
@@ -86,6 +88,7 @@ export function RockPaperScissorsGame({
   const [isSpecialMove, setIsSpecialMove] = useState(false);
   const withReconcile = useWithReconcile();
   const gold = useUserGold();
+  const { dispatch } = useGlobalStore();
 
   // Play sound effect (visual simulation)
   const playSoundEffect = (effectName: string) => {
@@ -180,6 +183,15 @@ export function RockPaperScissorsGame({
           isSpecialMove: false,
         };
         setRoundHistory((prev: GameRound[]) => [round, ...prev.slice(0, 9)]);
+        // 통계 병합
+        mergeGameStats(dispatch, 'rps', {
+          totalGames: 1,
+          wins: result === 'win' ? 1 : 0,
+          losses: result === 'lose' ? 1 : 0,
+          draws: result === 'draw' ? 1 : 0,
+          totalBet: betAmount,
+          totalPayout: winnings,
+        });
         return res;
       });
     } catch (e: any) {

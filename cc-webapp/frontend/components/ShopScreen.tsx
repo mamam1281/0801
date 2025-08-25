@@ -27,7 +27,7 @@ import useBalanceSync from '@/hooks/useBalanceSync';
 import { api } from '@/lib/unifiedApi';
 import { useWithReconcile } from '@/lib/sync';
 import { useUserGold } from '@/hooks/useSelectors';
-import { useGlobalStore, mergeProfile } from '@/store/globalStore';
+import { useGlobalStore, mergeProfile, applyPurchase, mergeGameStats } from '@/store/globalStore';
 
 interface ShopScreenProps {
   user: User;
@@ -240,7 +240,23 @@ export function ShopScreen({
       if (typeof newBal === 'number' && Number.isFinite(newBal)) {
         mergeProfile(dispatch, { goldBalance: Number(newBal) });
       }
-      // 아이템 지급은 서버 측 인벤토리 동기화를 신뢰, 필요시 WS/polling으로 반영됨
+      // 인벤토리 지급: 서버 응답에 items/awards 형태가 있으면 store 반영(가벼운 캐시)
+      const awarded = res?.items ?? res?.awards ?? res?.granted_items ?? [];
+      if (Array.isArray(awarded) && awarded.length > 0) {
+        applyPurchase(dispatch, awarded.map((it: any) => ({
+          id: String(it.id ?? `${item.id}_${Date.now()}`),
+          name: String(it.name ?? item.name ?? '아이템'),
+          type: String(it.type ?? item.type ?? 'item'),
+          rarity: String(it.rarity ?? item.rarity ?? 'common'),
+          quantity: Number(it.quantity ?? it.qty ?? 1),
+          value: Number(it.value ?? 0),
+          icon: String(it.icon ?? item.icon ?? ''),
+        })));
+      }
+      // 구매로 인한 통계 증가가 응답에 있으면 병합(선택)
+      if (res?.stats_delta && typeof res.stats_delta === 'object') {
+        mergeGameStats(dispatch, 'shop', res.stats_delta as any);
+      }
       onAddNotification(item.type === 'currency'
         ? `💰 ${item.value.toLocaleString()}G를 획득했습니다!`
         : `✅ ${item.name}을(를) 구매했습니다!`

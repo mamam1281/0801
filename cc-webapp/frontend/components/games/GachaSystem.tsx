@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { api } from '@/lib/unifiedApi';
 import { useWithReconcile } from '@/lib/sync';
 import { useUserGold } from '@/hooks/useSelectors';
+import { useGlobalStore, mergeProfile, mergeGameStats, applyPurchase } from '@/store/globalStore';
 import useAuthToken from '../../hooks/useAuthToken';
 import useFeedback from '../../hooks/useFeedback';
 import useBalanceSync from '../../hooks/useBalanceSync';
@@ -65,6 +66,7 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
   });
   const withReconcile = useWithReconcile();
   const gold = useUserGold();
+  const { dispatch } = useGlobalStore();
 
   const [selectedBanner, setSelectedBanner] = useState(GACHA_BANNERS[0] as GachaBanner);
   const [isPulling, setIsPulling] = useState(false);
@@ -170,14 +172,39 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
         setPullResults(mapped);
         setCurrentPullIndex(0);
         setShowResults(true);
-        // Update user from authoritative balance & stats
-        // 우선 서버 응답 balance 사용, 이후 /users/balance로 최종 동기화 시도
-        const newBalance = res.balance ?? res.currency_balance?.tokens;
+        // 전역 스토어 반영: balance/인벤토리/통계
+        const newBalance = res.balance ?? res.currency_balance?.tokens ?? (res as any)?.gold ?? (res as any)?.gold_balance;
+        if (typeof newBalance === 'number' && Number.isFinite(newBalance)) {
+          mergeProfile(dispatch, { goldBalance: Number(newBalance) });
+        }
+        // inventory 적용(가벼운 캐시)
+        if (Array.isArray(mapped) && mapped.length > 0) {
+          applyPurchase(
+            dispatch,
+            mapped.map((it) => ({
+              id: String(it.id),
+              name: it.name,
+              type: it.type,
+              rarity: it.rarity,
+              quantity: Number(it.quantity ?? 1),
+              value: Number(it.value ?? 0),
+            }))
+          );
+        }
+        const epicAdds1 = mapped.filter((i) => i.rarity === 'epic').length;
+        const ultraAdds1 = mapped.filter((i) => ['legendary', 'mythic'].includes(i.rarity)).length;
+        mergeGameStats(dispatch, 'gacha', {
+          pulls: 1,
+          totalSpent: cost,
+          epicCount: epicAdds1,
+          legendaryCount: ultraAdds1,
+        });
+        // 기존 onUpdateUser 경로는 하위 UI 표시 호환을 위해 유지
         const first = mapped[0];
         const updatedUser = updateUserInventory(
           {
             ...user,
-            // 잔액은 서버 응답/재동기화에만 의존
+            // 잔액은 서버 응답/재동기화에만 의존(전역 mergeProfile도 수행)
             goldBalance: typeof newBalance === 'number' ? newBalance : user.goldBalance,
             gameStats: {
               ...user.gameStats,
@@ -274,12 +301,34 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
         setParticles(generateParticles(bestItem.rarity));
         const ultraAdds = mapped.filter((i) => ['legendary', 'mythic'].includes(i.rarity)).length;
         const epicAdds = mapped.filter((i) => i.rarity === 'epic').length;
-        const newBalance = res.balance ?? res.currency_balance?.tokens;
+        const newBalance = res.balance ?? res.currency_balance?.tokens ?? (res as any)?.gold ?? (res as any)?.gold_balance;
+        if (typeof newBalance === 'number' && Number.isFinite(newBalance)) {
+          mergeProfile(dispatch, { goldBalance: Number(newBalance) });
+        }
+        if (Array.isArray(mapped) && mapped.length > 0) {
+          applyPurchase(
+            dispatch,
+            mapped.map((it) => ({
+              id: String(it.id),
+              name: it.name,
+              type: it.type,
+              rarity: it.rarity,
+              quantity: Number(it.quantity ?? 1),
+              value: Number(it.value ?? 0),
+            }))
+          );
+        }
+        mergeGameStats(dispatch, 'gacha', {
+          pulls: 10,
+          totalSpent: discountedCost,
+          epicCount: epicAdds,
+          legendaryCount: ultraAdds,
+        });
         const updatedUser = mapped.reduce(
           (acc, item) => updateUserInventory(acc as User, item) as User,
           {
             ...user,
-            // 잔액은 서버 응답/재동기화에만 의존
+            // 잔액은 서버 응답/재동기화에만 의존(전역 mergeProfile도 수행)
             goldBalance: typeof newBalance === 'number' ? newBalance : user.goldBalance,
             gameStats: {
               ...user.gameStats,

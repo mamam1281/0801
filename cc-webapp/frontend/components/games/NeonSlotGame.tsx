@@ -6,6 +6,7 @@ import useBalanceSync from '../../hooks/useBalanceSync';
 import { api } from '@/lib/unifiedApi';
 import { useWithReconcile } from '@/lib/sync';
 import { useUserGold } from '@/hooks/useSelectors';
+import { useGlobalStore, mergeProfile, mergeGameStats } from '@/store/globalStore';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft,
@@ -108,6 +109,7 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
   const withReconcile = useWithReconcile();
   // 전역 권위 잔액(셀렉터)
   const gold = useUserGold();
+  const { dispatch } = useGlobalStore();
 
   // unifiedApi: call games endpoints with relative paths
   const [reels, setReels] = useState([
@@ -301,7 +303,8 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
     // Deduct bet amount (locally; authoritative balance will come from server if call succeeds)
     const costAmount = betAmount;
 
-    let serverResult: SlotSpinApiResponse | null = null;
+  let serverResult: SlotSpinApiResponse | null = null;
+  let hasMergedBalance = false;
     // Attempt authoritative server spin with reconcile + idempotency
     try {
       const raw = await withReconcile(async (idemKey: string) =>
@@ -314,6 +317,11 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
       serverResult = raw;
       if (serverResult?.feedback) {
         fromApi(serverResult as any);
+      }
+      // 서버 응답에 최신 잔액이 포함된 경우 전역 스토어에 즉시 반영
+      if (serverResult && typeof serverResult.balance === 'number') {
+        mergeProfile(dispatch, { goldBalance: Number(serverResult.balance) });
+        hasMergedBalance = true;
       }
     } catch (_e) {
       serverResult = null; // fallback to local simulation (no local balance mutation)
@@ -390,7 +398,7 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
 
     // Process final result after all reels stop
     setTimeout(async () => {
-      if (result.winAmount > 0) {
+  if (result.winAmount > 0) {
         setIsWin(true);
         setWinAmount(result.winAmount);
         setWinningPositions(result.winningPositions);
@@ -407,8 +415,19 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
 
         generateCoinDrops();
 
-        // 🎯 백엔드에서 최신 잔액을 받아온 후 전역 동기화
-        await reconcileBalance();
+        // 🎯 잔액 동기화: 서버 응답에 balance가 없을 때만 reconcile 수행
+        if (!hasMergedBalance) {
+          await reconcileBalance();
+        }
+
+        // 전역 게임 통계 누적(가산)
+        mergeGameStats(dispatch, 'slot', {
+          totalSpins: 1,
+          totalBet: costAmount,
+          totalPayout: result.winAmount,
+          totalWins: 1,
+          jackpots: result.isJackpot ? 1 : 0,
+        });
 
         // 게임 통계만 업데이트 (잔액은 reconcileBalance에서 처리됨)
         const updatedUser = {
@@ -445,8 +464,19 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
       } else {
         setConsecutiveWins(0);
 
-        // 🎯 패배 시에도 백엔드에서 최신 잔액을 받아온 후 전역 동기화
-        await reconcileBalance();
+        // 🎯 패배 시에도 잔액 동기화 필요: 서버 balance 없을 때만 reconcile
+        if (!hasMergedBalance) {
+          await reconcileBalance();
+        }
+
+        // 전역 게임 통계 누적(가산)
+        mergeGameStats(dispatch, 'slot', {
+          totalSpins: 1,
+          totalBet: costAmount,
+          totalPayout: 0,
+          totalWins: 0,
+          jackpots: 0,
+        });
 
         // 게임 통계만 업데이트 (잔액은 reconcileBalance에서 처리됨)
         const updatedUser = {
@@ -664,7 +694,8 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
                                 className={`text-4xl lg:text-5xl ${spinSymbol.color}`}
                               />
                             </div>
-                          )) || []}
+                          ))}
+
                       </motion.div>
                     )}
                   </AnimatePresence>

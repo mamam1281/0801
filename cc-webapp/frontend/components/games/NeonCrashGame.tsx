@@ -33,6 +33,7 @@ import { Slider } from '../ui/slider';
 import { api } from '@/lib/unifiedApi';
 import { useWithReconcile } from '@/lib/sync';
 import { useUserGold } from '@/hooks/useSelectors';
+import { useGlobalStore, mergeProfile, mergeGameStats } from '@/store/globalStore';
 
 interface NeonCrashGameProps {
   user: User;
@@ -49,6 +50,7 @@ export function NeonCrashGame({
 }: NeonCrashGameProps) {
   const withReconcile = useWithReconcile();
   const gold = useUserGold();
+  const { dispatch } = useGlobalStore();
   const [betAmount, setBetAmount] = useState(10);
   const [multiplier, setMultiplier] = useState(1.0);
   const [isRunning, setIsRunning] = useState(false);
@@ -138,6 +140,10 @@ export function NeonCrashGame({
       // 서버에서 받은 게임 결과로 애니메이션 시작
       const finalMultiplier = gameResult.max_multiplier || 1.01;
       const winAmount = gameResult.win_amount || 0;
+      const newBalance = gameResult?.balance ?? gameResult?.gold ?? gameResult?.gold_balance;
+      if (typeof newBalance === 'number' && Number.isFinite(newBalance)) {
+        mergeProfile(dispatch, { goldBalance: Number(newBalance) });
+      }
       const isWin = gameResult.status === 'auto_cashed';
 
       // 이전 게임의 곡선 저장
@@ -167,6 +173,14 @@ export function NeonCrashGame({
       animationRef.current = requestAnimationFrame(updateGame);
 
       // 통계는 별도 fetch, 잔액은 withReconcile 후 하이드레이트에 위임
+      // 통계 병합(1회 베팅)
+      mergeGameStats(dispatch, 'crash', {
+        totalBets: 1,
+        totalWagered: betAmount,
+        totalWins: winAmount > 0 ? 1 : 0,
+        totalProfit: (winAmount - betAmount),
+        highestMultiplier: finalMultiplier,
+      });
       fetchAuthoritativeStats();
     } catch (error) {
       console.error('크래시 게임 시작 실패:', error);
@@ -406,6 +420,13 @@ export function NeonCrashGame({
       },
       ...prev,
     ]);
+
+    // 통계 병합(캐시아웃 성공 이벤트)
+    mergeGameStats(dispatch, 'crash', {
+      totalWins: 1,
+      totalProfit: winnings,
+      highestMultiplier: Math.max(multiplier, (authoritativeStats?.highest_multiplier ?? 0)),
+    });
 
     fetchAuthoritativeStats();
 
