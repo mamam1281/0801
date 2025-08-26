@@ -379,7 +379,10 @@ export function RealtimeSyncProvider({ children, apiBaseUrl }: RealtimeSyncProvi
   const lastPurchaseByReceiptRef = useRef(new Map<string, { status: string; at: number }>());
 
   // Prefer the same origin resolution as unifiedApi to avoid cross-origin/SSR mismatches
-  const baseUrl = apiBaseUrl || API_ORIGIN || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8000');
+  const baseUrl =
+    apiBaseUrl ||
+    API_ORIGIN ||
+    (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8000');
 
   // WebSocket 메시지 핸들러
   const handleWebSocketMessage = useCallback((message: WebSocketMessage) => {
@@ -412,10 +415,14 @@ export function RealtimeSyncProvider({ children, apiBaseUrl }: RealtimeSyncProvi
 
         if (status === 'success') {
           type = 'success';
-          text = `${product} 결제가 완료되었습니다${data?.amount ? ` (금액: ${data.amount})` : ''}.`;
+          text = `${product} 결제가 완료되었습니다${
+            data?.amount ? ` (금액: ${data.amount})` : ''
+          }.`;
         } else if (status === 'failed') {
           type = 'error';
-          text = `${product} 결제가 실패했습니다${data?.reason_code ? ` (${data.reason_code})` : ''}.`;
+          text = `${product} 결제가 실패했습니다${
+            data?.reason_code ? ` (${data.reason_code})` : ''
+          }.`;
         } else if (status === 'idempotent_reuse') {
           type = 'system';
           text = `${product} 결제가 이미 처리되었습니다.`;
@@ -431,8 +438,8 @@ export function RealtimeSyncProvider({ children, apiBaseUrl }: RealtimeSyncProvi
         } catch (e) {
           // If window is not available or dispatch fails, ignore silently
         }
-  // 전역 상태 업데이트(배지/요약용)
-  dispatch({ type: 'UPDATE_PURCHASE', payload: data });
+        // 전역 상태 업데이트(배지/요약용)
+        dispatch({ type: 'UPDATE_PURCHASE', payload: data });
         break;
       }
 
@@ -467,7 +474,7 @@ export function RealtimeSyncProvider({ children, apiBaseUrl }: RealtimeSyncProvi
 
   // WebSocket 연결
   const connect = useCallback(async () => {
-  const token = getAccessToken() || (await getValidAccessToken());
+    const token = getAccessToken() || (await getValidAccessToken());
     if (!token || !user) {
       console.log('[RealtimeSync] Cannot connect - no token or user');
       return;
@@ -691,12 +698,9 @@ export function RealtimeSyncProvider({ children, apiBaseUrl }: RealtimeSyncProvi
 
   // 정리 작업 (오래된 보상 제거)
   useEffect(() => {
-    const interval = window.setInterval(
-      () => {
-        clearOldRewards();
-      },
-      10 * 60 * 1000
-    ); // 10분마다 정리
+    const interval = window.setInterval(() => {
+      clearOldRewards();
+    }, 10 * 60 * 1000); // 10분마다 정리
 
     return () => window.clearInterval(interval);
   }, [clearOldRewards]);
@@ -712,6 +716,24 @@ export function RealtimeSyncProvider({ children, apiBaseUrl }: RealtimeSyncProvi
     clearOldRewards,
     triggerFallbackPoll,
   };
+
+  // Jest/SSR 환경에서 window가 없는 경우, WebSocket/interval 부작용 없이 최소 컨텍스트만 제공
+  if (typeof window === 'undefined') {
+    const noop = () => {};
+    const noopAsync = async () => {};
+    const minimal: RealtimeSyncContextType = {
+      state,
+      connect: noopAsync,
+      disconnect: noop,
+      refreshProfile: noopAsync as any,
+      refreshAchievements: noopAsync as any,
+      refreshStreaks: noopAsync as any,
+      refreshEvents: noopAsync as any,
+      clearOldRewards: noop,
+      triggerFallbackPoll: noopAsync,
+    };
+    return <RealtimeSyncContext.Provider value={minimal}>{children}</RealtimeSyncContext.Provider>;
+  }
 
   return (
     <RealtimeSyncContext.Provider value={contextValue}>{children}</RealtimeSyncContext.Provider>

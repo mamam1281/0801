@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useReducer } from 'react';
+import React, { useContext, useReducer } from 'react';
 import { api } from '../lib/unifiedApi';
 
 // Types
@@ -19,7 +19,17 @@ export type Balances = {
 };
 
 export type GameStats = Record<string, number>;
-export type Inventory = Array<any>;
+export type InventoryItem = {
+  id: string;
+  name?: string;
+  type?: string;
+  rarity?: string;
+  quantity?: number;
+  value?: number;
+  icon?: string;
+  [k: string]: any;
+};
+export type Inventory = Array<InventoryItem>;
 export type Streak = { level?: number; last_claim_ts?: string };
 export type EventItem = { id: string; type: string; payload?: any };
 export type NotificationItem = { id: string; type: string; message: string; meta?: any };
@@ -110,12 +120,11 @@ function reducer(state: GlobalState, action: Action): GlobalState {
 
 type Dispatch = (action: Action) => void;
 
-const GlobalStoreContext = createContext<{
-  state: GlobalState;
-  dispatch: Dispatch;
-} | null>(null);
+const GlobalStoreContext = React.createContext(
+  null as unknown as { state: GlobalState; dispatch: Dispatch } | null
+);
 
-export function GlobalStoreProvider({ children }: { children: React.ReactNode }) {
+export function GlobalStoreProvider({ children }: { children?: React.ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialState);
   return (
     <GlobalStoreContext.Provider value={{ state, dispatch }}>
@@ -192,12 +201,31 @@ export const applyReward = (
   dispatch({ type: 'APPLY_REWARD', reward });
 };
 
-export const applyPurchase = (
+// Overloads to support legacy signature applyPurchase(dispatch, items[], options?)
+export function applyPurchase(
   dispatch: Dispatch,
   purchase: { gold_delta?: number; gems_delta?: number; items?: any[] }
-) => {
-  dispatch({ type: 'APPLY_PURCHASE', purchase });
-};
+): void;
+export function applyPurchase(
+  dispatch: Dispatch,
+  items: InventoryItem[],
+  options?: { replace?: boolean }
+): void;
+export function applyPurchase(
+  dispatch: Dispatch,
+  a: { gold_delta?: number; gems_delta?: number; items?: any[] } | InventoryItem[],
+  b?: { replace?: boolean }
+) {
+  if (Array.isArray(a)) {
+    dispatch({
+      type: 'APPLY_PURCHASE',
+      purchase: { items: a },
+      ...(b ? { replace: b.replace } : {}),
+    } as any);
+  } else {
+    dispatch({ type: 'APPLY_PURCHASE', purchase: a });
+  }
+}
 
 // 호환 헬퍼: 기존 setProfile/mergeProfile/patchBalances 시그니처를 새 스토어로 매핑
 export function setProfile(dispatch: Dispatch, profile: any | null) {
@@ -240,4 +268,6 @@ export function patchBalances(dispatch: Dispatch, delta: { gold?: number; gems?:
   dispatch({ type: 'APPLY_REWARD', reward: { gold: delta.gold ?? 0, gems: delta.gems ?? 0 } });
 }
 
+// Provide both named and default export for compatibility in tests
 export default GlobalStoreProvider;
+export { GlobalStoreProvider as Provider };

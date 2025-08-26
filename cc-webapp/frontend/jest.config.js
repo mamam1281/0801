@@ -6,10 +6,14 @@ const createJestConfig = nextJest({ dir: './' });
 /** @type {import('jest').Config} */
 const customJestConfig = {
   setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'].filter(Boolean),
-  testMatch: ['**/__tests__/**/*.test.(ts|tsx|js)'],
-  moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json'],
+  testMatch: ['**/__tests__/**/*.test.{ts,tsx,js}'],
+  moduleFileExtensions: ['tsx', 'ts', 'js', 'jsx', 'json'],
   moduleNameMapper: {
+    '^@/store/globalStore$': '<rootDir>/store/globalStore.tsx',
     '^@/(.+)$': '<rootDir>/$1',
+    '^react$': '<rootDir>/node_modules/react',
+    '^react-dom$': '<rootDir>/node_modules/react-dom',
+    '^react-dom/server$': 'react-dom/server.node',
     '\\.(css|less|scss|sass)$': 'identity-obj-proxy',
   },
     testEnvironment: 'jsdom',

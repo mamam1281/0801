@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { useGlobalStore, reconcileBalance, applyReward, mergeGameStats } from '../store/globalStore'
+import { useGlobalStore, reconcileBalance, applyReward, mergeGameStats } from '@/store/globalStore'
 import { api as unifiedApi } from '../lib/unifiedApi'
 
 type WSMessage = { type: string; payload?: any; event_id?: string }

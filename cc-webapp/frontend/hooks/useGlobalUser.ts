@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from 'react'
-import { useGlobalStore } from '../store/globalStore'
+import { useGlobalStore } from '@/store/globalStore'
 
 // shallow compare helper
 function shallowEqual(a: any, b: any) {

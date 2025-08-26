@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useGlobalStore, applyReward } from '../../store/globalStore';
+import { useGlobalStore, applyReward } from '@/store/globalStore';
 import { motion } from 'framer-motion';
 import {
   Star,

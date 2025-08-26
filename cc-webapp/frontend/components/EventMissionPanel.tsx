@@ -35,7 +35,7 @@ import { useEvents } from '../hooks/useEvents';
 import useAuthGate from '../hooks/useAuthGate';
 import useTelemetry from '../hooks/useTelemetry';
 import { api as unifiedApi } from '../lib/unifiedApi';
-import { useGlobalStore, applyReward } from '../store/globalStore';
+import { useGlobalStore, applyReward } from '@/store/globalStore';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';

@@ -22,7 +22,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { User as UserType } from '../types';
-import { useGlobalStore, setProfile } from '../store/globalStore';
+import { useGlobalStore, setProfile } from '@/store/globalStore';
 import api from '../utils/api';
 import { Button } from './ui/button';
 import { Switch } from './ui/switch';

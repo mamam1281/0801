@@ -1,6 +1,6 @@
 import React, { useEffect, useContext } from 'react'
 import { api, API_ORIGIN } from './unifiedApi'
-import { useGlobalStore, reconcileBalance, applyReward as storeApplyReward } from '../store/globalStore'
+import { useGlobalStore, reconcileBalance, applyReward as storeApplyReward } from '@/store/globalStore'
 
 // hydrate profile + balances + stats
 export async function hydrateProfile(dispatch: any) {

@@ -4,7 +4,7 @@ import {
   useGlobalStore,
   reconcileBalance,
   applyReward as storeApplyReward,
-} from '../store/globalStore';
+} from '@/store/globalStore';
 
 // hydrate profile + balances + stats
 export async function hydrateProfile(dispatch: any) {

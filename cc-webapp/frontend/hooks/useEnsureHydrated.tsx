@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { useGlobalStore, hydrateFromServer } from '../store/globalStore';
+import { useGlobalStore, hydrateFromServer } from '@/store/globalStore';
 
 export default function useEnsureHydrated() {
   const { state, dispatch } = useGlobalStore();
