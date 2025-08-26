@@ -9,6 +9,7 @@
 		"build": "next build",
 		"start": "next start",
 		"lint": "next lint",
+		"test": "jest",
 		"test:e2e": "playwright test --config=playwright.config.ts"
 	},
 	"dependencies": {
@@ -49,6 +50,12 @@
 		"vaul": "^1.1.2"
 	},
 	"devDependencies": {
+		"@testing-library/jest-dom": "^5.16.5",
+		"@testing-library/react": "^14.0.0",
+		"@types/jest": "^29.5.5",
+		"jest": "^30.0.5",
+		"jest-environment-jsdom": "^30.0.0",
+		"ts-jest": "^29.1.0",
 		"@axe-core/playwright": "^4.10.2",
 		"@playwright/test": "^1.55.0",
 		"@tailwindcss/postcss": "^4.0.0",

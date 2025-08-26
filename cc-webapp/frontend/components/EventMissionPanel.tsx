@@ -35,6 +35,7 @@ import { useEvents } from '../hooks/useEvents';
 import useAuthGate from '../hooks/useAuthGate';
 import useTelemetry from '../hooks/useTelemetry';
 import { api as unifiedApi } from '../lib/unifiedApi';
+import { useGlobalStore, applyReward } from '../store/globalStore';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
@@ -198,6 +199,8 @@ export function EventMissionPanel({
     fetchData();
   }, [authReady, authenticated]);
 
+  const { dispatch } = useGlobalStore();
+
   // Statistics
   const activeEvents = events.filter((e: Event) => e.status === 'active').length;
   const completedMissions = missions.filter((m: Mission) => m.status === 'completed').length;
@@ -260,6 +263,15 @@ export function EventMissionPanel({
         // 사용자 정보 업데이트
         const totalGold = response.rewards.gold || 0;
         const totalExp = response.rewards.exp || 0;
+
+        // 즉시 전역 스토어에 보상 반영(awarded_gold 형태를 우선 사용)
+        try {
+          if (dispatch && totalGold) {
+            applyReward(dispatch, { gold: totalGold, reason: 'mission_claim' });
+          }
+        } catch (e) {
+          console.warn('applyReward 실패:', e);
+        }
 
         // 경험치는 로컬로 반영하되, 잔액은 서버 권위 소스로 동기화
         let updatedUser = {
@@ -342,6 +354,15 @@ export function EventMissionPanel({
         // 사용자 정보 업데이트
         const totalGold = response.rewards.gold || 0;
         const totalGems = response.rewards.gems || 0;
+
+        // 즉시 전역 스토어에 보상 반영
+        try {
+          if (dispatch && totalGold) {
+            applyReward(dispatch, { gold: totalGold, gems: totalGems, reason: 'event_claim' });
+          }
+        } catch (e) {
+          console.warn('applyReward 실패(이벤트 보상):', e);
+        }
 
         // 잔액은 서버 권위 소스로 동기화
         try {

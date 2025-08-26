@@ -220,12 +220,15 @@ def upgrade() -> None:
         op.create_index(op.f('ix_user_missions_mission_id'), 'user_missions', ['mission_id'], unique=False)
     if 'ix_user_missions_user_id' not in existing_um_indexes:
         op.create_index(op.f('ix_user_missions_user_id'), 'user_missions', ['user_id'], unique=False)
-    op.alter_column('user_rewards', 'reward_id',
-               existing_type=sa.INTEGER(),
-               nullable=True)
-    existing_ur_indexes = {i['name'] for i in insp.get_indexes('user_rewards')}
-    if 'ix_user_rewards_claimed_at' not in existing_ur_indexes:
-        op.create_index(op.f('ix_user_rewards_claimed_at'), 'user_rewards', ['claimed_at'], unique=False)
+    # Guard: only alter user_rewards if the table exists to avoid crashing during partial/damaged DB states
+    existing_tables = {t for t in insp.get_table_names()}
+    if 'user_rewards' in existing_tables:
+        op.alter_column('user_rewards', 'reward_id',
+                   existing_type=sa.INTEGER(),
+                   nullable=True)
+        existing_ur_indexes = {i['name'] for i in insp.get_indexes('user_rewards')}
+        if 'ix_user_rewards_claimed_at' not in existing_ur_indexes:
+            op.create_index(op.f('ix_user_rewards_claimed_at'), 'user_rewards', ['claimed_at'], unique=False)
     op.alter_column('user_segments', 'last_updated',
                existing_type=postgresql.TIMESTAMP(),
                nullable=True,

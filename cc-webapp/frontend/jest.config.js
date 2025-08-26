@@ -1,3 +1,13 @@
+module.exports = {
+  testEnvironment: 'jsdom',
+  transform: {
+    '^.+\\.tsx?$': 'ts-jest',
+  },
+  moduleNameMapper: {
+    '^@/(.*)$': '<rootDir>/$1',
+  },
+  testPathIgnorePatterns: ['/node_modules/', '/.next/'],
+}
 // 단일 Jest 설정 (Next.js 15 + TypeScript) - VSCode 확장 다중 설정 충돌 방지
 // 기존 jest.config.ts 내용을 통합하여 ts-jest 개별 설정 없이 next/jest (SWC) 파이프라인 사용.
 // 해결 대상 에러: "Multiple configurations found" -> jest.config.ts 제거(또는 rename) 권장.

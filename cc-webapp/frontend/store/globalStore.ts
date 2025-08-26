@@ -132,7 +132,7 @@ function reducer(state: GlobalState, action: Actions): GlobalState {
 }
 
 type DispatchFn = (action: Actions) => void;
-const StoreContext = createContext(null as unknown as { state: GlobalState; dispatch: DispatchFn } | null);
+export const StoreContext = createContext(null as unknown as { state: GlobalState; dispatch: DispatchFn } | null);
 
 export function GlobalStoreProvider(props: { children?: React.ReactNode }) {
     const [state, dispatch] = useReducer(reducer, initialState);
@@ -142,7 +142,13 @@ export function GlobalStoreProvider(props: { children?: React.ReactNode }) {
 
 export function useGlobalStore() {
     const ctx = useContext(StoreContext);
-    if (!ctx) throw new Error("useGlobalStore must be used within GlobalStoreProvider");
+    if (!ctx) {
+        // SSR or outside provider: return a safe fallback to avoid runtime throws.
+        return {
+            state: initialState,
+            dispatch: (() => { }) as DispatchFn,
+        } as { state: GlobalState; dispatch: DispatchFn };
+    }
     return ctx;
 }
 

@@ -279,6 +279,7 @@ def list_limited_catalog_compat():
         remaining_stock = LimitedPackageService.get_stock(p.code)
         packages.append(LimitedPackageOut(
             code=p.code,
+            package_id=p.code,
             name=p.name,
             description=p.description,
             price_cents=p.price_cents,

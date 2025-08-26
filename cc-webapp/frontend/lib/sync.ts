@@ -5,15 +5,11 @@
  * - RealtimeSyncProvider: WS 수신 → 프로필/상태 동기화 (필요 시 재하이드레이트)
  * - withReconcile: 쓰기 요청 후 재조정(hydrate)
  */
-import React, { useEffect } from "react";
+import React, { useEffect, useContext } from "react";
 import { api, API_ORIGIN } from "../lib/unifiedApi";
-import {
-  useGlobalStore,
-  setProfile,
-  setHydrated,
-} from "../store/globalStore";
+import { setProfile, setHydrated, useGlobalStore, StoreContext } from "../store/globalStore";
 
-export async function hydrateProfile(dispatch: ReturnType<typeof useGlobalStore>["dispatch"]) {
+export async function hydrateProfile(dispatch: any) {
   try {
     // 최초 진입 병렬 hydrate:
   // - /auth/me (필수)
@@ -56,17 +52,23 @@ export function EnsureHydrated(props: { children?: React.ReactNode }) {
   const { dispatch } = useGlobalStore();
   useEffect(() => {
     // 최초 1회 하이드레이트 (토큰 없으면 실패하지만 harmless)
-    hydrateProfile(dispatch);
+    try {
+      if (dispatch) hydrateProfile(dispatch);
+    } catch {
+      // Provider may not be present during SSR; ignore.
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [dispatch]);
   return React.createElement(React.Fragment, null, props.children ?? null);
 }
 
 // 간단 WS 프로바이더 (프로필/구매/리워드 이벤트 수신)
 export function RealtimeSyncProvider(props: { children?: React.ReactNode }) {
-  const { dispatch } = useGlobalStore();
+  const ctx = useContext(StoreContext);
+  const dispatch = ctx?.dispatch;
   useEffect(() => {
     if (typeof window === "undefined") return;
+    if (!dispatch) return;
     let ws: WebSocket | null = null;
     let closed = false;
     let lastHydrate = 0;
@@ -95,12 +97,59 @@ export function RealtimeSyncProvider(props: { children?: React.ReactNode }) {
           const msg = JSON.parse(ev.data);
           const type = msg?.type;
           switch (type) {
-            case "profile_update":
-            case "purchase_update":
-            case "reward_granted":
-            case "game_update":
-              safeHydrate();
+              case "profile_update": {
+                // profile_update may include target user id; if it targets current session,
+                // call reconcileBalance for an explicit re-sync. Otherwise, run general hydrate.
+                try {
+                  const payload = msg?.data || msg?.payload || {};
+                  const targetId = payload?.user_id ?? payload?.id ?? payload?.target_user_id;
+                  // dynamic import to avoid circular import
+                  import('../store/globalStore').then((m: any) => {
+                    const state = (m as any).useGlobalStore ? undefined : undefined; // noop to satisfy bundler
+                    // get current profile id via context import at runtime
+                    import('../store/globalStore').then((storeMod: any) => {
+                      try {
+                        const ctx = storeMod.useGlobalStore();
+                        const currentId = ctx?.state?.profile?.id;
+                        if (targetId && String(targetId) === String(currentId) && typeof storeMod.reconcileBalance === 'function') {
+                          storeMod.reconcileBalance(dispatch);
+                        } else {
+                          safeHydrate();
+                        }
+                      } catch (e) {
+                        safeHydrate();
+                      }
+                    }).catch(() => safeHydrate());
+                  }).catch(() => safeHydrate());
+                } catch (e) {
+                  safeHydrate();
+                }
+                break;
+              }
+              case "purchase_update":
+              case "game_update":
+                safeHydrate();
+                break;
+            case "reward_granted": {
+              // try to apply awarded_gold immediately to reduce visual latency.
+              try {
+                const awarded = msg?.data || msg?.payload || msg?.award || {};
+                const gold = Number(awarded?.awarded_gold ?? awarded?.gold ?? awarded?.amount ?? 0) || 0;
+                const gems = Number(awarded?.awarded_gems ?? awarded?.gems ?? 0) || 0;
+                // dynamic import to avoid circular dependency at module load
+                import('../store/globalStore').then((m: any) => {
+                  const applyReward = (m as any).applyReward;
+                  if (typeof applyReward === 'function' && (gold !== 0 || gems !== 0)) {
+                    applyReward(dispatch, { gold, gems, reason: awarded?.reason });
+                  } else {
+                    safeHydrate();
+                  }
+                }).catch(() => safeHydrate());
+              } catch (e) {
+                safeHydrate();
+              }
               break;
+            }
             default:
               break;
           }
@@ -147,7 +196,7 @@ function uuidv4() {
 type ReconcileOptions = { reconcile?: boolean };
 
 export async function withReconcile<T>(
-  dispatch: ReturnType<typeof useGlobalStore>["dispatch"],
+  dispatch: any,
   serverCall: (idemKey: string) => Promise<T>,
   options: ReconcileOptions = { reconcile: true }
 ): Promise<T> {
@@ -160,9 +209,11 @@ export async function withReconcile<T>(
 }
 
 export function useWithReconcile() {
-  const { dispatch } = useGlobalStore();
+  const ctx = useContext(StoreContext);
+  const dispatch = ctx?.dispatch;
   return React.useMemo(() => {
     return async function run<T>(serverCall: (idemKey: string) => Promise<T>, opts?: ReconcileOptions) {
+      if (!dispatch) throw new Error('No dispatch available in useWithReconcile');
       return withReconcile<T>(dispatch, serverCall, opts);
     };
   }, [dispatch]);

@@ -28,7 +28,11 @@ type GlobalState = {
 type Actions =
   | { type: 'SET_PROFILE'; profile: GlobalUserProfile | null }
   | { type: 'SET_HYDRATED'; value: boolean }
-  | { type: 'PATCH_BALANCES'; delta: { gold?: number; gems?: number } };
+  | { type: 'PATCH_BALANCES'; delta: { gold?: number; gems?: number } }
+  | { type: 'APPLY_REWARD'; awarded: { gold?: number; gems?: number; reason?: string } }
+  | { type: 'MERGE_PROFILE'; patch: Partial<GlobalUserProfile> }
+  | { type: 'APPLY_PURCHASE'; items: any[] }
+  | { type: 'MERGE_GAME_STATS'; source: string; delta: any };
 
 const initialState: GlobalState = {
   profile: null,
@@ -66,12 +70,48 @@ function reducer(state: GlobalState, action: Actions): GlobalState {
         },
       };
     }
+    case 'APPLY_REWARD': {
+      if (!state.profile) return state;
+      const gold = state.profile.goldBalance ?? 0;
+      const gems = state.profile.gemsBalance ?? 0;
+      return {
+        ...state,
+        profile: {
+          ...state.profile,
+          goldBalance: gold + (action.awarded.gold ?? 0),
+          gemsBalance: gems + (action.awarded.gems ?? 0),
+          updatedAt: new Date().toISOString(),
+        },
+      };
+    }
+    case 'MERGE_PROFILE': {
+      const existing = state.profile ?? ({} as GlobalUserProfile);
+      const merged = {
+        ...existing,
+        ...action.patch,
+        updatedAt: new Date().toISOString(),
+      } as GlobalUserProfile;
+      return {
+        ...state,
+        profile: merged,
+        hydrated: true,
+        lastHydratedAt: Date.now(),
+      };
+    }
+    case 'APPLY_PURCHASE': {
+      // inventory not stored globally yet; placeholder for future expansion
+      return state;
+    }
+    case 'MERGE_GAME_STATS': {
+      // game stats not stored in global state currently; ignore for now
+      return state;
+    }
     default:
       return state;
   }
 }
 
-const StoreContext = createContext<{
+export const StoreContext = createContext<{
   state: GlobalState;
   dispatch: React.Dispatch<Actions>;
 } | null>(null);
@@ -84,7 +124,15 @@ export function GlobalStoreProvider({ children }: { children?: React.ReactNode }
 
 export function useGlobalStore() {
   const ctx = useContext(StoreContext);
-  if (!ctx) throw new Error('useGlobalStore must be used within GlobalStoreProvider');
+  if (!ctx) {
+    // SSR or outside provider: return a safe fallback to avoid runtime throws.
+    return {
+      state: initialState,
+      dispatch: (() => {
+        /* noop */
+      }) as React.Dispatch<Actions>,
+    } as { state: GlobalState; dispatch: React.Dispatch<Actions> };
+  }
   return ctx;
 }
 
@@ -110,4 +158,38 @@ export function patchBalances(
   delta: { gold?: number; gems?: number }
 ) {
   dispatch({ type: 'PATCH_BALANCES', delta });
+}
+
+// Additional helpers used across the UI
+export function mergeProfile(dispatch: React.Dispatch<Actions>, patch: Partial<GlobalUserProfile>) {
+  dispatch({ type: 'MERGE_PROFILE', patch });
+}
+
+export function applyPurchase(dispatch: React.Dispatch<Actions>, items: any[]) {
+  dispatch({ type: 'APPLY_PURCHASE', items });
+}
+
+export function applyReward(
+  dispatch: React.Dispatch<Actions>,
+  awarded: { gold?: number; gems?: number; reason?: string }
+) {
+  dispatch({ type: 'APPLY_REWARD', awarded });
+}
+
+export function mergeGameStats(dispatch: React.Dispatch<Actions>, source: string, delta: any) {
+  dispatch({ type: 'MERGE_GAME_STATS', source, delta });
+}
+
+// Reconcile helper: 호출 시 서버 권위로 프로필/밸런스를 재하이드레이트합니다.
+// dynamic import 사용으로 로드 시 순환 의존을 방지합니다.
+export async function reconcileBalance(dispatch: React.Dispatch<Actions>) {
+  try {
+    const m = await import('../lib/sync');
+    if (m && typeof m.hydrateProfile === 'function') {
+      await m.hydrateProfile(dispatch as any);
+    }
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.warn('[globalStore] reconcileBalance 실패', e);
+  }
 }
