@@ -12,6 +12,9 @@ services:
       - ./:/workspace
       - ./logs/playwright:/workspace/cc-webapp/frontend/test-results:rw
       - playwright_node_modules:/workspace/cc-webapp/frontend/node_modules
+    depends_on:
+      - frontend
+      - backend
     networks:
       ccnet:
         aliases:

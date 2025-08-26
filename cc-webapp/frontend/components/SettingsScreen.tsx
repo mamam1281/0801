@@ -24,8 +24,6 @@ import { User as UserType } from '../types';
 import { Button } from './ui/button';
 import { Switch } from './ui/switch';
 import { Slider } from './ui/slider';
-import { Input } from './ui/input';
-import { useProfileUpdate } from '@/hooks/useProfileUpdate';
 
 interface SettingsScreenProps {
   user: UserType;
@@ -42,9 +40,6 @@ export function SettingsScreen({ user, onBack, onUpdateUser, onAddNotification }
   const [vibrationEnabled, setVibrationEnabled] = useState(true);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [showBalance, setShowBalance] = useState(true);
-  const [nickDraft, setNickDraft] = useState(user?.nickname ?? '');
-  const [savingNick, setSavingNick] = useState(false);
-  const { updateNickname } = useProfileUpdate();
 
   const handleSoundToggle = (enabled: boolean) => {
     setSoundEnabled(enabled);
@@ -238,33 +233,7 @@ export function SettingsScreen({ user, onBack, onUpdateUser, onAddNotification }
               <User className="w-8 h-8 text-white" />
             </div>
             <div className="flex-1">
-              <div className="flex items-center gap-3">
-                <Input
-                  value={nickDraft}
-                  onChange={(e: any) => setNickDraft(e.currentTarget?.value ?? e.target?.value)}
-                  className="max-w-xs"
-                />
-                <Button
-                  size="sm"
-                  disabled={savingNick || !nickDraft || nickDraft === user.nickname}
-                  onClick={async () => {
-                    try {
-                      setSavingNick(true);
-                      await updateNickname(nickDraft.trim());
-                      onAddNotification('✅ 닉네임이 저장되었어요');
-                      if (onUpdateUser) {
-                        onUpdateUser({ ...user, nickname: nickDraft.trim() });
-                      }
-                    } catch (e) {
-                      onAddNotification('⚠️ 닉네임 저장 중 오류가 발생했어요');
-                    } finally {
-                      setSavingNick(false);
-                    }
-                  }}
-                >
-                  {savingNick ? '저장 중…' : '저장'}
-                </Button>
-              </div>
+              <h3 className="text-lg font-bold text-foreground">{user.nickname}</h3>
               <p className="text-sm text-muted-foreground">레벨 {user.level} • {user.goldBalance.toLocaleString()}G</p>
               <p className="text-xs text-primary">{user.stats.gamesPlayed}게임 플레이 • {user.stats.gamesWon}승</p>
             </div>

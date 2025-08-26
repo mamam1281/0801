@@ -43,8 +43,6 @@ import { API_ORIGIN } from '@/lib/unifiedApi';
 import { createWSClient, WSClient, WebSocketMessage } from '@/utils/wsClient';
 import useBalanceSync from '@/hooks/useBalanceSync';
 import { useUserGold, useUserLevel } from '@/hooks/useSelectors';
-import { useGlobalStore } from '@/store/globalStore';
-import { applyReward as applyRewardToStore } from '@/store/globalStore';
 
 interface HomeDashboardProps {
   user: User;
@@ -74,7 +72,6 @@ export function HomeDashboard({
   // 전역 프로필 셀렉터(표시 우선)
   const goldFromStore = useUserGold();
   const levelFromStore = useUserLevel();
-  const { dispatch: globalDispatch } = useGlobalStore();
   const router = useRouter();
   const { reconcileBalance } = useBalanceSync({
     sharedUser: user,
@@ -316,10 +313,6 @@ export function HomeDashboard({
     try {
       const data = await unifiedApi.post('streak/claim', { action_type: 'DAILY_LOGIN' });
       // data: { awarded_gold, awarded_xp, new_gold_balance, streak_count }
-      // 전역 스토어에 즉시 보상 반영(골드/젬 등)
-      try {
-        applyRewardToStore(globalDispatch, { reward_data: { awarded_gold: data.awarded_gold, awarded_gems: data.awarded_gems } });
-      } catch {}
       const fallback = {
         ...user,
         goldBalance: data.new_gold_balance ?? user.goldBalance,

@@ -27,31 +27,10 @@ function migrateLegacyIfNeeded() {
     // refresh 토큰은 알 수 없으므로 null 설정 (향후 강제 재로그인 트리거 가능)
     const migrated = { access_token: legacyAccess, refresh_token: null };
     localStorage.setItem(TOKEN_KEY, JSON.stringify(migrated));
-    // 쿠키에도 동기화하여 서버측 프록시/테스트(page.request)에서 Authorization 주입이 가능하도록 함
-    try {
-      document.cookie = `cc_access_token=${encodeURIComponent(legacyAccess)}; Path=/; SameSite=Lax`;
-    } catch {}
     console.warn('[tokenStorage] 레거시 토큰 자동 마이그레이션 수행 (refresh_token=null). 2025-09-15 이후 레거시 키 제거 예정.');
     return migrated;
   } catch (e) {
     console.error('[tokenStorage] 레거시 마이그레이션 실패:', e);
-    return null;
-  }
-}
-
-/**
- * 앱 부트스트랩 단계에서 호출하여 토큰 번들이 보장되도록 함.
- * - 존재 시 그대로 반환, 없으면 레거시에서 마이그레이션 시도 후 반환.
- * - SSR 에서는 no-op.
- * @returns {AuthTokens|null}
- */
-export function ensureTokenBundleMigrated() {
-  if (typeof window === 'undefined') return null;
-  try {
-    const existing = localStorage.getItem(TOKEN_KEY);
-    if (existing) return JSON.parse(existing);
-    return migrateLegacyIfNeeded();
-  } catch {
     return null;
   }
 }
@@ -106,8 +85,6 @@ export const setTokens = (tokens) => {
     // 레거시 키 동기화 (점진적 제거 전까지 유지) - 2025-09-01 이후 제거 예정
     if (tokens?.access_token) {
       try { localStorage.setItem(LEGACY_ACCESS_KEY, tokens.access_token); } catch { }
-  // 서버 프록시/미들웨어가 사용할 수 있도록 쿠키에도 저장
-  try { document.cookie = `cc_access_token=${encodeURIComponent(tokens.access_token)}; Path=/; SameSite=Lax`; } catch {}
     }
   } catch (error) {
     console.error('토큰 저장 오류:', error);
@@ -122,8 +99,6 @@ export const clearTokens = () => {
 
   try {
     localStorage.removeItem(TOKEN_KEY);
-  // 쿠키 제거(만료)
-  try { document.cookie = 'cc_access_token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax'; } catch {}
   } catch (error) {
     console.error('토큰 삭제 오류:', error);
   }
