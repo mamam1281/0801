@@ -6,7 +6,6 @@ import { WSClient, createWSClient, WebSocketMessage, SyncEventData } from '../ut
 import { useAuth } from '../hooks/useAuth';
 import { useAuthToken } from '../hooks/useAuthToken';
 import { globalFallbackPoller, createSyncPollingTasks } from '../utils/fallbackPolling';
-import { useToast } from '@/components/NotificationToast';
 
 /**
  * 실시간 동기화 전역 상태 정의
@@ -372,7 +371,11 @@ export function RealtimeSyncProvider({ children, apiBaseUrl }: RealtimeSyncProvi
   const { getAccessToken, getValidAccessToken } = useAuthToken();
   const wsClientRef = useRef(null as WSClient | null);
   const fallbackPollingActive = useRef(false);
-  const { push } = useToast();
+  // NOTE: avoid calling useToast() here because this provider may be mounted
+  // in a tree above the ToastProvider, which would throw during SSR/prerender.
+  // Instead emit a global CustomEvent('app:notification') which NotificationToast
+  // already listens for. This keeps toast behavior working without requiring
+  // a direct hook dependency.
   const lastPurchaseByReceiptRef = useRef(new Map<string, { status: string; at: number }>());
 
   // Prefer the same origin resolution as unifiedApi to avoid cross-origin/SSR mismatches
@@ -420,7 +423,14 @@ export function RealtimeSyncProvider({ children, apiBaseUrl }: RealtimeSyncProvi
           type = 'shop';
           text = `${product} 결제가 진행 중입니다...`;
         }
-        try { push(text, type); } catch {}
+
+        // Emit a global notification event instead of calling the toast hook
+        try {
+          const detail = { key, type, text, source: 'purchase_update', payload: data };
+          window.dispatchEvent(new CustomEvent('app:notification', { detail }));
+        } catch (e) {
+          // If window is not available or dispatch fails, ignore silently
+        }
   // 전역 상태 업데이트(배지/요약용)
   dispatch({ type: 'UPDATE_PURCHASE', payload: data });
         break;
@@ -453,7 +463,7 @@ export function RealtimeSyncProvider({ children, apiBaseUrl }: RealtimeSyncProvi
       default:
         console.warn('[RealtimeSync] Unknown message type:', message.type);
     }
-  }, [push]);
+  }, []);
 
   // WebSocket 연결
   const connect = useCallback(async () => {

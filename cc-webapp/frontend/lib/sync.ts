@@ -124,10 +124,28 @@ export function RealtimeSyncProvider(props: { children?: React.ReactNode }) {
                 } catch (e) {
                   safeHydrate();
                 }
+                // notify ToastProvider via window event for profile updates
+                try {
+                  const payload = msg?.data || msg?.payload || {};
+                  const detail = { type: 'profile_update', payload };
+                  window.dispatchEvent(new CustomEvent('app:notification', { detail }));
+                } catch (e) {
+                  // noop
+                }
                 break;
               }
               case "purchase_update":
               case "game_update":
+                // purchase updates should hydrate and also surface a toast about purchase status
+                try {
+                  const payload = msg?.data || msg?.payload || {};
+                  const status = payload?.status || payload?.state || 'update';
+                  const product = payload?.product_id || payload?.product || payload?.item_id || null;
+                  const message = product ? `Purchase ${status}: ${product}` : `Purchase ${status}`;
+                  window.dispatchEvent(new CustomEvent('app:notification', { detail: { type: 'shop', payload: message } }));
+                } catch (e) {
+                  // noop
+                }
                 safeHydrate();
                 break;
             case "reward_granted": {
@@ -145,6 +163,16 @@ export function RealtimeSyncProvider(props: { children?: React.ReactNode }) {
                     safeHydrate();
                   }
                 }).catch(() => safeHydrate());
+                // show a reward toast (uses ToastProvider dedupe)
+                try {
+                  const rewardTextParts: string[] = [];
+                  if (gold) rewardTextParts.push(`${gold} gold`);
+                  if (gems) rewardTextParts.push(`${gems} gems`);
+                  const rewardText = rewardTextParts.length > 0 ? `You received ${rewardTextParts.join(' and ')}` : 'You received a reward';
+                  window.dispatchEvent(new CustomEvent('app:notification', { detail: { type: 'reward', payload: rewardText } }));
+                } catch (e) {
+                  // noop
+                }
               } catch (e) {
                 safeHydrate();
               }

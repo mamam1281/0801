@@ -44,6 +44,7 @@ type Actions =
     | { type: "SET_PROFILE"; profile: GlobalUserProfile | null }
     | { type: "SET_HYDRATED"; value: boolean }
     | { type: "PATCH_BALANCES"; delta: { gold?: number; gems?: number } }
+    | { type: "APPLY_REWARD"; awarded: { gold?: number; gems?: number; reason?: string } }
     | { type: "MERGE_PROFILE"; patch: Partial<GlobalUserProfile> & Record<string, unknown> }
     | { type: "MERGE_GAME_STATS"; game: string; delta: Record<string, any> }
     | { type: "APPLY_PURCHASE"; items: InventoryItem[]; replace?: boolean };
@@ -103,6 +104,33 @@ function reducer(state: GlobalState, action: Actions): GlobalState {
 
             const mergedForGame = deepMergeNumericAdd(prev, action.delta);
             return { ...state, gameStats: { ...current, [action.game]: mergedForGame } };
+        }
+        case "PATCH_BALANCES": {
+            if (!state.profile) return state;
+            const gold = state.profile.goldBalance ?? 0;
+            const gems = (state.profile as any).gemsBalance ?? 0;
+            return {
+                ...state,
+                profile: {
+                    ...state.profile,
+                    goldBalance: gold + (action.delta.gold ?? 0),
+                    gemsBalance: gems + (action.delta.gems ?? 0),
+                } as GlobalUserProfile,
+            };
+        }
+        case "APPLY_REWARD": {
+            if (!state.profile) return state;
+            const gold = state.profile.goldBalance ?? 0;
+            const gems = (state.profile as any).gemsBalance ?? 0;
+            return {
+                ...state,
+                profile: {
+                    ...state.profile,
+                    goldBalance: gold + (action.awarded.gold ?? 0),
+                    gemsBalance: gems + (action.awarded.gems ?? 0),
+                    updatedAt: new Date().toISOString(),
+                } as GlobalUserProfile,
+            };
         }
         case "APPLY_PURCHASE": {
             const current = state.inventory || [];
@@ -171,6 +199,10 @@ export function setHydrated(dispatch: DispatchFn, value: boolean) {
 
 export function patchBalances(dispatch: DispatchFn, delta: { gold?: number; gems?: number }) {
     dispatch({ type: "PATCH_BALANCES", delta });
+}
+
+export function applyReward(dispatch: DispatchFn, awarded: { gold?: number; gems?: number; reason?: string }) {
+    dispatch({ type: "APPLY_REWARD", awarded });
 }
 
 export function mergeProfile(dispatch: DispatchFn, patch: Partial<GlobalUserProfile> & Record<string, unknown>) {

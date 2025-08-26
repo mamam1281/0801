@@ -74,6 +74,7 @@
     "app/**/*",
     "components/**/*",
   "hooks/**/*",
+  "store/**/*",
     "pages/**/*",
     "src/**/*",
     "types/**/*.d.ts",
