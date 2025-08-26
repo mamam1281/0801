@@ -1,5 +1,5 @@
 'use client';
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { api as unifiedApi, UnifiedRequestOptions } from '@/lib/unifiedApi';
 
 type Tx = {
@@ -23,9 +23,6 @@ export default function ProfileHistory() {
   const [mergeMode, setMergeMode] = useState(true); // true: merge(append), false: replace
 
   async function loadPage() {
-  // debug trace
-  // eslint-disable-next-line no-console
-  console.log('[ProfileHistory] loadPage start');
     setLoading(true);
     setError(null);
     try {
@@ -38,8 +35,6 @@ export default function ProfileHistory() {
       const path = `shop/transactions?${qs.toString()}`;
       // call API; response shape may be Tx[] or { transactions: Tx[] }
   const raw = await unifiedApi.get<unknown>(path, { parseJson: true, auth: true });
-  // eslint-disable-next-line no-console
-  console.log('[ProfileHistory] loaded raw', raw);
       let txs: Tx[] = [];
       if (Array.isArray(raw)) {
         txs = raw as Tx[];
@@ -50,17 +45,9 @@ export default function ProfileHistory() {
         }
       }
 
-      // eslint-disable-next-line no-console
-      console.log('[ProfileHistory] txs length', txs.length, 'mergeMode', mergeMode);
       if (mergeMode) {
-        setItems((prev: Tx[]) => {
-          // eslint-disable-next-line no-console
-          console.log('[ProfileHistory] setItems(prev+txs)', prev.length, '+', txs.length);
-          return [...prev, ...txs];
-        });
+  setItems((prev: Tx[]) => [...prev, ...txs]);
       } else {
-        // eslint-disable-next-line no-console
-        console.log('[ProfileHistory] setItems(replace)', txs.length);
         setItems(txs);
       }
 
@@ -78,16 +65,9 @@ export default function ProfileHistory() {
       if (e instanceof Error) setError(e.message);
       else setError(String(e));
     } finally {
-  // eslint-disable-next-line no-console
-  console.log('[ProfileHistory] loadPage finally done');
       setLoading(false);
     }
   }
-
-  useEffect(() => {
-    // eslint-disable-next-line no-console
-    console.log('[ProfileHistory] items updated', items.length);
-  }, [items]);
 
   return (
     <div className="p-4 bg-slate-800 text-white rounded">
