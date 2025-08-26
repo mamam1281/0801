@@ -7,6 +7,7 @@ import { useAuth } from '../hooks/useAuth';
 import { useAuthToken } from '../hooks/useAuthToken';
 import { globalFallbackPoller, createSyncPollingTasks } from '../utils/fallbackPolling';
 import { useToast } from '@/components/NotificationToast';
+import { useGlobalStore, applyReward as applyRewardToStore } from '@/store/globalStore';
 
 /**
  * 실시간 동기화 전역 상태 정의
@@ -374,6 +375,7 @@ export function RealtimeSyncProvider({ children, apiBaseUrl }: RealtimeSyncProvi
   const fallbackPollingActive = useRef(false);
   const { push } = useToast();
   const lastPurchaseByReceiptRef = useRef(new Map<string, { status: string; at: number }>());
+  const { dispatch: globalDispatch } = useGlobalStore();
 
   // Prefer the same origin resolution as unifiedApi to avoid cross-origin/SSR mismatches
   const baseUrl = apiBaseUrl || API_ORIGIN || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8000');
@@ -438,9 +440,19 @@ export function RealtimeSyncProvider({ children, apiBaseUrl }: RealtimeSyncProvi
         dispatch({ type: 'UPDATE_EVENT', payload: message.data });
         break;
 
-      case 'reward_granted':
+      case 'reward_granted': {
+        // 전역 스토어의 골드/젬 잔액 즉시 반영(서버 권위 WS 페이로드 기준)
+        try {
+          const payload: any = (message as any)?.data;
+          const rd = payload?.reward_data ?? payload;
+          applyRewardToStore(globalDispatch, { reward_data: rd });
+        } catch (e) {
+          console.warn('[RealtimeSync] applyRewardToStore failed', e);
+        }
+        // UI 알림/최근 보상 리스트는 기존대로 유지
         dispatch({ type: 'ADD_REWARD', payload: message.data });
         break;
+      }
 
       case 'stats_update':
         dispatch({ type: 'UPDATE_STATS', payload: message.data });
@@ -453,7 +465,7 @@ export function RealtimeSyncProvider({ children, apiBaseUrl }: RealtimeSyncProvi
       default:
         console.warn('[RealtimeSync] Unknown message type:', message.type);
     }
-  }, [push]);
+  }, [push, globalDispatch]);
 
   // WebSocket 연결
   const connect = useCallback(async () => {

@@ -43,6 +43,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/Tabs';
 import { Progress } from './ui/progress';
 import { Badge } from './ui/badge';
 import { Switch } from './ui/switch';
+import { useGlobalStore } from '@/store/globalStore';
+import { applyReward as applyRewardToStore } from '@/store/globalStore';
 
 interface EventMissionPanelProps {
   user: User;
@@ -57,6 +59,7 @@ export function EventMissionPanel({
   onUpdateUser,
   onAddNotification,
 }: EventMissionPanelProps) {
+  const { dispatch: globalDispatch } = useGlobalStore();
   // 공통 Auth Gate (마운트 후 토큰 존재 여부 결정)
   const { isReady: authReady, authenticated } = useAuthGate();
   const { record: t } = useTelemetry('events');
@@ -246,8 +249,8 @@ export function EventMissionPanel({
       return;
     }
     try {
-      // API를 통한 미션 보상 수령
-      const response = await eventMissionApi.missions.claimRewards(parseInt(missionId));
+  // API를 통한 미션 보상 수령
+  const response = await eventMissionApi.missions.claimRewards(parseInt(missionId));
 
       if (response && response.success) {
         // 보상 내역 표시
@@ -257,8 +260,13 @@ export function EventMissionPanel({
 
         onAddNotification(`보상 수령 완료: ${rewardMessage}`);
 
-        // 사용자 정보 업데이트
-        const totalGold = response.rewards.gold || 0;
+        // 전역 스토어에 보상 즉시 반영(골드/젬)
+        try {
+          applyRewardToStore(globalDispatch, { reward_data: response.rewards });
+        } catch {}
+
+        // 사용자 정보 업데이트(경험치 등 로컬 표시용)
+        const totalGold = response.rewards.gold || response.rewards.awarded_gold || 0;
         const totalExp = response.rewards.exp || 0;
 
         // 경험치는 로컬로 반영하되, 잔액은 서버 권위 소스로 동기화
@@ -286,8 +294,8 @@ export function EventMissionPanel({
 
         onUpdateUser(updatedUser);
 
-        // 데이터 다시 로드
-        fetchData();
+  // 데이터 다시 로드(진행도/claimed 상태는 항상 서버값으로 갱신)
+  fetchData();
         t('mission_claim_success', { missionId });
       }
     } catch (error) {
@@ -329,7 +337,7 @@ export function EventMissionPanel({
       return;
     }
     try {
-      const response = await claimEvent(parseInt(eventId));
+  const response = await claimEvent(parseInt(eventId));
 
       if (response && response.success) {
         // 보상 내역 표시
@@ -339,9 +347,14 @@ export function EventMissionPanel({
 
         onAddNotification(`이벤트 보상 수령 완료: ${rewardMessage}`);
 
-        // 사용자 정보 업데이트
-        const totalGold = response.rewards.gold || 0;
-        const totalGems = response.rewards.gems || 0;
+        // 전역 스토어에 보상 즉시 반영(골드/젬)
+        try {
+          applyRewardToStore(globalDispatch, { reward_data: response.rewards });
+        } catch {}
+
+        // 사용자 정보 업데이트(로컬 표시)
+        const totalGold = response.rewards.gold || response.rewards.awarded_gold || 0;
+        const totalGems = response.rewards.gems || response.rewards.awarded_gems || 0;
 
         // 잔액은 서버 권위 소스로 동기화
         try {
@@ -356,8 +369,8 @@ export function EventMissionPanel({
           onUpdateUser({ ...user });
         }
 
-        // 데이터 다시 로드
-        refreshEvents();
+  // 데이터 다시 로드(진행도/claimed 상태는 항상 서버값으로 갱신)
+  refreshEvents();
         t('event_claim_success', { eventId });
       }
     } catch (error) {
