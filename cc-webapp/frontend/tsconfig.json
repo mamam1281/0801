@@ -25,6 +25,9 @@
     ],
     "baseUrl": ".",
     "paths": {
+      "@/store/globalStore": [
+        "./store/globalStore.ts"
+      ],
       "@/*": [
         "./*"
       ],
@@ -36,6 +39,9 @@
       ],
       "@/lib/*": [
         "./lib/*"
+      ],
+      "@/store/*": [
+        "./store/*"
       ],
       "@/utils/*": [
         "./utils/*"
@@ -73,6 +79,7 @@
     "next-env.d.ts",
     "app/**/*",
     "components/**/*",
+  "store/**/*",
   "hooks/**/*",
     "pages/**/*",
     "src/**/*",

@@ -438,6 +438,12 @@ async def health_check():
         redis_connected=redis_connected
     )
 
+# Backward/compat alias for environments or scripts expecting /api/health
+@app.get("/api/health", response_model=HealthResponse, tags=["Health"])
+async def health_check_api():
+    """Alias of /health to keep readiness checks consistent across stacks."""
+    return await health_check()
+
 @app.get("/api/kafka/_debug/last", tags=["Kafka"])
 async def kafka_last_messages(limit: int = 10):
     """Return last consumed Kafka messages (debug)."""

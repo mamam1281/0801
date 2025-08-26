@@ -26,7 +26,7 @@ import { useUserManager } from '../hooks/useUserManager';
 import { useAppNavigation } from '../hooks/useAppNavigation';
 // NOTE: Deprecated useAuthHandlers (local simulation) removed – now using real backend auth via useAuth
 import { useAuth } from '../hooks/useAuth';
-import { GlobalStoreProvider } from '../store/globalStore';
+import { GlobalStoreProvider } from '@/store/globalStore';
 import { EnsureHydrated, RealtimeSyncProvider } from '../lib/sync';
 import DailyRewardClaimedDialog from '../components/rewards/DailyRewardClaimedDialog';
 import {

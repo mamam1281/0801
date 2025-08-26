@@ -10,8 +10,11 @@ async function waitForOk(url, timeoutMs) {
     try {
       const resp = await fetch(url, { method: 'GET' });
       // Treat any non-5xx as readiness (200/404 are fine for root)
-      if (resp.status < 500) return;
-      lastErr = new Error(`Status ${resp.status}`);
+  if (resp.status < 500) return;
+  // read body for diagnostics (best-effort; may throw if stream used)
+  let body = '';
+  try { body = await resp.text(); } catch (_) { /* ignore */ }
+  lastErr = new Error(`Status ${resp.status} from ${url} :: ${body?.slice(0, 300)}`);
     } catch (e) {
       lastErr = e;
     }

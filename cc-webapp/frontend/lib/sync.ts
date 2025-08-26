@@ -11,7 +11,7 @@ import {
   useGlobalStore,
   setProfile,
   setHydrated,
-} from "../store/globalStore";
+} from "@/store/globalStore";
 
 export async function hydrateProfile(dispatch: ReturnType<typeof useGlobalStore>["dispatch"]) {
   try {
