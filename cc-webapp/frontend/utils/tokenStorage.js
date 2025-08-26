@@ -36,6 +36,23 @@ function migrateLegacyIfNeeded() {
 }
 
 /**
+ * 앱 부트스트랩 단계에서 호출하여 토큰 번들이 보장되도록 함.
+ * - 존재 시 그대로 반환, 없으면 레거시에서 마이그레이션 시도 후 반환.
+ * - SSR 에서는 no-op.
+ * @returns {AuthTokens|null}
+ */
+export function ensureTokenBundleMigrated() {
+  if (typeof window === 'undefined') return null;
+  try {
+    const existing = localStorage.getItem(TOKEN_KEY);
+    if (existing) return JSON.parse(existing);
+    return migrateLegacyIfNeeded();
+  } catch {
+    return null;
+  }
+}
+
+/**
  * 토큰 인터페이스 정의
  * @typedef {Object} AuthTokens
  * @property {string} access_token - 액세스 토큰

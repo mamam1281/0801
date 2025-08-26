@@ -10,6 +10,8 @@ import { Progress } from './ui/progress';
 import { User, UserStats, UserBalance } from '../types/user';
 import { api as unifiedApi } from '@/lib/unifiedApi';
 import useBalanceSync from '@/hooks/useBalanceSync';
+import { useGlobalStore, mergeProfile, mergeGameStats } from '@/store/globalStore';
+import { useUserGold, useUserProfile } from '@/hooks/useSelectors';
 import { getTokens, setTokens } from '../utils/tokenStorage';
 import { useRealtimeProfile, useRealtimeStats } from '@/hooks/useRealtimeData';
 
@@ -38,6 +40,10 @@ export function ProfileScreen({
     onUpdateUser,
     onAddNotification,
   });
+  // 전역 스토어 구독(표시값은 스토어 기준)
+  const storeProfile = useUserProfile();
+  const displayGoldFromStore = useUserGold();
+  const { dispatch } = useGlobalStore();
   // Realtime 전역 상태 구독(골드 등 핵심 값은 전역 프로필 우선 사용)
   const { profile: rtProfile, refresh: refreshRtProfile } = useRealtimeProfile();
   const { allStats: rtAllStats } = useRealtimeStats();
@@ -98,11 +104,46 @@ export function ProfileScreen({
           (rawBalance as any).tokens ||
           0,
       };
-  setUser(profileData as any);
-  setStats(statsData as any);
-  setBalance(balanceData as any);
-  // 공용 user 상태와 동기화: GOLD 일관성 확보(중앙 훅 사용)
-  reconcileWith((balanceData as any)?.cyber_token_balance);
+      // 로컬 보조 상태 업데이트(진행도 UI 등)
+      setUser(profileData as any);
+      setStats(statsData as any);
+      setBalance(balanceData as any);
+
+      // 전역 스토어 덮어쓰기(서버 권위)
+      try {
+        const mappedProfile = {
+          id: (rawProfile as any)?.id ?? (rawProfile as any)?.user_id ?? 'unknown',
+          nickname: (rawProfile as any)?.nickname ?? (rawProfile as any)?.name ?? '',
+          goldBalance:
+            Number(
+              (balanceData as any)?.cyber_token_balance ??
+                (rawProfile as any)?.gold ??
+                (rawProfile as any)?.gold_balance ??
+                0
+            ) || 0,
+          level: (rawProfile as any)?.level ?? (rawProfile as any)?.battlepass_level ?? undefined,
+          xp: (rawProfile as any)?.xp ?? (rawProfile as any)?.experience ?? undefined,
+          dailyStreak: profileData.dailyStreak ?? 0,
+          updatedAt: new Date().toISOString(),
+        } as any;
+        mergeProfile(dispatch, mappedProfile);
+      } catch (e) {
+        console.warn('[fetchProfileBundle] mergeProfile 실패', e);
+      }
+
+      try {
+        // 게임 통계는 집계 키로 저장(aggregate)
+        const aggregate = {
+          total_games_played: Number((statsData as any)?.total_games_played ?? 0) || 0,
+          total_wins: Number((statsData as any)?.total_wins ?? 0) || 0,
+        } as Record<string, any>;
+        mergeGameStats(dispatch, 'aggregate', aggregate);
+      } catch (e) {
+        console.warn('[fetchProfileBundle] mergeGameStats 실패', e);
+      }
+
+      // 공용 user 상태와 동기화: GOLD 일관성 확보(중앙 훅 사용)
+      reconcileWith((balanceData as any)?.cyber_token_balance);
     } catch (error) {
       console.error('[fetchProfileBundle] 오류:', error);
       throw error;
@@ -379,10 +420,8 @@ export function ProfileScreen({
   const progressToNext =
     user?.experience && user?.maxExperience ? (user.experience / user.maxExperience) * 100 : 0;
 
-  // GOLD 표시값: Realtime 전역 상태(우선) → 공용 상태 → 로컬 balance 폴백
-  const displayGold: number | string = (
-    (rtProfile?.gold as any) ?? (sharedUser?.goldBalance as any) ?? (balance?.cyber_token_balance as any) ?? 0
-  );
+  // GOLD 표시값: 전역 스토어 기준(필수), 폴백은 없음
+  const displayGold: number | string = displayGoldFromStore ?? 0;
 
   // 실시간 통계 파생값: 전역 stats 우선, 없으면 기존 로컬 stats 사용
   const pickNumber = (obj: Record<string, any> | undefined, keys: string[]): number => {
@@ -460,7 +499,7 @@ export function ProfileScreen({
                 {/* 🎯 닉네임 (단순하게) */}
                 <div>
                   <h2 className="text-4xl font-black text-gradient-primary mb-4">
-                    {user?.nickname || '사용자'}
+                    {storeProfile?.nickname || user?.nickname || '사용자'}
                   </h2>
 
                   {/* 🎯 연속출석일만 표시 */}
@@ -657,7 +696,7 @@ export function ProfileScreen({
                           <div className="text-xs text-muted-foreground">레벨 10 달성하기</div>
                         </div>
                         <Badge className="bg-muted/20 text-muted-foreground border-muted/30 text-xs">
-                          {user?.level || 0}/10
+                          {(storeProfile as any)?.level ?? user?.level ?? 0}/10
                         </Badge>
                       </div>
 

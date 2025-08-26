@@ -28,6 +28,7 @@ import { useAppNavigation } from '../hooks/useAppNavigation';
 import { useAuth } from '../hooks/useAuth';
 import { GlobalStoreProvider } from '@/store/globalStore';
 import { EnsureHydrated, RealtimeSyncProvider } from '../lib/sync';
+import { ensureTokenBundleMigrated } from '../utils/tokenStorage';
 import DailyRewardClaimedDialog from '../components/rewards/DailyRewardClaimedDialog';
 import {
   APP_CONFIG,
@@ -41,6 +42,13 @@ type NotificationItem = { id: string | number; message: React.ReactNode };
 export default function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [hasInitialized, setHasInitialized] = useState(false);
+
+  // 부트스트랩: 가장 먼저 토큰 번들 마이그레이션을 보장해 초기 API/WS에 Authorization 누락이 없도록 함.
+  useEffect(() => {
+    try { ensureTokenBundleMigrated(); } catch { /* noop */ }
+    // 한 번만 시도
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // 🎯 커스텀 훅으로 상태 관리 분리
   const {
