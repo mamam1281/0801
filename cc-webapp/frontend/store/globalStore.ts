@@ -1,3 +1,152 @@
+import React, { createContext, useContext, useReducer, useCallback } from 'react'
+import unifiedApi from '../lib/unifiedApi'
+
+// Types
+export type User = {
+    id: string
+    nickname?: string
+    tier?: string
+    created_at?: string
+    // ...other profile fields
+}
+
+export type Balances = {
+    gold: number
+    gems?: number
+    [k: string]: any
+}
+
+export type GameStats = Record<string, number>
+export type Inventory = Array<any>
+export type Streak = { level?: number; last_claim_ts?: string }
+export type EventItem = { id: string; type: string; payload?: any }
+export type NotificationItem = { id: string; type: string; message: string; meta?: any }
+
+export type GlobalState = {
+    user?: User | null
+    balances: Balances
+    gameStats: GameStats
+    inventory: Inventory
+    streak?: Streak
+    events: EventItem[]
+    notifications: NotificationItem[]
+    ready: boolean
+    lastError?: string | null
+}
+
+const initialState: GlobalState = {
+    user: null,
+    balances: { gold: 0, gems: 0 },
+    gameStats: {},
+    inventory: [],
+    streak: {},
+    events: [],
+    notifications: [],
+    ready: false,
+    lastError: null,
+}
+
+// Actions
+type Action =
+    | { type: 'SET_READY'; ready: boolean }
+    | { type: 'SET_USER'; user: User }
+    | { type: 'SET_BALANCES'; balances: Balances }
+    | { type: 'MERGE_GAME_STATS'; stats: GameStats }
+    | { type: 'APPLY_REWARD'; reward: { gold?: number; gems?: number; items?: any[] } }
+    | { type: 'APPLY_PURCHASE'; purchase: { gold_delta?: number; gems_delta?: number; items?: any[] } }
+    | { type: 'SET_LAST_ERROR'; error?: string | null }
+    | { type: 'PUSH_NOTIFICATION'; notification: NotificationItem }
+
+function reducer(state: GlobalState, action: Action): GlobalState {
+    switch (action.type) {
+        case 'SET_READY':
+            return { ...state, ready: action.ready }
+        case 'SET_USER':
+            return { ...state, user: action.user }
+        case 'SET_BALANCES':
+            return { ...state, balances: { ...state.balances, ...action.balances } }
+        case 'MERGE_GAME_STATS':
+            return { ...state, gameStats: { ...state.gameStats, ...action.stats } }
+        case 'APPLY_REWARD': {
+            const { gold = 0, gems = 0, items = [] } = action.reward
+            return {
+                ...state,
+                balances: { ...state.balances, gold: (state.balances.gold || 0) + gold, gems: (state.balances.gems || 0) + gems },
+                inventory: [...state.inventory, ...items],
+            }
+        }
+        case 'APPLY_PURCHASE': {
+            const { gold_delta = 0, gems_delta = 0, items = [] } = action.purchase
+            return {
+                ...state,
+                balances: { ...state.balances, gold: (state.balances.gold || 0) + gold_delta, gems: (state.balances.gems || 0) + gems_delta },
+                inventory: [...state.inventory, ...items],
+            }
+        }
+        case 'SET_LAST_ERROR':
+            return { ...state, lastError: action.error ?? null }
+        case 'PUSH_NOTIFICATION':
+            return { ...state, notifications: [action.notification, ...state.notifications].slice(0, 100) }
+        default:
+            return state
+    }
+}
+
+const GlobalStoreContext = createContext<{
+    state: GlobalState
+    dispatch: React.Dispatch<Action>
+} | null>(null)
+
+export const GlobalStoreProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+    const [state, dispatch] = useReducer(reducer, initialState)
+    return <GlobalStoreContext.Provider value={ { state, dispatch } }> { children } </GlobalStoreContext.Provider>
+}
+
+export function useGlobalStore() {
+    const ctx = useContext(GlobalStoreContext)
+    if (!ctx) throw new Error('useGlobalStore must be used within GlobalStoreProvider')
+    return ctx
+}
+
+// Action helpers
+export const hydrateFromServer = async (dispatch: React.Dispatch<Action>) => {
+    try {
+        const [me, balances, stats] = await Promise.all([
+            unifiedApi.get('auth/me'),
+            unifiedApi.get('users/balance'),
+            unifiedApi.get('games/stats/me'),
+        ])
+        dispatch({ type: 'SET_USER', user: me })
+        dispatch({ type: 'SET_BALANCES', balances })
+        dispatch({ type: 'MERGE_GAME_STATS', stats })
+        dispatch({ type: 'SET_READY', ready: true })
+    } catch (err: any) {
+        dispatch({ type: 'SET_LAST_ERROR', error: err?.message ?? 'hydrate_failed' })
+    }
+}
+
+export const reconcileBalance = async (dispatch: React.Dispatch<Action>) => {
+    try {
+        const balances = await unifiedApi.get('users/balance')
+        dispatch({ type: 'SET_BALANCES', balances })
+    } catch (err: any) {
+        dispatch({ type: 'SET_LAST_ERROR', error: err?.message ?? 'reconcile_failed' })
+    }
+}
+
+export const mergeGameStats = (dispatch: React.Dispatch<Action>, stats: GameStats) => {
+    dispatch({ type: 'MERGE_GAME_STATS', stats })
+}
+
+export const applyReward = (dispatch: React.Dispatch<Action>, reward: { gold?: number; gems?: number; items?: any[] }) => {
+    dispatch({ type: 'APPLY_REWARD', reward })
+}
+
+export const applyPurchase = (dispatch: React.Dispatch<Action>, purchase: { gold_delta?: number; gems_delta?: number; items?: any[] }) => {
+    dispatch({ type: 'APPLY_PURCHASE', purchase })
+}
+
+export default GlobalStoreProvider
 /*
  * Global Store (Context + Reducer)
  * - 서버 권위 프로필/밸런스 상태 보관

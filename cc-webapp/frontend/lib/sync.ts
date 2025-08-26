@@ -1,248 +1,146 @@
-/*
- * Sync utilities
- * - hydrateProfile: 서버 권위 프로필 로드
- * - EnsureHydrated: 최초 마운트 시 하이드레이트 트리거(렌더 차단 안함)
- * - RealtimeSyncProvider: WS 수신 → 프로필/상태 동기화 (필요 시 재하이드레이트)
- * - withReconcile: 쓰기 요청 후 재조정(hydrate)
- */
-import React, { useEffect, useContext } from "react";
-import { api, API_ORIGIN } from "../lib/unifiedApi";
-import { setProfile, setHydrated, useGlobalStore, StoreContext } from "../store/globalStore";
+import React, { useEffect, useContext } from 'react'
+import { api, API_ORIGIN } from './unifiedApi'
+import { useGlobalStore, reconcileBalance, applyReward as storeApplyReward } from '../store/globalStore'
 
+// hydrate profile + balances + stats
 export async function hydrateProfile(dispatch: any) {
   try {
-    // 최초 진입 병렬 hydrate:
-  // - /auth/me (필수)
-    // - /users/balance (권위 잔액)
-    // - /games/stats/me (통계 – 전역 저장은 아직 없으나, 워밍업/요건 충족용 호출)
-    const [profileRes, balanceRes] = await Promise.all([
-      api.get("auth/me"),
-      api.get("users/balance").catch(() => null),
-      // 통계는 실패/401 무시 (호출만 수행)
-      api.get("games/stats/me").catch(() => null),
-    ]);
+    const [profileRes, balanceRes, statsRes] = await Promise.all([
+      api.get('auth/me').catch(() => null),
+      api.get('users/balance').catch(() => null),
+      api.get('games/stats/me').catch(() => null),
+    ])
 
-    const data = profileRes as any;
-    // balance 응답에서 가능한 키를 우선적으로 사용
-    const balAny = balanceRes as any;
-    const goldFromBalanceRaw = balAny?.gold ?? balAny?.gold_balance ?? balAny?.cyber_token_balance ?? balAny?.balance;
-    const goldFromBalance = Number.isFinite(Number(goldFromBalanceRaw)) ? Number(goldFromBalanceRaw) : undefined;
-
-    const mapped = {
-      id: data?.id ?? data?.user_id ?? "unknown",
-      nickname: data?.nickname ?? data?.name ?? "",
-      goldBalance: goldFromBalance ?? Number(data?.gold ?? data?.gold_balance ?? 0),
-      gemsBalance: Number(data?.gems ?? data?.gems_balance ?? 0),
-      level: data?.level ?? data?.battlepass_level ?? undefined,
-      xp: data?.xp ?? undefined,
-      updatedAt: new Date().toISOString(),
-      ...data,
-    } as any;
-    setProfile(dispatch, mapped);
+    if (profileRes) dispatch({ type: 'SET_USER', user: profileRes })
+    if (balanceRes) dispatch({ type: 'SET_BALANCES', balances: balanceRes })
+    if (statsRes) dispatch({ type: 'MERGE_GAME_STATS', stats: statsRes })
   } catch (e) {
-    // 401 등은 무시(로그인 전/토큰 만료 시점)
-    // eslint-disable-next-line no-console
-    console.warn("[sync] hydrateProfile 실패", e);
-  } finally {
-    setHydrated(dispatch, true);
+    // ignore
+    // console.warn('[sync] hydrateProfile failed', e)
   }
 }
 
 export function EnsureHydrated(props: { children?: React.ReactNode }) {
-  const { dispatch } = useGlobalStore();
+  const { state, dispatch } = useGlobalStore()
   useEffect(() => {
-    // 최초 1회 하이드레이트 (토큰 없으면 실패하지만 harmless)
-    try {
-      if (dispatch) hydrateProfile(dispatch);
-    } catch {
-      // Provider may not be present during SSR; ignore.
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dispatch]);
-  return React.createElement(React.Fragment, null, props.children ?? null);
+    if (state.ready) return
+    hydrateProfile(dispatch).finally(() => {
+      dispatch({ type: 'SET_READY', ready: true })
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  return <>{ props.children ?? null } </>
 }
 
-// 간단 WS 프로바이더 (프로필/구매/리워드 이벤트 수신)
+function toWs(origin: string) {
+  return origin.replace(/^http/i, 'ws')
+}
+
 export function RealtimeSyncProvider(props: { children?: React.ReactNode }) {
-  const ctx = useContext(StoreContext);
-  const dispatch = ctx?.dispatch;
+  const ctx = useContext((React as any).createContext ? undefined : undefined) // noop for typing clarity
+  const { state, dispatch } = useGlobalStore()
+
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (!dispatch) return;
-    let ws: WebSocket | null = null;
-    let closed = false;
-    let lastHydrate = 0;
-    const minInterval = 600; // ms, 잦은 재하이드레이트 방지
+    if (typeof window === 'undefined') return
+    let ws: WebSocket | null = null
+    let closed = false
 
-    function toWs(origin: string) {
-      return origin.replace(/^http/i, "ws");
-    }
-
-    function safeHydrate() {
-      const now = Date.now();
-      if (now - lastHydrate < minInterval) return;
-      lastHydrate = now;
-      hydrateProfile(dispatch);
-    }
-
+    const url = `${toWs(API_ORIGIN)}/ws/updates`
     try {
-      const url = toWs(API_ORIGIN) + "/ws/updates";
-      ws = new WebSocket(url);
-      ws.onopen = () => {
-        // eslint-disable-next-line no-console
-        console.log("[sync] WS connected", url);
-      };
+      ws = new WebSocket(url)
+      ws.onopen = () => console.log('[sync] WS connected', url)
       ws.onmessage = (ev) => {
         try {
-          const msg = JSON.parse(ev.data);
-          const type = msg?.type;
+          const msg = JSON.parse(ev.data)
+          const type = msg?.type
+          const payload = msg?.data || msg?.payload || {}
+          const targetId = payload?.user_id ?? payload?.id ?? payload?.target_user_id
+
           switch (type) {
-              case "profile_update": {
-                // profile_update may include target user id; if it targets current session,
-                // call reconcileBalance for an explicit re-sync. Otherwise, run general hydrate.
-                try {
-                  const payload = msg?.data || msg?.payload || {};
-                  const targetId = payload?.user_id ?? payload?.id ?? payload?.target_user_id;
-                  // dynamic import to avoid circular import
-                  import('../store/globalStore').then((m: any) => {
-                    const state = (m as any).useGlobalStore ? undefined : undefined; // noop to satisfy bundler
-                    // get current profile id via context import at runtime
-                    import('../store/globalStore').then((storeMod: any) => {
-                      try {
-                        const ctx = storeMod.useGlobalStore();
-                        const currentId = ctx?.state?.profile?.id;
-                        if (targetId && String(targetId) === String(currentId) && typeof storeMod.reconcileBalance === 'function') {
-                          storeMod.reconcileBalance(dispatch);
-                        } else {
-                          safeHydrate();
-                        }
-                      } catch (e) {
-                        safeHydrate();
-                      }
-                    }).catch(() => safeHydrate());
-                  }).catch(() => safeHydrate());
-                } catch (e) {
-                  safeHydrate();
-                }
-                // notify ToastProvider via window event for profile updates
-                try {
-                  const payload = msg?.data || msg?.payload || {};
-                  const detail = { type: 'profile_update', payload };
-                  window.dispatchEvent(new CustomEvent('app:notification', { detail }));
-                } catch (e) {
-                  // noop
-                }
-                break;
+            case 'profile_update':
+              if (targetId && state.user?.id && String(targetId) === String(state.user.id)) {
+                // if profile_update targets current user, reconcile
+                reconcileBalance(dispatch)
+              } else {
+                hydrateProfile(dispatch)
               }
-              case "purchase_update":
-              case "game_update":
-                // purchase updates should hydrate and also surface a toast about purchase status
-                try {
-                  const payload = msg?.data || msg?.payload || {};
-                  const status = payload?.status || payload?.state || 'update';
-                  const product = payload?.product_id || payload?.product || payload?.item_id || null;
-                  const message = product ? `Purchase ${status}: ${product}` : `Purchase ${status}`;
-                  window.dispatchEvent(new CustomEvent('app:notification', { detail: { type: 'shop', payload: message } }));
-                } catch (e) {
-                  // noop
-                }
-                safeHydrate();
-                break;
-            case "reward_granted": {
-              // try to apply awarded_gold immediately to reduce visual latency.
-              try {
-                const awarded = msg?.data || msg?.payload || msg?.award || {};
-                const gold = Number(awarded?.awarded_gold ?? awarded?.gold ?? awarded?.amount ?? 0) || 0;
-                const gems = Number(awarded?.awarded_gems ?? awarded?.gems ?? 0) || 0;
-                // dynamic import to avoid circular dependency at module load
-                import('../store/globalStore').then((m: any) => {
-                  const applyReward = (m as any).applyReward;
-                  if (typeof applyReward === 'function' && (gold !== 0 || gems !== 0)) {
-                    applyReward(dispatch, { gold, gems, reason: awarded?.reason });
-                  } else {
-                    safeHydrate();
-                  }
-                }).catch(() => safeHydrate());
-                // show a reward toast (uses ToastProvider dedupe)
-                try {
-                  const rewardTextParts: string[] = [];
-                  if (gold) rewardTextParts.push(`${gold} gold`);
-                  if (gems) rewardTextParts.push(`${gems} gems`);
-                  const rewardText = rewardTextParts.length > 0 ? `You received ${rewardTextParts.join(' and ')}` : 'You received a reward';
-                  window.dispatchEvent(new CustomEvent('app:notification', { detail: { type: 'reward', payload: rewardText } }));
-                } catch (e) {
-                  // noop
-                }
-              } catch (e) {
-                safeHydrate();
+              window.dispatchEvent(new CustomEvent('app:notification', { detail: { type: 'profile_update', message: '프로필 업데이트', payload } }))
+              break
+            case 'purchase_update':
+              if (targetId && state.user?.id && String(targetId) === String(state.user.id) && payload?.new_balance) {
+                dispatch({ type: 'SET_BALANCES', balances: payload.new_balance })
+              } else {
+                hydrateProfile(dispatch)
               }
-              break;
-            }
+              window.dispatchEvent(new CustomEvent('app:notification', { detail: { type: 'purchase_update', message: '구매 상태 변경', payload } }))
+              break
+            case 'reward_granted':
+              if (targetId && state.user?.id && String(targetId) === String(state.user.id)) {
+                const r: any = payload?.reward || payload
+                if ((r?.awarded_gold || r?.gold) && typeof storeApplyReward === 'function') {
+                  storeApplyReward(dispatch, { gold: Number(r.awarded_gold ?? r.gold ?? 0), gems: Number(r.awarded_gems ?? r.gems ?? 0) })
+                } else {
+                  hydrateProfile(dispatch)
+                }
+              }
+              window.dispatchEvent(new CustomEvent('app:notification', { detail: { type: 'reward_granted', message: '보상 수령', payload } }))
+              break
+            case 'game_update':
+              if (payload?.stats) dispatch({ type: 'MERGE_GAME_STATS', stats: payload.stats })
+              break
             default:
-              break;
+              break
           }
-        } catch {
-          // ignore
-        }
-      };
-      ws.onclose = () => {
-        if (closed) return;
-        // eslint-disable-next-line no-console
-        console.log("[sync] WS closed – retry soon");
-        setTimeout(() => {
-          if (!closed) {
-            // 재연결
-            hydrateProfile(dispatch);
-          }
-        }, 1500);
-      };
+        } catch (e) { /* ignore */ }
+      }
+      ws.onclose = () => { if (!closed) { setTimeout(() => { if (!closed) hydrateProfile(dispatch) }, 1500) } }
+      ws.onerror = () => { ws?.close() }
     } catch (e) {
-      // eslint-disable-next-line no-console
-      console.warn("[sync] WS init failed", e);
+      console.warn('[sync] WS init failed', e)
     }
 
-    return () => {
-      closed = true;
-      try { ws?.close(); } catch { /* noop */ }
-    };
+    return () => { closed = true; try { ws?.close() } catch { } }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [state.user?.id])
 
-  return React.createElement(React.Fragment, null, props.children ?? null);
+  return <>{ props.children ?? null } </>
 }
 
-// 간단 UUIDv4 (라이브러리 무의존)
+// uuid helper
 function uuidv4() {
-  // eslint-disable-next-line no-bitwise
-  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function (c) {
-    const r = (Math.random() * 16) | 0,
-      v = c === "x" ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+    const r = (Math.random() * 16) | 0; const v = c === 'x' ? r : (r & 0x3) | 0x8; return v.toString(16)
+  })
 }
 
-type ReconcileOptions = { reconcile?: boolean };
-
-export async function withReconcile<T>(
-  dispatch: any,
-  serverCall: (idemKey: string) => Promise<T>,
-  options: ReconcileOptions = { reconcile: true }
-): Promise<T> {
-  const idemKey = uuidv4();
-  const result = await serverCall(idemKey);
-  if (options.reconcile !== false) {
-    await hydrateProfile(dispatch);
+export async function withReconcile<T>(dispatch: any, serverCall: (idemKey: string) => Promise<T>, options: { reconcile?: boolean } = { reconcile: true }) {
+  const idem = uuidv4()
+  try {
+    const res = await serverCall(idem)
+    return res
+  } finally {
+    if (options.reconcile !== false) {
+      try { await reconcileBalance(dispatch) } catch { }
+    }
   }
-  return result;
+}
+
+export function withIdempotency(headers: Record<string, string> = {}, key?: string) {
+  const out = { ...headers }
+  if (!out['X-Idempotency-Key']) out['X-Idempotency-Key'] = key || uuidv4()
+  return out
+}
+
+export async function postWithIdemAndReconcile(dispatch: any, path: string, body?: any, opts: any = {}) {
+  const headers = withIdempotency(opts.headers || {}, opts.idemKey)
+  return withReconcile(dispatch, () => api.post(path, body, { ...opts, headers }))
 }
 
 export function useWithReconcile() {
-  const ctx = useContext(StoreContext);
-  const dispatch = ctx?.dispatch;
-  return React.useMemo(() => {
-    return async function run<T>(serverCall: (idemKey: string) => Promise<T>, opts?: ReconcileOptions) {
-      if (!dispatch) throw new Error('No dispatch available in useWithReconcile');
-      return withReconcile<T>(dispatch, serverCall, opts);
-    };
-  }, [dispatch]);
+  const { dispatch } = useGlobalStore()
+  return (serverCall: (idemKey: string) => Promise<any>, opts?: any) => {
+    if (!dispatch) throw new Error('useWithReconcile requires GlobalStoreProvider')
+    return withReconcile(dispatch, serverCall, opts)
+  }
 }
+

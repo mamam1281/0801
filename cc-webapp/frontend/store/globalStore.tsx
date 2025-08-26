@@ -1,195 +1,243 @@
-/*
- * Global Store (Context + Reducer)
- * - 서버 권위 프로필/밸런스 상태 보관
- * - 최소 스키마만 우선 도입(추후 확장)
- */
 'use client';
 
-import React, { createContext, useContext, useMemo, useReducer } from 'react';
+import React, { createContext, useContext, useReducer } from 'react';
+import { api } from '../lib/unifiedApi';
 
-export type GlobalUserProfile = {
+// Types
+export type User = {
   id: string | number;
-  nickname: string;
-  goldBalance: number;
-  gemsBalance?: number;
-  level?: number;
-  xp?: number;
-  updatedAt?: string;
-  // 필요한 필드는 점진 확장
-  [k: string]: unknown;
+  nickname?: string;
+  tier?: string;
+  created_at?: string;
+  // ...other profile fields
 };
 
-type GlobalState = {
-  profile: GlobalUserProfile | null;
-  hydrated: boolean;
-  lastHydratedAt?: number;
+export type Balances = {
+  gold: number;
+  gems?: number;
+  [k: string]: any;
 };
 
-type Actions =
-  | { type: 'SET_PROFILE'; profile: GlobalUserProfile | null }
-  | { type: 'SET_HYDRATED'; value: boolean }
-  | { type: 'PATCH_BALANCES'; delta: { gold?: number; gems?: number } }
-  | { type: 'APPLY_REWARD'; awarded: { gold?: number; gems?: number; reason?: string } }
-  | { type: 'MERGE_PROFILE'; patch: Partial<GlobalUserProfile> }
-  | { type: 'APPLY_PURCHASE'; items: any[] }
-  | { type: 'MERGE_GAME_STATS'; source: string; delta: any };
+export type GameStats = Record<string, number>;
+export type Inventory = Array<any>;
+export type Streak = { level?: number; last_claim_ts?: string };
+export type EventItem = { id: string; type: string; payload?: any };
+export type NotificationItem = { id: string; type: string; message: string; meta?: any };
+
+export type GlobalState = {
+  user: User | null;
+  balances: Balances;
+  gameStats: GameStats;
+  inventory: Inventory;
+  streak?: Streak;
+  events: EventItem[];
+  notifications: NotificationItem[];
+  ready: boolean;
+  lastError?: string | null;
+};
 
 const initialState: GlobalState = {
-  profile: null,
-  hydrated: false,
-  lastHydratedAt: undefined,
+  user: null,
+  balances: { gold: 0, gems: 0 },
+  gameStats: {},
+  inventory: [],
+  streak: {},
+  events: [],
+  notifications: [],
+  ready: false,
+  lastError: null,
 };
 
-function reducer(state: GlobalState, action: Actions): GlobalState {
+// Actions
+type Action =
+  | { type: 'SET_READY'; ready: boolean }
+  | { type: 'SET_USER'; user: User | null }
+  | { type: 'SET_BALANCES'; balances: Balances }
+  | { type: 'MERGE_GAME_STATS'; stats: GameStats }
+  | { type: 'APPLY_REWARD'; reward: { gold?: number; gems?: number; items?: any[] } }
+  | {
+      type: 'APPLY_PURCHASE';
+      purchase: { gold_delta?: number; gems_delta?: number; items?: any[] };
+    }
+  | { type: 'SET_LAST_ERROR'; error?: string | null }
+  | { type: 'PUSH_NOTIFICATION'; notification: NotificationItem };
+
+function reducer(state: GlobalState, action: Action): GlobalState {
   switch (action.type) {
-    case 'SET_PROFILE': {
-      return {
-        ...state,
-        profile: action.profile,
-        hydrated: true,
-        lastHydratedAt: Date.now(),
-      };
-    }
-    case 'SET_HYDRATED': {
-      return {
-        ...state,
-        hydrated: action.value,
-        lastHydratedAt: action.value ? Date.now() : state.lastHydratedAt,
-      };
-    }
-    case 'PATCH_BALANCES': {
-      if (!state.profile) return state;
-      const gold = state.profile.goldBalance ?? 0;
-      const gems = state.profile.gemsBalance ?? 0;
-      return {
-        ...state,
-        profile: {
-          ...state.profile,
-          goldBalance: gold + (action.delta.gold ?? 0),
-          gemsBalance: gems + (action.delta.gems ?? 0),
-        },
-      };
-    }
+    case 'SET_READY':
+      return { ...state, ready: action.ready };
+    case 'SET_USER':
+      return { ...state, user: action.user };
+    case 'SET_BALANCES':
+      return { ...state, balances: { ...state.balances, ...action.balances } };
+    case 'MERGE_GAME_STATS':
+      return { ...state, gameStats: { ...state.gameStats, ...action.stats } };
     case 'APPLY_REWARD': {
-      if (!state.profile) return state;
-      const gold = state.profile.goldBalance ?? 0;
-      const gems = state.profile.gemsBalance ?? 0;
+      const { gold = 0, gems = 0, items = [] } = action.reward;
       return {
         ...state,
-        profile: {
-          ...state.profile,
-          goldBalance: gold + (action.awarded.gold ?? 0),
-          gemsBalance: gems + (action.awarded.gems ?? 0),
-          updatedAt: new Date().toISOString(),
+        balances: {
+          ...state.balances,
+          gold: (state.balances.gold || 0) + gold,
+          gems: (state.balances.gems || 0) + gems,
         },
-      };
-    }
-    case 'MERGE_PROFILE': {
-      const existing = state.profile ?? ({} as GlobalUserProfile);
-      const merged = {
-        ...existing,
-        ...action.patch,
-        updatedAt: new Date().toISOString(),
-      } as GlobalUserProfile;
-      return {
-        ...state,
-        profile: merged,
-        hydrated: true,
-        lastHydratedAt: Date.now(),
+        inventory: [...state.inventory, ...items],
       };
     }
     case 'APPLY_PURCHASE': {
-      // inventory not stored globally yet; placeholder for future expansion
-      return state;
+      const { gold_delta = 0, gems_delta = 0, items = [] } = action.purchase;
+      return {
+        ...state,
+        balances: {
+          ...state.balances,
+          gold: (state.balances.gold || 0) + gold_delta,
+          gems: (state.balances.gems || 0) + gems_delta,
+        },
+        inventory: [...state.inventory, ...items],
+      };
     }
-    case 'MERGE_GAME_STATS': {
-      // game stats not stored in global state currently; ignore for now
-      return state;
-    }
+    case 'SET_LAST_ERROR':
+      return { ...state, lastError: action.error ?? null };
+    case 'PUSH_NOTIFICATION':
+      return {
+        ...state,
+        notifications: [action.notification, ...state.notifications].slice(0, 100),
+      };
     default:
       return state;
   }
 }
 
-export const StoreContext = createContext<{
+type Dispatch = (action: Action) => void;
+
+const GlobalStoreContext = createContext<{
   state: GlobalState;
-  dispatch: React.Dispatch<Actions>;
+  dispatch: Dispatch;
 } | null>(null);
 
-export function GlobalStoreProvider({ children }: { children?: React.ReactNode }) {
+export function GlobalStoreProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialState);
-  const value = useMemo(() => ({ state, dispatch }), [state]);
-  return React.createElement(StoreContext.Provider, { value }, children as any);
+  return (
+    <GlobalStoreContext.Provider value={{ state, dispatch }}>
+      {children}
+    </GlobalStoreContext.Provider>
+  );
 }
 
 export function useGlobalStore() {
-  const ctx = useContext(StoreContext);
-  if (!ctx) {
-    // SSR or outside provider: return a safe fallback to avoid runtime throws.
-    return {
-      state: initialState,
-      dispatch: (() => {
-        /* noop */
-      }) as React.Dispatch<Actions>,
-    } as { state: GlobalState; dispatch: React.Dispatch<Actions> };
-  }
+  const ctx = useContext(GlobalStoreContext);
+  if (!ctx) throw new Error('useGlobalStore must be used within GlobalStoreProvider');
   return ctx;
 }
 
-export function useGlobalProfile() {
-  return useGlobalStore().state.profile;
-}
-
-export function useIsHydrated() {
-  return useGlobalStore().state.hydrated;
+// 호환용 프로필 셀렉터: 기존 GlobalUserProfile 형태를 에뮬레이션
+export function useGlobalProfile(): any | null {
+  const { state } = useGlobalStore();
+  if (!state) return null;
+  const user = state.user || ({} as any);
+  return {
+    ...user,
+    goldBalance: Number(state.balances?.gold ?? 0),
+    gemsBalance: Number(state.balances?.gems ?? 0),
+  };
 }
 
 // Action helpers
-export function setProfile(dispatch: React.Dispatch<Actions>, profile: GlobalUserProfile | null) {
-  dispatch({ type: 'SET_PROFILE', profile });
-}
-
-export function setHydrated(dispatch: React.Dispatch<Actions>, value: boolean) {
-  dispatch({ type: 'SET_HYDRATED', value });
-}
-
-export function patchBalances(
-  dispatch: React.Dispatch<Actions>,
-  delta: { gold?: number; gems?: number }
-) {
-  dispatch({ type: 'PATCH_BALANCES', delta });
-}
-
-// Additional helpers used across the UI
-export function mergeProfile(dispatch: React.Dispatch<Actions>, patch: Partial<GlobalUserProfile>) {
-  dispatch({ type: 'MERGE_PROFILE', patch });
-}
-
-export function applyPurchase(dispatch: React.Dispatch<Actions>, items: any[]) {
-  dispatch({ type: 'APPLY_PURCHASE', items });
-}
-
-export function applyReward(
-  dispatch: React.Dispatch<Actions>,
-  awarded: { gold?: number; gems?: number; reason?: string }
-) {
-  dispatch({ type: 'APPLY_REWARD', awarded });
-}
-
-export function mergeGameStats(dispatch: React.Dispatch<Actions>, source: string, delta: any) {
-  dispatch({ type: 'MERGE_GAME_STATS', source, delta });
-}
-
-// Reconcile helper: 호출 시 서버 권위로 프로필/밸런스를 재하이드레이트합니다.
-// dynamic import 사용으로 로드 시 순환 의존을 방지합니다.
-export async function reconcileBalance(dispatch: React.Dispatch<Actions>) {
+export const hydrateFromServer = async (dispatch: Dispatch) => {
   try {
-    const m = await import('../lib/sync');
-    if (m && typeof m.hydrateProfile === 'function') {
-      await m.hydrateProfile(dispatch as any);
+    const [me, balances, stats] = await Promise.all([
+      api.get('auth/me'),
+      api.get('users/balance'),
+      api.get('games/stats/me'),
+    ]);
+    dispatch({ type: 'SET_USER', user: me });
+    dispatch({ type: 'SET_BALANCES', balances });
+    dispatch({ type: 'MERGE_GAME_STATS', stats });
+    dispatch({ type: 'SET_READY', ready: true });
+  } catch (err: any) {
+    dispatch({ type: 'SET_LAST_ERROR', error: err?.message ?? 'hydrate_failed' });
+  }
+};
+
+export const reconcileBalance = async (dispatch: Dispatch) => {
+  try {
+    const balances = await api.get('users/balance');
+    dispatch({ type: 'SET_BALANCES', balances });
+  } catch (err: any) {
+    dispatch({ type: 'SET_LAST_ERROR', error: err?.message ?? 'reconcile_failed' });
+  }
+};
+
+// 범용 시그니처 지원: (dispatch, stats) | (dispatch, game: string, delta)
+export const mergeGameStats = (
+  dispatch: Dispatch,
+  a: GameStats | string,
+  b?: Record<string, any>
+) => {
+  if (typeof a === 'string' && b && typeof b === 'object') {
+    const out: GameStats = {};
+    for (const [k, v] of Object.entries(b)) {
+      if (typeof v === 'number') out[`${a}.${k}`] = v;
     }
-  } catch (e) {
-    // eslint-disable-next-line no-console
-    console.warn('[globalStore] reconcileBalance 실패', e);
+    dispatch({ type: 'MERGE_GAME_STATS', stats: out });
+  } else {
+    dispatch({ type: 'MERGE_GAME_STATS', stats: a as GameStats });
+  }
+};
+
+export const applyReward = (
+  dispatch: Dispatch,
+  reward: { gold?: number; gems?: number; items?: any[] }
+) => {
+  dispatch({ type: 'APPLY_REWARD', reward });
+};
+
+export const applyPurchase = (
+  dispatch: Dispatch,
+  purchase: { gold_delta?: number; gems_delta?: number; items?: any[] }
+) => {
+  dispatch({ type: 'APPLY_PURCHASE', purchase });
+};
+
+// 호환 헬퍼: 기존 setProfile/mergeProfile/patchBalances 시그니처를 새 스토어로 매핑
+export function setProfile(dispatch: Dispatch, profile: any | null) {
+  if (!profile) {
+    dispatch({ type: 'SET_USER', user: null });
+    return;
+  }
+  const { goldBalance, gemsBalance, ...rest } = profile as any;
+  if (goldBalance != null || gemsBalance != null) {
+    dispatch({
+      type: 'SET_BALANCES',
+      balances: {
+        ...(goldBalance != null ? { gold: Number(goldBalance) } : {}),
+        ...(gemsBalance != null ? { gems: Number(gemsBalance) } : {}),
+      } as Balances,
+    });
+  }
+  dispatch({ type: 'SET_USER', user: rest as User });
+}
+
+export function mergeProfile(dispatch: Dispatch, patch: Record<string, any>) {
+  const { goldBalance, gemsBalance, ...rest } = (patch || {}) as any;
+  if (goldBalance != null || gemsBalance != null) {
+    dispatch({
+      type: 'SET_BALANCES',
+      balances: {
+        ...(goldBalance != null ? { gold: Number(goldBalance) } : {}),
+        ...(gemsBalance != null ? { gems: Number(gemsBalance) } : {}),
+      } as Balances,
+    });
+  }
+  if (Object.keys(rest).length > 0) {
+    // 병합 동작을 위해 최소한으로 필드 덮어쓰기(서버 응답이 전체 프로필일 것을 가정)
+    dispatch({ type: 'SET_USER', user: rest as User });
   }
 }
+
+export function patchBalances(dispatch: Dispatch, delta: { gold?: number; gems?: number }) {
+  // 누적 반영은 APPLY_REWARD로 처리(내부에서 가산)
+  dispatch({ type: 'APPLY_REWARD', reward: { gold: delta.gold ?? 0, gems: delta.gems ?? 0 } });
+}
+
+export default GlobalStoreProvider;
