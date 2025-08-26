@@ -88,8 +88,8 @@ export function RockPaperScissorsGame({
   const [isSpecialMove, setIsSpecialMove] = useState(false);
   // 오류 표시 및 재시도 액션 저장
   const [errorMessage, setErrorMessage] = useState(null as string | null);
-  const [lastChoice, setLastChoice] = useState<Choice | null>(null);
-  const retryActionRef = React.useRef<(() => void) | null>(null);
+  const [lastChoice, setLastChoice] = useState(null as Choice | null);
+  const retryActionRef = React.useRef(null as (() => void) | null);
   const withReconcile = useWithReconcile();
   const gold = useUserGold();
   const { dispatch } = useGlobalStore();

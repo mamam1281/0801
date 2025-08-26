@@ -74,6 +74,7 @@ export function NeonCrashGame({
   // 오류 상태 및 재시도 트리거
   const [errorMessage, setErrorMessage] = useState(null as string | null);
   const [retryKey, setRetryKey] = useState(0);
+  const retryActionRef = useRef(null as (() => void) | null);
 
   // Canvas 및 애니메이션 관련 Refs
   const canvasRef = useRef(null) as { current: HTMLCanvasElement | null };
@@ -123,7 +124,7 @@ export function NeonCrashGame({
       return;
     }
 
-    try {
+  try {
       // 서버에 크래시 베팅 요청 (멱등키 포함)
       const gameResult = await withReconcile(async (idemKey: string) =>
         api.post<any>(
@@ -185,6 +186,8 @@ export function NeonCrashGame({
     } catch (error) {
       console.error('크래시 게임 시작 실패:', error);
       onAddNotification('게임 시작에 실패했습니다. 다시 시도해주세요.');
+      setErrorMessage('네트워크 오류로 게임 시작에 실패했습니다. 재시도해주세요.');
+      retryActionRef.current = () => { void startGame(); };
     }
   };
 
@@ -405,6 +408,8 @@ export function NeonCrashGame({
       );
     } catch (e) {
       // 캐시아웃 엔드포인트 미구현 환경에서도 하이드레이트로 최종 정합 보장됨
+      setErrorMessage('캐시아웃 요청 실패. 연결 상태를 확인하고 재시도하세요.');
+      retryActionRef.current = () => { void cashout(); };
     }
 
     // 게임 상태 업데이트
@@ -513,6 +518,33 @@ export function NeonCrashGame({
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-black to-error/10 relative overflow-hidden">
+      {/* 오류 배너 및 재시도 */}
+      {errorMessage && (
+        <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 w-[92%] max-w-xl bg-destructive/15 border border-destructive/40 text-destructive px-4 py-3 rounded-lg shadow-sm">
+          <div className="flex justify-between items-start gap-4">
+            <div className="flex-1">
+              <div className="font-semibold mb-1">오류 발생</div>
+              <div className="text-sm leading-relaxed break-all">{errorMessage}</div>
+            </div>
+            <div className="flex gap-2 shrink-0">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  const fn = retryActionRef.current;
+                  setErrorMessage(null);
+                  if (fn) fn();
+                }}
+              >
+                재시도
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setErrorMessage(null)}>
+                닫기
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* 동적 배경 */}
       <motion.div
         animate={{
