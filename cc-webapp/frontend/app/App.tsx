@@ -26,8 +26,7 @@ import { useUserManager } from '../hooks/useUserManager';
 import { useAppNavigation } from '../hooks/useAppNavigation';
 // NOTE: Deprecated useAuthHandlers (local simulation) removed – now using real backend auth via useAuth
 import { useAuth } from '../hooks/useAuth';
-import { GlobalStoreProvider } from '../store/globalStore';
-import { EnsureHydrated, RealtimeSyncProvider } from '../lib/sync';
+// Providers are supplied at the app layout level (app/providers.tsx). Do not provide them here.
 import DailyRewardClaimedDialog from '../components/rewards/DailyRewardClaimedDialog';
 import {
   APP_CONFIG,
@@ -233,10 +232,7 @@ export default function App() {
   };
 
   return (
-    <GlobalStoreProvider>
-      <EnsureHydrated>
-        <RealtimeSyncProvider>
-          <div className="dark">
+    <div className="dark">
             {/* 📱 🎯 VIP 알림 시스템 */}
             <div className={NOTIFICATION_STYLES.CONTAINER}>
               <AnimatePresence>
@@ -464,8 +460,5 @@ export default function App() {
               onScheduleReminder={handleScheduleDailyRewardReminder}
             />
           </div>
-        </RealtimeSyncProvider>
-      </EnsureHydrated>
-    </GlobalStoreProvider>
   );
 }

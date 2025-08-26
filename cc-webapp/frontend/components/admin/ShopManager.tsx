@@ -1,8 +1,10 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { api } from '@/lib/unifiedApi';
+import { emitEvent } from '@/lib/events';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
+import {
   Plus,
   Search,
   Edit,
@@ -18,7 +20,7 @@ import {
   DollarSign,
   TrendingUp,
   Tag,
-  Image as ImageIcon
+  Image as ImageIcon,
 } from 'lucide-react';
 import { ShopItem } from '../../types/admin';
 import { Button } from '../ui/button';
@@ -28,7 +30,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Badge } from '../ui/badge';
 import { Switch } from '../ui/switch';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
-  import { Label } from '../ui/Label';
+import { Label } from '../ui/Label';
 
 interface ShopManagerProps {
   onAddNotification: (message: string) => void;
@@ -42,108 +44,58 @@ export function ShopManager({ onAddNotification }: ShopManagerProps) {
   const [editingItem, setEditingItem] = useState(null as ShopItem | null);
   const [isLoading, setIsLoading] = useState(false as boolean);
 
-  // Mock shop items
+  // Load admin-managed shop items from backend
   useEffect(() => {
-    const mockItems: ShopItem[] = [
-      {
-        id: '1',
-        name: '골든 스킨 팩',
-        description: '화려한 골든 테마의 스킨 컬렉션',
-        price: 50000,
-        category: 'skin',
-        rarity: 'legendary',
-        isActive: true,
-        stock: 100,
-        discount: 20,
-        icon: '✨',
-        createdAt: new Date('2024-12-01'),
-        updatedAt: new Date('2024-12-30'),
-        sales: 234,
-        tags: ['golden', 'premium', 'limited']
-      },
-      {
-        id: '2',
-        name: '더블 경험치 부스터',
-        description: '1시간 동안 경험치 2배 획득',
-        price: 10000,
-        category: 'powerup',
-        rarity: 'rare',
-        isActive: true,
-        stock: 500,
-        icon: '⚡',
-        createdAt: new Date('2024-11-15'),
-        updatedAt: new Date('2024-12-28'),
-        sales: 567,
-        tags: ['boost', 'exp', 'temporary']
-      },
-      {
-        id: '3',
-        name: '럭키 코인',
-        description: '행운 확률을 일시적으로 증가시킵니다',
-        price: 25000,
-        category: 'powerup',
-        rarity: 'epic',
-        isActive: false,
-        stock: 50,
-        icon: '🍀',
-        createdAt: new Date('2024-12-20'),
-        updatedAt: new Date('2024-12-29'),
-        sales: 89,
-        tags: ['luck', 'rare', 'gambling']
+    let cancelled = false;
+    async function loadItems() {
+      try {
+        const res: any = await api.get('admin/shop/items');
+        if (!cancelled && Array.isArray(res)) setShopItems(res as ShopItem[]);
+      } catch (e) {
+        // fallback to empty
+        if (!cancelled) setShopItems([]);
       }
-    ];
-    setShopItems(mockItems);
+    }
+    loadItems();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Filter items
   const filteredItems = shopItems.filter((item: ShopItem) => {
-    const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         item.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         item.tags.some((tag: string) => tag.toLowerCase().includes(searchQuery.toLowerCase()));
-    
+    const matchesSearch =
+      item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.tags.some((tag: string) => tag.toLowerCase().includes(searchQuery.toLowerCase()));
+
     const matchesCategory = categoryFilter === 'all' || item.category === categoryFilter;
-    
+
     return matchesSearch && matchesCategory;
   });
 
   // Handle create/edit item
   const handleSaveItem = async (itemData: Partial<ShopItem>) => {
     setIsLoading(true);
-    
+
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
       if (editingItem) {
-        // Update existing item
-        setShopItems((prev: ShopItem[]) => prev.map((item: ShopItem) => 
-          item.id === editingItem.id 
-            ? { ...item, ...itemData, updatedAt: new Date() }
-            : item
-        ));
+        // call admin update
+        const res: any = await api.put(`admin/shop/items/${editingItem.id}`, itemData);
+        // optimistic local merge
+        setShopItems((prev: ShopItem[]) =>
+          prev.map((item: ShopItem) => (item.id === editingItem.id ? { ...item, ...res } : item))
+        );
         onAddNotification(`✅ "${itemData.name}" 아이템이 수정되었습니다.`);
       } else {
-        // Create new item
-        const newItem: ShopItem = {
-          id: Date.now().toString(),
-          name: itemData.name || '',
-          description: itemData.description || '',
-          price: itemData.price || 0,
-          category: itemData.category || 'skin',
-          rarity: itemData.rarity || 'common',
-          isActive: itemData.isActive ?? true,
-          stock: itemData.stock,
-          discount: itemData.discount,
-          icon: itemData.icon || '📦',
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          sales: 0,
-          tags: itemData.tags || []
-        };
-        
-  setShopItems((prev: ShopItem[]) => [newItem, ...prev]);
-        onAddNotification(`✅ "${newItem.name}" 아이템이 생성되었습니다.`);
+        // call admin create
+        const res: any = await api.post('admin/shop/items', itemData);
+        if (res) setShopItems((prev: ShopItem[]) => [res as ShopItem, ...prev]);
+        onAddNotification(`✅ "${res?.name ?? itemData.name}" 아이템이 생성되었습니다.`);
       }
-      
+      // emit event so shop UIs can refetch catalog
+      emitEvent('shopCatalogUpdated', { source: 'admin' });
+
       setShowCreateModal(false);
       setEditingItem(null);
     } catch (error) {
@@ -156,14 +108,14 @@ export function ShopManager({ onAddNotification }: ShopManagerProps) {
   // Handle delete item
   const handleDeleteItem = async (itemId: string) => {
     if (!confirm('정말로 이 아이템을 삭제하시겠습니까?')) return;
-    
+
     setIsLoading(true);
-    
+
     try {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-  setShopItems((prev: ShopItem[]) => prev.filter((item: ShopItem) => item.id !== itemId));
+      await api.del(`admin/shop/items/${itemId}`);
+      setShopItems((prev: ShopItem[]) => prev.filter((item: ShopItem) => item.id !== itemId));
       onAddNotification('🗑️ 아이템이 삭제되었습니다.');
+      emitEvent('shopCatalogUpdated', { source: 'admin' });
     } catch (error) {
       onAddNotification('❌ 아이템 삭제에 실패했습니다.');
     } finally {
@@ -173,12 +125,12 @@ export function ShopManager({ onAddNotification }: ShopManagerProps) {
 
   // Toggle item active status
   const toggleItemStatus = async (itemId: string) => {
-    setShopItems((prev: ShopItem[]) => prev.map((item: ShopItem) => 
-      item.id === itemId 
-        ? { ...item, isActive: !item.isActive, updatedAt: new Date() }
-        : item
-    ));
-    
+    setShopItems((prev: ShopItem[]) =>
+      prev.map((item: ShopItem) =>
+        item.id === itemId ? { ...item, isActive: !item.isActive, updatedAt: new Date() } : item
+      )
+    );
+
     const item = shopItems.find((i: ShopItem) => i.id === itemId);
     onAddNotification(`${item?.isActive ? '⏸️' : '▶️'} "${item?.name}" 상태가 변경되었습니다.`);
   };
@@ -186,12 +138,18 @@ export function ShopManager({ onAddNotification }: ShopManagerProps) {
   // Get rarity color
   const getRarityColor = (rarity: string) => {
     switch (rarity) {
-      case 'common': return 'text-muted-foreground';
-      case 'rare': return 'text-info';
-      case 'epic': return 'text-primary';
-      case 'legendary': return 'text-gold';
-      case 'mythic': return 'text-gradient-primary';
-      default: return 'text-muted-foreground';
+      case 'common':
+        return 'text-muted-foreground';
+      case 'rare':
+        return 'text-info';
+      case 'epic':
+        return 'text-primary';
+      case 'legendary':
+        return 'text-gold';
+      case 'mythic':
+        return 'text-gradient-primary';
+      default:
+        return 'text-muted-foreground';
     }
   };
 
@@ -201,7 +159,7 @@ export function ShopManager({ onAddNotification }: ShopManagerProps) {
     { value: 'currency', label: '화폐' },
     { value: 'collectible', label: '수집품' },
     { value: 'character', label: '캐릭터' },
-    { value: 'weapon', label: '무기' }
+    { value: 'weapon', label: '무기' },
   ];
 
   const rarities = [
@@ -209,7 +167,7 @@ export function ShopManager({ onAddNotification }: ShopManagerProps) {
     { value: 'rare', label: '희귀' },
     { value: 'epic', label: '영웅' },
     { value: 'legendary', label: '전설' },
-    { value: 'mythic', label: '신화' }
+    { value: 'mythic', label: '신화' },
   ];
 
   return (
@@ -220,7 +178,7 @@ export function ShopManager({ onAddNotification }: ShopManagerProps) {
           <h2 className="text-2xl font-bold text-foreground">상점 관리</h2>
           <p className="text-muted-foreground">아이템 추가, 수정, 삭제 및 재고 관리</p>
         </div>
-        
+
         <div className="flex gap-3">
           <Button variant="outline" className="btn-hover-lift">
             <Download className="w-4 h-4 mr-2" />
@@ -230,7 +188,7 @@ export function ShopManager({ onAddNotification }: ShopManagerProps) {
             <Upload className="w-4 h-4 mr-2" />
             가져오기
           </Button>
-          <Button 
+          <Button
             onClick={() => setShowCreateModal(true)}
             className="bg-gradient-game btn-hover-lift"
           >
@@ -280,7 +238,10 @@ export function ShopManager({ onAddNotification }: ShopManagerProps) {
               </div>
               <div>
                 <div className="text-lg font-bold text-foreground">
-                  {shopItems.reduce((sum: number, item: ShopItem) => sum + (item.sales * item.price), 0).toLocaleString()}G
+                  {shopItems
+                    .reduce((sum: number, item: ShopItem) => sum + item.sales * item.price, 0)
+                    .toLocaleString()}
+                  G
                 </div>
                 <div className="text-sm text-muted-foreground">총 매출</div>
               </div>
@@ -296,7 +257,9 @@ export function ShopManager({ onAddNotification }: ShopManagerProps) {
               </div>
               <div>
                 <div className="text-lg font-bold text-foreground">
-                  {shopItems.reduce((sum: number, item: ShopItem) => sum + item.sales, 0).toLocaleString()}
+                  {shopItems
+                    .reduce((sum: number, item: ShopItem) => sum + item.sales, 0)
+                    .toLocaleString()}
                 </div>
                 <div className="text-sm text-muted-foreground">총 판매량</div>
               </div>
@@ -312,18 +275,20 @@ export function ShopManager({ onAddNotification }: ShopManagerProps) {
           <Input
             placeholder="아이템 검색..."
             value={searchQuery}
-            onChange={(e: React.FormEvent<HTMLInputElement>) => setSearchQuery((e.currentTarget as HTMLInputElement).value)}
+            onChange={(e: React.FormEvent<HTMLInputElement>) =>
+              setSearchQuery((e.currentTarget as HTMLInputElement).value)
+            }
             className="pl-10"
           />
         </div>
-        
+
         <Select value={categoryFilter} onValueChange={setCategoryFilter}>
           <SelectTrigger className="w-40">
             <SelectValue placeholder="카테고리" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">전체 카테고리</SelectItem>
-            {categories.map(category => (
+            {categories.map((category) => (
               <SelectItem key={category.value} value={category.value}>
                 {category.label}
               </SelectItem>
@@ -334,7 +299,7 @@ export function ShopManager({ onAddNotification }: ShopManagerProps) {
 
       {/* Items Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-  {filteredItems.map((item: ShopItem, index: number) => (
+        {filteredItems.map((item: ShopItem, index: number) => (
           <motion.div
             key={item.id}
             initial={{ opacity: 0, y: 20 }}
@@ -350,11 +315,8 @@ export function ShopManager({ onAddNotification }: ShopManagerProps) {
                   <p className="text-sm text-muted-foreground">{item.description}</p>
                 </div>
               </div>
-              
-              <Switch
-                checked={item.isActive}
-                onCheckedChange={() => toggleItemStatus(item.id)}
-              />
+
+              <Switch checked={item.isActive} onCheckedChange={() => toggleItemStatus(item.id)} />
             </div>
 
             <div className="space-y-3">
@@ -375,7 +337,7 @@ export function ShopManager({ onAddNotification }: ShopManagerProps) {
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">희귀도</span>
                 <Badge className={getRarityColor(item.rarity)}>
-                  {rarities.find(r => r.value === item.rarity)?.label}
+                  {rarities.find((r) => r.value === item.rarity)?.label}
                 </Badge>
               </div>
 
@@ -387,7 +349,9 @@ export function ShopManager({ onAddNotification }: ShopManagerProps) {
               {item.stock !== undefined && (
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">재고</span>
-                  <span className={`font-medium ${item.stock < 10 ? 'text-error' : 'text-foreground'}`}>
+                  <span
+                    className={`font-medium ${item.stock < 10 ? 'text-error' : 'text-foreground'}`}
+                  >
                     {item.stock}
                   </span>
                 </div>
@@ -395,7 +359,7 @@ export function ShopManager({ onAddNotification }: ShopManagerProps) {
 
               {item.tags.length > 0 && (
                 <div className="flex flex-wrap gap-1">
-                  {item.tags.slice(0, 3).map(tag => (
+                  {item.tags.slice(0, 3).map((tag) => (
                     <Badge key={tag} variant="outline" className="text-xs">
                       {tag}
                     </Badge>
