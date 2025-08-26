@@ -6,7 +6,7 @@ import { WSClient, createWSClient, WebSocketMessage, SyncEventData } from '../ut
 import { useAuth } from '../hooks/useAuth';
 import { useAuthToken } from '../hooks/useAuthToken';
 import { globalFallbackPoller, createSyncPollingTasks } from '../utils/fallbackPolling';
-import { useToast } from '@/components/NotificationToast';
+// Toast는 직접 의존하지 않고 window 이벤트로 브로드캐스트합니다.
 
 /**
  * 실시간 동기화 전역 상태 정의
@@ -372,7 +372,14 @@ export function RealtimeSyncProvider({ children, apiBaseUrl }: RealtimeSyncProvi
   const { getAccessToken, getValidAccessToken } = useAuthToken();
   const wsClientRef = useRef(null as WSClient | null);
   const fallbackPollingActive = useRef(false);
-  const { push } = useToast();
+  const pushToast = useCallback((message: string, type?: string) => {
+    if (typeof window === 'undefined') return;
+    try {
+      window.dispatchEvent(new CustomEvent('app:notification', { detail: { type: type || 'info', payload: message } }));
+    } catch {
+      // ignore
+    }
+  }, []);
   const lastPurchaseByReceiptRef = useRef(new Map<string, { status: string; at: number }>());
 
   // Prefer the same origin resolution as unifiedApi to avoid cross-origin/SSR mismatches
@@ -384,6 +391,11 @@ export function RealtimeSyncProvider({ children, apiBaseUrl }: RealtimeSyncProvi
 
     switch (message.type) {
       case 'profile_update':
+        try {
+          const p = message.data as SyncEventData['profile_update'];
+          const goldPart = p && typeof p.gold === 'number' ? `잔액이 업데이트되었습니다: ${p.gold}G` : '프로필이 업데이트되었습니다.';
+          pushToast(goldPart, 'system');
+        } catch {}
         dispatch({ type: 'UPDATE_PROFILE', payload: message.data });
         break;
 
@@ -420,7 +432,7 @@ export function RealtimeSyncProvider({ children, apiBaseUrl }: RealtimeSyncProvi
           type = 'shop';
           text = `${product} 결제가 진행 중입니다...`;
         }
-        try { push(text, type); } catch {}
+  pushToast(text, type);
   // 전역 상태 업데이트(배지/요약용)
   dispatch({ type: 'UPDATE_PURCHASE', payload: data });
         break;
@@ -439,6 +451,14 @@ export function RealtimeSyncProvider({ children, apiBaseUrl }: RealtimeSyncProvi
         break;
 
       case 'reward_granted':
+        try {
+          const r = message.data as SyncEventData['reward_granted'];
+          // 보상 데이터에서 금액 추정(awarded_gold 우선)
+          const data: any = r?.reward_data || {};
+          const amount = (typeof data.awarded_gold === 'number' && data.awarded_gold) || (typeof data.gold === 'number' && data.gold) || (typeof data.amount === 'number' && data.amount);
+          const msg = amount ? `보상 지급 +${amount}G (${r?.reward_type || 'reward'})` : `보상 지급 (${r?.reward_type || 'reward'})`;
+          pushToast(msg, 'reward');
+        } catch {}
         dispatch({ type: 'ADD_REWARD', payload: message.data });
         break;
 
@@ -453,7 +473,7 @@ export function RealtimeSyncProvider({ children, apiBaseUrl }: RealtimeSyncProvi
       default:
         console.warn('[RealtimeSync] Unknown message type:', message.type);
     }
-  }, [push]);
+  }, [pushToast]);
 
   // WebSocket 연결
   const connect = useCallback(async () => {

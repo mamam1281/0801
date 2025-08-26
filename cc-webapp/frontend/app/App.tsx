@@ -28,6 +28,7 @@ import { useAppNavigation } from '../hooks/useAppNavigation';
 import { useAuth } from '../hooks/useAuth';
 import { GlobalStoreProvider } from '../store/globalStore';
 import { EnsureHydrated, RealtimeSyncProvider } from '../lib/sync';
+import { ToastProvider } from '@/components/NotificationToast';
 import DailyRewardClaimedDialog from '../components/rewards/DailyRewardClaimedDialog';
 import {
   APP_CONFIG,
@@ -236,6 +237,7 @@ export default function App() {
     <GlobalStoreProvider>
       <EnsureHydrated>
         <RealtimeSyncProvider>
+          <ToastProvider>
           <div className="dark">
             {/* 📱 🎯 VIP 알림 시스템 */}
             <div className={NOTIFICATION_STYLES.CONTAINER}>
@@ -464,6 +466,7 @@ export default function App() {
               onScheduleReminder={handleScheduleDailyRewardReminder}
             />
           </div>
+          </ToastProvider>
         </RealtimeSyncProvider>
       </EnsureHydrated>
     </GlobalStoreProvider>
