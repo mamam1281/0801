@@ -40,13 +40,57 @@ import { NOTIFICATION_STYLES } from '../constants/notificationConstants';
 type NotificationItem = { id: string | number; message: React.ReactNode };
 
 export default function App() {
+  // [Auth Bootstrap] 모듈 로드 시 즉시 레거시 토큰 → 번들 마이그레이션 보장
+  // 테스트/초기 렌더 타이밍 이슈 방지를 위해 useEffect 이전에 수행
+  try {
+    if (typeof window !== 'undefined') {
+      const bundle = ensureTokenBundleMigrated();
+      // 번들 토큰을 쿠키에도 동기화하여 미들웨어가 Authorization 주입 가능하도록 함
+      try {
+        const at = bundle?.access_token;
+        if (at) document.cookie = `cc_access_token=${encodeURIComponent(at)}; Path=/; SameSite=Lax`;
+      } catch { /* noop */ }
+      // 전역 fetch 패치: /api/* 요청에 Authorization 자동 부착(헤더 미존재 시)
+      const w = window as unknown as Record<string, any>;
+      if (!w.__authFetchPatched) {
+        const origFetch = window.fetch.bind(window);
+        w.__authFetchPatched = true;
+        window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
+          try {
+            const url = typeof input === 'string' ? input : (input as Request).url;
+            if (url && /\/api\//.test(url)) {
+              const headers = new Headers(init?.headers || {});
+              if (!headers.has('Authorization')) {
+                // 토큰은 번들 → 쿠키(cc_at) 순으로 조회
+                let token: string | undefined;
+                try {
+                  const raw = localStorage.getItem('cc_auth_tokens');
+                  if (raw) token = (JSON.parse(raw) || {}).access_token;
+                } catch { /* noop */ }
+        if (!token && typeof document !== 'undefined') {
+                  try {
+          const m = document.cookie.match(/(?:^|; )cc_access_token=([^;]+)/);
+                    token = m ? decodeURIComponent(m[1]) : undefined;
+                  } catch { /* noop */ }
+                }
+                if (token) headers.set('Authorization', `Bearer ${token}`);
+              }
+              init = { ...(init || {}), headers };
+            }
+          } catch { /* noop */ }
+          return origFetch(input as any, init);
+        };
+      }
+    }
+  } catch { /* noop */ }
+
   const [isLoading, setIsLoading] = useState(false);
   const [hasInitialized, setHasInitialized] = useState(false);
 
   // 부트스트랩: 가장 먼저 토큰 번들 마이그레이션을 보장해 초기 API/WS에 Authorization 누락이 없도록 함.
   useEffect(() => {
+    // 보수적 중복 호출(안전): 초기 마운트 시 한 번 더 보장
     try { ensureTokenBundleMigrated(); } catch { /* noop */ }
-    // 한 번만 시도
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
