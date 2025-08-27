@@ -30,10 +30,9 @@ export interface UnifiedRequestOptions<T=any> {
   signal?: AbortSignal;
   parseJson?: boolean;       // false면 text 그대로 반환
   transform?: (data:any)=>T; // 결과 후처리
-  idem?: boolean;            // 쓰기 계열 요청시 멱등키 자동 주입 (기본 true)
 }
 
-const DEFAULT_RETRY_STATUS = new Set([408, 409, 429, 500, 502, 503, 504]);
+const DEFAULT_RETRY_STATUS = new Set([408, 429, 500, 502, 503, 504]);
 
 function resolveOrigin(): string {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -106,8 +105,7 @@ export async function apiCall<T=any>(path: string, opts: UnifiedRequestOptions<T
     headers = {},
     signal,
     parseJson = true,
-  transform,
-  idem = true,
+    transform
   } = opts;
 
   if (path.startsWith('/')) path = path.slice(1); // normalize
@@ -131,7 +129,7 @@ export async function apiCall<T=any>(path: string, opts: UnifiedRequestOptions<T
 
     // 멱등키 자동 주입: 쓰기 계열(POST/PUT/PATCH/DELETE)이고, 헤더에 없으면 생성
     const m = method.toUpperCase();
-  if (idem !== false && m !== 'GET' && !finalHeaders['X-Idempotency-Key']) {
+    if (m !== 'GET' && !finalHeaders['X-Idempotency-Key']) {
       finalHeaders['X-Idempotency-Key'] = __uuidv4();
     }
 

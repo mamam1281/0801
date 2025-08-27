@@ -79,9 +79,6 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
   const [heartParticles, setHeartParticles] = useState(
     [] as Array<{ id: string; x: number; y: number }>
   );
-  // 오류 배너 및 재시도
-  const [errorMessage, setErrorMessage] = useState(null as string | null);
-  const retryActionRef = React.useRef(null as (() => void) | null);
 
   // 동적 가챠 비용 계산 (서버 설정 우선, fallback으로 배너 기본값)
   const getSinglePullCost = () => {
@@ -238,10 +235,7 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
         onAddNotification(getRarityMessage(first));
       }
     } catch (e) {
-      // 네트워크 오류 표시 및 재시도 제공
-      setErrorMessage('가챠 요청 실패. 네트워크 상태를 확인한 후 다시 시도하세요.');
-      retryActionRef.current = () => { void performSinglePull(); };
-      // Fallback to local simulation (시각 효과만)
+      // Fallback to local simulation
     }
     if (!serverUsed) {
       // Local fallback: preserve visuals only, avoid local balance mutation per authoritative rules
@@ -361,9 +355,6 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
         onAddNotification(getTenPullMessage(mapped));
       }
     } catch (e) {
-      // 오류 표시 및 재시도 제공
-      setErrorMessage('10연차 요청 실패. 네트워크 상태를 확인한 후 다시 시도하세요.');
-      retryActionRef.current = () => { void performTenPull(); };
       // swallow & fallback
     }
     if (!serverUsed) {
@@ -401,33 +392,6 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-black via-pink-900/20 to-purple-900/30 relative overflow-hidden">
-      {/* 오류 배너 및 재시도 */}
-      {errorMessage && (
-        <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 w-[92%] max-w-xl bg-destructive/15 border border-destructive/40 text-destructive px-4 py-3 rounded-lg shadow-sm">
-          <div className="flex justify-between items-start gap-4">
-            <div className="flex-1">
-              <div className="font-semibold mb-1">오류 발생</div>
-              <div className="text-sm leading-relaxed break-all">{errorMessage}</div>
-            </div>
-            <div className="flex gap-2 shrink-0">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => {
-                  const fn = retryActionRef.current;
-                  setErrorMessage(null);
-                  if (fn) fn();
-                }}
-              >
-                재시도
-              </Button>
-              <Button size="sm" variant="ghost" onClick={() => setErrorMessage(null)}>
-                닫기
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
       {/* Floating Heart Particles */}
       <AnimatePresence mode="wait">
         {heartParticles.map((heart: any) => (

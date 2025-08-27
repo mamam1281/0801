@@ -1,11 +1,9 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { TrendingUp, TrendingDown, Coins, AlertTriangle, History } from 'lucide-react';
+import { TrendingUp, TrendingDown, Coins, AlertTriangle } from 'lucide-react';
 import useBalanceSync from '@/hooks/useBalanceSync';
-import { useUserGold } from '@/hooks/useSelectors';
-import { useRealtimeRewards, useRealtimePurchases } from '@/hooks/useRealtimeData';
 
 interface TokenBalanceProps {
   amount: number;
@@ -186,103 +184,5 @@ export function TokenBalanceWidget({
         <div className="absolute -bottom-4 -left-4 w-32 h-32 bg-gradient-to-tr from-emerald-500/10 to-cyan-500/10 rounded-full blur-xl" />
       </div>
     </motion.div>
-  );
-}
-
-// ------------------------------------------------------------
-// Quick variant: 전역 store 잔액 표시 + 클릭 시 최근 변경 이력 모달
-// ------------------------------------------------------------
-// (상단으로 이동된 import 들)
-
-export function TokenBalanceQuick() {
-  const gold = useUserGold();
-  const { recentRewards } = useRealtimeRewards();
-  const { recentPurchases } = useRealtimePurchases();
-  const [open, setOpen] = useState(false);
-
-  type ChangeItem = { id: string; type: 'reward' | 'purchase'; amount: number; at: string; label: string };
-  const changes: ChangeItem[] = useMemo(() => {
-    const rewardItems = (recentRewards || []).map((r: any) => {
-      const data = r?.reward_data || {};
-      const amount = (typeof data.awarded_gold === 'number' && data.awarded_gold)
-        || (typeof data.gold === 'number' && data.gold)
-        || (typeof data.amount === 'number' && data.amount)
-        || 0;
-      return {
-        id: `reward:${r.id}`,
-        type: 'reward' as const,
-        amount,
-        at: r.timestamp,
-        label: r.reward_type || 'reward',
-      };
-    });
-
-    const purchaseItems = (recentPurchases || []).map((p: any) => ({
-      id: `purchase:${p.id}`,
-      type: 'purchase' as const,
-      amount: typeof p.amount === 'number' ? -Math.abs(p.amount) : 0,
-      at: p.timestamp,
-      label: `${p.product_id || 'product'} (${p.status})`,
-    }));
-
-    const merged = [...rewardItems, ...purchaseItems];
-    merged.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
-    return merged.slice(0, 15);
-  }, [recentRewards, recentPurchases]);
-
-  return (
-    <div className="inline-flex items-center gap-2">
-      <button
-        type="button"
-        className="flex items-center gap-1 px-2 py-1 rounded bg-gradient-gold text-black text-xs font-bold shadow hover:opacity-90"
-        onClick={() => setOpen(true)}
-        aria-label="잔액 상세 보기"
-      >
-        <Coins className="w-4 h-4" />
-        <span>{gold.toLocaleString()}G</span>
-      </button>
-
-      {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70" role="dialog" aria-modal="true">
-          <div className="w-[92vw] max-w-md rounded-lg bg-zinc-900 border border-zinc-700 shadow-xl">
-            <div className="flex items-center justify-between p-3 border-b border-zinc-700">
-              <div className="flex items-center gap-2 font-semibold text-sm text-white">
-                <History className="w-4 h-4" />
-                최근 변경 이력
-              </div>
-              <button
-                className="text-zinc-300 hover:text-white text-sm"
-                onClick={() => setOpen(false)}
-                aria-label="닫기"
-              >
-                닫기
-              </button>
-            </div>
-            <div className="max-h-[70vh] overflow-y-auto p-3">
-              {changes.length === 0 && (
-                <div className="text-zinc-400 text-sm">최근 변경 이력이 없습니다.</div>
-              )}
-              {changes.length > 0 && (
-                <ul className="space-y-2">
-                  {changes.map((c: ChangeItem) => (
-                    <li key={c.id} className="flex items-center justify-between rounded bg-zinc-800 border border-zinc-700 px-3 py-2">
-                      <div className="text-xs text-zinc-200">
-                        <div className="font-medium">
-                          {c.type === 'reward' ? '보상' : '구매'} • {c.label}
-                        </div>
-                        <div className="text-[11px] opacity-70">{new Date(c.at).toLocaleString()}</div>
-                      </div>
-                      <div className={`text-sm font-bold ${c.amount >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                        {c.amount >= 0 ? `+${c.amount}` : `${c.amount}`}G
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
   );
 }

@@ -86,10 +86,6 @@ export function RockPaperScissorsGame({
   );
   const [comboCount, setComboCount] = useState(0);
   const [isSpecialMove, setIsSpecialMove] = useState(false);
-  // 오류 표시 및 재시도 액션 저장
-  const [errorMessage, setErrorMessage] = useState(null as string | null);
-  const [lastChoice, setLastChoice] = useState(null as Choice | null);
-  const retryActionRef = React.useRef(null as (() => void) | null);
   const withReconcile = useWithReconcile();
   const gold = useUserGold();
   const { dispatch } = useGlobalStore();
@@ -146,7 +142,6 @@ export function RockPaperScissorsGame({
       return;
     }
 
-  setLastChoice(choice);
     setIsPlaying(true);
     // 🚫 사용자 선택을 미리 보여주지 않음!
     setPlayerChoice(null);
@@ -201,10 +196,6 @@ export function RockPaperScissorsGame({
       });
     } catch (e: any) {
       onAddNotification('플레이 실패. 네트워크 상태를 확인해주세요.');
-      setErrorMessage('RPS 플레이 중 오류가 발생했습니다. 다시 시도해주세요.');
-      retryActionRef.current = () => {
-        if (lastChoice) void playGame(lastChoice);
-      };
     }
 
     setShowResult(true);
@@ -235,33 +226,6 @@ export function RockPaperScissorsGame({
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-black to-success/10 relative overflow-hidden">
-      {/* 오류 배너 및 재시도 */}
-      {errorMessage && (
-        <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 w-[92%] max-w-xl bg-destructive/15 border border-destructive/40 text-destructive px-4 py-3 rounded-lg shadow-sm">
-          <div className="flex justify-between items-start gap-4">
-            <div className="flex-1">
-              <div className="font-semibold mb-1">오류 발생</div>
-              <div className="text-sm leading-relaxed break-all">{errorMessage}</div>
-            </div>
-            <div className="flex gap-2 shrink-0">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => {
-                  const fn = retryActionRef.current;
-                  setErrorMessage(null);
-                  if (fn) fn();
-                }}
-              >
-                재시도
-              </Button>
-              <Button size="sm" variant="ghost" onClick={() => setErrorMessage(null)}>
-                닫기
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
       {/* Particle Effects */}
       <AnimatePresence>
         {particles.map((particle: { id: number; x: number; y: number; color: string }) => (

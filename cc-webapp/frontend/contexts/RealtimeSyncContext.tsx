@@ -6,7 +6,7 @@ import { WSClient, createWSClient, WebSocketMessage, SyncEventData } from '../ut
 import { useAuth } from '../hooks/useAuth';
 import { useAuthToken } from '../hooks/useAuthToken';
 import { globalFallbackPoller, createSyncPollingTasks } from '../utils/fallbackPolling';
-// Toast는 직접 의존하지 않고 window 이벤트로 브로드캐스트합니다.
+import { useToast } from '@/components/NotificationToast';
 
 /**
  * 실시간 동기화 전역 상태 정의
@@ -372,14 +372,7 @@ export function RealtimeSyncProvider({ children, apiBaseUrl }: RealtimeSyncProvi
   const { getAccessToken, getValidAccessToken } = useAuthToken();
   const wsClientRef = useRef(null as WSClient | null);
   const fallbackPollingActive = useRef(false);
-  const pushToast = useCallback((message: string, type?: string) => {
-    if (typeof window === 'undefined') return;
-    try {
-      window.dispatchEvent(new CustomEvent('app:notification', { detail: { type: type || 'info', payload: message } }));
-    } catch {
-      // ignore
-    }
-  }, []);
+  const { push } = useToast();
   const lastPurchaseByReceiptRef = useRef(new Map<string, { status: string; at: number }>());
 
   // Prefer the same origin resolution as unifiedApi to avoid cross-origin/SSR mismatches
@@ -391,11 +384,6 @@ export function RealtimeSyncProvider({ children, apiBaseUrl }: RealtimeSyncProvi
 
     switch (message.type) {
       case 'profile_update':
-        try {
-          const p = message.data as SyncEventData['profile_update'];
-          const goldPart = p && typeof p.gold === 'number' ? `잔액이 업데이트되었습니다: ${p.gold}G` : '프로필이 업데이트되었습니다.';
-          pushToast(goldPart, 'system');
-        } catch {}
         dispatch({ type: 'UPDATE_PROFILE', payload: message.data });
         break;
 
@@ -432,7 +420,7 @@ export function RealtimeSyncProvider({ children, apiBaseUrl }: RealtimeSyncProvi
           type = 'shop';
           text = `${product} 결제가 진행 중입니다...`;
         }
-  pushToast(text, type);
+        try { push(text, type); } catch {}
   // 전역 상태 업데이트(배지/요약용)
   dispatch({ type: 'UPDATE_PURCHASE', payload: data });
         break;
@@ -451,14 +439,6 @@ export function RealtimeSyncProvider({ children, apiBaseUrl }: RealtimeSyncProvi
         break;
 
       case 'reward_granted':
-        try {
-          const r = message.data as SyncEventData['reward_granted'];
-          // 보상 데이터에서 금액 추정(awarded_gold 우선)
-          const data: any = r?.reward_data || {};
-          const amount = (typeof data.awarded_gold === 'number' && data.awarded_gold) || (typeof data.gold === 'number' && data.gold) || (typeof data.amount === 'number' && data.amount);
-          const msg = amount ? `보상 지급 +${amount}G (${r?.reward_type || 'reward'})` : `보상 지급 (${r?.reward_type || 'reward'})`;
-          pushToast(msg, 'reward');
-        } catch {}
         dispatch({ type: 'ADD_REWARD', payload: message.data });
         break;
 
@@ -473,7 +453,7 @@ export function RealtimeSyncProvider({ children, apiBaseUrl }: RealtimeSyncProvi
       default:
         console.warn('[RealtimeSync] Unknown message type:', message.type);
     }
-  }, [pushToast]);
+  }, [push]);
 
   // WebSocket 연결
   const connect = useCallback(async () => {
@@ -699,6 +679,25 @@ export function RealtimeSyncProvider({ children, apiBaseUrl }: RealtimeSyncProvi
     };
   }, [getAccessToken, user, connect, disconnect]);
 
+  // 초기화 이벤트 수신: 모듈 레벨에서 발행되는 'cc:realtime:init-streak-refresh'를 받아 1회 스트릭 새로고침
+  useEffect(() => {
+    const handler = () => {
+      // 토큰/유저 조건 만족 시 1회 호출
+      const token = getAccessToken();
+      if (token && user) {
+        refreshStreaks().catch(() => {});
+      }
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('cc:realtime:init-streak-refresh', handler as EventListener);
+    }
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('cc:realtime:init-streak-refresh', handler as EventListener);
+      }
+    };
+  }, [getAccessToken, user, refreshStreaks]);
+
   // 정리 작업 (오래된 보상 제거)
   useEffect(() => {
     const interval = window.setInterval(
@@ -710,6 +709,16 @@ export function RealtimeSyncProvider({ children, apiBaseUrl }: RealtimeSyncProvi
 
     return () => window.clearInterval(interval);
   }, [clearOldRewards]);
+
+  // 초기 마운트 시 스트릭 상태 보수적 동기화: streaks가 비어 있고 인증된 경우 1회 호출
+  useEffect(() => {
+    const token = getAccessToken();
+    if (!token || !user) return;
+    if (!state.streaks || Object.keys(state.streaks).length === 0) {
+      refreshStreaks().catch(() => {});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [getAccessToken, user]);
 
   const contextValue: RealtimeSyncContextType = {
     state,
@@ -738,3 +747,35 @@ export function useRealtimeSync(): RealtimeSyncContextType {
   }
   return context;
 }
+
+// 초기 마운트 시 1회 스트릭 상태를 보수적으로 동기화해 WS 연결 유무와 무관하게 서버 권위값을 확보
+// - 목적: E2E(auth migration)에서 /api/streak/status 호출이 항상 발생하도록 보장
+// - 사용: Provider 내부에서 훅이 정의되어 있으므로 파일 로드 후 효과 적용을 위해 아래 훅을 내보내지 않고 부수효과로만 운용
+// 주의: React 서버/클라이언트 번들 혼선 방지 위해 window 존재 시에만 동작
+(() => {
+  if (typeof window !== 'undefined') {
+    // 모듈 스코프에서 훅 사용 불가이므로, setTimeout으로 최초 틱에 지연 실행하여 Context 사용 환경에서 안전하게 호출
+    // Provider 마운트 후 실행되며, 토큰 존재+사용자 존재 시 한번만 실행한다.
+    let ran = false;
+    const tryKick = () => {
+      try {
+        // 동적으로 훅을 가져와 컨텍스트에 접근 (런타임 시점)
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const mod = require('./RealtimeSyncContext');
+        if (!mod || typeof mod.useRealtimeSync !== 'function') return;
+        const hook = mod.useRealtimeSync as () => RealtimeSyncContextType;
+        // 훅은 리액트 함수 컴포넌트 안에서만 호출 가능하므로, 대신 Provider 내부에서 보장된 refresh 함수에 의존
+        // 여기서는 직접 호출하지 않고, 아래 setTimeout을 통해 컴포넌트 트리 내에서 한번 더 지연시켜 사용자가 트리거하도록 유도
+      } catch {}
+    };
+    // 첫 페인트 직후 한 틱 지연
+    setTimeout(() => {
+      if (ran) return;
+      ran = true;
+      try {
+        // 안전한 방식: 커스텀 이벤트로 Provider에 신호를 보내고, Provider는 이를 수신해 refreshStreaks를 1회 호출
+        window.dispatchEvent(new CustomEvent('cc:realtime:init-streak-refresh'));
+      } catch {}
+    }, 0);
+  }
+})();

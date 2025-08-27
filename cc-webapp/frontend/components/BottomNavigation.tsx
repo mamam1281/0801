@@ -20,7 +20,6 @@ interface BottomNavigationProps {
 }
 
 import { useUserGold, useUserLevel } from '@/hooks/useSelectors';
-import { TokenBalanceQuick } from '@/components/TokenBalanceWidget';
 
 export function BottomNavigation({ currentScreen, onNavigate }: BottomNavigationProps) {
   const { pendingCount } = useRealtimePurchaseBadge();
@@ -91,8 +90,6 @@ export function BottomNavigation({ currentScreen, onNavigate }: BottomNavigation
       )}
       
       <div className="flex items-center justify-around px-2 py-3 max-w-md mx-auto">
-        {/* 잔액 퀵 위젯 */}
-        <div className="absolute -top-10 right-2"><TokenBalanceQuick /></div>
         {navItems.map((item, index) => {
           const isActive = currentScreen === item.id;
           const Icon = item.icon;
