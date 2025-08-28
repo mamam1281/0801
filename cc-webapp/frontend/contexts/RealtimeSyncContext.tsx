@@ -384,7 +384,9 @@ export function RealtimeSyncProvider({ children, apiBaseUrl }: RealtimeSyncProvi
 
     switch (message.type) {
       case 'profile_update':
-        dispatch({ type: 'UPDATE_PROFILE', payload: message.data });
+  dispatch({ type: 'UPDATE_PROFILE', payload: message.data });
+  // 프로필 갱신 토스트(ToastProvider의 1.5s 중복 억제 적용)
+  try { push('프로필이 갱신되었습니다.', 'system'); } catch {}
         break;
 
       case 'purchase_update': {
@@ -438,9 +440,18 @@ export function RealtimeSyncProvider({ children, apiBaseUrl }: RealtimeSyncProvi
         dispatch({ type: 'UPDATE_EVENT', payload: message.data });
         break;
 
-      case 'reward_granted':
+      case 'reward_granted': {
         dispatch({ type: 'ADD_REWARD', payload: message.data });
+        // 보상 토스트: 금액이 있으면 포함
+        try {
+          const d: any = message.data || {};
+          const rd: any = d.reward_data || d;
+          const g = Number(rd?.awarded_gold ?? rd?.gold ?? rd?.amount ?? 0);
+          const text = Number.isFinite(g) && g !== 0 ? `보상 지급: ${g > 0 ? '+' : ''}${g}G` : '보상 지급';
+          push(text, 'reward');
+        } catch {}
         break;
+      }
 
       case 'stats_update':
         dispatch({ type: 'UPDATE_STATS', payload: message.data });

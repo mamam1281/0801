@@ -79,6 +79,7 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
   const [heartParticles, setHeartParticles] = useState(
     [] as Array<{ id: string; x: number; y: number }>
   );
+  const [errorMessage, setErrorMessage] = useState(null as string | null);
 
   // 동적 가챠 비용 계산 (서버 설정 우선, fallback으로 배너 기본값)
   const getSinglePullCost = () => {
@@ -150,6 +151,7 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
     setPullAnimation('revealing');
     let serverUsed = false;
     try {
+      setErrorMessage(null);
       const res = await withReconcile(async (idemKey: string) =>
         api.post<GachaPullApiResponse>('games/gacha/pull', { pull_count: 1 }, { headers: { 'X-Idempotency-Key': idemKey } })
       );
@@ -236,6 +238,11 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
       }
     } catch (e) {
       // Fallback to local simulation
+      const msg =
+        (e as any)?.message ||
+        (typeof e === 'string' ? (e as string) : '가챠 요청에 실패했습니다. 다시 시도해주세요.');
+      setErrorMessage(msg);
+      onAddNotification('네트워크 오류: 가챠 재시도 가능');
     }
     if (!serverUsed) {
       // Local fallback: preserve visuals only, avoid local balance mutation per authoritative rules
@@ -265,6 +272,7 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
     setPullAnimation('revealing');
     let serverUsed = false;
     try {
+      setErrorMessage(null);
       const res = await withReconcile(async (idemKey: string) =>
         api.post<GachaPullApiResponse>('games/gacha/pull', { pull_count: 10 }, { headers: { 'X-Idempotency-Key': idemKey } })
       );
@@ -356,6 +364,11 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
       }
     } catch (e) {
       // swallow & fallback
+      const msg =
+        (e as any)?.message ||
+        (typeof e === 'string' ? (e as string) : '가챠 요청에 실패했습니다. 다시 시도해주세요.');
+      setErrorMessage(msg);
+      onAddNotification('네트워크 오류: 가챠 재시도 가능');
     }
     if (!serverUsed) {
       // Local fallback visuals only; avoid local economy mutation
@@ -392,6 +405,26 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-black via-pink-900/20 to-purple-900/30 relative overflow-hidden">
+      {/* 오류 배너 */}
+      <AnimatePresence>
+        {errorMessage && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="fixed top-4 left-1/2 -translate-x-1/2 z-50 w-[92%] max-w-3xl bg-destructive/15 border border-destructive/40 text-destructive px-4 py-3 rounded-lg shadow-sm"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="text-sm leading-relaxed break-all">{errorMessage}</div>
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" onClick={() => { setErrorMessage(null); void performSinglePull(); }}>단일 재시도</Button>
+                <Button size="sm" variant="outline" onClick={() => { setErrorMessage(null); void performTenPull(); }}>10회 재시도</Button>
+                <Button size="sm" variant="ghost" onClick={() => setErrorMessage(null)}>닫기</Button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       {/* Floating Heart Particles */}
       <AnimatePresence mode="wait">
         {heartParticles.map((heart: any) => (

@@ -193,6 +193,18 @@ export function ShopScreen({
       if (!cancelled) setCatalog([]); // 빈 배열이면 아래에서 폴백 사용
     }
     load();
+    // 간단한 캐시 무효화 훅: 어드민 업서트 이후 window 이벤트로 무효화
+    const invalidate = () => {
+      load();
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('cc:catalog.invalidate', invalidate as EventListener);
+      // 전역 트리거 유틸 (선택적)
+      // @ts-ignore
+      window.__ccInvalidateCatalog = () => {
+        window.dispatchEvent(new Event('cc:catalog.invalidate'));
+      };
+    }
     return () => { cancelled = true; };
   }, []);
 

@@ -38,3 +38,10 @@ export function useUserSummary() {
 		[p?.nickname, p?.goldBalance, p?.level, p?.dailyStreak, p?.isAdmin, p?.is_admin]
 	);
 }
+
+// 범용 메모이즈 셀렉터: 복수 컴포넌트에서 동일 파생값 재사용 시 사용
+export function useProfileSelector<T>(selector: (p:any)=>T, deps?: any[]) {
+	const p = useGlobalProfile() as any;
+	const v = selector(p);
+	return useMemo(()=>v, deps && deps.length ? deps : [v]);
+}

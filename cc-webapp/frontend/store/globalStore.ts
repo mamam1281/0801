@@ -6,6 +6,7 @@
 "use client";
 
 import React, { createContext, useContext, useMemo, useReducer } from "react";
+import { api } from "@/lib/unifiedApi";
 
 export type GlobalUserProfile = {
     id: string | number;
@@ -31,36 +32,56 @@ export type InventoryItem = {
 };
 
 type GlobalState = {
+    // 권위 사용자/밸런스
     profile: GlobalUserProfile | null;
+    balances?: { gold: number; gems?: number };
+    // 준비 플래그
     hydrated: boolean;
     lastHydratedAt?: number;
     // 게임별 통계(키: 게임 식별자)
     gameStats?: Record<string, any>;
     // 인벤토리(가벼운 캐시; 서버와 불일치 시 서버값 우선)
     inventory?: InventoryItem[];
+    // 스트릭/이벤트/알림(경량)
+    streak?: Record<string, any>;
+    events?: Record<string, any>;
+    notifications?: Array<{ id: string; type: string; message: string; at: number }>;
+    // 오류 상태(옵션)
+    lastError?: { message: string; at: number } | null;
 };
 
 type Actions =
     | { type: "SET_PROFILE"; profile: GlobalUserProfile | null }
     | { type: "SET_HYDRATED"; value: boolean }
     | { type: "PATCH_BALANCES"; delta: { gold?: number; gems?: number } }
+    | { type: "APPLY_REWARD"; award: { gold?: number; gems?: number } }
     | { type: "MERGE_PROFILE"; patch: Partial<GlobalUserProfile> & Record<string, unknown> }
     | { type: "MERGE_GAME_STATS"; game: string; delta: Record<string, any> }
-    | { type: "APPLY_PURCHASE"; items: InventoryItem[]; replace?: boolean };
+    | { type: "APPLY_PURCHASE"; items: InventoryItem[]; replace?: boolean }
+    | { type: "SET_ERROR"; error: { message: string; at: number } | null }
+    | { type: "SET_BALANCES"; balances: { gold: number; gems?: number } }
+    | { type: "SET_STREAK"; streak: Record<string, any> }
+    | { type: "SET_EVENTS"; events: Record<string, any> }
+    | { type: "PUSH_NOTIFICATION"; item: { id: string; type: string; message: string; at: number } };
 
 const initialState: GlobalState = {
     profile: null,
+    balances: { gold: 0, gems: 0 },
     hydrated: false,
     lastHydratedAt: undefined,
     gameStats: {},
     inventory: [],
+    streak: {},
+    events: {},
+    notifications: [],
+    lastError: null,
 };
 
 function reducer(state: GlobalState, action: Actions): GlobalState {
     switch (action.type) {
         case "SET_PROFILE":
             return { ...state, profile: action.profile, hydrated: true, lastHydratedAt: Date.now() };
-        case "SET_HYDRATED":
+    case "SET_HYDRATED":
             return { ...state, hydrated: action.value, lastHydratedAt: action.value ? Date.now() : state.lastHydratedAt };
         case "PATCH_BALANCES": {
             if (!state.profile) return state;
@@ -73,6 +94,23 @@ function reducer(state: GlobalState, action: Actions): GlobalState {
                     goldBalance: gold + (action.delta.gold ?? 0),
                     gemsBalance: gems + (action.delta.gems ?? 0),
                 } as GlobalUserProfile,
+        balances: { gold: (state.balances?.gold ?? gold) + (action.delta.gold ?? 0), gems: (state.balances?.gems ?? gems) + (action.delta.gems ?? 0) },
+            };
+        }
+        case "APPLY_REWARD": {
+            if (!state.profile) return state;
+            const gold = state.profile.goldBalance ?? 0;
+            const gems = (state.profile as any).gemsBalance ?? 0;
+            const addGold = Number(action.award.gold ?? 0);
+            const addGems = Number(action.award.gems ?? 0);
+            return {
+                ...state,
+                profile: {
+                    ...state.profile,
+                    goldBalance: gold + (Number.isFinite(addGold) ? addGold : 0),
+                    gemsBalance: gems + (Number.isFinite(addGems) ? addGems : 0),
+                } as GlobalUserProfile,
+        balances: { gold: (state.balances?.gold ?? gold) + (Number.isFinite(addGold) ? addGold : 0), gems: (state.balances?.gems ?? gems) + (Number.isFinite(addGems) ? addGems : 0) },
             };
         }
         case "MERGE_PROFILE": {
@@ -126,6 +164,16 @@ function reducer(state: GlobalState, action: Actions): GlobalState {
             }
             return { ...state, inventory: Object.values(byId) };
         }
+        case "SET_ERROR":
+            return { ...state, lastError: action.error };
+        case "SET_BALANCES":
+            return { ...state, balances: { ...action.balances }, profile: state.profile ? { ...state.profile, goldBalance: action.balances.gold, gemsBalance: action.balances.gems } as GlobalUserProfile : state.profile };
+        case "SET_STREAK":
+            return { ...state, streak: { ...action.streak } };
+        case "SET_EVENTS":
+            return { ...state, events: { ...action.events } };
+        case "PUSH_NOTIFICATION":
+            return { ...state, notifications: [{ ...action.item }, ...(state.notifications || [])].slice(0, 50) };
         default:
             return state;
     }
@@ -167,6 +215,10 @@ export function patchBalances(dispatch: DispatchFn, delta: { gold?: number; gems
     dispatch({ type: "PATCH_BALANCES", delta });
 }
 
+export function applyReward(dispatch: DispatchFn, award: { gold?: number; gems?: number }) {
+    dispatch({ type: "APPLY_REWARD", award });
+}
+
 export function mergeProfile(dispatch: DispatchFn, patch: Partial<GlobalUserProfile> & Record<string, unknown>) {
     dispatch({ type: "MERGE_PROFILE", patch });
 }
@@ -180,3 +232,48 @@ export function mergeGameStats(dispatch: DispatchFn, game: string, delta: Record
 export function applyPurchase(dispatch: DispatchFn, items: InventoryItem[], options?: { replace?: boolean }) {
     dispatch({ type: "APPLY_PURCHASE", items, replace: options?.replace });
 }
+
+// 고수준 액션들(hydrate/reconcile)
+export async function hydrateFromServer(dispatch: DispatchFn) {
+    try {
+        const [me, bal, stats] = await Promise.all([
+            api.get("auth/me"),
+            api.get("users/balance").catch(() => null),
+            api.get("games/stats/me").catch(() => null),
+        ]);
+        const goldFromBalanceRaw = (bal as any)?.gold ?? (bal as any)?.gold_balance ?? (bal as any)?.cyber_token_balance ?? (bal as any)?.balance;
+        const mapped = {
+            id: me?.id ?? me?.user_id ?? "unknown",
+            nickname: me?.nickname ?? me?.name ?? "",
+            goldBalance: Number.isFinite(Number(goldFromBalanceRaw)) ? Number(goldFromBalanceRaw) : Number(me?.gold ?? me?.gold_balance ?? 0),
+            gemsBalance: Number(me?.gems ?? me?.gems_balance ?? 0),
+            level: me?.level ?? me?.battlepass_level ?? undefined,
+            xp: me?.xp ?? undefined,
+            updatedAt: new Date().toISOString(),
+            ...me,
+        } as GlobalUserProfile as any;
+        const balances = { gold: mapped.goldBalance ?? 0, gems: (mapped as any).gemsBalance ?? 0 };
+        setProfile(dispatch, mapped);
+        dispatch({ type: "SET_BALANCES", balances });
+        if (stats && typeof stats === 'object') {
+            try { dispatch({ type: "MERGE_GAME_STATS", game: "_me", delta: stats as any }); } catch { /* noop */ }
+        }
+    } catch (e:any) {
+        dispatch({ type: "SET_ERROR", error: { message: e?.message || "hydrateFromServer failed", at: Date.now() } });
+    } finally {
+        setHydrated(dispatch, true);
+    }
+}
+
+export async function reconcileBalance(dispatch: DispatchFn) {
+    try {
+        const bal = await api.get("users/balance");
+        const gold = Number((bal as any)?.gold ?? (bal as any)?.gold_balance ?? (bal as any)?.cyber_token_balance ?? (bal as any)?.balance ?? 0);
+        const gems = Number((bal as any)?.gems ?? (bal as any)?.gems_balance ?? 0);
+        dispatch({ type: "SET_BALANCES", balances: { gold, gems } });
+    } catch (e:any) {
+        dispatch({ type: "SET_ERROR", error: { message: e?.message || "reconcileBalance failed", at: Date.now() } });
+    }
+}
+
+export function getLastError(state: GlobalState) { return state.lastError; }

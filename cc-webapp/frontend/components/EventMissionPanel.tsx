@@ -248,7 +248,7 @@ export function EventMissionPanel({
       // API를 통한 미션 보상 수령
       const response = await eventMissionApi.missions.claimRewards(parseInt(missionId));
 
-      if (response && response.success) {
+  if (response && response.success) {
         // 보상 내역 표시
         const rewardMessage = Object.entries(response.rewards)
           .map(([type, amount]) => `${type}: ${amount}`)
@@ -256,27 +256,7 @@ export function EventMissionPanel({
 
         onAddNotification(`보상 수령 완료: ${rewardMessage}`);
 
-        // 사용자 정보 업데이트
-        const totalGold = response.rewards.gold || 0;
-        const totalExp = response.rewards.exp || 0;
-
-        const updatedUser = {
-          ...user,
-          goldBalance: user.goldBalance + totalGold,
-          experience: user.experience + totalExp,
-        };
-
-        // Check for level up
-        if (updatedUser.experience >= updatedUser.maxExperience) {
-          updatedUser.level += 1;
-          updatedUser.experience = updatedUser.experience - updatedUser.maxExperience;
-          updatedUser.maxExperience = Math.floor(updatedUser.maxExperience * 1.2);
-          onAddNotification(`🆙 레벨업! ${updatedUser.level}레벨 달성!`);
-        }
-
-        onUpdateUser(updatedUser);
-
-        // 데이터 다시 로드
+  // 진행/목록은 서버가 권위: 새로고침으로 동기화
         fetchData();
         t('mission_claim_success', { missionId });
       }
@@ -321,7 +301,7 @@ export function EventMissionPanel({
     try {
       const response = await claimEvent(parseInt(eventId));
 
-      if (response && response.success) {
+  if (response && response.success) {
         // 보상 내역 표시
         const rewardMessage = Object.entries(response.rewards)
           .map(([type, amount]) => `${type}: ${amount}`)
@@ -329,17 +309,7 @@ export function EventMissionPanel({
 
         onAddNotification(`이벤트 보상 수령 완료: ${rewardMessage}`);
 
-        // 사용자 정보 업데이트
-        const totalGold = response.rewards.gold || 0;
-        const totalGems = response.rewards.gems || 0;
-
-        onUpdateUser({
-          ...user,
-          goldBalance: user.goldBalance + totalGold,
-          // 젬은 사용자 타입에 없으면 추가해야 함
-        });
-
-        // 데이터 다시 로드
+  // 권위 데이터 재조회
         refreshEvents();
         t('event_claim_success', { eventId });
       }

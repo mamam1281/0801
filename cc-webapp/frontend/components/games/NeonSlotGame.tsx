@@ -135,6 +135,8 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
   const [isAutoSpinning, setIsAutoSpinning] = useState(false);
   const [autoSpinCount, setAutoSpinCount] = useState(0);
   const [coinDrops, setCoinDrops] = useState([] as Array<{ id: number; x: number; delay: number }>);
+  // 오류 상태 및 재시도
+  const [errorMessage, setErrorMessage] = useState(null as string | null);
 
   // gameConfig가 로드되면 슬롯 게임 비용으로 베팅 금액 업데이트
   useEffect(() => {
@@ -307,6 +309,7 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
   let hasMergedBalance = false;
     // Attempt authoritative server spin with reconcile + idempotency
     try {
+      setErrorMessage(null);
       const raw = await withReconcile(async (idemKey: string) =>
         api.post<SlotSpinApiResponse>(
           'games/slot/spin',
@@ -325,6 +328,11 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
       }
     } catch (_e) {
       serverResult = null; // fallback to local simulation (no local balance mutation)
+      const msg =
+        (_e as any)?.message ||
+        (typeof _e === 'string' ? (_e as string) : '스핀 요청에 실패했습니다. 다시 시도해주세요.');
+      setErrorMessage(msg);
+      onAddNotification('네트워크 오류: 스핀 재시도 가능');
     }
 
     // Helper to map server unicode symbol to local symbol
@@ -505,6 +513,36 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-black to-primary-soft relative overflow-hidden">
+      {/* 오류 배너 */}
+      <AnimatePresence>
+        {errorMessage && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="fixed top-4 left-1/2 -translate-x-1/2 z-50 w-[92%] max-w-3xl bg-destructive/15 border border-destructive/40 text-destructive px-4 py-3 rounded-lg shadow-sm"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="text-sm leading-relaxed break-all">{errorMessage}</div>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setErrorMessage(null);
+                    void handleSpin();
+                  }}
+                >
+                  재시도
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => setErrorMessage(null)}>
+                  닫기
+                </Button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       {/* Enhanced Particle Effects */}
       <AnimatePresence>
         {particles.map((particle: { id: number; x: number; y: number; type: string }) => (

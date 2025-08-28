@@ -7,11 +7,7 @@
  */
 import React, { useEffect } from "react";
 import { api, API_ORIGIN } from "../lib/unifiedApi";
-import {
-  useGlobalStore,
-  setProfile,
-  setHydrated,
-} from "../store/globalStore";
+import { useGlobalStore, setProfile, setHydrated, applyReward } from "../store/globalStore";
 
 export async function hydrateProfile(dispatch: ReturnType<typeof useGlobalStore>["dispatch"]) {
   try {
@@ -97,9 +93,56 @@ export function RealtimeSyncProvider(props: { children?: React.ReactNode }) {
           switch (type) {
             case "profile_update":
             case "purchase_update":
-            case "reward_granted":
+            case "reward_granted": {
+              // 빠른 체감: 보상 즉시 적용 후 재하이드레이트로 정합화
+              try {
+                const data = msg?.data || {};
+                const reward = data?.reward_data || data || {};
+                const gold = Number(reward?.awarded_gold ?? reward?.gold ?? reward?.amount ?? 0);
+                if (Number.isFinite(gold) && gold !== 0) {
+                  applyReward(dispatch, { gold });
+                }
+              } catch { /* noop */ }
+
+              // 유형별 토스트 발행 (ToastProvider가 중복 1.5s 억제)
+              try {
+                if (typeof window !== "undefined") {
+                  if (type === "reward_granted") {
+                    const g = (() => {
+                      try {
+                        const d = msg?.data?.reward_data ?? msg?.data ?? {};
+                        const val = Number(d?.awarded_gold ?? d?.gold ?? d?.amount ?? 0);
+                        return Number.isFinite(val) ? val : 0;
+                      } catch { return 0; }
+                    })();
+                    const text = g !== 0 ? `보상 지급: ${g > 0 ? "+" : ""}${g}G` : "보상 지급";
+                    window.dispatchEvent(new CustomEvent("app:notification", { detail: { type: "reward", payload: text } }));
+                  } else if (type === "purchase_update") {
+                    const st = (msg?.data?.status || "pending").toString();
+                    const product = msg?.data?.product_id ? `상품 ${msg?.data?.product_id}` : "구매";
+                    let t = "shop"; let text = `${product} 결제가 진행 중입니다...`;
+                    if (st === "success") { t = "success"; text = `${product} 결제가 완료되었습니다.`; }
+                    else if (st === "failed") { t = "error"; text = `${product} 결제가 실패했습니다.`; }
+                    else if (st === "idempotent_reuse") { t = "system"; text = `${product} 결제가 이미 처리되었습니다.`; }
+                    window.dispatchEvent(new CustomEvent("app:notification", { detail: { type: t, payload: text } }));
+                  } else if (type === "profile_update") {
+                    window.dispatchEvent(new CustomEvent("app:notification", { detail: { type: "system", payload: "프로필이 갱신되었습니다." } }));
+                  }
+                }
+              } catch { /* noop */ }
+              safeHydrate();
+              break;
+            }
             case "game_update":
               safeHydrate();
+              break;
+            case "catalog_updated":
+            case "package_upserted":
+              try {
+                if (typeof window !== "undefined") {
+                  window.dispatchEvent(new Event("cc:catalog.invalidate"));
+                }
+              } catch { /* noop */ }
               break;
             default:
               break;
@@ -152,11 +195,19 @@ export async function withReconcile<T>(
   options: ReconcileOptions = { reconcile: true }
 ): Promise<T> {
   const idemKey = uuidv4();
-  const result = await serverCall(idemKey);
-  if (options.reconcile !== false) {
-    await hydrateProfile(dispatch);
+  let caught: any = null;
+  let result!: T;
+  try {
+    result = await serverCall(idemKey);
+    return result;
+  } catch (e:any) {
+    caught = e;
+    throw e;
+  } finally {
+    if (options.reconcile !== false) {
+      await hydrateProfile(dispatch);
+    }
   }
-  return result;
 }
 
 export function useWithReconcile() {
@@ -166,4 +217,13 @@ export function useWithReconcile() {
       return withReconcile<T>(dispatch, serverCall, opts);
     };
   }, [dispatch]);
+}
+
+// 멱등키 부여 유틸: 서버콜에 헤더/본문 중 하나로 키를 전달할 때 사용
+export async function withIdem<T>(
+  fn: (idemKey: string) => Promise<T>,
+  explicitKey?: string
+): Promise<T> {
+  const key = explicitKey || uuidv4();
+  return fn(key);
 }

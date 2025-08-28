@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api as unifiedApi } from '@/lib/unifiedApi';
+import { useWithReconcile } from '@/lib/sync';
+import { applyReward, useGlobalStore } from '@/store/globalStore';
 import { getTokens } from '../utils/tokenStorage';
 
 export interface EventItem {
@@ -73,6 +75,8 @@ async function loadEvents() {
 export function useEvents(opts: UseEventsOptions = {}): UseEventsReturn {
   const { autoLoad = true } = opts;
   const [, setVer] = useState(0);
+  const { dispatch } = useGlobalStore();
+  const withReconcile = useWithReconcile();
   useEffect(() => { const f = () => setVer((v: number) => v + 1); cache.listeners.add(f); return () => { cache.listeners.delete(f); }; }, []);
   useEffect(() => {
     if (!autoLoad) return;
@@ -92,8 +96,16 @@ export function useEvents(opts: UseEventsOptions = {}): UseEventsReturn {
     updateOne(eventId, e => ({ ...e, user_participation: { joined: true, progress: res?.progress ?? 0, completed: !!res?.completed, claimed: !!res?.claimed_rewards } }));
   }, []);
   const claim = useCallback(async (eventId: number) => {
-    const res = await unifiedApi.post(`events/claim/${eventId}`, {});
+    const res = await withReconcile(async (idemKey: string) =>
+      unifiedApi.post(`events/claim/${eventId}`, {}, { headers: { 'X-Idempotency-Key': idemKey } })
+    );
     updateOne(eventId, e => ({ ...e, user_participation: { ...(e.user_participation || { joined: true, progress: 0, completed: true, claimed: false }), claimed: true } }));
+    try {
+      const awarded = (res as any)?.awarded_gold ?? (res as any)?.rewards?.gold ?? (res as any)?.gold;
+      if (typeof awarded === 'number' && Number.isFinite(awarded) && awarded !== 0) {
+        applyReward(dispatch, { gold: Number(awarded) });
+      }
+    } catch { /* noop */ }
     return res;
   }, []);
   const updateProgress = useCallback(async (eventId: number, progress: number) => {

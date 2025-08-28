@@ -10,6 +10,9 @@ import { Progress } from './ui/progress';
 import { User, UserStats, UserBalance } from '../types/user';
 import { api as unifiedApi } from '@/lib/unifiedApi';
 import useBalanceSync from '@/hooks/useBalanceSync';
+import { useWithReconcile } from '@/lib/sync';
+import { useGlobalStore } from '@/store/globalStore';
+import { validateNickname } from '@/utils/securityUtils';
 import { getTokens, setTokens } from '../utils/tokenStorage';
 import { useRealtimeProfile, useRealtimeStats } from '@/hooks/useRealtimeData';
 
@@ -38,6 +41,12 @@ export function ProfileScreen({
     onUpdateUser,
     onAddNotification,
   });
+  // 전역 스토어 구독(권위 값)
+  const { state } = useGlobalStore();
+  const storeProfile = state.profile;
+  const storeGameStats = state.gameStats || {};
+  // 쓰기 후 재동기화 유틸 (멱등 포함)
+  const withReconcile = useWithReconcile();
   // Realtime 전역 상태 구독(골드 등 핵심 값은 전역 프로필 우선 사용)
   const { profile: rtProfile, refresh: refreshRtProfile } = useRealtimeProfile();
   const { allStats: rtAllStats } = useRealtimeStats();
@@ -56,7 +65,7 @@ export function ProfileScreen({
     try {
       const [rawProfile, rawStats, rawBalance] = await Promise.all([
         unifiedApi.get('auth/me'),
-        unifiedApi.get('users/stats'),
+        unifiedApi.get('games/stats/me'),
         unifiedApi.get('users/balance'),
       ]);
       
@@ -381,7 +390,7 @@ export function ProfileScreen({
 
   // GOLD 표시값: Realtime 전역 상태(우선) → 공용 상태 → 로컬 balance 폴백
   const displayGold: number | string = (
-    (rtProfile?.gold as any) ?? (sharedUser?.goldBalance as any) ?? (balance?.cyber_token_balance as any) ?? 0
+    (storeProfile?.goldBalance as any) ?? (rtProfile?.gold as any) ?? (sharedUser?.goldBalance as any) ?? (balance?.cyber_token_balance as any) ?? 0
   );
 
   // 실시간 통계 파생값: 전역 stats 우선, 없으면 기존 로컬 stats 사용
@@ -395,10 +404,13 @@ export function ProfileScreen({
   };
   const computeRtTotals = (): { totalGames?: number; totalWins?: number } => {
     try {
-      const entries = Object.values(rtAllStats || {}) as Array<{ data?: Record<string, any> }>;
+      // 전역 store 게임 통계를 우선 사용, 폴백으로 기존 실시간/로컬 사용
+      const primaryEntries = Object.values(storeGameStats || {}) as Array<{ data?: Record<string, any> } | Record<string, any>>;
+      const entries = (primaryEntries.length ? primaryEntries : (Object.values(rtAllStats || {}) as Array<{ data?: Record<string, any> }>));
       if (!entries?.length) return {};
-      const totalGames = entries.reduce((acc, e) => acc + pickNumber(e?.data, ['total_games_played','total_games','games','plays','spins']), 0);
-      const totalWins = entries.reduce((acc, e) => acc + pickNumber(e?.data, ['total_wins','wins']), 0);
+      const getData = (e: any) => (e?.data ? e.data : e);
+      const totalGames = entries.reduce((acc, e) => acc + pickNumber(getData(e), ['total_games_played','total_games','games','plays','spins']), 0);
+      const totalWins = entries.reduce((acc, e) => acc + pickNumber(getData(e), ['total_wins','wins']), 0);
       return { totalGames, totalWins };
     } catch { return {}; }
   };
@@ -433,7 +445,7 @@ export function ProfileScreen({
 
           <div className="glass-effect rounded-xl p-3 border border-primary/20">
             <div className="text-right">
-              <div className="text-sm text-muted-foreground">{user?.nickname || '사용자'}</div>
+              <div className="text-sm text-muted-foreground">{storeProfile?.nickname || user?.nickname || '사용자'}</div>
               <div className="text-lg font-bold text-primary">프로필</div>
             </div>
           </div>
@@ -459,9 +471,40 @@ export function ProfileScreen({
               <div className="relative z-10 text-center space-y-6">
                 {/* 🎯 닉네임 (단순하게) */}
                 <div>
-                  <h2 className="text-4xl font-black text-gradient-primary mb-4">
-                    {user?.nickname || '사용자'}
-                  </h2>
+                  <div className="flex items-center justify-center gap-3 mb-4">
+                    <h2 className="text-4xl font-black text-gradient-primary">
+                      {storeProfile?.nickname || user?.nickname || '사용자'}
+                    </h2>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="glass-effect hover:bg-primary/10"
+                      onClick={async () => {
+                        try {
+                          const current = (storeProfile?.nickname || user?.nickname || '').toString();
+                          const next = window.prompt('새 닉네임을 입력하세요', current)?.trim();
+                          if (!next || next === current) return;
+                          const { isValid, error } = validateNickname(next);
+                          if (!isValid) {
+                            onAddNotification(error || '닉네임 형식이 올바르지 않습니다.');
+                            return;
+                          }
+                          await withReconcile(async () => {
+                            await unifiedApi.put('users/profile', { nickname: next });
+                            return { ok: true } as any;
+                          });
+                          onAddNotification('닉네임이 변경되었습니다.');
+                          // 하이드레이트로 덮어쓰기를 기다리되, 즉시성 확보를 위해 로컬 표시값 폴백 최소화
+                        } catch (e) {
+                          // eslint-disable-next-line no-console
+                          console.error('[ProfileScreen] 닉네임 변경 실패', e);
+                          onAddNotification('닉네임 변경 중 오류가 발생했습니다.');
+                        }
+                      }}
+                    >
+                      닉네임 수정
+                    </Button>
+                  </div>
 
                   {/* 🎯 연속출석일만 표시 */}
                   <div className="flex justify-center">

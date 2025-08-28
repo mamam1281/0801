@@ -32,7 +32,8 @@ export interface UnifiedRequestOptions<T=any> {
   transform?: (data:any)=>T; // 결과 후처리
 }
 
-const DEFAULT_RETRY_STATUS = new Set([408, 429, 500, 502, 503, 504]);
+// 재시도 대상 상태코드: 네트워크 지연/과부하/일시적 경합(409 포함)
+const DEFAULT_RETRY_STATUS = new Set([408, 409, 429, 500, 502, 503, 504]);
 
 function resolveOrigin(): string {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

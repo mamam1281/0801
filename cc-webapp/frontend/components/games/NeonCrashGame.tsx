@@ -124,6 +124,8 @@ export function NeonCrashGame({
     }
 
     try {
+  // 이전 오류 상태 초기화
+  setErrorMessage(null);
       // 서버에 크래시 베팅 요청 (멱등키 포함)
       const gameResult = await withReconcile(async (idemKey: string) =>
         api.post<any>(
@@ -184,6 +186,10 @@ export function NeonCrashGame({
       fetchAuthoritativeStats();
     } catch (error) {
       console.error('크래시 게임 시작 실패:', error);
+      const msg =
+        (error as any)?.message ||
+        (typeof error === 'string' ? (error as string) : '게임 시작에 실패했습니다. 다시 시도해주세요.');
+      setErrorMessage(msg);
       onAddNotification('게임 시작에 실패했습니다. 다시 시도해주세요.');
     }
   };
@@ -404,7 +410,11 @@ export function NeonCrashGame({
         )
       );
     } catch (e) {
-      // 캐시아웃 엔드포인트 미구현 환경에서도 하이드레이트로 최종 정합 보장됨
+      // 캐시아웃 실패 시 오류 표시 + 재시도 유도
+      const msg =
+        (e as any)?.message ||
+        (typeof e === 'string' ? (e as string) : '캐시아웃 처리에 실패했습니다. 다시 시도해주세요.');
+      setErrorMessage(msg);
     }
 
     // 게임 상태 업데이트

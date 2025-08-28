@@ -86,6 +86,7 @@ export function RockPaperScissorsGame({
   );
   const [comboCount, setComboCount] = useState(0);
   const [isSpecialMove, setIsSpecialMove] = useState(false);
+  const [errorMessage, setErrorMessage] = useState(null as string | null);
   const withReconcile = useWithReconcile();
   const gold = useUserGold();
   const { dispatch } = useGlobalStore();
@@ -142,7 +143,8 @@ export function RockPaperScissorsGame({
       return;
     }
 
-    setIsPlaying(true);
+  setIsPlaying(true);
+  setErrorMessage(null);
     // 🚫 사용자 선택을 미리 보여주지 않음!
     setPlayerChoice(null);
     setAiChoice(null);
@@ -195,6 +197,8 @@ export function RockPaperScissorsGame({
         return res;
       });
     } catch (e: any) {
+      const msg = e?.message || (typeof e === 'string' ? e : '플레이 실패. 네트워크 상태를 확인해주세요.');
+      setErrorMessage(msg);
       onAddNotification('플레이 실패. 네트워크 상태를 확인해주세요.');
     }
 
@@ -226,6 +230,25 @@ export function RockPaperScissorsGame({
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-black to-success/10 relative overflow-hidden">
+      {/* 오류 배너 */}
+      <AnimatePresence>
+        {errorMessage && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="fixed top-4 left-1/2 -translate-x-1/2 z-50 w-[92%] max-w-3xl bg-destructive/15 border border-destructive/40 text-destructive px-4 py-3 rounded-lg shadow-sm"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="text-sm leading-relaxed break-all">{errorMessage}</div>
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" onClick={() => { setErrorMessage(null); playerChoice ? void playGame(playerChoice) : null; }}>재시도</Button>
+                <Button size="sm" variant="ghost" onClick={() => setErrorMessage(null)}>닫기</Button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       {/* Particle Effects */}
       <AnimatePresence>
         {particles.map((particle: { id: number; x: number; y: number; color: string }) => (
