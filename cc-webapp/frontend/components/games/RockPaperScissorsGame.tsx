@@ -242,7 +242,7 @@ export function RockPaperScissorsGame({
             <div className="flex items-start justify-between gap-3">
               <div className="text-sm leading-relaxed break-all">{errorMessage}</div>
               <div className="flex gap-2">
-                <Button size="sm" variant="outline" onClick={() => { setErrorMessage(null); playerChoice ? void playGame(playerChoice) : null; }}>재시도</Button>
+                <Button size="sm" variant="outline" onClick={() => { setErrorMessage(null); if (playerChoice) { void playGame(playerChoice); } }}>재시도</Button>
                 <Button size="sm" variant="ghost" onClick={() => setErrorMessage(null)}>닫기</Button>
               </div>
             </div>
