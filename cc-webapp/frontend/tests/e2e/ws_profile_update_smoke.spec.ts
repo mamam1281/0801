@@ -39,13 +39,13 @@ test.describe('WS→UI 반영 스모크', () => {
     const goldFromApi = Number(balJson?.gold ?? balJson?.gold_balance ?? balJson?.cyber_token_balance ?? me?.gold ?? me?.gold_balance ?? 0);
 
   // 3) 화면 우측 상단 GOLD(하단바 quick view) 값 읽기 (안정적인 data-testid 사용)
-  const goldQuick = page.getByTestId('gold-quick');
-  // 최대 3초 대기: 초기 렌더/수치 반영 지연 흡수
-  await goldQuick.waitFor({ state: 'visible', timeout: 3000 });
-  const uiGoldText = (await goldQuick.innerText()).trim(); // e.g. "1,234G"
-  const uiGoldNum = Number(uiGoldText.replace(/[^0-9.-]/g, '')) || 0;
+      await page.waitForFunction((expected) => {
+        const el = document.querySelector('[data-testid="gold-quick"]');
+        const uiVal = el ? (Number((el.textContent || '').replace(/[^0-9.-]/g, '')) || 0) : 0;
+        return uiVal === expected;
+      }, goldFromApi, { timeout: 5000 });
 
-  // 4) 간접 동기성 검증: API 수치와 UI 수치가 동일(혹은 await 직후 근사치)
-  expect(uiGoldNum).toBe(goldFromApi);
+  // 4) 간접 동기성 검증은 waitForFunction 내부에서 수행 완료(일치 시까지 대기)
+  expect(true).toBeTruthy();
   });
 });

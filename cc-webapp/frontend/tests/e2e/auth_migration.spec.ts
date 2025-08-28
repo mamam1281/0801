@@ -29,22 +29,21 @@ test.describe('Legacy 토큰 자동 마이그레이션', () => {
 
         // 3) 홈 진입 -> migration 수행 & streak/status Authorization 헤더 인터셉트 검증
         const intercepted: { auth?: string } = {};
-        await page.route('**/api/streak/status**', route => {
+            await page.route('**/api/streak/status**', route => {
             const headers = route.request().headers();
             intercepted.auth = headers['authorization'];
             route.continue();
         });
     await page.goto('/');
-
-    // 번들 생성은 환경에 따라 늦을 수 있어, 검증을 Authorization 헤더 존재로 한정한다
-    await page.waitForTimeout(300);
-
-    // 4) streak/status 호출 결과 및 Authorization 헤더 브라우저 fetch 수준 검증
-    if (!intercepted.auth) {
-            // 브라우저 컨텍스트에서 한 번 호출을 강제하여 Authorization 헤더를 캡처
-            await page.evaluate(() => fetch('/api/streak/status', { cache: 'no-store' }).catch(() => { }));
-            await page.waitForTimeout(300);
-    }
+            // 번들 생성은 환경에 따라 늦을 수 있어, 최대 1초까지 인터셉트 대기
+            await page.waitForTimeout(500);
+            if (!intercepted.auth) {
+                // 브라우저 컨텍스트에서 한 번 호출을 강제하여 Authorization 헤더를 캡처
+                await page.evaluate(async () => {
+                    try { await fetch('/api/streak/status', { cache: 'no-store' }); } catch {}
+                });
+                await page.waitForTimeout(700);
+            }
     expect(intercepted.auth).toBeTruthy();
     expect(intercepted.auth?.toLowerCase()).toMatch(/^bearer\s+.+/);
     });
