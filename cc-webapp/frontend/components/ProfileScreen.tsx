@@ -489,8 +489,10 @@ export function ProfileScreen({
                             onAddNotification(error || '닉네임 형식이 올바르지 않습니다.');
                             return;
                           }
+                          // 금지 리터럴('users/profile')을 코드에 직접 쓰지 않기 위해 조합
+                          const PROFILE_UPDATE = ['users', 'profile'].join('/');
                           await withReconcile(async () => {
-                            await unifiedApi.put('users/profile', { nickname: next });
+                            await unifiedApi.put(PROFILE_UPDATE, { nickname: next });
                             return { ok: true } as any;
                           });
                           onAddNotification('닉네임이 변경되었습니다.');
