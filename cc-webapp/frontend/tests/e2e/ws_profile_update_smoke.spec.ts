@@ -38,19 +38,14 @@ test.describe('WS→UI 반영 스모크', () => {
     const balJson = balRes.ok() ? await balRes.json() : {};
     const goldFromApi = Number(balJson?.gold ?? balJson?.gold_balance ?? balJson?.cyber_token_balance ?? me?.gold ?? me?.gold_balance ?? 0);
 
-    // 3) 화면 우측 상단 GOLD(하단바 quick view) 텍스트를 가져와 숫자로 파싱
-    //    .soft selector: 하단바 골드가 존재한다면 비교, 없으면 HomeDashboard 내부 표시를 fallback으로 찾음
-    const goldBadge = page.locator('text=/G$/');
-    // 일정 시간 내 렌더를 기다림
-    await page.waitForTimeout(500);
-    // HomeDashboard 메트릭 카드 내 골드 표시 후보
-    const metricGold = page.locator('text=골드').first();
+  // 3) 화면 우측 상단 GOLD(하단바 quick view) 값 읽기 (안정적인 data-testid 사용)
+  const goldQuick = page.getByTestId('gold-quick');
+  // 최대 3초 대기: 초기 렌더/수치 반영 지연 흡수
+  await goldQuick.waitFor({ state: 'visible', timeout: 3000 });
+  const uiGoldText = (await goldQuick.innerText()).trim(); // e.g. "1,234G"
+  const uiGoldNum = Number(uiGoldText.replace(/[^0-9.-]/g, '')) || 0;
 
-    // 4) 간접 동기성 검증: API와 UI 값이 큰 차이를 보이지 않는지(정확 비교는 포맷 의존이므로근사치)
-    //    텍스트에 goldFromApi의 천단위 포맷 일부가 포함되는지 검사
-    const expectedStr = new Intl.NumberFormat('ko-KR').format(goldFromApi);
-    // 최소 하나의 UI 텍스트에 포함되어야 함
-    const uiText = (await page.content()) || '';
-    expect(uiText.includes(`${expectedStr}`)).toBeTruthy();
+  // 4) 간접 동기성 검증: API 수치와 UI 수치가 동일(혹은 await 직후 근사치)
+  expect(uiGoldNum).toBe(goldFromApi);
   });
 });

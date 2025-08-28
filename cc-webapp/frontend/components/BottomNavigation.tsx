@@ -175,13 +175,14 @@ export function BottomNavigation({ currentScreen, onNavigate }: BottomNavigation
         })}
       </div>
 
-      {/* Gold balance quick view */}
+  {/* Gold balance quick view */}
     {gold > 0 && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.2 }}
-          className="absolute top-1 right-2 bg-gradient-gold text-black px-2 py-1 rounded text-xs font-bold"
+      className="absolute top-1 right-2 bg-gradient-gold text-black px-2 py-1 rounded text-xs font-bold"
+      data-testid="gold-quick"
         >
       {gold.toLocaleString()}G
         </motion.div>
