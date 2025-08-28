@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Plus,
@@ -29,6 +29,8 @@ import { Badge } from '../ui/badge';
 import { Switch } from '../ui/switch';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
   import { Label } from '../ui/Label';
+import { api } from '@/lib/unifiedApi';
+import { useWithReconcile } from '@/lib/sync';
 
 interface ShopManagerProps {
   onAddNotification: (message: string) => void;
@@ -38,62 +40,43 @@ export function ShopManager({ onAddNotification }: ShopManagerProps) {
   const [shopItems, setShopItems] = useState([] as ShopItem[]);
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all' as string);
+  const [includeDeleted, setIncludeDeleted] = useState(false as boolean);
   const [showCreateModal, setShowCreateModal] = useState(false as boolean);
   const [editingItem, setEditingItem] = useState(null as ShopItem | null);
   const [isLoading, setIsLoading] = useState(false as boolean);
+  const withReconcile = useWithReconcile();
+  // Load products from backend
+  const load = useCallback(async () => {
+    try {
+      // GET /api/shop/admin/products?include_deleted=bool
+      const list = await api.get<any[]>(`shop/admin/products${includeDeleted ? '?include_deleted=true' : ''}`);
+      // Map backend → UI type
+      const mapped: ShopItem[] = (list || []).map((p: any) => {
+        const extra = p.extra || {};
+        return {
+          id: String(p.product_id || p.id || ''),
+          name: String(p.name || ''),
+          description: String(p.description || ''),
+          price: Number(p.price || 0),
+          category: String(extra.category || 'skin'),
+          rarity: String(extra.rarity || 'common'),
+          isActive: Boolean(p.is_active ?? (p.deleted_at ? false : true)),
+          stock: extra.stock !== undefined ? Number(extra.stock) : undefined,
+          discount: extra.discount !== undefined ? Number(extra.discount) : undefined,
+          icon: String(extra.icon || '📦'),
+          createdAt: p.created_at ? new Date(p.created_at) : new Date(),
+          updatedAt: p.updated_at ? new Date(p.updated_at) : new Date(),
+          sales: Number(p.sales || 0),
+          tags: Array.isArray(extra.tags) ? extra.tags : [],
+        } as ShopItem;
+      });
+      setShopItems(mapped);
+    } catch (e: any) {
+      onAddNotification(`상점 목록 로드 실패: ${e.message || e}`);
+    }
+  }, [onAddNotification, includeDeleted]);
 
-  // Mock shop items
-  useEffect(() => {
-    const mockItems: ShopItem[] = [
-      {
-        id: '1',
-        name: '골든 스킨 팩',
-        description: '화려한 골든 테마의 스킨 컬렉션',
-        price: 50000,
-        category: 'skin',
-        rarity: 'legendary',
-        isActive: true,
-        stock: 100,
-        discount: 20,
-        icon: '✨',
-        createdAt: new Date('2024-12-01'),
-        updatedAt: new Date('2024-12-30'),
-        sales: 234,
-        tags: ['golden', 'premium', 'limited']
-      },
-      {
-        id: '2',
-        name: '더블 경험치 부스터',
-        description: '1시간 동안 경험치 2배 획득',
-        price: 10000,
-        category: 'powerup',
-        rarity: 'rare',
-        isActive: true,
-        stock: 500,
-        icon: '⚡',
-        createdAt: new Date('2024-11-15'),
-        updatedAt: new Date('2024-12-28'),
-        sales: 567,
-        tags: ['boost', 'exp', 'temporary']
-      },
-      {
-        id: '3',
-        name: '럭키 코인',
-        description: '행운 확률을 일시적으로 증가시킵니다',
-        price: 25000,
-        category: 'powerup',
-        rarity: 'epic',
-        isActive: false,
-        stock: 50,
-        icon: '🍀',
-        createdAt: new Date('2024-12-20'),
-        updatedAt: new Date('2024-12-29'),
-        sales: 89,
-        tags: ['luck', 'rare', 'gambling']
-      }
-    ];
-    setShopItems(mockItems);
-  }, []);
+  useEffect(() => { load(); }, [load]);
 
   // Filter items
   const filteredItems = shopItems.filter((item: ShopItem) => {
@@ -102,50 +85,63 @@ export function ShopManager({ onAddNotification }: ShopManagerProps) {
                          item.tags.some((tag: string) => tag.toLowerCase().includes(searchQuery.toLowerCase()));
     
     const matchesCategory = categoryFilter === 'all' || item.category === categoryFilter;
-    
-    return matchesSearch && matchesCategory;
+    const matchesActive = includeDeleted ? true : item.isActive;
+    return matchesSearch && matchesCategory && matchesActive;
   });
 
   // Handle create/edit item
-  const handleSaveItem = async (itemData: Partial<ShopItem>) => {
+  const handleSaveItem = async (itemData: Partial<ShopItem> & { product_id?: string }) => {
     setIsLoading(true);
     
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
       if (editingItem) {
-        // Update existing item
-        setShopItems((prev: ShopItem[]) => prev.map((item: ShopItem) => 
-          item.id === editingItem.id 
-            ? { ...item, ...itemData, updatedAt: new Date() }
-            : item
-        ));
+        // PUT /api/shop/admin/products/{product_id}
+        await withReconcile(async () => {
+          await api.put(`shop/admin/products/${encodeURIComponent(editingItem.id)}`, {
+            name: itemData.name,
+            price: itemData.price,
+            description: itemData.description,
+            is_active: itemData.isActive,
+            extra: {
+              category: itemData.category,
+              rarity: itemData.rarity,
+              stock: itemData.stock,
+              discount: itemData.discount,
+              icon: itemData.icon,
+              tags: itemData.tags,
+            },
+          });
+          return {} as any;
+        });
         onAddNotification(`✅ "${itemData.name}" 아이템이 수정되었습니다.`);
       } else {
-        // Create new item
-        const newItem: ShopItem = {
-          id: Date.now().toString(),
-          name: itemData.name || '',
-          description: itemData.description || '',
-          price: itemData.price || 0,
-          category: itemData.category || 'skin',
-          rarity: itemData.rarity || 'common',
-          isActive: itemData.isActive ?? true,
-          stock: itemData.stock,
-          discount: itemData.discount,
-          icon: itemData.icon || '📦',
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          sales: 0,
-          tags: itemData.tags || []
-        };
-        
-  setShopItems((prev: ShopItem[]) => [newItem, ...prev]);
-        onAddNotification(`✅ "${newItem.name}" 아이템이 생성되었습니다.`);
+        // POST /api/shop/admin/products
+        if (!itemData.product_id || !itemData.name) {
+          throw new Error('product_id와 name은 필수입니다.');
+        }
+        await withReconcile(async () => {
+          await api.post(`shop/admin/products`, {
+            product_id: itemData.product_id,
+            name: itemData.name,
+            price: itemData.price ?? 0,
+            description: itemData.description,
+            extra: {
+              category: itemData.category,
+              rarity: itemData.rarity,
+              stock: itemData.stock,
+              discount: itemData.discount,
+              icon: itemData.icon,
+              tags: itemData.tags,
+            },
+          });
+          return {} as any;
+        });
+        onAddNotification(`✅ "${itemData.name}" 아이템이 생성되었습니다.`);
       }
-      
+
       setShowCreateModal(false);
       setEditingItem(null);
+      await load();
     } catch (error) {
       onAddNotification('❌ 아이템 저장에 실패했습니다.');
     } finally {
@@ -160,9 +156,11 @@ export function ShopManager({ onAddNotification }: ShopManagerProps) {
     setIsLoading(true);
     
     try {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-  setShopItems((prev: ShopItem[]) => prev.filter((item: ShopItem) => item.id !== itemId));
+      await withReconcile(async () => {
+        await api.del(`shop/admin/products/${encodeURIComponent(itemId)}`);
+        return {} as any;
+      });
+      await load();
       onAddNotification('🗑️ 아이템이 삭제되었습니다.');
     } catch (error) {
       onAddNotification('❌ 아이템 삭제에 실패했습니다.');
@@ -173,14 +171,29 @@ export function ShopManager({ onAddNotification }: ShopManagerProps) {
 
   // Toggle item active status
   const toggleItemStatus = async (itemId: string) => {
-    setShopItems((prev: ShopItem[]) => prev.map((item: ShopItem) => 
-      item.id === itemId 
-        ? { ...item, isActive: !item.isActive, updatedAt: new Date() }
-        : item
-    ));
-    
-    const item = shopItems.find((i: ShopItem) => i.id === itemId);
-    onAddNotification(`${item?.isActive ? '⏸️' : '▶️'} "${item?.name}" 상태가 변경되었습니다.`);
+    const target = shopItems.find((i: ShopItem) => i.id === itemId);
+    if (!target) return;
+    setIsLoading(true);
+    try {
+      // If currently active, soft delete; else restore
+      if (target.isActive) {
+        await withReconcile(async () => {
+          await api.del(`shop/admin/products/${encodeURIComponent(itemId)}`);
+          return {} as any;
+        });
+      } else {
+        await withReconcile(async () => {
+          await api.post(`shop/admin/products/${encodeURIComponent(itemId)}/restore`, {});
+          return {} as any;
+        });
+      }
+      await load();
+      onAddNotification(`${target.isActive ? '⏸️' : '▶️'} "${target.name}" 상태가 변경되었습니다.`);
+    } catch (e) {
+      onAddNotification('❌ 상태 변경에 실패했습니다.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // Get rarity color
@@ -330,6 +343,11 @@ export function ShopManager({ onAddNotification }: ShopManagerProps) {
             ))}
           </SelectContent>
         </Select>
+
+        <div className="flex items-center gap-2 pl-2">
+          <Switch checked={includeDeleted} onCheckedChange={setIncludeDeleted} />
+          <span className="text-sm text-muted-foreground">삭제/비활성 포함</span>
+        </div>
       </div>
 
       {/* Items Grid */}
@@ -473,6 +491,7 @@ function ItemModal({
   rarities 
 }: ItemModalProps) {
   const [formData, setFormData] = useState({
+  product_id: '',
     name: '',
     description: '',
     price: 0,
@@ -485,9 +504,20 @@ function ItemModal({
 
   useEffect(() => {
     if (editingItem) {
-      setFormData(editingItem);
+      // Map editing item to form (no product_id change allowed)
+      setFormData({
+        name: editingItem.name,
+        description: editingItem.description,
+        price: editingItem.price,
+        category: editingItem.category,
+        rarity: editingItem.rarity,
+        isActive: editingItem.isActive,
+        icon: editingItem.icon,
+        tags: editingItem.tags,
+      });
     } else {
       setFormData({
+        product_id: '',
         name: '',
         description: '',
         price: 0,
@@ -534,6 +564,18 @@ function ItemModal({
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {!editingItem && (
+                <div>
+                  <Label htmlFor="product_id">상품 ID (고유) *</Label>
+                  <Input
+                    id="product_id"
+                    value={(formData as any).product_id || ''}
+                    onChange={(e: any) => setFormData((prev: Partial<ShopItem>) => ({ ...prev, product_id: e.target.value as any }))}
+                    placeholder="ex) skin_gold_001"
+                    required
+                  />
+                </div>
+              )}
               <div>
                 <Label htmlFor="name">아이템 이름 *</Label>
                 <Input

@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useCallback, useMemo, useState } from "react";
-import apiRequest from "../../../utils/api";
+import { api as unifiedApi } from "@/lib/unifiedApi";
+import { useWithReconcile } from "@/lib/sync";
 import { Input } from "../../../components/ui/input";
 // 라벨 컴포넌트는 프로젝트에서 'Label.tsx' 대소문자로 사용 중
 import { Label } from "../../../components/ui/Label";
@@ -18,7 +19,8 @@ export default function AdminPointsPage() {
 	const [amount, setAmount] = useState("");
 	const [memo, setMemo] = useState("");
 	const [isSubmitting, setIsSubmitting] = useState(false);
-		const [result, setResult] = useState({ status: "idle" } as ResultState);
+	const [result, setResult] = useState({ status: "idle" } as ResultState);
+	const withReconcile = useWithReconcile();
 
 	const canSubmit = useMemo(() => {
 		const idOk = userId.trim().length > 0 && /^[0-9]+$/.test(userId.trim());
@@ -27,25 +29,24 @@ export default function AdminPointsPage() {
 		return idOk && amtOk && !isSubmitting;
 	}, [userId, amount, isSubmitting]);
 
-	const handleSubmit = useCallback(async () => {
+		const handleSubmit = useCallback(async () => {
 		if (!canSubmit) return;
 		setIsSubmitting(true);
 		setResult({ status: "idle" });
 		try {
 			const uid = userId.trim();
 			const amt = Number(amount);
-			const body = {
-				amount: amt,
-				// 백엔드 스키마와 일치: source_description 사용
-				source_description: memo?.trim() || "admin:points-grant",
-			};
+				const note = memo?.trim() || "admin:gold-grant";
+				const res: any = await withReconcile(async (idemKey: string) =>
+					unifiedApi.post(
+						`admin/users/${uid}/gold/grant`,
+						{ amount: amt, reason: note, idempotency_key: idemKey },
+						{ headers: { "X-Idempotency-Key": idemKey } }
+					)
+				);
 
-			const data = await apiRequest(`/api/admin/users/${uid}/tokens/add`, {
-				method: "POST",
-				body: JSON.stringify(body),
-			});
-
-			setResult({ status: "success", message: "포인트가 지급되었습니다." });
+				const rc = res?.receipt_code ? ` (영수증: ${res.receipt_code})` : "";
+				setResult({ status: "success", message: `골드 ${amt} 지급 완료${rc}` });
 			// 성공 후 폼 유지(감사 로그 용). 필요 시 초기화하려면 아래 주석 해제
 			// setUserId(""); setAmount(""); setMemo("");
 		} catch (err: any) {
@@ -54,7 +55,7 @@ export default function AdminPointsPage() {
 		} finally {
 			setIsSubmitting(false);
 		}
-	}, [canSubmit, userId, amount, memo]);
+		}, [canSubmit, userId, amount, memo, withReconcile]);
 
 	return (
 		<div className="min-h-[calc(100vh-4rem)] w-full px-4 py-6 md:px-8 lg:px-12">
@@ -117,10 +118,11 @@ export default function AdminPointsPage() {
 					</div>
 				</Card>
 
-				<div className="mt-6 text-xs text-muted-foreground">
-					  • 백엔드: POST /api/admin/users/{"{user_id}"}/tokens/add (관리자 전용)
-					<br />• 필수: amount(number) / 선택: source_description(string)
-				</div>
+								<div className="mt-6 text-xs text-muted-foreground">
+									{/* eslint-disable-next-line react/no-unescaped-entities */}
+									• 백엔드: POST /api/admin/users/{"{user_id}"}/gold/grant (관리자 전용, 멱등키 지원)
+									<br />• 필수: amount(number) / 선택: reason(string), idempotency_key(string)
+								</div>
 			</div>
 		</div>
 	);

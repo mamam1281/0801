@@ -4838,11 +4838,18 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ClaimRequest"
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/ClaimRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "200": {
