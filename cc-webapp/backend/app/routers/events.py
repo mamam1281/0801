@@ -36,7 +36,7 @@ def _metric(endpoint: str, action: str, status: str, auth: str):
 logger = logging.getLogger(__name__)
 
 # 이벤트 엔드포인트
-@router.get("/", response_model=List[EventResponse])
+@router.get("/", response_model=List[EventResponse], operation_id="events_list_active")
 async def get_active_events(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -74,7 +74,7 @@ class EventAdminCreate(EventCreate):
 class EventAdminUpdate(EventUpdate):
     pass
 
-@router.post("/admin", response_model=EventResponse)
+@router.post("/admin", response_model=EventResponse, operation_id="events_admin_create")
 async def admin_create_event(
     data: EventAdminCreate,
     current_user: User = Depends(get_current_user),
@@ -88,7 +88,7 @@ async def admin_create_event(
     db.refresh(ev)
     return ev
 
-@router.get("/admin/list", response_model=List[EventResponse])
+@router.get("/admin/list", response_model=List[EventResponse], operation_id="events_admin_list")
 async def admin_list_events(
     include_deleted: bool = Query(False),
     current_user: User = Depends(get_current_user),
@@ -102,7 +102,7 @@ async def admin_list_events(
         pass
     return q.order_by(Event.id.desc()).all()
 
-@router.put("/admin/{event_id}", response_model=EventResponse)
+@router.put("/admin/{event_id}", response_model=EventResponse, operation_id="events_admin_update")
 async def admin_update_event(
     event_id: int,
     data: EventAdminUpdate,
@@ -120,7 +120,7 @@ async def admin_update_event(
     db.refresh(ev)
     return ev
 
-@router.delete("/admin/{event_id}")
+@router.delete("/admin/{event_id}", operation_id="events_admin_soft_delete")
 async def admin_soft_delete_event(
     event_id: int,
     current_user: User = Depends(get_current_user),
@@ -139,7 +139,7 @@ async def admin_soft_delete_event(
     # return {"deleted": True, "deleted_at": ev.deleted_at}
     return {"message": "Soft delete temporarily disabled"}
 
-@router.post("/admin/{event_id}/restore")
+@router.post("/admin/{event_id}/restore", operation_id="events_admin_restore")
 async def admin_restore_event(
     event_id: int,
     current_user: User = Depends(get_current_user),
@@ -155,7 +155,7 @@ async def admin_restore_event(
     # db.commit()
     return {"message": "Restore temporarily disabled"}
 
-@router.get("/{event_id}", response_model=EventResponse)
+@router.get("/{event_id}", response_model=EventResponse, operation_id="events_get_detail")
 async def get_event_detail(
     event_id: int,
     current_user: User = Depends(get_current_user),
@@ -169,7 +169,7 @@ async def get_event_detail(
     _metric("events", "detail", "success", "y")
     return event
 
-@router.post("/join", response_model=EventParticipationResponse)
+@router.post("/join", response_model=EventParticipationResponse, operation_id="events_join")
 async def join_event(
     request: EventJoin,
     current_user: User = Depends(get_current_user),
@@ -186,7 +186,7 @@ async def join_event(
         _metric("events", "join", "error", "y")
         raise HTTPException(status_code=400, detail=str(e))
 
-@router.put("/progress/{event_id}", response_model=EventParticipationResponse)
+@router.put("/progress/{event_id}", response_model=EventParticipationResponse, operation_id="events_progress_update")
 async def update_event_progress(
     event_id: int,
     request: EventProgressUpdate,
@@ -204,7 +204,7 @@ async def update_event_progress(
         _metric("events", "progress", "error", "y")
         raise HTTPException(status_code=400, detail=str(e))
 
-@router.post("/claim/{event_id}", response_model=ClaimRewardResponse)
+@router.post("/claim/{event_id}", response_model=ClaimRewardResponse, operation_id="events_claim")
 async def claim_event_rewards(
     event_id: int,
     current_user: User = Depends(get_current_user),
@@ -235,7 +235,7 @@ async def claim_event_rewards(
         raise HTTPException(status_code=400, detail=str(e))
 
 # 미션 엔드포인트
-@router.get("/missions/daily", response_model=List[UserMissionResponse])
+@router.get("/missions/daily", response_model=List[UserMissionResponse], operation_id="missions_list_daily")
 async def get_daily_missions(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -251,7 +251,7 @@ async def get_daily_missions(
     _metric("missions", "list_daily", "success", "y")
     return missions
 
-@router.get("/missions/weekly", response_model=List[UserMissionResponse])
+@router.get("/missions/weekly", response_model=List[UserMissionResponse], operation_id="missions_list_weekly")
 async def get_weekly_missions(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -260,7 +260,7 @@ async def get_weekly_missions(
     _metric("missions", "list_weekly", "success", "y")
     return MissionService.get_user_missions(db, current_user.id, 'weekly')
 
-@router.get("/missions/all", response_model=List[UserMissionResponse])
+@router.get("/missions/all", response_model=List[UserMissionResponse], operation_id="missions_list_all")
 async def get_all_missions(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -269,7 +269,7 @@ async def get_all_missions(
     _metric("missions", "list_all", "success", "y")
     return MissionService.get_user_missions(db, current_user.id)
 
-@router.put("/missions/progress", response_model=Dict)
+@router.put("/missions/progress", response_model=Dict, operation_id="missions_progress_update")
 async def update_mission_progress(
     request: UserMissionProgress,
     current_user: User = Depends(get_current_user),
@@ -290,7 +290,7 @@ async def update_mission_progress(
         "missions": completed
     }
 
-@router.post("/missions/claim/{mission_id}", response_model=ClaimRewardResponse)
+@router.post("/missions/claim/{mission_id}", response_model=ClaimRewardResponse, operation_id="missions_claim")
 async def claim_mission_rewards(
     mission_id: int,
     current_user: User = Depends(get_current_user),

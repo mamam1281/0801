@@ -338,8 +338,6 @@ app.include_router(missions.router)  # 태그 오버라이드 제거 - 이미 mi
 
 # Management & Monitoring (MINIMAL FOR MVP)
 app.include_router(dashboard.router)  # ENABLED - dashboard for container environment
-from .routers import events as events_router
-app.include_router(events_router.router)  # ENABLED - events for container environment
 # app.include_router(notifications.router, tags=["Real-time Notifications"])  # DISABLED - WebSocket risk
 # app.include_router(notifications_sse_router)  # DISABLED - SSE complexity
 # app.include_router(notifications_api_router)  # DISABLED - notification complexity
