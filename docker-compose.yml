@@ -24,7 +24,7 @@ services:
       CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-}
       OLAP_BATCH_SIZE: ${OLAP_BATCH_SIZE:-200}
       OLAP_FLUSH_SECONDS: ${OLAP_FLUSH_SECONDS:-2}
-      CORS_ORIGINS: "http://localhost:3000,http://127.0.0.1:3000,https://localhost:3000,https://127.0.0.1:3000,http://localhost:40001,http://127.0.0.1:40001"
+      CORS_ORIGINS: "http://localhost:3000,http://127.0.0.1:3000,https://localhost:3000,https://127.0.0.1:3000,http://localhost:40001,http://127.0.0.1:40001,http://frontend:3000"
       AUTO_SEED_BASIC: "1"
     volumes:
       - ./cc-webapp/backend:/app
@@ -59,8 +59,8 @@ services:
         reservations:
           memory: 2G
     environment:
-      NEXT_PUBLIC_API_URL: "${NEXT_PUBLIC_API_URL:-http://localhost:8000}"
-      NEXT_PUBLIC_API_ORIGIN: "${NEXT_PUBLIC_API_ORIGIN:-http://localhost:8000}"
+      NEXT_PUBLIC_API_URL: "${NEXT_PUBLIC_API_URL:-http://backend:8000}"
+      NEXT_PUBLIC_API_ORIGIN: "${NEXT_PUBLIC_API_ORIGIN:-http://backend:8000}"
       NEXT_PUBLIC_API_URL_INTERNAL: "${NEXT_PUBLIC_API_URL_INTERNAL:-http://backend:8000}"
       NEXT_DISABLE_WEBPACK_CACHE: "1"
       NEXT_TELEMETRY_DISABLED: "1"
