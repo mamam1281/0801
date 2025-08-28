@@ -10,13 +10,13 @@ import { GlobalStoreProvider } from '@/store/globalStore';
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <GlobalStoreProvider>
-      <EnsureHydrated>
-        <RealtimeSyncProvider>
-          <ToastProvider>
+      <ToastProvider>
+        <EnsureHydrated>
+          <RealtimeSyncProvider>
             <FeedbackProvider>{children}</FeedbackProvider>
-          </ToastProvider>
-        </RealtimeSyncProvider>
-      </EnsureHydrated>
+          </RealtimeSyncProvider>
+        </EnsureHydrated>
+      </ToastProvider>
     </GlobalStoreProvider>
   );
 }

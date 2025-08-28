@@ -3,19 +3,38 @@ import { test, expect } from '@playwright/test';
 
 test.describe('WS→UI 반영 스모크', () => {
   test('홈 대시보드 GOLD가 /auth/me 및 /users/balance와 동기 유지(간접 검증)', async ({ page, request }) => {
+    // 0) 인증 시드: 신규 유저 등록 후 토큰을 번들 형태로 주입
+    const API = process.env.API_BASE_URL || 'http://localhost:8000';
+    const nickname = 'wsseed_' + Math.random().toString(36).slice(2, 8);
+    const reg = await request.post(`${API}/api/auth/register`, {
+      data: { nickname, invite_code: process.env.E2E_INVITE_CODE || '5858' }
+    });
+    expect(reg.ok()).toBeTruthy();
+    const { access_token, refresh_token } = await reg.json();
+    await page.addInitScript(([a, r]) => {
+      try { localStorage.setItem('cc_auth_tokens', JSON.stringify({ access_token: a, refresh_token: r || undefined })); } catch {}
+    }, access_token, refresh_token);
+
     // 1) 홈 접근
     await page.goto('/');
     // 2) 토큰이 있는 상태로 가정: 서버의 권위 값 조회
-    //    백엔드 베이스는 프록시/동일 오리진을 가정하여 상대 호출 사용 불가 → page 요청 기준으로 /api 프록시 사용
-    let authRes = await page.request.get('/api/auth/me');
+    //    주의: page.request는 브라우저 localStorage 기반의 인증을 자동으로 사용하지 않으므로
+    //    백엔드 API를 직접 호출하면서 Authorization 헤더를 명시한다.
+    let authRes = await request.get(`${API}/api/auth/me`, {
+      headers: { Authorization: `Bearer ${access_token}` }
+    });
     if (!authRes.ok()) {
-      // 초기 렌더 직후 번들/마이그레이션 타이밍 이슈 완화: 짧게 대기 후 1회 재시도
+      // 초기 렌더 직후 타이밍 이슈 완화: 짧게 대기 후 1회 재시도
       await page.waitForTimeout(300);
-      authRes = await page.request.get('/api/auth/me');
+      authRes = await request.get(`${API}/api/auth/me`, {
+        headers: { Authorization: `Bearer ${access_token}` }
+      });
     }
     expect(authRes.ok()).toBeTruthy();
     const me = await authRes.json();
-    const balRes = await page.request.get('/api/users/balance');
+    const balRes = await request.get(`${API}/api/users/balance`, {
+      headers: { Authorization: `Bearer ${access_token}` }
+    });
     const balJson = balRes.ok() ? await balRes.json() : {};
     const goldFromApi = Number(balJson?.gold ?? balJson?.gold_balance ?? balJson?.cyber_token_balance ?? me?.gold ?? me?.gold_balance ?? 0);
 
