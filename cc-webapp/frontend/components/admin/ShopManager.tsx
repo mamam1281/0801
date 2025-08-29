@@ -45,10 +45,14 @@ export function ShopManager({ onAddNotification }: ShopManagerProps) {
   const [editingItem, setEditingItem] = useState(null as ShopItem | null);
   const [isLoading, setIsLoading] = useState(false as boolean);
   const withReconcile = useWithReconcile();
+  // NOTE(2025-08-29): Admin Shop API 표준화
+  // - 프론트는 /api/shop/admin/products 네임스페이스를 기준으로 사용합니다.
+  // - 백엔드에는 /api/admin/shop/items 도 공존하나, 중복 제거 정책에 따라 폐기 예정 경로로 간주합니다.
+  // - 필드 스키마도 상이(AdminCatalogItem* vs products): 현재 컴포넌트는 products 스키마에 맞춰 동작합니다.
   // Load products from backend
   const load = useCallback(async () => {
     try {
-      // GET /api/shop/admin/products?include_deleted=bool
+      // GET /api/shop/admin/products?include_deleted=bool (표준)
       const list = await api.get<any[]>(`shop/admin/products${includeDeleted ? '?include_deleted=true' : ''}`);
       // Map backend → UI type
       const mapped: ShopItem[] = (list || []).map((p: any) => {

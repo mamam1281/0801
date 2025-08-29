@@ -99,6 +99,7 @@ export default function AdminPage() {
           onBack={()=>router.push('/')}
           onUpdateUser={()=>{}}
           onAddNotification={()=>{}}
+          navigate={(path)=>router.push(path)}
           coreStats={coreStats || undefined}
           loadingStats={loading}
           statsError={error}

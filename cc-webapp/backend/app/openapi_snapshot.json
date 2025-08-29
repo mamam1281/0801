@@ -1553,17 +1553,12 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/AdminCatalogItemOut"
-                  },
-                  "type": "array",
-                  "title": "Response Admin List Items Api Admin Shop Items Get"
-                }
+                "schema": {}
               }
             }
           }
         },
+        "deprecated": true,
         "security": [
           {
             "HTTPBearer": []
@@ -1591,9 +1586,7 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AdminCatalogItemOut"
-                }
+                "schema": {}
               }
             }
           },
@@ -1608,6 +1601,7 @@
             }
           }
         },
+        "deprecated": true,
         "security": [
           {
             "HTTPBearer": []
@@ -1622,6 +1616,7 @@
         ],
         "summary": "Admin Update Item",
         "operationId": "admin_update_item_api_admin_shop_items__item_id__put",
+        "deprecated": true,
         "security": [
           {
             "HTTPBearer": []
@@ -1653,9 +1648,7 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AdminCatalogItemOut"
-                }
+                "schema": {}
               }
             }
           },
@@ -1677,6 +1670,7 @@
         ],
         "summary": "Admin Delete Item",
         "operationId": "admin_delete_item_api_admin_shop_items__item_id__delete",
+        "deprecated": true,
         "security": [
           {
             "HTTPBearer": []
@@ -1722,6 +1716,7 @@
         ],
         "summary": "Admin Set Discount",
         "operationId": "admin_set_discount_api_admin_shop_items__item_id__discount_patch",
+        "deprecated": true,
         "security": [
           {
             "HTTPBearer": []
@@ -1753,9 +1748,7 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AdminCatalogItemOut"
-                }
+                "schema": {}
               }
             }
           },
@@ -1779,6 +1772,7 @@
         ],
         "summary": "Admin Set Rank",
         "operationId": "admin_set_rank_api_admin_shop_items__item_id__rank_patch",
+        "deprecated": true,
         "security": [
           {
             "HTTPBearer": []
@@ -1810,9 +1804,7 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AdminCatalogItemOut"
-                }
+                "schema": {}
               }
             }
           },
@@ -8375,80 +8367,6 @@
           "gold"
         ],
         "title": "AdminCatalogItemIn"
-      },
-      "AdminCatalogItemOut": {
-        "properties": {
-          "id": {
-            "type": "integer",
-            "title": "Id"
-          },
-          "sku": {
-            "type": "string",
-            "title": "Sku"
-          },
-          "name": {
-            "type": "string",
-            "title": "Name"
-          },
-          "price_cents": {
-            "type": "integer",
-            "title": "Price Cents"
-          },
-          "gold": {
-            "type": "integer",
-            "title": "Gold",
-            "description": "Amount of gold granted"
-          },
-          "gems": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Gems",
-            "description": "DEPRECATED: alias of gold - will be removed"
-          },
-          "discount_percent": {
-            "type": "integer",
-            "title": "Discount Percent",
-            "default": 0
-          },
-          "discount_ends_at": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Discount Ends At"
-          },
-          "min_rank": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Min Rank"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "sku",
-          "name",
-          "price_cents",
-          "gold"
-        ],
-        "title": "AdminCatalogItemOut"
       },
       "AdminDiscountPatch": {
         "properties": {

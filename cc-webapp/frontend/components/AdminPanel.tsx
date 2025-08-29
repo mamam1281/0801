@@ -38,6 +38,7 @@ interface AdminPanelProps {
   onBack: () => void;
   onUpdateUser: (user: User) => void;
   onAddNotification: (message: string) => void;
+  navigate?: (path: string) => void;
   coreStats?: {
     total_users: number;
     active_users: number;
@@ -63,7 +64,7 @@ interface QuickAction {
   onClick: () => void;
 }
 
-export function AdminPanel({ user, onBack, onUpdateUser, onAddNotification, coreStats, loadingStats, statsError }: AdminPanelProps) {
+export function AdminPanel({ user, onBack, onUpdateUser, onAddNotification, coreStats, loadingStats, statsError, navigate }: AdminPanelProps) {
   const [activeView, setActiveView] = useState(
     'menu' as 'menu' | 'dashboard' | 'users' | 'shop' | 'security' | 'system'
   );
@@ -91,7 +92,7 @@ export function AdminPanel({ user, onBack, onUpdateUser, onAddNotification, core
       bgClass: 'bg-gradient-to-r from-success to-info',
       shortcut: 'Ctrl+U',
       category: 'user',
-      onClick: () => setActiveView('users'),
+  onClick: () => navigate ? navigate('/admin/users') : setActiveView('users'),
     },
     {
       id: 'manage-users',
@@ -100,7 +101,7 @@ export function AdminPanel({ user, onBack, onUpdateUser, onAddNotification, core
       icon: Users,
       bgClass: 'bg-gradient-to-r from-primary to-primary-light',
       category: 'user',
-      onClick: () => setActiveView('users'),
+  onClick: () => navigate ? navigate('/admin/users') : setActiveView('users'),
     },
     {
       id: 'ban-management',
@@ -129,7 +130,7 @@ export function AdminPanel({ user, onBack, onUpdateUser, onAddNotification, core
       icon: Plus,
       bgClass: 'bg-gradient-to-r from-warning to-gold',
       category: 'shop',
-      onClick: () => setActiveView('shop'),
+  onClick: () => navigate ? navigate('/admin/shop') : setActiveView('shop'),
     },
     {
       id: 'manage-shop',
@@ -138,7 +139,7 @@ export function AdminPanel({ user, onBack, onUpdateUser, onAddNotification, core
       icon: ShoppingCart,
       bgClass: 'bg-gradient-to-r from-info to-primary',
       category: 'shop',
-      onClick: () => setActiveView('shop'),
+  onClick: () => navigate ? navigate('/admin/shop') : setActiveView('shop'),
     },
     {
       id: 'sales-analytics',
@@ -147,7 +148,7 @@ export function AdminPanel({ user, onBack, onUpdateUser, onAddNotification, core
       icon: BarChart3,
       bgClass: 'bg-gradient-to-r from-success to-warning',
       category: 'shop',
-      onClick: () => onAddNotification('📊 판매 분석 리포트를 생성중입니다.'),
+  onClick: () => navigate ? navigate('/admin/stats') : onAddNotification('📊 판매 분석 리포트를 생성중입니다.'),
     },
     {
       id: 'promotions',
@@ -156,7 +157,7 @@ export function AdminPanel({ user, onBack, onUpdateUser, onAddNotification, core
       icon: Percent,
       bgClass: 'bg-gradient-to-r from-error to-primary',
       category: 'shop',
-      onClick: () => onAddNotification('🏷️ 프로모션 설정 기능을 준비중입니다.'),
+  onClick: () => navigate ? navigate('/admin/campaigns') : onAddNotification('🏷️ 프로모션 설정 기능을 준비중입니다.'),
     },
 
     // 🛡️ 보안 관리
@@ -167,7 +168,7 @@ export function AdminPanel({ user, onBack, onUpdateUser, onAddNotification, core
       icon: AlertTriangle,
       bgClass: 'bg-gradient-to-r from-error to-error-soft',
       category: 'security',
-      onClick: () => setActiveView('security'),
+  onClick: () => setActiveView('security'),
     },
     {
       id: 'fraud-detection',
@@ -176,7 +177,7 @@ export function AdminPanel({ user, onBack, onUpdateUser, onAddNotification, core
       icon: Eye,
       bgClass: 'bg-gradient-to-r from-warning to-error',
       category: 'security',
-      onClick: () => setActiveView('security'),
+  onClick: () => setActiveView('security'),
     },
     {
       id: 'ip-management',
@@ -196,7 +197,7 @@ export function AdminPanel({ user, onBack, onUpdateUser, onAddNotification, core
       icon: Settings,
       bgClass: 'bg-gradient-metal',
       category: 'system',
-      onClick: () => setActiveView('system'),
+  onClick: () => setActiveView('system'),
     },
     {
       id: 'backup-restore',

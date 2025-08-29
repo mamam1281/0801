@@ -514,108 +514,54 @@ class AdminCatalogItemOut(BaseModel):
     class Config:
         allow_population_by_field_name = True
 
-@router.get("/shop/items", response_model=list[AdminCatalogItemOut])
+from fastapi.responses import RedirectResponse, JSONResponse
+
+DEPRECATION_MSG = {
+    "message": "This endpoint is deprecated. Please use /api/shop/admin/products* endpoints.",
+    "migration": {
+        "list": "/api/shop/admin/products",
+        "create": "/api/shop/admin/products",
+        "update": "/api/shop/admin/products/{product_id}",
+        "delete": "/api/shop/admin/products/{product_id}",
+        "restore": "/api/shop/admin/products/{product_id}/restore",
+        "discount": "Use PUT /api/shop/admin/products/{product_id} with extra.discount",
+        "rank": "Use PUT /api/shop/admin/products/{product_id} with extra.min_rank"
+    }
+}
+
+@router.get("/shop/items", deprecated=True)
 async def admin_list_items(admin_user = Depends(require_admin_access)):
-    items = []
-    for p in CatalogService.list_products():
-        items.append(AdminCatalogItemOut(
-            id=p.id,
-            sku=p.sku,
-            name=p.name,
-            price_cents=p.price_cents,
-                gold=p.gold,
-            discount_percent=p.discount_percent or 0,
-            discount_ends_at=p.discount_ends_at,
-            min_rank=p.min_rank,
-        ))
-    return items
+    # 307 preserves method/verb if clients follow redirect programmatically
+    return RedirectResponse(url="/api/shop/admin/products", status_code=307)
 
-@router.post("/shop/items", response_model=AdminCatalogItemOut)
+@router.post("/shop/items", deprecated=True)
 async def admin_create_item(body: AdminCatalogItemIn, admin_user = Depends(require_admin_access)):
-    if CatalogService.get_product(body.id):
-        raise HTTPException(status_code=400, detail="Product id already exists")
-    prod = Product(
-        id=body.id,
-        sku=body.sku,
-        name=body.name,
-        price_cents=body.price_cents,
-        gold=body.gold,
-        discount_percent=body.discount_percent or 0,
-        discount_ends_at=body.discount_ends_at,
-        min_rank=body.min_rank,
-    )
-    CatalogService._catalog[body.id] = prod  # noqa: SLF001
-    return AdminCatalogItemOut(**prod.__dict__)
+    return RedirectResponse(url="/api/shop/admin/products", status_code=307)
 
-@router.put("/shop/items/{item_id}", response_model=AdminCatalogItemOut)
+@router.put("/shop/items/{item_id}", deprecated=True)
 async def admin_update_item(item_id: int, body: AdminCatalogItemIn, admin_user = Depends(require_admin_access)):
-    if item_id != body.id:
-        raise HTTPException(status_code=400, detail="Path id and body id must match")
-    prod = CatalogService.get_product(item_id)
-    if not prod:
-        raise HTTPException(status_code=404, detail="Product not found")
-    new_prod = Product(
-        id=body.id,
-        sku=body.sku,
-        name=body.name,
-        price_cents=body.price_cents,
-        gold=body.gold,
-        discount_percent=body.discount_percent or 0,
-        discount_ends_at=body.discount_ends_at,
-        min_rank=body.min_rank,
-    )
-    CatalogService._catalog[item_id] = new_prod  # noqa: SLF001
-    return AdminCatalogItemOut(**new_prod.__dict__)
+    return RedirectResponse(url=f"/api/shop/admin/products/{item_id}", status_code=307)
 
-@router.delete("/shop/items/{item_id}")
+@router.delete("/shop/items/{item_id}", deprecated=True)
 async def admin_delete_item(item_id: int, admin_user = Depends(require_admin_access)):
-    if not CatalogService.get_product(item_id):
-        raise HTTPException(status_code=404, detail="Product not found")
-    del CatalogService._catalog[item_id]  # noqa: SLF001
-    return {"success": True}
+    return RedirectResponse(url=f"/api/shop/admin/products/{item_id}", status_code=307)
 
 class AdminDiscountPatch(BaseModel):
     discount_percent: int = Field(..., ge=0, le=100)
     discount_ends_at: Optional[datetime] = None
 
-@router.patch("/shop/items/{item_id}/discount", response_model=AdminCatalogItemOut)
+@router.patch("/shop/items/{item_id}/discount", deprecated=True)
 async def admin_set_discount(item_id: int, body: AdminDiscountPatch, admin_user = Depends(require_admin_access)):
-    prod = CatalogService.get_product(item_id)
-    if not prod:
-        raise HTTPException(status_code=404, detail="Product not found")
-    updated = Product(
-        id=prod.id,
-        sku=prod.sku,
-        name=prod.name,
-        price_cents=prod.price_cents,
-        gold=prod.gold,
-        discount_percent=body.discount_percent,
-        discount_ends_at=body.discount_ends_at,
-        min_rank=prod.min_rank,
-    )
-    CatalogService._catalog[item_id] = updated  # noqa: SLF001
-    return AdminCatalogItemOut(**updated.__dict__)
+    # No direct equivalent under products API; instruct clients to use PUT with extra fields
+    return JSONResponse(content=DEPRECATION_MSG, status_code=410)
 
 class AdminRankPatch(BaseModel):
     min_rank: Optional[str] = None
 
-@router.patch("/shop/items/{item_id}/rank", response_model=AdminCatalogItemOut)
+@router.patch("/shop/items/{item_id}/rank", deprecated=True)
 async def admin_set_rank(item_id: int, body: AdminRankPatch, admin_user = Depends(require_admin_access)):
-    prod = CatalogService.get_product(item_id)
-    if not prod:
-        raise HTTPException(status_code=404, detail="Product not found")
-    updated = Product(
-        id=prod.id,
-        sku=prod.sku,
-        name=prod.name,
-        price_cents=prod.price_cents,
-        gold=prod.gold,
-        discount_percent=prod.discount_percent or 0,
-        discount_ends_at=prod.discount_ends_at,
-        min_rank=body.min_rank,
-    )
-    CatalogService._catalog[item_id] = updated  # noqa: SLF001
-    return AdminCatalogItemOut(**updated.__dict__)
+    # No direct equivalent under products API; instruct clients to use PUT with extra fields
+    return JSONResponse(content=DEPRECATION_MSG, status_code=410)
 
 # API endpoints
 @router.get("/stats", response_model=AdminStatsResponse)
