@@ -63,7 +63,9 @@ export const API_ORIGIN = ORIGIN;
 const __env: any = (typeof process !== 'undefined' ? (process as any).env : undefined) || {};
 const __build = __env.NEXT_PUBLIC_BUILD_ID || 'dev';
 const __ctx = (typeof window === 'undefined') ? 'SSR' : 'CSR';
-console.log(`[unifiedApi] 초기화 - ctx=${__ctx} build=${__build} origin=${ORIGIN}`);
+if (__env.NEXT_PUBLIC_UNIFIEDAPI_LOG !== '0') {
+  console.log(`[unifiedApi] 초기화 - ctx=${__ctx} build=${__build} origin=${ORIGIN}`);
+}
 
 // 간단 UUIDv4 (라이브러리 무의존) - 멱등키 자동 주입용
 function __uuidv4() {
@@ -136,7 +138,8 @@ export async function apiCall<T=any>(path: string, opts: UnifiedRequestOptions<T
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const devLog = (typeof process !== 'undefined' ? (process as any).env?.NODE_ENV : 'development') !== 'production';
-    if (devLog && attempt === 0) {
+  const logEnabled = (__env.NEXT_PUBLIC_UNIFIEDAPI_LOG ?? '1') !== '0';
+    if (devLog && attempt === 0 && logEnabled) {
       console.groupCollapsed(`[unifiedApi] ${method} ${url}`);
       console.log('opts', { method, body, auth, retry });
       console.log('headers', finalHeaders);
@@ -174,8 +177,8 @@ export async function apiCall<T=any>(path: string, opts: UnifiedRequestOptions<T
         await new Promise(r=>setTimeout(r, delay));
         attempt++; continue;
       }
-      const errText = await response.text().catch(()=>`HTTP ${response.status}`);
-      console.error(`[unifiedApi] API 오류 - ${response.status} ${response.statusText}:`, errText);
+  const errText = await response.text().catch(()=>`HTTP ${response.status}`);
+  if (logEnabled) console.error(`[unifiedApi] API 오류 - ${response.status} ${response.statusText}:`, errText);
       throw new Error(`[unifiedApi] ${response.status} ${errText}`);
     }
 

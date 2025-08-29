@@ -31,6 +31,10 @@ module.exports = async () => {
     await waitForOk(api, 30_000);
   }
 
-  // Then frontend
-  await waitForOk(web, 60_000);
+  // Then frontend: prefer lightweight healthz if available
+  try {
+    await waitForOk(`${web}/healthz`, 60_000);
+  } catch (_) {
+    await waitForOk(web, 60_000);
+  }
 };

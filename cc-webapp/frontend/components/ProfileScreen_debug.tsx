@@ -12,7 +12,8 @@ interface ProfileScreenProps {
   onAddNotification: (message: string) => void;
 }
 
-export function ProfileScreen({ onBack, onAddNotification }: ProfileScreenProps) {
+// NOTE: 디버그 전용 컴포넌트 – 실제 화면(ProfileScreen)과 이름 충돌 방지를 위해 별도 이름 사용
+export function ProfileScreenDebug({ onBack, onAddNotification }: ProfileScreenProps) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -181,3 +182,5 @@ export function ProfileScreen({ onBack, onAddNotification }: ProfileScreenProps)
     </div>
   );
 }
+
+export default ProfileScreenDebug;

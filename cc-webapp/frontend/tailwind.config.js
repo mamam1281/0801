@@ -1,4 +1,16 @@
 /** @type {import('tailwindcss').Config} */
+// VSCode 확장에서 node_modules 미존재 시 require 실패를 무시하도록 안전 처리
+let animatePlugin = null;
+try {
+  // 컨테이너/CI에서는 정상 로드됨
+  animatePlugin = require("tailwindcss-animate");
+} catch (_) {
+  // 호스트(에디터)에서 의존성 부재 시 no-op 플러그인으로 대체하여 경고 억제
+  animatePlugin = function () {
+    return function () { /* no-op */ };
+  };
+}
+
 module.exports = {
   darkMode: ["class"],
   content: [
@@ -103,5 +115,5 @@ module.exports = {
       },
     },
   },
-  plugins: [require("tailwindcss-animate")],
+  plugins: [animatePlugin],
 }

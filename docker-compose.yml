@@ -78,8 +78,8 @@ services:
     restart: unless-stopped
     command: ["/usr/local/bin/start-dev"]
     healthcheck:
-      test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:3000',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))\""]
-      start_period: 45s
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:3000/healthz',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))\""]
+      start_period: 75s
       interval: 20s
       timeout: 5s
       retries: 5

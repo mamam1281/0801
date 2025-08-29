@@ -15,6 +15,7 @@ import { useGlobalStore } from '@/store/globalStore';
 import { validateNickname } from '@/utils/securityUtils';
 import { getTokens, setTokens } from '../utils/tokenStorage';
 import { useRealtimeProfile, useRealtimeStats } from '@/hooks/useRealtimeData';
+import ActionHistory from '@/components/profile/ActionHistory';
 
 interface ProfileScreenProps {
   onBack: () => void;
@@ -721,6 +722,16 @@ export function ProfileScreen({
                 </div>
               </div>
             </Card>
+          </motion.div>
+
+          {/* 세 번째 카드: 서버 권위 액션 이력 (페이지네이션) */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+          >
+            {/* 주의: WS recent_purchases는 경량 배지/알림용. 리스트는 반드시 서버 API 기반으로 표시해 중복/순서 오류 방지 */}
+            <ActionHistory pageSize={10} />
           </motion.div>
         </div>
       </div>

@@ -1,4 +1,5 @@
 // 전역 스토어 셀렉터 훅: 컴포넌트는 로컬 user state 대신 이 훅만 사용
+// 주의: 로컬 user 객체를 임의 변형하지 말 것. 항상 전역 스토어 업데이트/withReconcile 사용.
 "use client";
 
 import { useMemo } from "react";

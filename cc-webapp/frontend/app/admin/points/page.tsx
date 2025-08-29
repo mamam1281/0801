@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useState } from "react";
 import { api as unifiedApi } from "@/lib/unifiedApi";
 import { useWithReconcile } from "@/lib/sync";
 import { Input } from "../../../components/ui/input";
@@ -22,12 +22,12 @@ export default function AdminPointsPage() {
 	const [result, setResult] = useState({ status: "idle" } as ResultState);
 	const withReconcile = useWithReconcile();
 
-	const canSubmit = useMemo(() => {
-		const idOk = userId.trim().length > 0 && /^[0-9]+$/.test(userId.trim());
-		const amtNum = Number(amount);
-		const amtOk = !Number.isNaN(amtNum) && Number.isFinite(amtNum) && amtNum > 0;
-		return idOk && amtOk && !isSubmitting;
-	}, [userId, amount, isSubmitting]);
+	// Compute validity inline to avoid any potential memoization edge cases in CI/Playwright
+	// 즉시 계산 방식으로 전환하여 하이드레이션/렌더 타이밍에 따른 메모이제이션 엣지 케이스 회피
+	const idOk = /^\d+$/.test(userId.trim());
+	const amtNum = Number(amount.trim());
+	const amtOk = !Number.isNaN(amtNum) && amtNum > 0;
+	const canSubmit = idOk && amtOk && !isSubmitting;
 
 		const handleSubmit = useCallback(async () => {
 		if (!canSubmit) return;
@@ -71,31 +71,37 @@ export default function AdminPointsPage() {
 					<div className="grid grid-cols-1 gap-4 md:grid-cols-2">
 						<div className="flex flex-col gap-2">
 							<Label htmlFor="user_id">사용자 ID</Label>
-											<Input
+							<Input
 								id="user_id"
+								type="text"
 								inputMode="numeric"
 								placeholder="예) 123"
 								value={userId}
-												onChange={(e: any) => setUserId((e.target as HTMLInputElement).value)}
+								onChange={(e: any) => setUserId((e.target as HTMLInputElement).value)}
+								onInput={(e: any) => setUserId((e.target as HTMLInputElement).value)}
 							/>
 						</div>
 						<div className="flex flex-col gap-2">
 							<Label htmlFor="amount">지급 수량</Label>
-											<Input
+							<Input
 								id="amount"
+								type="text"
 								inputMode="decimal"
 								placeholder="예) 100"
 								value={amount}
-												onChange={(e: any) => setAmount((e.target as HTMLInputElement).value)}
+								onChange={(e: any) => setAmount((e.target as HTMLInputElement).value)}
+								onInput={(e: any) => setAmount((e.target as HTMLInputElement).value)}
 							/>
 						</div>
 						<div className="md:col-span-2 flex flex-col gap-2">
 							<Label htmlFor="memo">메모(선택)</Label>
-											<Input
+							<Input
 								id="memo"
+								type="text"
 								placeholder="감사/출처 등 간단 메모"
 								value={memo}
-												onChange={(e: any) => setMemo((e.target as HTMLInputElement).value)}
+								onChange={(e: any) => setMemo((e.target as HTMLInputElement).value)}
+								onInput={(e: any) => setMemo((e.target as HTMLInputElement).value)}
 							/>
 						</div>
 					</div>
