@@ -63,7 +63,17 @@ export const API_ORIGIN = ORIGIN;
 const __env: any = (typeof process !== 'undefined' ? (process as any).env : undefined) || {};
 const __build = __env.NEXT_PUBLIC_BUILD_ID || 'dev';
 const __ctx = (typeof window === 'undefined') ? 'SSR' : 'CSR';
-if (__env.NEXT_PUBLIC_UNIFIEDAPI_LOG !== '0') {
+// 런타임 로컬스토리지 게이트(테스트 용도): localStorage.UNIFIEDAPI_LOG === '0' 이면 로그 억제
+function __logGateEnabled(): boolean {
+  try {
+    if (typeof window !== 'undefined') {
+      const ls = window.localStorage?.getItem('UNIFIEDAPI_LOG');
+      if (ls === '0') return false;
+    }
+  } catch {}
+  return (__env.NEXT_PUBLIC_UNIFIEDAPI_LOG ?? '1') !== '0';
+}
+if (__logGateEnabled()) {
   console.log(`[unifiedApi] 초기화 - ctx=${__ctx} build=${__build} origin=${ORIGIN}`);
 }
 
@@ -138,7 +148,7 @@ export async function apiCall<T=any>(path: string, opts: UnifiedRequestOptions<T
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const devLog = (typeof process !== 'undefined' ? (process as any).env?.NODE_ENV : 'development') !== 'production';
-  const logEnabled = (__env.NEXT_PUBLIC_UNIFIEDAPI_LOG ?? '1') !== '0';
+  const logEnabled = __logGateEnabled();
     if (devLog && attempt === 0 && logEnabled) {
       console.groupCollapsed(`[unifiedApi] ${method} ${url}`);
       console.log('opts', { method, body, auth, retry });
