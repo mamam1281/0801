@@ -1,20 +1,21 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, Page } from '@playwright/test';
 
 // 이 스펙은 unifiedApi의 401→refresh, 429/5xx 백오프 재시도, 로그 억제를 간단히 검증합니다.
 // 주의: 서버 측에서 의도적 429/500을 내는 테스트 엔드포인트가 없다면 이 스펙은 스킵됩니다.
 
 const API = process.env.API_BASE_URL || 'http://localhost:8000';
 
-async function setLogGateOff(page) {
+async function setLogGateOff(page: Page) {
   await page.addInitScript(() => {
     try { localStorage.setItem('UNIFIEDAPI_LOG', '0'); } catch {}
   });
 }
 
 // 임시 테스트 엔드포인트 존재 여부 확인
-async function checkEndpoint(page, path: string) {
+async function checkEndpoint(page: Page, path: string) {
   const res = await page.request.get(`${API}${path}`);
-  return res.status() < 500; // 404 포함 시 false를 줄 수 있으나, 동작 상 가볍게 허용
+  // 실제 테스트 엔드포인트는 2xx 여야 "존재"로 간주
+  return res.status() >= 200 && res.status() < 300;
 }
 
 // 1) 401 → refresh 플로우는 기존 스펙에 포함되어 있다고 가정(여기선 smoke)

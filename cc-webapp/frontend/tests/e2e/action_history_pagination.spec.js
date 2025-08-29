@@ -3,7 +3,21 @@ const { test, expect } = require('@playwright/test');
 test.describe('Action history pagination', () => {
   test('navigates pages without duplication and shows controls state', async ({ page }) => {
     const base = process.env.BASE_URL || 'http://frontend:3000';
+    const API = process.env.API_BASE_URL || 'http://localhost:8000';
+
+    // 0) 인증 시드: 신규 유저 등록 후 토큰을 번들 형태로 주입
+    const nickname = 'histjs_' + Math.random().toString(36).slice(2, 8);
+    const reg = await page.request.post(`${API}/api/auth/register`, {
+      data: { nickname, invite_code: process.env.E2E_INVITE_CODE || '5858' }
+    });
+    expect(reg.ok()).toBeTruthy();
+    const { access_token, refresh_token } = await reg.json();
+    await page.addInitScript(([a, r]) => {
+      try { localStorage.setItem('cc_auth_tokens', JSON.stringify({ access_token: a, refresh_token: r || undefined })); } catch {}
+    }, access_token, refresh_token);
+
     await page.goto(base);
+    await page.waitForTimeout(200);
 
     // 하단 탭으로 프로필 진입
     await page.getByText('프로필').first().click();
