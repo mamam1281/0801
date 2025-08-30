@@ -80,6 +80,7 @@ export function BottomNavigation({ currentScreen, onNavigate }: BottomNavigation
       animate={{ y: 0 }}
       transition={{ duration: 0.3 }}
       className="fixed bottom-0 left-0 right-0 z-50 bg-black/95 backdrop-blur-lg border-t border-primary/20"
+      data-testid="bottom-navigation"
     >
       {/* VIP Status Bar */}
   {level >= 10 && (
@@ -100,6 +101,7 @@ export function BottomNavigation({ currentScreen, onNavigate }: BottomNavigation
               whileTap={{ scale: 0.95 }}
               onClick={item.action}
               className="flex flex-col items-center justify-center p-2 rounded-lg relative min-w-[60px] btn-hover-lift"
+              data-testid={`nav-${item.id}`}
             >
               {/* Active indicator */}
               {isActive && !item.isExternal && (

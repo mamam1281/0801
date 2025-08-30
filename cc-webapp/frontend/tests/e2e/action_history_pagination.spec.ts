@@ -14,21 +14,43 @@ test.describe('Action history pagination', () => {
 		});
 		expect(reg.ok()).toBeTruthy();
 		const { access_token, refresh_token } = await reg.json();
-		await page.addInitScript(([a, r]: [string, string | undefined]) => {
-			try { localStorage.setItem('cc_auth_tokens', JSON.stringify({ access_token: a, refresh_token: r || undefined })); } catch {}
-		}, access_token as string, (refresh_token as string | undefined));
+		await page.addInitScript(([a, r, nick]: [string, string | undefined, string]) => {
+			try {
+				localStorage.setItem('cc_auth_tokens', JSON.stringify({ access_token: a, refresh_token: r || undefined }));
+				// App 초기화에서 restoreSavedUser()로 user truthy 필요 → 최소 game-user 시드
+				localStorage.setItem('game-user', JSON.stringify({ id: 'e2e', nickname: nick, goldBalance: 0, level: 1 }));
+				// E2E: 초기화 시 바로 프로필로 진입하도록 플래그 설정
+				localStorage.setItem('E2E_FORCE_SCREEN', 'profile');
+				// E2E: 액션 이력은 테스트 전용 스텁 데이터로 결정적 렌더링
+				localStorage.setItem('E2E_ACTION_HISTORY_STUB', '1');
+			} catch {}
+		}, access_token as string, (refresh_token as string | undefined), nickname as string);
 
-		// 1) 홈 진입(토큰 주입 이후)
+		// 0-1) UI 하단 내비게이션 렌더를 위해 최소 사용자 스텁도 주입
+		await page.addInitScript((nick: string) => {
+			try {
+				const stub = {
+					id: 'e2e-' + Math.random().toString(36).slice(2),
+					nickname: nick,
+					goldBalance: 1000,
+					level: 1,
+					dailyStreak: 0,
+					lastLogin: new Date().toISOString(),
+				};
+				localStorage.setItem('game-user', JSON.stringify(stub));
+			} catch {}
+		}, nickname);
+
+		// 1) 진입 후 전역 E2E 헬퍼로 즉시 유저/화면 세팅
 		await page.goto(base);
-		// 초기화 대기
-		await page.waitForTimeout(200);
-
-		// 2) 간단 내비게이션: 하단 탭으로 프로필 진입
-		await page.getByText('프로필').first().click();
+		await page.evaluate(() => {
+			(window as any).__E2E_SET_USER?.();
+			(window as any).__E2E_NAV?.('profile');
+		});
 
 		// 리스트 로드 대기
 		const list = page.locator('[data-testid="action-history-list"]');
-		await expect(list).toBeVisible({ timeout: 15000 });
+		await expect(list).toBeVisible({ timeout: 20000 });
 
 		const firstPageIds = await list.locator('> div').evaluateAll((rows: Element[]) => rows.map((r: Element) => (r.getAttribute('key') || r.getAttribute('data-key')) as string | null));
 

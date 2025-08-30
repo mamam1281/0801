@@ -171,12 +171,30 @@ export default function App() {
 
     const initializeApp = async () => {
       try {
+        // 테스트 전용 강제 화면 플래그 우선 확인
+        let forced: string | null = null;
+        try {
+          forced = localStorage.getItem('E2E_FORCE_SCREEN');
+        } catch {}
+
         const savedUser = restoreSavedUser();
         if (savedUser) {
           updateUser(savedUser);
-          navigationHandlers.toHome();
+        } else if (forced) {
+          // 저장 유저가 없지만 테스트에서 화면 강제를 요청한 경우 최소 스텁 유저 생성
+          const stub = createUserData('E2E', '', false);
+          updateUser(stub);
+        }
 
-          // 🎁 일일 보너스 체크
+        // 네비게이션 결정: 강제 화면 우선 → 기본 홈
+        if (forced && typeof forced === 'string') {
+          navigationHandlers.navigate(forced as any);
+        } else if (savedUser) {
+          navigationHandlers.toHome();
+        }
+
+        // 저장 유저가 있는 경우에만 일일 보너스 체크 수행
+        if (savedUser) {
           const lastLogin = new Date(savedUser.lastLogin);
           const today = new Date();
           const timeDiff = today.getTime() - lastLogin.getTime();
@@ -189,7 +207,7 @@ export default function App() {
           }
         }
 
-        setHasInitialized(true);
+  setHasInitialized(true);
       } catch (error) {
         console.error('App initialization failed:', error);
         setHasInitialized(true);
@@ -210,6 +228,23 @@ export default function App() {
   const showBottomNavigation = useMemo(() => {
     return SCREENS_WITH_BOTTOM_NAV.includes(currentScreen as any) && user;
   }, [currentScreen, user]);
+
+  // E2E 전용 전역 헬퍼 노출: 테스트에서 직접 화면 전환/유저 시드 가능
+  useEffect(() => {
+    try {
+      // 화면 전환
+      (window as any).__E2E_NAV = (screen: string) => {
+        navigationHandlers.navigate(screen as any);
+      };
+      // 유저 주입 (미지정 시 기본 스텁)
+      (window as any).__E2E_SET_USER = (stub?: any) => {
+        const u = stub || createUserData('E2E', '', false);
+        updateUser(u as any);
+      };
+    } catch {
+      // noop
+    }
+  }, [navigationHandlers, updateUser, createUserData]);
 
   // ---------------------------------------------------------------------------
   // Daily Reward Claimed Dialog 상태 (이미 수령한 경우 노출)

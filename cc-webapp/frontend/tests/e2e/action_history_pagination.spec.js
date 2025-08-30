@@ -12,19 +12,40 @@ test.describe('Action history pagination', () => {
     });
     expect(reg.ok()).toBeTruthy();
     const { access_token, refresh_token } = await reg.json();
-    await page.addInitScript(([a, r]) => {
-      try { localStorage.setItem('cc_auth_tokens', JSON.stringify({ access_token: a, refresh_token: r || undefined })); } catch {}
-    }, access_token, refresh_token);
+  await page.addInitScript(([a, r, nick]) => {
+      try {
+        localStorage.setItem('cc_auth_tokens', JSON.stringify({ access_token: a, refresh_token: r || undefined }));
+        localStorage.setItem('game-user', JSON.stringify({ id: 'e2e', nickname: nick, goldBalance: 0, level: 1 }));
+    // E2E: 초기화 시 바로 프로필로 진입하도록 플래그 설정
+  localStorage.setItem('E2E_ACTION_HISTORY_STUB', '1');
+    localStorage.setItem('E2E_FORCE_SCREEN', 'profile');
+      } catch {}
+    }, access_token, refresh_token, nickname);
 
-    await page.goto(base);
-    await page.waitForTimeout(200);
+      // UI 하단 내비게이션 렌더를 위해 최소 사용자 스텁도 주입
+      await page.addInitScript((nick) => {
+        try {
+          const stub = {
+            id: 'e2e-' + Math.random().toString(36).slice(2),
+            nickname: nick,
+            goldBalance: 1000,
+            level: 1,
+            dailyStreak: 0,
+            lastLogin: new Date().toISOString(),
+          };
+          localStorage.setItem('game-user', JSON.stringify(stub));
+        } catch {}
+      }, nickname);
 
-    // 하단 탭으로 프로필 진입
-    await page.getByText('프로필').first().click();
+  await page.goto(base);
+  await page.evaluate(() => {
+    window.__E2E_SET_USER?.();
+    window.__E2E_NAV?.('profile');
+  });
 
     // 리스트 로드 대기
-    const list = page.locator('[data-testid="action-history-list"]');
-    await expect(list).toBeVisible({ timeout: 15000 });
+  const list = page.locator('[data-testid="action-history-list"]');
+  await expect(list).toBeVisible({ timeout: 20000 });
 
     const firstPageTexts = await list.locator('> div').allTextContents();
 

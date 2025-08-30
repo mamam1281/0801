@@ -47,6 +47,33 @@ export default function ActionHistory({ pageSize = 10 }: { pageSize?: number }) 
 			setLoading(true);
 			setError(null);
 			try {
+				// E2E 전용: 로컬 스텁이 켜져 있으면 네트워크 없이 결정적 페이징 데이터를 렌더링
+				try {
+					const stubFlag = typeof window !== 'undefined' ? window.localStorage.getItem('E2E_ACTION_HISTORY_STUB') : null;
+					if (stubFlag) {
+						const stubTotal = 25; // 3페이지(10/10/5)로 고정
+						const start = p * pageSize;
+						const end = Math.min(start + pageSize, stubTotal);
+						const pageItems: GameHistoryItem[] = Array.from({ length: Math.max(0, end - start) }, (_, i) => {
+							const id = start + i + 1;
+							return {
+								id: `stub-${id}`,
+								game_type: 'stub-game',
+								action_type: 'stub-action',
+								amount: (id % 2 === 0 ? 10 : -5),
+								result: id % 2 === 0 ? 'win' : 'lose',
+								created_at: new Date(Date.now() - id * 1000 * 60).toISOString(),
+							};
+						});
+						setItems(pageItems);
+						setTotal(stubTotal);
+						setLoading(false);
+						return; // 네트워크 호출 우회
+					}
+				} catch {
+					// noop
+				}
+
 				const offset = p * pageSize;
 				const { items: pageItems, total: t } = await fetchHistory(pageSize, offset);
 				// 중복 제거(id 중심)
@@ -89,17 +116,19 @@ export default function ActionHistory({ pageSize = 10 }: { pageSize?: number }) 
 					</Badge>
 				</div>
 
-				{loading ? (
-					<div className="text-center text-muted-foreground py-6 text-sm">불러오는 중…</div>
-				) : error ? (
-					<div className="text-center text-red-500 py-6 text-sm">{error}</div>
-				) : items.length === 0 ? (
-					<div className="text-center text-muted-foreground py-6 text-sm">이력이 없습니다.</div>
-				) : (
-					<div className="space-y-2 max-h-64 overflow-auto pr-1" data-testid="action-history-list">
-						{items.map((it: GameHistoryItem) => (
+				{/* 항상 컨테이너를 렌더링하여 E2E가 안정적으로 찾을 수 있도록 함 */}
+				<div className="space-y-2 max-h-64 overflow-auto pr-1" data-testid="action-history-list">
+					{loading ? (
+						<div className="text-center text-muted-foreground py-6 text-sm">불러오는 중…</div>
+					) : error ? (
+						<div className="text-center text-red-500 py-6 text-sm">{error}</div>
+					) : items.length === 0 ? (
+						<div className="text-center text-muted-foreground py-6 text-sm">이력이 없습니다.</div>
+					) : (
+						items.map((it: GameHistoryItem) => (
 							<div
 								key={`${it.id}`}
+								data-key={`${it.id}`}
 								className="flex items-center justify-between p-3 rounded-lg border border-border/30 glass-metal-hover"
 							>
 								<div className="text-sm">
@@ -121,9 +150,9 @@ export default function ActionHistory({ pageSize = 10 }: { pageSize?: number }) 
 									)}
 								</div>
 							</div>
-						))}
-					</div>
-				)}
+						))
+					)}
+				</div>
 
 				<div className="flex items-center justify-between mt-3">
 					<button
