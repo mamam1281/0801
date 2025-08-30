@@ -446,7 +446,7 @@ export function ProfileScreen({
   const displayTotalWins = (rtTotals.totalWins ?? 0) || (stats?.total_wins ?? 0) || 0;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-black/95 to-primary/5 relative">
+    <div className="min-h-screen bg-gradient-to-br from-background via-black/95 to-primary/5 relative" data-testid="profile-screen">
       {/* 배경 효과 */}
       <div className="absolute inset-0 bg-gradient-to-br from-transparent via-primary/3 to-gold/5 pointer-events-none" />
 

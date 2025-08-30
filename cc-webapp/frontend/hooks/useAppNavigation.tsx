@@ -2,7 +2,18 @@ import { useState, useCallback } from 'react';
 import { AppScreen } from '../types';
 
 export function useAppNavigation() {
-  const [currentScreen, setCurrentScreen] = useState('loading' as AppScreen);
+  // E2E: 초기 화면을 로컬 스토리지 플래그로 강제 가능
+  const initialScreen = (() => {
+    try {
+      if (typeof window !== 'undefined') {
+        const forced = window.localStorage.getItem('E2E_FORCE_SCREEN');
+        if (forced) return forced as AppScreen;
+      }
+    } catch {/* noop */}
+    return 'loading' as AppScreen;
+  })();
+
+  const [currentScreen, setCurrentScreen] = useState(initialScreen);
   const [isSideMenuOpen, setIsSideMenuOpen] = useState(false);
 
   // 🎯 네비게이션 핸들러
