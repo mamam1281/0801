@@ -1,0 +1,4 @@
+services:
+  playwright:
+    environment:
+      E2E_REALTIME_DEEP: "1"
