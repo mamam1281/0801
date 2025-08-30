@@ -5,6 +5,7 @@ services:
       dockerfile: Dockerfile
     container_name: cc_backend
     environment:
+      ENVIRONMENT: "${ENVIRONMENT:-development}"
       PYTHONPATH: /app
       POSTGRES_SERVER: postgres
       POSTGRES_USER: cc_user
