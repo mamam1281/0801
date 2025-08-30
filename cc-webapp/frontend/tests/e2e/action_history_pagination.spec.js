@@ -37,11 +37,8 @@ test.describe('Action history pagination', () => {
         } catch {}
       }, nickname);
 
-  await page.goto(base);
-  await page.evaluate(() => {
-    window.__E2E_SET_USER?.();
-    window.__E2E_NAV?.('profile');
-  });
+  await page.goto(base + '/e2e/profile');
+  await expect(page.getByTestId('profile-screen')).toBeVisible({ timeout: 20000 });
 
     // 리스트 로드 대기
   const list = page.locator('[data-testid="action-history-list"]');

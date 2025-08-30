@@ -42,11 +42,9 @@ test.describe('Action history pagination', () => {
 		}, nickname);
 
 		// 1) 진입 후 전역 E2E 헬퍼로 즉시 유저/화면 세팅
-		await page.goto(base);
-		await page.evaluate(() => {
-			(window as any).__E2E_SET_USER?.();
-			(window as any).__E2E_NAV?.('profile');
-		});
+		await page.goto(base + '/e2e/profile');
+		// 프로필 화면 렌더 대기
+		await expect(page.getByTestId('profile-screen')).toBeVisible({ timeout: 20000 });
 
 		// 리스트 로드 대기
 		const list = page.locator('[data-testid="action-history-list"]');
