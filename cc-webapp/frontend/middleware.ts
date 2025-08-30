@@ -1,4 +1,7 @@
+// 에디터 타입 오류 회피: 로컬에서 node_modules 미설치 시 타입 선언 경고가 날 수 있어 무시 처리
+// @ts-ignore
 import type { NextRequest } from 'next/server';
+// @ts-ignore
 import { NextResponse } from 'next/server';
 
 // 기본 미들웨어: 통과 시키되 명시적으로 Response를 반환하여 런타임 오류를 방지합니다.

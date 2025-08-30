@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Action history pagination', () => {
-	test('navigates pages without duplication and shows controls state', async ({ page }) => {
+	test('navigates pages without duplication and shows controls state', async ({ page }: { page: import('@playwright/test').Page }) => {
 		const base = process.env.BASE_URL || 'http://frontend:3000';
 
 		// 0) 인증 시드: 신규 유저 등록 후 토큰을 번들 형태로 주입

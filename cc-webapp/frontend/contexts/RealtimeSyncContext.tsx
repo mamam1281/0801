@@ -769,15 +769,8 @@ export function useRealtimeSync(): RealtimeSyncContextType {
     // Provider 마운트 후 실행되며, 토큰 존재+사용자 존재 시 한번만 실행한다.
     let ran = false;
     const tryKick = () => {
-      try {
-        // 동적으로 훅을 가져와 컨텍스트에 접근 (런타임 시점)
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
-        const mod = require('./RealtimeSyncContext');
-        if (!mod || typeof mod.useRealtimeSync !== 'function') return;
-        const hook = mod.useRealtimeSync as () => RealtimeSyncContextType;
-        // 훅은 리액트 함수 컴포넌트 안에서만 호출 가능하므로, 대신 Provider 내부에서 보장된 refresh 함수에 의존
-        // 여기서는 직접 호출하지 않고, 아래 setTimeout을 통해 컴포넌트 트리 내에서 한번 더 지연시켜 사용자가 트리거하도록 유도
-      } catch {}
+      // 브라우저 번들에서 require 사용을 제거하여 타입 오류 회피.
+      // 실제 초기화 트리거는 아래 CustomEvent로 대체한다.
     };
     // 첫 페인트 직후 한 틱 지연
     setTimeout(() => {

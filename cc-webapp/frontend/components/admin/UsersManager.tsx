@@ -37,13 +37,13 @@ interface UsersManagerProps {
 }
 
 export function UsersManager({ onAddNotification }: UsersManagerProps) {
-  const [items, setItems] = useState<UserSummary[]>([]);
+  const [items, setItems] = useState([] as UserSummary[]);
   const [search, setSearch] = useState('');
   const [skip, setSkip] = useState(0);
   const [limit] = useState(20);
   const [loading, setLoading] = useState(false);
-  const [selected, setSelected] = useState<UserDetail | null>(null);
-  const [logs, setLogs] = useState<AdminLog[]>([]);
+  const [selected, setSelected] = useState(null as UserDetail | null);
+  const [logs, setLogs] = useState([] as AdminLog[]);
   const [rankInput, setRankInput] = useState('');
 
   const load = useCallback(async () => {
@@ -53,8 +53,8 @@ export function UsersManager({ onAddNotification }: UsersManagerProps) {
       q.set('skip', String(skip));
       q.set('limit', String(limit));
       if (search.trim()) q.set('search', search.trim());
-      const list = await api.get<UserSummary[]>(`admin/users?${q.toString()}`);
-      setItems(list || []);
+  const list = (await api.get(`admin/users?${q.toString()}`)) as UserSummary[];
+  setItems(list || []);
     } catch (e: any) {
       onAddNotification(`사용자 목록 로드 실패: ${e?.message || e}`);
     } finally {
@@ -66,12 +66,12 @@ export function UsersManager({ onAddNotification }: UsersManagerProps) {
 
   const selectUser = useCallback(async (u: UserSummary) => {
     try {
-      const d = await api.get<UserDetail>(`admin/users/${u.id}`);
+  const d = (await api.get(`admin/users/${u.id}`)) as UserDetail;
       setSelected(d);
       setRankInput(d.user_rank || '');
       try {
-        const lg = await api.get<AdminLog[]>(`admin/users/${u.id}/logs?limit=50`);
-        setLogs(lg || []);
+  const lg = (await api.get(`admin/users/${u.id}/logs?limit=50`)) as AdminLog[];
+  setLogs(lg || []);
       } catch { setLogs([]); }
     } catch (e: any) {
       onAddNotification(`사용자 상세 로드 실패: ${e?.message || e}`);
@@ -138,7 +138,7 @@ export function UsersManager({ onAddNotification }: UsersManagerProps) {
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              {items.map(u => (
+              {items.map((u: UserSummary) => (
                 <button key={u.id} onClick={()=>selectUser(u)} className={`w-full text-left p-3 rounded border border-border-secondary hover:bg-secondary/30 ${selected?.id===u.id ? 'bg-secondary/40' : ''}`}>
                   <div className="flex items-center justify-between">
                     <div className="font-medium text-foreground">{u.nickname} <span className="text-muted-foreground">({u.site_id})</span></div>
@@ -209,7 +209,7 @@ export function UsersManager({ onAddNotification }: UsersManagerProps) {
                     {logs.length === 0 && (
                       <div className="text-xs text-muted-foreground p-3">기록 없음</div>
                     )}
-                    {logs.map((l) => (
+                    {logs.map((l: AdminLog) => (
                       <div key={l.id} className="p-3 text-xs">
                         <div className="text-foreground">{l.action_type}</div>
                         <div className="text-muted-foreground">{new Date(l.created_at).toLocaleString()}</div>

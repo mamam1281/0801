@@ -75,6 +75,7 @@ from app.routers import email as email_router
 from app.kafka_client import start_consumer, stop_consumer, get_last_messages, is_consumer_ready
 from app.routers import streak
 from app.routers import test_retry  # Dev-only retry test endpoints
+from app.routers import test_realtime  # Dev-only realtime emit endpoints
 from app.routers import abtest
 from app.routers import metrics  # Global metrics (social proof)
 
@@ -387,6 +388,7 @@ app.include_router(invite_router.router)  # 태그 오버라이드 제거 - 이�
 app.include_router(rbac_demo.router)  # New RBAC demo router included
 app.include_router(metrics.router)  # Global metrics endpoint
 app.include_router(test_retry.router)  # Dev-only retry endpoints (hidden)
+app.include_router(test_realtime.router)  # Dev-only realtime emit endpoints (hidden)
 
 # ===== NON-MVP ROUTERS DISABLED FOR DEPLOYMENT STABILITY =====
 # Phase 6: Analytics (DISABLED - non-MVP)

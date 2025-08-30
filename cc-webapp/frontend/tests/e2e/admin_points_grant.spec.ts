@@ -1,4 +1,4 @@
-import { test, expect, request } from '@playwright/test';
+import { test, expect } from '@playwright/test';
 
 // 환경 변수 기반 API 오리진
 // @ts-ignore
@@ -21,8 +21,8 @@ async function getBalance(ctx: any, token: string) {
   try { const j = await res.json(); return Number(j?.cyber_token_balance ?? 0); } catch { return null; }
 }
 
-test('Admin Points Gold Grant: idempotent grant updates target balance', async () => {
-  const ctx = await request.newContext();
+test('Admin Points Gold Grant: idempotent grant updates target balance', async ({ request }: { request: import('@playwright/test').APIRequestContext }) => {
+  const ctx = request as import('@playwright/test').APIRequestContext;
   const invite = __env.E2E_INVITE_CODE || '5858';
 
   // 1) 관리자 계정 생성 및 로그인 토큰

@@ -123,3 +123,11 @@ declare module 'next/navigation' {
   export function useSearchParams(): any;
   export function usePathname(): string;
 }
+
+// next/server 간단 shim (에디터 타입 인식 실패 시 임시 완화)
+declare module 'next/server' {
+  export type NextRequest = any;
+  export class NextResponse {
+    static next(): NextResponse;
+  }
+}
