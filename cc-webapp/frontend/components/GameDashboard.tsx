@@ -139,7 +139,7 @@ export function GameDashboard({
   }, []);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#0e0a17] via-black to-[#1a0f1f] relative">
+    <div className="min-h-screen bg-gradient-to-br from-[#0e0a17] via-black to-[#1a0f1f] relative" data-testid="game-dashboard">
       <GameBackground />
 
       <div className="relative z-10">

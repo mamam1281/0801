@@ -7,6 +7,7 @@ import { LoginScreen } from '../components/LoginScreen';
 import { SignupScreen } from '../components/SignupScreen';
 import { AdminLoginScreen } from '../components/AdminLoginScreen';
 import { HomeDashboard } from '../components/HomeDashboard';
+import { GameDashboard } from '../components/GameDashboard';
 
 import { SettingsScreen } from '../components/SettingsScreen';
 import { ShopScreen } from '../components/ShopScreen';
@@ -347,6 +348,22 @@ export default function App() {
                     onNavigateToShop={navigationHandlers.toShop}
                     onNavigateToSettings={navigationHandlers.toSettings}
                     onNavigateToStreaming={navigationHandlers.toStreaming}
+                    onUpdateUser={updateUser}
+                    onAddNotification={addNotification}
+                    onToggleSideMenu={toggleSideMenu}
+                  />
+                </React.Fragment>
+              )}
+
+              {currentScreen === 'game-dashboard' && user && (
+                <React.Fragment key="game-dashboard">
+                  <GameDashboard
+                    user={user}
+                    onNavigateToHome={navigationHandlers.backToHome}
+                    onNavigateToSlot={navigationHandlers.toSlot}
+                    onNavigateToRPS={navigationHandlers.toRPS}
+                    onNavigateToGacha={navigationHandlers.toGacha}
+                    onNavigateToCrash={navigationHandlers.toCrash}
                     onUpdateUser={updateUser}
                     onAddNotification={addNotification}
                     onToggleSideMenu={toggleSideMenu}
