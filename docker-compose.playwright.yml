@@ -6,7 +6,6 @@ services:
     environment:
       BASE_URL: http://frontend:3000
       API_BASE_URL: http://backend:8000
-  E2E_UI_NAV_SMOKE: "1"
       CI: "1"
       HEADLESS: "1"
       TS_NODE_CACHE: "false"

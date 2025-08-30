@@ -2,33 +2,12 @@ import { useState, useCallback } from 'react';
 import { AppScreen } from '../types';
 
 export function useAppNavigation() {
-  // 레거시 키를 신 키로 정규화
-  const normalize = (s: string): AppScreen => {
-    let mapped: AppScreen = s as AppScreen;
-    switch (s) {
-      case 'home':
-        mapped = 'home-dashboard';
-        break;
-      case 'games':
-        mapped = 'game-dashboard';
-        break;
-      default:
-        mapped = s as AppScreen;
-        break;
-    }
-    // 진단 로깅: 레거시 키가 들어오면 1회 경고 출력(개발모드에서만 의미)
-    if (typeof window !== 'undefined' && s !== mapped) {
-      try { console.warn(`[nav] legacy key '${s}' -> '${mapped}'로 정규화`); } catch {}
-    }
-    return mapped;
-  };
-
   // E2E: 초기 화면을 로컬 스토리지 플래그로 강제 가능
   const initialScreen = (() => {
     try {
       if (typeof window !== 'undefined') {
         const forced = window.localStorage.getItem('E2E_FORCE_SCREEN');
-        if (forced) return normalize(forced);
+        if (forced) return forced as AppScreen;
       }
     } catch {/* noop */}
     return 'loading' as AppScreen;
@@ -39,7 +18,7 @@ export function useAppNavigation() {
 
   // 🎯 네비게이션 핸들러
   const navigate = useCallback((screen: AppScreen) => {
-    setCurrentScreen(normalize(screen as string));
+    setCurrentScreen(screen);
     setIsSideMenuOpen(false);
   }, []);
 
@@ -81,13 +60,11 @@ export function useAppNavigation() {
 
   // 하단 네비게이션 핸들러 - 수정됨
   const handleBottomNavigation = useCallback((screen: string) => {
-    // 레거시 키도 수용
-    const s = normalize(screen);
-    switch (s) {
-      case 'home-dashboard':
+    switch (screen) {
+      case 'home-dashboard': // 🔧 수정: 'home' → 'home-dashboard'
         navigate('home-dashboard');
         break;
-      case 'game-dashboard':
+      case 'game-dashboard': // 🔧 수정: 'games' → 'game-dashboard'
         navigate('game-dashboard');
         break;
       case 'shop':
@@ -97,8 +74,6 @@ export function useAppNavigation() {
         navigate('profile');
         break;
       default:
-        // 기타는 그대로 전달
-        navigate(s);
         break;
     }
   }, [navigate]);
