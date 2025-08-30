@@ -41,7 +41,19 @@ test.describe('Action history pagination', () => {
 			} catch {}
 		}, nickname);
 
-		// 1) 진입 후 전역 E2E 헬퍼로 즉시 유저/화면 세팅
+		// 1) 진입 전 하단 네비게이션 클릭 간섭을 전역 CSS로 차단
+		await page.addInitScript(() => {
+			try {
+				const style = document.createElement('style');
+				style.setAttribute('data-e2e-bottomnav', 'off');
+				style.textContent = `
+					[data-testid="bottom-navigation"]{ pointer-events:none !important; opacity:0 !important; transform: translateY(200vh) !important; }
+				`;
+				document.head.appendChild(style);
+			} catch {}
+		});
+
+		// 1-1) 진입 후 전역 E2E 헬퍼로 즉시 유저/화면 세팅
 		await page.goto(base + '/e2e/profile');
 		// 프로필 화면 렌더 대기
 		await expect(page.getByTestId('profile-screen')).toBeVisible({ timeout: 20000 });
@@ -55,8 +67,16 @@ test.describe('Action history pagination', () => {
 		// 다음 페이지
 		const nextBtn = page.getByTestId('action-next');
 		if (await nextBtn.isEnabled()) {
-			await nextBtn.click();
-			await list.waitFor();
+			// 화면 하단 겹침 회피: programmatic click 우선 사용
+			await nextBtn.evaluate((btn: Element) => (btn as HTMLButtonElement).click());
+			await page.waitForFunction((args: { sel: string; prevFirst: string | null }) => {
+				const el = document.querySelector(args.sel);
+				if (!el) return false;
+				const rows = (el as HTMLElement).querySelectorAll(':scope > div');
+				if (!rows.length) return false;
+				const first = rows[0].getAttribute('data-key') || rows[0].getAttribute('key');
+				return !!first && first !== args.prevFirst;
+			}, { sel: '[data-testid="action-history-list"]', prevFirst: (firstPageIds as (string | null)[] | undefined)?.[0] ?? null }, { timeout: 5000 });
 			const secondPageIds = await list.locator('> div').evaluateAll((rows: Element[]) => rows.map((r: Element) => (r.getAttribute('key') || r.getAttribute('data-key')) as string | null));
 			if (firstPageIds && secondPageIds) {
 				const dup = (secondPageIds as (string | null)[]).filter((id: string | null) => id && (firstPageIds as (string | null)[]).includes(id));

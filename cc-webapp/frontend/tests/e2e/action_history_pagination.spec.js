@@ -44,17 +44,35 @@ test.describe('Action history pagination', () => {
   const list = page.locator('[data-testid="action-history-list"]');
   await expect(list).toBeVisible({ timeout: 20000 });
 
-    const firstPageTexts = await list.locator('> div').allTextContents();
+  const firstPageIds = await list.locator('> div').evaluateAll((rows) => rows.map((r) => (r.getAttribute('data-key') || r.getAttribute('key'))));
 
     // 다음 페이지
+    // 하단 네비게이션 전역 차단 스타일 주입 (초기화 이후 안전망)
+    await page.addInitScript(() => {
+      try {
+        const style = document.createElement('style');
+        style.setAttribute('data-e2e-bottomnav', 'off');
+        style.textContent = `
+          [data-testid="bottom-navigation"]{ pointer-events:none !important; opacity:0 !important; transform: translateY(200vh) !important; }
+        `;
+        document.head.appendChild(style);
+      } catch {}
+    });
     const nextBtn = page.getByTestId('action-next');
     if (await nextBtn.isEnabled()) {
-      await nextBtn.click();
-      await list.waitFor();
-      const secondPageTexts = await list.locator('> div').allTextContents();
-      // 간단 중복 체크: 전체 텍스트 기준 교집합이 크지 않아야 함
-      const dup = secondPageTexts.filter((t) => firstPageTexts.includes(t));
-      expect(dup.length).toBeLessThan(Math.max(1, Math.floor(firstPageTexts.length * 0.2)));
+      // programmatic click 우선 적용으로 클릭 간섭 회피
+      await nextBtn.evaluate((btn) => btn.click());
+      await page.waitForFunction((args) => {
+        const el = document.querySelector(args.sel);
+        if (!el) return false;
+        const rows = el.querySelectorAll(':scope > div');
+        if (!rows.length) return false;
+        const first = rows[0].getAttribute('data-key') || rows[0].getAttribute('key');
+        return !!first && first !== args.prevFirst;
+      }, { sel: '[data-testid="action-history-list"]', prevFirst: (firstPageIds && firstPageIds[0]) || null }, { timeout: 5000 });
+      const secondPageIds = await list.locator('> div').evaluateAll((rows) => rows.map((r) => (r.getAttribute('data-key') || r.getAttribute('key'))));
+      const dup = (secondPageIds || []).filter((id) => id && (firstPageIds || []).includes(id));
+      expect(dup.length).toBe(0);
     }
 
     // 이전 페이지 버튼 상태 확인
