@@ -308,7 +308,10 @@ export function ProfileScreen({
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-black/95 to-primary/5">
+      <div
+        className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-black/95 to-primary/5"
+        data-testid="profile-screen"
+      >
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -323,7 +326,10 @@ export function ProfileScreen({
 
   if (error && !user) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-background via-black/95 to-primary/5 relative">
+      <div
+        className="min-h-screen bg-gradient-to-br from-background via-black/95 to-primary/5 relative"
+        data-testid="profile-screen"
+      >
         <div className="absolute inset-0 bg-gradient-to-br from-transparent via-primary/3 to-gold/5 pointer-events-none" />
 
         <motion.div
