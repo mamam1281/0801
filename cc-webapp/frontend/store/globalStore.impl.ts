@@ -197,3 +197,83 @@ export function useGlobalStore() {
 export function useGlobalProfile() {
     return useGlobalStore().state.profile;
 }
+
+export function useIsHydrated() {
+    return useGlobalStore().state.hydrated;
+}
+
+// Action helpers
+export function setProfile(dispatch: DispatchFn, profile: GlobalUserProfile | null) {
+    dispatch({ type: "SET_PROFILE", profile });
+}
+
+export function setHydrated(dispatch: DispatchFn, value: boolean) {
+    dispatch({ type: "SET_HYDRATED", value });
+}
+
+export function patchBalances(dispatch: DispatchFn, delta: { gold?: number; gems?: number }) {
+    dispatch({ type: "PATCH_BALANCES", delta });
+}
+
+export function applyReward(dispatch: DispatchFn, award: { gold?: number; gems?: number }) {
+    dispatch({ type: "APPLY_REWARD", award });
+}
+
+export function mergeProfile(dispatch: DispatchFn, patch: Partial<GlobalUserProfile> & Record<string, unknown>) {
+    dispatch({ type: "MERGE_PROFILE", patch });
+}
+
+// 통계 병합(숫자는 누적, 배열은 concat, 객체는 재귀 병합)
+export function mergeGameStats(dispatch: DispatchFn, game: string, delta: Record<string, any>) {
+    dispatch({ type: "MERGE_GAME_STATS", game, delta });
+}
+
+// 인벤토리 적용(append 기본, replace=true 시 교체)
+export function applyPurchase(dispatch: DispatchFn, items: InventoryItem[], options?: { replace?: boolean }) {
+    dispatch({ type: "APPLY_PURCHASE", items, replace: options?.replace });
+}
+
+// 고수준 액션들(hydrate/reconcile)
+export async function hydrateFromServer(dispatch: DispatchFn) {
+    try {
+        const [me, bal, stats] = await Promise.all([
+            api.get("auth/me"),
+            api.get("users/balance").catch(() => null),
+            api.get("games/stats/me").catch(() => null),
+        ]);
+        const goldFromBalanceRaw = (bal as any)?.gold ?? (bal as any)?.gold_balance ?? (bal as any)?.cyber_token_balance ?? (bal as any)?.balance;
+        const mapped = {
+            id: me?.id ?? me?.user_id ?? "unknown",
+            nickname: me?.nickname ?? me?.name ?? "",
+            goldBalance: Number.isFinite(Number(goldFromBalanceRaw)) ? Number(goldFromBalanceRaw) : Number(me?.gold ?? me?.gold_balance ?? 0),
+            gemsBalance: Number(me?.gems ?? me?.gems_balance ?? 0),
+            level: me?.level ?? me?.battlepass_level ?? undefined,
+            xp: me?.xp ?? undefined,
+            updatedAt: new Date().toISOString(),
+            ...me,
+        } as GlobalUserProfile as any;
+        const balances = { gold: mapped.goldBalance ?? 0, gems: (mapped as any).gemsBalance ?? 0 };
+        setProfile(dispatch, mapped);
+        dispatch({ type: "SET_BALANCES", balances });
+        if (stats && typeof stats === 'object') {
+            try { dispatch({ type: "MERGE_GAME_STATS", game: "_me", delta: stats as any }); } catch { /* noop */ }
+        }
+    } catch (e:any) {
+        dispatch({ type: "SET_ERROR", error: { message: e?.message || "hydrateFromServer failed", at: Date.now() } });
+    } finally {
+        setHydrated(dispatch, true);
+    }
+}
+
+export async function reconcileBalance(dispatch: DispatchFn) {
+    try {
+        const bal = await api.get("users/balance");
+        const gold = Number((bal as any)?.gold ?? (bal as any)?.gold_balance ?? (bal as any)?.cyber_token_balance ?? (bal as any)?.balance ?? 0);
+        const gems = Number((bal as any)?.gems ?? (bal as any)?.gems_balance ?? 0);
+        dispatch({ type: "SET_BALANCES", balances: { gold, gems } });
+    } catch (e:any) {
+        dispatch({ type: "SET_ERROR", error: { message: e?.message || "reconcileBalance failed", at: Date.now() } });
+    }
+}
+
+export function getLastError(state: GlobalState) { return state.lastError; }
