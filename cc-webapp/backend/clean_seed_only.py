@@ -1,9 +1,13 @@
-"""시드계정만 남기고 모든 가짜 데이터 정리 스크립트
+"""[통합] 시드 정리 단일 스크립트(clean_seed_only)
 
 목적:
-- 가짜 시드 데이터 모두 삭제
-- 시드계정(admin, user001~004)만 유지
-- 깨끗한 상태에서 실제 활동 반영 가능하도록
+- (단일 진입점) 시드계정만 남기고 모든 가짜/목 데이터 정리 + 시드계정 기본값 리셋
+- seed_realistic_data.py, clean_seed_reset.py 는 본 스크립트로 통합/대체됨
+
+기능:
+- 존재 테이블 자동 탐지 후, 시드계정 외 데이터만 안전 삭제
+- users 테이블은 시드계정 외 모두 삭제
+- 시드계정(gold_balance/total_spent/vip_tier/battlepass_level) 기본값 리셋
 
 사용:
     docker compose exec backend python clean_seed_only.py
@@ -54,7 +58,11 @@ def main():
                 'user_rewards',
                 'user_segments',
                 'battlepass_status',
-                'notifications'
+                'notifications',
+                # 추가 정리 대상(존재 시만 처리)
+                'gacha_log',
+                'event_participations',
+                'user_missions'
             ]
             
             for table in tables_to_check:
