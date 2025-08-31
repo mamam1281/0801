@@ -124,6 +124,41 @@ export async function apiCall<T=any>(path: string, opts: UnifiedRequestOptions<T
   if (path.startsWith('/')) path = path.slice(1); // normalize
   const url = `${ORIGIN}/api/${path}`;
 
+  // 개발환경 전용 가드: 정수 ID가 필요한 경로에 비정수(me 등) 전달 감지 → URL 및 스택 로깅
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const __dev = (typeof process !== 'undefined' ? (process as any).env?.NODE_ENV : 'development') !== 'production';
+    if (__dev) {
+      const checks: Array<{ re: RegExp; name: string }> = [
+        { re: /^admin\/users\/([^\/\?]+)(?:[\/\?]|$)/i, name: 'admin/users/:user_id' },
+        { re: /^actions\/recent\/([^\/\?]+)(?:[\/\?]|$)/i, name: 'actions/recent/:user_id' },
+        { re: /^rewards\/users\/([^\/\?]+)(?:[\/\?]|$)/i, name: 'rewards/users/:user_id' },
+      ];
+      for (const c of checks) {
+        const m = path.match(c.re);
+        if (m) {
+          const seg = decodeURIComponent(m[1]);
+          if (!/^\d+$/.test(seg)) {
+            const err = new Error(`[unifiedApi][dev-guard] 비정수 user_id 세그먼트 감지: '${seg}' @ ${c.name}`);
+            // URL/경로/스택을 경고 로그로 출력하여 호출 지점 추적
+            // eslint-disable-next-line no-console
+            console.warn('[unifiedApi][dev-guard] Non-numeric user_id detected', {
+              matched: c.name,
+              segment: seg,
+              path,
+              url,
+            });
+            // eslint-disable-next-line no-console
+            if (err.stack) console.warn('[unifiedApi][stack]', err.stack.split('\n').slice(0, 8).join('\n'));
+            break; // 한 경로만 경고
+          }
+        }
+      }
+    }
+  } catch {
+    // no-op: 가드 로깅 실패는 무시
+  }
+
   let attempt = 0;
   let didRefresh = false;
 

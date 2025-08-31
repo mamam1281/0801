@@ -181,16 +181,35 @@ export default function App() {
         const savedUser = restoreSavedUser();
         if (savedUser) {
           updateUser(savedUser);
-        } else if (forced) {
-          // 저장 유저가 없지만 테스트에서 화면 강제를 요청한 경우 최소 스텁 유저 생성
-          const stub = createUserData('E2E', '', false);
-          updateUser(stub);
+        } else {
+          // 저장 유저가 없을 때: 테스트 강제 or 개발용 스텁 허용 시 게스트 생성
+          let allowStub = false;
+          try {
+            const env = (process as any)?.env?.NEXT_PUBLIC_ALLOW_STUB_USER;
+            if (env && (String(env) === '1' || String(env).toLowerCase() === 'true')) allowStub = true;
+          } catch {}
+          try {
+            if (!allowStub && typeof window !== 'undefined') {
+              allowStub = window.localStorage.getItem('E2E_ALLOW_STUB') === '1';
+            }
+          } catch {}
+          try {
+            if (!allowStub) allowStub = (process as any)?.env?.NODE_ENV !== 'production';
+          } catch {}
+
+          if (forced || allowStub) {
+            const stub = createUserData(forced ? 'E2E' : 'GUEST', '', false);
+            updateUser(stub);
+          }
         }
 
         // 네비게이션 결정: 강제 화면 우선 → 기본 홈
         if (forced && typeof forced === 'string') {
           navigationHandlers.navigate(forced as any);
         } else if (savedUser) {
+          navigationHandlers.toHome();
+        } else {
+          // 스텁 유저가 생성되었을 수 있으니 홈으로 기본 이동
           navigationHandlers.toHome();
         }
 
@@ -246,6 +265,42 @@ export default function App() {
       // noop
     }
   }, [navigationHandlers, updateUser, createUserData]);
+
+  // 개발/테스트 편의: 게임 화면 진입 시 유저가 없으면 안전 스텁 자동 주입
+  // 활성 조건: 
+  //  - NEXT_PUBLIC_ALLOW_STUB_USER=1 또는 true
+  //  - 로컬스토리지 E2E_ALLOW_STUB=1
+  //  - NODE_ENV !== 'production' (개발 기본 허용)
+  useEffect(() => {
+    const isGameScreen = (
+      currentScreen === 'game-dashboard' ||
+      currentScreen === 'neon-slot' ||
+      currentScreen === 'rock-paper-scissors' ||
+      currentScreen === 'gacha-system' ||
+      currentScreen === 'neon-crash'
+    );
+    if (!isGameScreen || user) return;
+
+    let allow = false;
+    try {
+      const env = (process as any)?.env?.NEXT_PUBLIC_ALLOW_STUB_USER;
+      if (env && (String(env) === '1' || String(env).toLowerCase() === 'true')) allow = true;
+    } catch {/* ignore */}
+    try {
+      if (!allow && typeof window !== 'undefined') {
+        allow = window.localStorage.getItem('E2E_ALLOW_STUB') === '1';
+      }
+    } catch {/* ignore */}
+    try {
+      // 개발 환경 기본 허용 (프로덕션은 비활성)
+      if (!allow) allow = (process as any)?.env?.NODE_ENV !== 'production';
+    } catch {/* ignore */}
+
+    if (allow) {
+      const stub = createUserData('GUEST', '', false);
+      updateUser(stub);
+    }
+  }, [currentScreen, user, createUserData, updateUser]);
 
   // ---------------------------------------------------------------------------
   // Daily Reward Claimed Dialog 상태 (이미 수령한 경우 노출)
