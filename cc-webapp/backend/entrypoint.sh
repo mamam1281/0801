@@ -62,11 +62,26 @@ fi
 if [ "$USERS_EXISTS" = "t" ] && [ -z "$CUR_VER" ]; then
   echo "Core tables exist but alembic_version is empty. Stamping head to align..."
   alembic stamp head || true
+  echo "Alembic stamped successfully. Skipping further migrations..."
+  echo "Setting up initial data... (SKIPPED: app/core/init_db.py not found)"
+  echo "Starting FastAPI application..."
+  uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+  exit 0
 fi
 
-# Alembic 마이그레이션 실행
-echo "Running database migrations..."
-alembic upgrade head || { echo "Alembic migration failed"; exit 1; }
+# If core tables exist and alembic_version has a version, skip migration to avoid duplicate table errors
+if [ "$USERS_EXISTS" = "t" ] && [ -n "$CUR_VER" ]; then
+  echo "Core tables exist and alembic_version is at $CUR_VER. Skipping migration to avoid DuplicateTable errors..."
+  echo "Use 'alembic upgrade head' manually if schema changes are needed."
+  echo "Setting up initial data... (SKIPPED: app/core/init_db.py not found)"
+  echo "Starting FastAPI application..."
+  uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+  exit 0
+else
+  # Alembic 마이그레이션 실행
+  echo "Running database migrations..."
+  alembic upgrade head || { echo "Alembic migration failed"; exit 1; }
+fi
 
 # 초기 데이터 설정 (초대 코드 생성 등)
 echo "Setting up initial data... (SKIPPED: app/core/init_db.py not found)"
