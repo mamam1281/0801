@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { LoadingScreen } from '../components/LoadingScreen';
 import { LoginScreen } from '../components/LoginScreen';
@@ -41,6 +41,8 @@ type NotificationItem = { id: string | number; message: React.ReactNode };
 export default function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [hasInitialized, setHasInitialized] = useState(false);
+  // 외부 네비게이션(__E2E_NAV 등) 사용 여부 플래그 – 초기 네비게이션 덮어쓰기 방지용
+  const externalNavRef = useRef(false);
 
   // 🎯 커스텀 훅으로 상태 관리 분리
   const {
@@ -203,14 +205,16 @@ export default function App() {
           }
         }
 
-        // 네비게이션 결정: 강제 화면 우선 → 기본 홈
-        if (forced && typeof forced === 'string') {
-          navigationHandlers.navigate(forced as any);
-        } else if (savedUser) {
-          navigationHandlers.toHome();
-        } else {
-          // 스텁 유저가 생성되었을 수 있으니 홈으로 기본 이동
-          navigationHandlers.toHome();
+        // 네비게이션 결정: 강제 화면 우선 → 기본 홈 (단, 외부 네비게이션이 이미 개입했으면 건드리지 않음)
+        if (!externalNavRef.current) {
+          if (forced && typeof forced === 'string') {
+            navigationHandlers.navigate(forced as any);
+          } else if (savedUser) {
+            navigationHandlers.toHome();
+          } else {
+            // 스텁 유저가 생성되었을 수 있으니 홈으로 기본 이동
+            navigationHandlers.toHome();
+          }
         }
 
         // 저장 유저가 있는 경우에만 일일 보너스 체크 수행
@@ -254,6 +258,7 @@ export default function App() {
     try {
       // 화면 전환
       (window as any).__E2E_NAV = (screen: string) => {
+        try { externalNavRef.current = true; } catch {}
         navigationHandlers.navigate(screen as any);
       };
       // 유저 주입 (미지정 시 기본 스텁)

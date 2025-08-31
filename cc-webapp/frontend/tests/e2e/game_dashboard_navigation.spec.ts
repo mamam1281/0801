@@ -5,7 +5,7 @@ test.skip(!ENABLE_NAV_SMOKE, 'Disabled by default. Set E2E_UI_NAV_SMOKE=1 to ena
 
 // Simple nav smoke: ensure bottom nav can open the Game Dashboard screen.
 test.describe('Navigation', () => {
-  test('Programmatic nav → Game Dashboard shows screen', async ({ page }: { page: Page }) => {
+  test('Bottom nav click → Game Dashboard shows screen', async ({ page }: { page: Page }) => {
     const base = process.env.BASE_URL || 'http://localhost:3000';
     // Seed flags before any app code runs
     await page.addInitScript(() => {
@@ -18,15 +18,9 @@ test.describe('Navigation', () => {
     });
     await page.goto(base);
 
-    // Ensure helper is available and set the user via app-level API
-  await page.waitForFunction(() => typeof (window as any).__E2E_NAV === 'function', undefined, { timeout: 8000 });
-    await page.waitForFunction(() => typeof (window as any).__E2E_SET_USER === 'function', undefined, { timeout: 8000 });
-    await page.evaluate(() => {
-      const stub = { id: 'E2E', nickname: 'E2E', goldBalance: 1000, level: 1, dailyStreak: 0 };
-      (window as any).__E2E_SET_USER(stub);
-    });
-    // Programmatic navigation to avoid overlay/click interference
-  await page.evaluate(() => { (window as any).__E2E_NAV('game-dashboard'); });
+  // Ensure user is present (redundant safety); then use bottom nav button path
+  await page.waitForTimeout(100); // allow App init hooks to settle briefly
+  await page.getByRole('button', { name: '게임' }).click();
 
   // Assert screen container visible
   await expect(page.getByTestId('game-dashboard')).toBeVisible({ timeout: 10000 });
