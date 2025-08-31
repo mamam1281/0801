@@ -1,4 +1,23 @@
 import os, sys, pytest
+# --- pytest 시작 전 외부 의존 비활성화(블로킹 방지) ---
+# Settings/import 이전에 환경 변수를 강제로 덮어써서 lifespan 초기화 중 대기 제거
+os.environ["KAFKA_ENABLED"] = "0"
+os.environ["CLICKHOUSE_ENABLED"] = "0"
+# 스타트업 스키마 드리프트 검사 비활성화(테스트 본문에서 별도 가드로 검증)
+os.environ["DISABLE_SCHEMA_DRIFT_GUARD"] = "1"
+
+# --- FastAPI app 라이프사이클 중 블로킹 요소 노옵 패치 ---
+try:
+	import app.main as _main_mod  # type: ignore
+	# 스케줄러 기동 차단
+	_main_mod.start_scheduler = lambda: None  # type: ignore[attr-defined]
+	# Kafka consumer 비활성 (lifespan await 경로 방지)
+	async def _noop_async():
+		return None
+	_main_mod.start_consumer = _noop_async  # type: ignore[attr-defined]
+	_main_mod.stop_consumer = _noop_async  # type: ignore[attr-defined]
+except Exception:
+	pass
 from types import SimpleNamespace
 from fastapi.testclient import TestClient
 from types import SimpleNamespace
@@ -12,6 +31,23 @@ if _backend_root not in sys.path:
 # Ensure DB tables exist for tests
 from app.database import Base, engine  # noqa: E402
 from app.main import app as fastapi_app  # noqa: E402
+# 테스트 시 FastAPI lifespan(startup/shutdown) 완전 무력화 옵션
+try:
+	if os.getenv("TEST_DISABLE_LIFESPAN", "1") == "1":
+		from contextlib import asynccontextmanager
+
+		@asynccontextmanager
+		async def _noop_lifespan(_app):  # type: ignore[override]
+			# startup/shutdown 훅을 모두 건너뛰기
+			yield
+
+		# Starlette/FastAPI 라우터 수준 lifespan 컨텍스트 교체
+		# (TestClient 진입 시 on_startup/on_shutdown 실행 방지)
+		if hasattr(fastapi_app, "router") and hasattr(fastapi_app.router, "lifespan_context"):
+			fastapi_app.router.lifespan_context = _noop_lifespan  # type: ignore[attr-defined]
+except Exception:
+	# 실패해도 테스트는 계속 진행 (기본 lifespan 사용)
+	pass
 try:
 	from app.routers.admin_content import require_admin as _require_admin  # noqa: E402
 	# Ensure admin dependency always passes during tests (isolated persistence tests)
@@ -59,24 +95,17 @@ def _ensure_schema():
 		pass
 
 	try:
-		from sqlalchemy import inspect as _insp_detect
 		_dialect = engine.url.get_backend_name()
-
-		# Postgres에서는 컨테이너 entrypoint에서 이미 upgrade head가 수행됨.
-		# 이미 core 테이블과 alembic_version이 존재하면 재실행을 생략해 잠재적 락 대기를 방지.
-		do_upgrade = True
+		# Postgres: entrypoint에서 이미 alembic upgrade head 수행 → 테스트에서는 기본 skip
+		# 필요 시 TEST_FORCE_ALEMBIC=1 로 강제 실행
 		if _dialect == "postgresql":
-			try:
-				ins = _insp_detect(engine)
-				has_users = ins.has_table("users")
-				has_alembic = ins.has_table("alembic_version")
-				if has_users and has_alembic and os.getenv("TEST_FORCE_ALEMBIC", "0") != "1":
-					do_upgrade = False
-			except Exception:
-				# 검사 실패 시 보수적으로 upgrade 시도
-				do_upgrade = True
-
-		if do_upgrade:
+			if os.getenv("TEST_FORCE_ALEMBIC", "0") == "1":
+				from alembic.config import Config
+				from alembic import command
+				cfg = Config("alembic.ini")
+				command.upgrade(cfg, "head")
+		else:
+			# SQLite 등에서는 간단히 head까지 올려 테스트 스키마 보장
 			from alembic.config import Config
 			from alembic import command
 			cfg = Config("alembic.ini")
@@ -111,8 +140,9 @@ def _ensure_schema():
 							pass
 		except Exception:
 			pass
-		# 일부 신규 모델이 아직 마이그레이션에 반영되지 않았다면 보강 (idempotent)
-		Base.metadata.create_all(bind=engine)
+		# 일부 신규 모델이 아직 마이그레이션에 반영되지 않았다면 보강 (SQLite 한정)
+		if engine.url.get_backend_name() == 'sqlite':
+			Base.metadata.create_all(bind=engine)
 		# --- Safety net 2: ensure gold_balance column exists after metadata creation (sqlite test env) ---
 		try:
 			if engine.url.get_backend_name() == 'sqlite':
@@ -143,7 +173,8 @@ def _ensure_schema():
 			pass
 	except Exception:
 		# Fallback: ensure at least ORM-known tables exist
-		Base.metadata.create_all(bind=engine)
+		if engine.url.get_backend_name() == 'sqlite':
+			Base.metadata.create_all(bind=engine)
 		# Fallback path에서도 동일 보강
 		try:
 			if engine.url.get_backend_name() == 'sqlite':
@@ -175,12 +206,16 @@ def _ensure_schema():
 @pytest.fixture(scope="session")
 def client():
 	from fastapi.testclient import TestClient as _TC
-	# --- 이벤트/어드민 테스트용 get_current_user / require_admin override (테스트 범위 한정) ---
+
+	# QUICK_SMOKE=1인 경우, DB 보강/어드민 오버라이드 없이 즉시 TestClient 반환 (health/docs 등 초경량 스모크용)
+	if os.getenv("QUICK_SMOKE", "0") == "1":
+		with _TC(fastapi_app) as c:
+			yield c
+		return
+
+	# --- 이벤트/어드민 테스트용 require_admin override (일반 인증 경로는 토큰 사용) ---
 	try:
 		from app.routers import admin_events as _admin_events_router
-		# NOTE: 이전에는 get_current_user 전역 override 로 모든 요청이 고정 user_id=12345 로 처리되어
-		# limited package per-user limit 테스트에서 서로 다른 사용자가 동일 사용자로 인식되는 버그 발생.
-		# 따라서 이제는 require_admin 에 대한 override 만 유지하고 일반 인증 경로는 실제 토큰 기반 인증 사용.
 		def _admin_test_user():
 			return SimpleNamespace(id=12345, is_admin=True, nickname="test-admin-event", gold_balance=1000, experience=0)
 		if hasattr(_admin_events_router, 'require_admin'):
@@ -216,6 +251,8 @@ def client():
 	except Exception:
 		# 비치명적 – 사용자 생성 실패 시 테스트 중 FK 에러로 surfaced 됨
 		pass
+
+	# TestClient 버전에서 lifespan 인자 미지원 가능성이 있어, 상단에서 router.lifespan_context를 no-op으로 교체한 방식만 사용
 	with _TC(fastapi_app) as c:
 		yield c
 
