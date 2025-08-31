@@ -59,24 +59,17 @@ def _ensure_schema():
 		pass
 
 	try:
-		from sqlalchemy import inspect as _insp_detect
 		_dialect = engine.url.get_backend_name()
-
-		# Postgres에서는 컨테이너 entrypoint에서 이미 upgrade head가 수행됨.
-		# 이미 core 테이블과 alembic_version이 존재하면 재실행을 생략해 잠재적 락 대기를 방지.
-		do_upgrade = True
+		# Postgres: entrypoint에서 이미 alembic upgrade head 수행 → 테스트에서는 기본 skip
+		# 필요 시 TEST_FORCE_ALEMBIC=1 로 강제 실행
 		if _dialect == "postgresql":
-			try:
-				ins = _insp_detect(engine)
-				has_users = ins.has_table("users")
-				has_alembic = ins.has_table("alembic_version")
-				if has_users and has_alembic and os.getenv("TEST_FORCE_ALEMBIC", "0") != "1":
-					do_upgrade = False
-			except Exception:
-				# 검사 실패 시 보수적으로 upgrade 시도
-				do_upgrade = True
-
-		if do_upgrade:
+			if os.getenv("TEST_FORCE_ALEMBIC", "0") == "1":
+				from alembic.config import Config
+				from alembic import command
+				cfg = Config("alembic.ini")
+				command.upgrade(cfg, "head")
+		else:
+			# SQLite 등에서는 간단히 head까지 올려 테스트 스키마 보장
 			from alembic.config import Config
 			from alembic import command
 			cfg = Config("alembic.ini")
@@ -111,8 +104,9 @@ def _ensure_schema():
 							pass
 		except Exception:
 			pass
-		# 일부 신규 모델이 아직 마이그레이션에 반영되지 않았다면 보강 (idempotent)
-		Base.metadata.create_all(bind=engine)
+		# 일부 신규 모델이 아직 마이그레이션에 반영되지 않았다면 보강 (SQLite 한정)
+		if engine.url.get_backend_name() == 'sqlite':
+			Base.metadata.create_all(bind=engine)
 		# --- Safety net 2: ensure gold_balance column exists after metadata creation (sqlite test env) ---
 		try:
 			if engine.url.get_backend_name() == 'sqlite':
@@ -143,7 +137,8 @@ def _ensure_schema():
 			pass
 	except Exception:
 		# Fallback: ensure at least ORM-known tables exist
-		Base.metadata.create_all(bind=engine)
+		if engine.url.get_backend_name() == 'sqlite':
+			Base.metadata.create_all(bind=engine)
 		# Fallback path에서도 동일 보강
 		try:
 			if engine.url.get_backend_name() == 'sqlite':
