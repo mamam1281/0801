@@ -5,6 +5,7 @@
  * - RealtimeSyncProvider: WS 수신 → 프로필/상태 동기화 (필요 시 재하이드레이트)
  * - withReconcile: 쓰기 요청 후 재조정(hydrate)
  */
+"use client";
 import React, { useEffect } from "react";
 import { api, API_ORIGIN } from "../lib/unifiedApi";
 import { useGlobalStore, setProfile, setHydrated, applyReward } from "../store/globalStore";

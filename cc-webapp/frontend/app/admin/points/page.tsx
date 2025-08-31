@@ -24,9 +24,13 @@ export default function AdminPointsPage() {
 
 	// Compute validity inline to avoid any potential memoization edge cases in CI/Playwright
 	// 즉시 계산 방식으로 전환하여 하이드레이션/렌더 타이밍에 따른 메모이제이션 엣지 케이스 회피
-	const idOk = /^\d+$/.test(userId.trim());
-	const amtNum = Number(amount.trim());
-	const amtOk = !Number.isNaN(amtNum) && amtNum > 0;
+	// 입력 유효성(테스트 시나리오 준수):
+	// - user_id: 숫자만 허용
+	// - amount: 양수(소수 허용)
+	const parsedId = (userId || '').toString().trim();
+	const parsedAmt = (amount || '').toString().trim();
+	const idOk = /^\d+$/.test(parsedId);
+	const amtOk = /^\d*(?:\.\d+)?$/.test(parsedAmt) && Number(parsedAmt) > 0;
 	const canSubmit = idOk && amtOk && !isSubmitting;
 
 		const handleSubmit = useCallback(async () => {
@@ -72,6 +76,7 @@ export default function AdminPointsPage() {
 						<div className="flex flex-col gap-2">
 							<Label htmlFor="user_id">사용자 ID</Label>
 							<Input
+								data-testid="admin-points-user-id"
 								id="user_id"
 								type="text"
 								inputMode="numeric"
@@ -84,6 +89,7 @@ export default function AdminPointsPage() {
 						<div className="flex flex-col gap-2">
 							<Label htmlFor="amount">지급 수량</Label>
 							<Input
+								data-testid="admin-points-amount"
 								id="amount"
 								type="text"
 								inputMode="decimal"
@@ -96,6 +102,7 @@ export default function AdminPointsPage() {
 						<div className="md:col-span-2 flex flex-col gap-2">
 							<Label htmlFor="memo">메모(선택)</Label>
 							<Input
+								data-testid="admin-points-memo"
 								id="memo"
 								type="text"
 								placeholder="감사/출처 등 간단 메모"
@@ -108,6 +115,7 @@ export default function AdminPointsPage() {
 
 					<div className="mt-5 flex items-center gap-3">
 						<Button
+							data-testid="admin-points-submit"
 							onClick={handleSubmit}
 							disabled={!canSubmit}
 							className="bg-gradient-to-r from-fuchsia-600 to-cyan-500 text-white hover:opacity-90"
