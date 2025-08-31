@@ -118,6 +118,16 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
+        # 테스트/CI에서 락 대기 행업 방지: 짧은 lock_timeout 적용 (PostgreSQL 한정)
+        try:
+            if connection.dialect.name == "postgresql":
+                # 5초 락 타임아웃
+                connection.exec_driver_sql("SET lock_timeout TO '5s'")
+                # 5초 statement 타임아웃 (긴 인덱스 생성 등 방지)
+                connection.exec_driver_sql("SET statement_timeout TO '5000ms'")
+        except Exception:
+            pass
+
         context.configure(
             connection=connection, target_metadata=target_metadata
         )

@@ -59,10 +59,28 @@ def _ensure_schema():
 		pass
 
 	try:
-		from alembic.config import Config
-		from alembic import command
-		cfg = Config("alembic.ini")
-		command.upgrade(cfg, "head")
+		from sqlalchemy import inspect as _insp_detect
+		_dialect = engine.url.get_backend_name()
+
+		# Postgres에서는 컨테이너 entrypoint에서 이미 upgrade head가 수행됨.
+		# 이미 core 테이블과 alembic_version이 존재하면 재실행을 생략해 잠재적 락 대기를 방지.
+		do_upgrade = True
+		if _dialect == "postgresql":
+			try:
+				ins = _insp_detect(engine)
+				has_users = ins.has_table("users")
+				has_alembic = ins.has_table("alembic_version")
+				if has_users and has_alembic and os.getenv("TEST_FORCE_ALEMBIC", "0") != "1":
+					do_upgrade = False
+			except Exception:
+				# 검사 실패 시 보수적으로 upgrade 시도
+				do_upgrade = True
+
+		if do_upgrade:
+			from alembic.config import Config
+			from alembic import command
+			cfg = Config("alembic.ini")
+			command.upgrade(cfg, "head")
 		# Safety net: 단일 골드 통화 컬럼 존재 보장 (테스트 SQLite 환경 한정)
 		try:
 			from sqlalchemy import inspect, text
