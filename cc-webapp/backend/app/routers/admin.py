@@ -1088,6 +1088,23 @@ async def admin_grant_gold(
     except Exception as e:
         raise HTTPException(status_code=500, detail="grant_failed") from e
 
+    # 실시간 브로드캐스트: profile_update + reward_granted (운영 프로파일 포함)
+    try:
+        from .realtime import broadcast_profile_update, broadcast_reward_granted
+        try:
+            # 잔액 변경을 프로필 업데이트로 통지
+            await broadcast_profile_update(int(user_id), {"gold_balance": int(new_bal)})
+        except Exception:
+            pass
+        try:
+            # 어드민 골드 지급 보상 이벤트 통지
+            await broadcast_reward_granted(int(user_id), "admin_grant_gold", int(body.amount), int(new_bal))
+        except Exception:
+            pass
+    except Exception:
+        # 브로드캐스트 실패는 본 응답을 막지 않음
+        pass
+
     # 감사 로그
     try:
         db.add(models.UserAction(
