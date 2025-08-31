@@ -111,6 +111,12 @@ async def minimal_register(req: _RegisterRequest, db: Session = Depends(get_db))
         else:
             raise HTTPException(status_code=501, detail="register_with_invite_code not implemented")
         access_token = AuthService.create_access_token({"sub": user.site_id, "user_id": user.id})
+        # 세션 생성: verify_token이 기본적으로 활성 세션을 요구하므로 여기서 기록
+        try:
+            # minimal endpoint이므로 Request 객체가 없어서 UA/IP는 None 처리
+            AuthService.create_session(db, user, access_token, None)
+        except Exception:
+            logger.exception("create_session (register) failed (non-fatal)")
         # simple refresh token generation (reuse access for now if manager absent)
         refresh_token = None
         if hasattr(AuthService, 'create_refresh_token'):

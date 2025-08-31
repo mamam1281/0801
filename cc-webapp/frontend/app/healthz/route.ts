@@ -1,9 +1,8 @@
-// Lightweight health endpoint for container healthcheck
-// Supports GET and HEAD; returns 200 immediately without touching app state
+export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 export async function GET() {
-  return new Response('ok', { status: 200, headers: { 'content-type': 'text/plain' } });
+  return new Response('ok', { status: 200, headers: { 'content-type': 'text/plain; charset=utf-8' } });
 }
 
 export async function HEAD() {
