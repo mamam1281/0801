@@ -3,6 +3,9 @@ import { test, expect } from '@playwright/test';
 const BASE = process.env.BASE_URL || 'http://frontend:3000';
 const API = process.env.API_BASE_URL || 'http://localhost:8000';
 
+const ENABLE = process.env.E2E_REALTIME_DEDUPE === '1';
+const REQUIRE = process.env.E2E_REQUIRE_REALTIME === '1';
+
 async function devOnlyAvailable(request: any, accessToken: string) {
   const res = await request
     .post(`${API}/api/test/realtime/emit/stats_update`, {
@@ -16,6 +19,7 @@ async function devOnlyAvailable(request: any, accessToken: string) {
 }
 
 test('[Realtime] 재연결·스로틀·중복 억제 스모크', async ({ page, request }: any) => {
+  test.skip(!ENABLE, 'Disabled by default. Set E2E_REALTIME_DEDUPE=1 to enable.');
   // 1) 회원가입
   const nickname = 'rr_' + Math.random().toString(36).slice(2, 8);
   const reg = await request.post(`${API}/api/auth/register`, {
@@ -25,7 +29,10 @@ test('[Realtime] 재연결·스로틀·중복 억제 스모크', async ({ page, 
   const { access_token, refresh_token } = await reg.json();
 
   const available = await devOnlyAvailable(request, access_token);
-  test.skip(!available, 'dev-only realtime emit API unavailable');
+  if (!available) {
+    if (REQUIRE) throw new Error('dev-only realtime emit API unavailable');
+    test.skip(true, 'dev-only realtime emit API unavailable');
+  }
 
   // 2) 토큰 주입 및 홈 진입
   await page.addInitScript(([a, r, nick]: any[]) => {

@@ -167,9 +167,10 @@ export function RockPaperScissorsGame({
     // 서버 권위 플레이 호출 + 재동기화
     try {
       await withReconcile(async (idemKey: string) => {
+        // 백엔드 스키마 준수: choice + bet_amount 필수
         const res = await api.post<any>(
           'games/rps/play',
-          { hand: choice },
+          { choice, bet_amount: betAmount },
           { headers: { 'X-Idempotency-Key': idemKey } }
         );
         // 서버 결과를 화면 연출에 사용하되, 잔액은 재동기화에 위임

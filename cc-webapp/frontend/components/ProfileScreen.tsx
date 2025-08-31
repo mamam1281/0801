@@ -569,7 +569,7 @@ export function ProfileScreen({
 
                 {/* 🎯 보유 골드 (크게 표시) */}
                 <div className="bg-gold/10 border-2 border-gold/30 rounded-2xl p-6 max-w-sm mx-auto">
-                  <div className="text-center">
+                    <div className="text-center">
                     <div className="text-sm text-muted-foreground mb-2">현재 보유 골드</div>
                     <div className="text-4xl font-black text-gradient-gold mb-2">
                       {Number(displayGold || 0).toLocaleString()}
@@ -684,14 +684,14 @@ export function ProfileScreen({
 
                   <div className="grid grid-cols-1 gap-3">
                     <div className="text-center p-4 rounded-lg bg-primary/5 border border-primary/10">
-                      <div className="text-2xl font-bold text-primary">
+                      <div className="text-2xl font-bold text-primary" data-testid="stats-total-games">
                         {displayTotalGames}
                       </div>
                       <div className="text-sm text-muted-foreground">총 게임 수</div>
                     </div>
 
                     <div className="text-center p-4 rounded-lg bg-gold/5 border border-gold/10">
-                      <div className="text-2xl font-bold text-gradient-gold">
+                      <div className="text-2xl font-bold text-gradient-gold" data-testid="stats-total-wins">
                         {displayTotalWins} 승
                       </div>
                       <div className="text-sm text-muted-foreground">총 수익</div>
