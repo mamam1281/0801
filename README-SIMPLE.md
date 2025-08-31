@@ -89,3 +89,24 @@ taskkill /F /PID <PID>
 ---
 
 이 간단한 설정을 통해 개발 환경을 빠르게 시작하고 관리할 수 있습니다.
+
+## 부록: E2E(Playwright) 컨테이너 실행
+
+기본 실행:
+
+```powershell
+docker compose -f docker-compose.yml -f docker-compose.playwright.yml up --abort-on-container-exit --exit-code-from playwright playwright
+```
+
+깊은 시나리오(맵핑/디듀프/상점 동기화) 활성화:
+
+```powershell
+docker compose -f docker-compose.yml -f docker-compose.playwright.yml -f docker-compose.playwright.deep.yml up --abort-on-container-exit --exit-code-from playwright playwright
+```
+
+엄격 모드(엔드포인트 안정화 후 CI와 동일하게 실패 전환) 예시:
+
+```powershell
+$env:E2E_REQUIRE_STATS_PARITY = "1"; $env:E2E_REQUIRE_SHOP_SYNC = "1"; $env:E2E_REQUIRE_REALTIME = "1";
+docker compose -f docker-compose.yml -f docker-compose.playwright.yml up --abort-on-container-exit --exit-code-from playwright playwright
+```

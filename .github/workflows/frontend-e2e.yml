@@ -27,6 +27,13 @@ jobs:
           for i in {1..60}; do curl -fsS http://localhost:3000/ || sleep 2; done
       - name: Run Playwright tests
         working-directory: cc-webapp/frontend
+        env:
+          E2E_REQUIRE_STATS_PARITY: ${{ vars.E2E_REQUIRE_STATS_PARITY || '0' }}
+          E2E_SHOP_SYNC: ${{ vars.E2E_SHOP_SYNC || '0' }}
+          E2E_REQUIRE_SHOP_SYNC: ${{ vars.E2E_REQUIRE_SHOP_SYNC || '0' }}
+          E2E_REALTIME_MAPPING: ${{ vars.E2E_REALTIME_MAPPING || '0' }}
+          E2E_REALTIME_DEDUPE: ${{ vars.E2E_REALTIME_DEDUPE || '0' }}
+          E2E_REQUIRE_REALTIME: ${{ vars.E2E_REQUIRE_REALTIME || '0' }}
         run: npx playwright test --reporter=list
       - name: Upload Playwright report
         if: always()
