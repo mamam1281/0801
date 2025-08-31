@@ -43,20 +43,24 @@ async def get_current_user(
         return user
 
     except HTTPException as e:
-        # Fallback: read unverified claims and return user (session validity is enforced in verify_token)
-        try:
-            claims = jwt.get_unverified_claims(credentials.credentials)
-            uid = claims.get("user_id")
-            if uid is not None:
-                user = db.query(User).filter(User.id == uid).first()
-                if user:
-                    try:
-                        user_id_ctx.set(str(user.id))
-                    except Exception:
-                        pass
-                    return user
-        except Exception:
-            pass
+        # 보안 강화를 위해 기본적으로 서명 미검증 폴백을 사용하지 않습니다.
+        # 필요 시 개발/테스트 환경에서만 ALLOW_UNVERIFIED_DEP_FALLBACK=1 설정으로 허용하세요.
+        allow_unverified = os.getenv("ALLOW_UNVERIFIED_DEP_FALLBACK", "0") == "1"
+        if allow_unverified:
+            try:
+                claims = jwt.get_unverified_claims(credentials.credentials)
+                uid = claims.get("user_id")
+                if uid is not None:
+                    user = db.query(User).filter(User.id == uid).first()
+                    if user:
+                        try:
+                            user_id_ctx.set(str(user.id))
+                        except Exception:
+                            pass
+                        return user
+            except Exception:
+                pass
+        # 폴백 비활성화 또는 실패 시 원래 예외 전파
         raise e
     except Exception as e:
         raise HTTPException(

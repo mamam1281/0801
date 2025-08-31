@@ -192,9 +192,9 @@ class AuthService:
                 UserSession.is_active == True
             ).first()
             if sess is None:
-                # In development/test environments allow missing session (legacy tokens or minimal endpoints)
-                if os.getenv("ENVIRONMENT", "development").lower() in {"dev", "development", "local", "test"}:
-                    logging.warning("Session record missing for token jti=%s (dev mode tolerance)", jti)
+                # 기본 정책: 세션 누락은 401 처리. 필요한 경우에만 ALLOW_MISSING_SESSION=1로 완화.
+                if os.getenv("ALLOW_MISSING_SESSION", "0") == "1":
+                    logging.warning("Session record missing for token jti=%s (env allow)", jti)
                 else:
                     raise HTTPException(
                         status_code=status.HTTP_401_UNAUTHORIZED,
