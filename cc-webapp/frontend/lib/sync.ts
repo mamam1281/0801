@@ -7,11 +7,15 @@
  */
 "use client";
 import React, { useEffect } from "react";
-import { api, API_ORIGIN } from "../lib/unifiedApi";
+import { api, API_ORIGIN, hasAccessToken } from "../lib/unifiedApi";
 import { useGlobalStore, setProfile, setHydrated, applyReward } from "../store/globalStore";
 
 export async function hydrateProfile(dispatch: ReturnType<typeof useGlobalStore>["dispatch"]) {
   try {
+    // 로그인 전에는 호출을 생략해 401/403 콘솔 소음을 방지
+    if (!hasAccessToken()) {
+      return;
+    }
     // 최초 진입 병렬 hydrate:
   // - /auth/me (필수)
     // - /users/balance (권위 잔액)

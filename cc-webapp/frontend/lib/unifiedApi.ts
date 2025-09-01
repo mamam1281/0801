@@ -222,8 +222,19 @@ export async function apiCall<T=any>(path: string, opts: UnifiedRequestOptions<T
         await new Promise(r=>setTimeout(r, delay));
         attempt++; continue;
       }
-  const errText = await response.text().catch(()=>`HTTP ${response.status}`);
-  if (logEnabled) console.error(`[unifiedApi] API 오류 - ${response.status} ${response.statusText}:`, errText);
+      const errText = await response.text().catch(() => `HTTP ${response.status}`);
+      // 403 Not authenticated & 토큰 없음 → 초기 하이드레이트 등에서 경고만
+      if (response.status === 403 && !getTokens()?.access_token) {
+        if (logEnabled) console.warn(`[unifiedApi] 403 Not authenticated (no token)`, errText);
+        throw new Error(`Not authenticated`);
+      }
+      // 일일보상 중복(400) 메시지 한국어/영문 패턴 정규화
+      if (response.status === 400 && /하루에 1번|already\s*claimed/i.test(errText)) {
+        const normalized = '{"detail":"한 회원당 하루에 1번만 연속 보상을 받을 수 있습니다"}';
+        if (logEnabled) console.warn(`[unifiedApi] 400 daily-claim duplicate`, errText);
+        throw new Error(`already_claimed ${normalized}`);
+      }
+      if (logEnabled) console.error(`[unifiedApi] API 오류 - ${response.status} ${response.statusText}:`, errText);
       throw new Error(`[unifiedApi] ${response.status} ${errText}`);
     }
 

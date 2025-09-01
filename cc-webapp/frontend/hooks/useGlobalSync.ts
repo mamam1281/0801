@@ -5,6 +5,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '@/lib/unifiedApi';
+import { hasAccessToken } from '@/lib/unifiedApi';
 import { useGlobalStore } from '@/store/globalStore';
 
 interface SyncOptions {
@@ -121,26 +122,49 @@ export function useGlobalSync() {
     const syncGameStats = useCallback(async (): Promise<boolean> => {
         try {
             const response = await api.get(AUTHORITY_ENDPOINTS.GAME_STATS);
-            const stats = response.data || response;
 
-            if (stats && stats.game_stats) {
-                // 게임별 통계 정리
-                const gameStats: Record<string, any> = {};
+            // 다양한 응답 포맷을 안전하게 stats 오브젝트로 변환
+            const raw = (response as any)?.data ?? response;
+            const statsRoot = (raw && typeof raw === 'object' && 'stats' in raw) ? (raw as any).stats : raw;
 
-                stats.game_stats.forEach((stat: any) => {
-                    gameStats[stat.game_type] = {
-                        total_plays: stat.total_hands || stat.play_count || 0,
-                        total_wins: stat.wins || 0,
-                        win_rate: stat.win_rate || 0,
-                        net_profit: stat.net || 0
+            const gameStats: Record<string, any> = {};
+
+            // 1) 배열 형태 (예: { game_stats: [...] } 또는 바로 [...])
+            const arr = Array.isArray((statsRoot as any)?.game_stats)
+                ? (statsRoot as any).game_stats
+                : (Array.isArray(statsRoot) ? (statsRoot as any) : null);
+
+            if (arr) {
+                for (const stat of arr as any[]) {
+                    const key = (stat.game_type || stat.game || stat.id || '').toString().toLowerCase();
+                    if (!key) continue;
+                    // 셀렉터 호환을 위해 공통 별칭 키를 함께 채워줌
+                    const plays = stat.total_hands ?? stat.play_count ?? stat.total_games ?? stat.plays ?? stat.spins ?? 0;
+                    const wins = stat.wins ?? stat.total_wins ?? 0;
+                    const games = stat.games ?? stat.total_games ?? plays ?? 0;
+                    const entry = {
+                        ...stat,
+                        plays,
+                        games,
+                        wins,
                     };
+                    // 슬롯의 경우 spins가 있으면 유지
+                    if (typeof stat.spins === 'number') (entry as any).spins = stat.spins;
+                    gameStats[key] = entry;
+                }
+            } else if (statsRoot && typeof statsRoot === 'object') {
+                // 2) 객체 형태 (예: { slot: {...}, rps: {...}, ... })
+                Object.entries(statsRoot as Record<string, any>).forEach(([k, v]) => {
+                    if (!v || typeof v !== 'object') return;
+                    const plays = (v as any).total_hands ?? (v as any).play_count ?? (v as any).total_games ?? (v as any).plays ?? (v as any).spins ?? 0;
+                    const wins = (v as any).wins ?? (v as any).total_wins ?? 0;
+                    const games = (v as any).games ?? (v as any).total_games ?? plays ?? 0;
+                    gameStats[k] = { ...(v as any), plays, games, wins };
                 });
+            }
 
-                dispatch({
-                    type: 'SET_GAME_STATS',
-                    gameStats
-                });
-
+            if (Object.keys(gameStats).length > 0) {
+                dispatch({ type: 'SET_GAME_STATS', gameStats });
                 lastSyncTimes.current.stats = Date.now();
                 return true;
             }
@@ -179,6 +203,14 @@ export function useGlobalSync() {
                 error: 'Too soon to sync',
                 timestamp: lastSyncTimes.current.full
             };
+        }
+
+        // 토큰이 없으면 로그인 전 단계 → 소음 방지를 위해 하이드레이트만 표시하고 종료
+        if (!hasAccessToken() && !force) {
+            dispatch({ type: 'SET_HYDRATED', value: true });
+            const nowTs = Date.now();
+            lastSyncTimes.current.full = nowTs;
+            return { success: true, timestamp: nowTs };
         }
 
         syncLock.current = true;
@@ -279,21 +311,21 @@ export function useGlobalSync() {
      * 자동 동기화 설정
      */
     useEffect(() => {
-        if (!state.hydrated) {
+        if (!state.hydrated && hasAccessToken()) {
             // 초기 로드 시 전체 동기화
             syncAll({ showToast: false });
         }
 
         // 주기적 잔액 동기화 (10초마다)
         const balanceInterval = setInterval(() => {
-            if (state.hydrated && !syncLock.current) {
+            if (state.hydrated && !syncLock.current && hasAccessToken()) {
                 syncBalance();
             }
         }, SYNC_INTERVALS.BALANCE);
 
         // 주기적 통계 동기화 (30초마다)
         const statsInterval = setInterval(() => {
-            if (state.hydrated && !syncLock.current) {
+            if (state.hydrated && !syncLock.current && hasAccessToken()) {
                 syncGameStats();
             }
         }, SYNC_INTERVALS.STATS);

@@ -137,7 +137,8 @@ export function useAuth() {
                 return merged as AuthUser;
             } catch (e: any) {
                 const msg = e?.message || '';
-                if (/Invalid credentials/i.test(msg)) {
+                // 백엔드가 문자열로 dict를 감싼 형태도 포괄
+                if (/Invalid credentials|invalid_credentials|아이디\s*또는\s*비밀번호가\s*올바르지\s*않습니다/i.test(msg)) {
                     throw new Error('아이디 또는 비밀번호가 올바르지 않습니다. 다시 시도하세요.');
                 }
                 if (/Too many failed attempts/i.test(msg)) {
@@ -167,7 +168,7 @@ export function useAuth() {
                 return merged as AuthUser;
             } catch (e: any) {
                 const msg = e?.message || '';
-                if (/Invalid credentials/i.test(msg)) {
+                if (/Invalid credentials|invalid_credentials|아이디\s*또는\s*비밀번호가\s*올바르지\s*않습니다/i.test(msg)) {
                     throw new Error('아이디 또는 비밀번호가 올바르지 않습니다. 다시 시도하세요.');
                 }
                 if (/Only admin users allowed/i.test(msg)) {
