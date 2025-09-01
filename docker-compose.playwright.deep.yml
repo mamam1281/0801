@@ -8,4 +8,4 @@ services:
       # Strict modes (fail instead of skip)
       # E2E_REQUIRE_REALTIME: "1"
       # E2E_REQUIRE_SHOP_SYNC: "1"
-      # E2E_REQUIRE_STATS_PARITY: "1"
+      E2E_REQUIRE_STATS_PARITY: "1"

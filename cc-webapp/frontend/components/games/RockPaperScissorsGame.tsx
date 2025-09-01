@@ -18,8 +18,8 @@ import {
 import { User } from '../../types';
 import { Button } from '../ui/button';
 import { useWithReconcile } from '@/lib/sync';
-import { useUserGold } from '@/hooks/useSelectors';
-import { useGlobalStore } from '@/store/globalStore';
+import { useGlobalSync } from '@/hooks/useGlobalSync';
+import { useGlobalStore, useGlobalProfile } from '@/store/globalStore';
 import { mergeGameStats } from '@/store/globalStore';
 
 interface RockPaperScissorsGameProps {
@@ -88,8 +88,10 @@ export function RockPaperScissorsGame({
   const [isSpecialMove, setIsSpecialMove] = useState(false);
   const [errorMessage, setErrorMessage] = useState(null as string | null);
   const withReconcile = useWithReconcile();
-  const gold = useUserGold();
+  const globalProfile = useGlobalProfile();
+  const { syncAfterGame } = useGlobalSync();
   const { dispatch } = useGlobalStore();
+  const gold = globalProfile?.goldBalance ?? 0;
 
   // Play sound effect (visual simulation)
   const playSoundEffect = (effectName: string) => {
@@ -138,13 +140,13 @@ export function RockPaperScissorsGame({
   const playGame = async (choice: Choice) => {
     if (isPlaying) return;
 
-  if (gold < betAmount) {
+    if (gold < betAmount) {
       onAddNotification('❌ 골드가 부족합니다!');
       return;
     }
 
-  setIsPlaying(true);
-  setErrorMessage(null);
+    setIsPlaying(true);
+    setErrorMessage(null);
     // 🚫 사용자 선택을 미리 보여주지 않음!
     setPlayerChoice(null);
     setAiChoice(null);
@@ -195,10 +197,13 @@ export function RockPaperScissorsGame({
           totalBet: betAmount,
           totalPayout: winnings,
         });
+        // 게임 후 전역 동기화
+        await syncAfterGame();
         return res;
       });
     } catch (e: any) {
-      const msg = e?.message || (typeof e === 'string' ? e : '플레이 실패. 네트워크 상태를 확인해주세요.');
+      const msg =
+        e?.message || (typeof e === 'string' ? e : '플레이 실패. 네트워크 상태를 확인해주세요.');
       setErrorMessage(msg);
       onAddNotification('플레이 실패. 네트워크 상태를 확인해주세요.');
     }
@@ -243,8 +248,21 @@ export function RockPaperScissorsGame({
             <div className="flex items-start justify-between gap-3">
               <div className="text-sm leading-relaxed break-all">{errorMessage}</div>
               <div className="flex gap-2">
-                <Button size="sm" variant="outline" onClick={() => { setErrorMessage(null); if (playerChoice) { void playGame(playerChoice); } }}>재시도</Button>
-                <Button size="sm" variant="ghost" onClick={() => setErrorMessage(null)}>닫기</Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setErrorMessage(null);
+                    if (playerChoice) {
+                      void playGame(playerChoice);
+                    }
+                  }}
+                >
+                  재시도
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => setErrorMessage(null)}>
+                  닫기
+                </Button>
               </div>
             </div>
           </motion.div>

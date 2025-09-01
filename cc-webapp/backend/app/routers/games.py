@@ -1268,38 +1268,6 @@ async def place_crash_bet(
     }
 
 # -------------------------------------------------------------------------
-# ================= Integrated Unified Game API (from game_api.py) =================
-@router.get("/stats/{user_id}", response_model=GameStats)
-def get_game_stats(user_id: int, db: Session = Depends(get_db)):
-    """사용자 전체 게임 통계 (슬롯/룰렛/가챠 등)"""
-    total_spins = db.query(models.UserAction).filter(
-        models.UserAction.user_id == user_id,
-        models.UserAction.action_type.in_(['SLOT_SPIN', 'ROULETTE_SPIN', 'GACHA_PULL'])
-    ).count()
-
-    # TODO: 보상 테이블 존재 여부 검증 후 reward 집계 로직 조정 필요
-    total_coins_won = 0
-    total_gold_won = 0
-    special_items_won = 0
-    jackpots_won = db.query(models.UserAction).filter(
-        models.UserAction.user_id == user_id,
-        models.UserAction.action_data.contains('jackpot')
-    ).count()
-
-    return GameStats(
-        user_id=user_id,
-        total_spins=total_spins,
-    total_coins_won=total_coins_won,
-    total_gold_won=total_gold_won,
-        special_items_won=special_items_won,
-        jackpots_won=jackpots_won,
-        bonus_spins_won=0,
-        best_streak=0,
-        current_streak=calculate_user_streak(user_id, db),
-        last_spin_date=None
-    )
-
-# -------------------------------------------------------------------------
 # Server-authoritative per-user aggregated crash stats (user_game_stats)
 @router.get("/stats/me")
 def get_my_authoritative_game_stats(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
@@ -1324,6 +1292,38 @@ def get_my_authoritative_game_stats(current_user: models.User = Depends(get_curr
     except Exception as e:  # pragma: no cover
         logger.error("get_my_authoritative_game_stats failed user=%s err=%s", current_user.id, e)
         raise HTTPException(status_code=500, detail="GameStats 조회 실패")
+
+# -------------------------------------------------------------------------
+# ================= Integrated Unified Game API (from game_api.py) =================
+@router.get("/stats/{user_id}", response_model=GameStats)
+def get_game_stats(user_id: int, db: Session = Depends(get_db)):
+    """사용자 전체 게임 통계 (슬롯/룰렛/가챠 등)"""
+    total_spins = db.query(models.UserAction).filter(
+        models.UserAction.user_id == user_id,
+        models.UserAction.action_type.in_(['SLOT_SPIN', 'ROULETTE_SPIN', 'GACHA_PULL'])
+    ).count()
+
+    # TODO: 보상 테이블 존재 여부 검증 후 reward 집계 로직 조정 필요
+    total_coins_won = 0
+    total_gold_won = 0
+    special_items_won = 0
+    jackpots_won = db.query(models.UserAction).filter(
+        models.UserAction.user_id == user_id,
+        models.UserAction.action_data.contains('jackpot')
+    ).count()
+
+    return GameStats(
+        user_id=user_id,
+        total_spins=total_spins,
+        total_coins_won=total_coins_won,
+        total_gold_won=total_gold_won,
+        special_items_won=special_items_won,
+        jackpots_won=jackpots_won,
+        bonus_spins_won=0,
+        best_streak=0,
+        current_streak=calculate_user_streak(user_id, db),
+        last_spin_date=None
+    )
 
 @router.get("/profile/{user_id}/stats", response_model=ProfileGameStats)
 def get_profile_game_stats(user_id: int, db: Session = Depends(get_db)):
