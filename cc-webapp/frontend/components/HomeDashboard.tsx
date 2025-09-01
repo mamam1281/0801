@@ -41,7 +41,8 @@ import useDashboard from '@/hooks/useDashboard';
 import useRecentActions from '@/hooks/useRecentActions';
 import { API_ORIGIN } from '@/lib/unifiedApi';
 import { createWSClient, WSClient, WebSocketMessage } from '@/utils/wsClient';
-import useBalanceSync from '@/hooks/useBalanceSync';
+import { useGlobalSync } from '@/hooks/useGlobalSync';
+import { useGlobalProfile } from '@/store/globalStore';
 import { useUserGold, useUserLevel } from '@/hooks/useSelectors';
 
 interface HomeDashboardProps {
@@ -69,19 +70,23 @@ export function HomeDashboard({
   onAddNotification,
   onToggleSideMenu,
 }: HomeDashboardProps) {
-  // 전역 프로필 셀렉터(표시 우선)
+  // 전역 동기화 사용
+  const globalProfile = useGlobalProfile();
+  const { syncAll, syncAfterGame, isHydrated } = useGlobalSync();
   const goldFromStore = useUserGold();
   const levelFromStore = useUserLevel();
   const router = useRouter();
-  const { reconcileBalance } = useBalanceSync({
-    sharedUser: user,
-    onUpdateUser,
-    onAddNotification,
-  });
-  
+
+  // 초기 동기화
+  useEffect(() => {
+    if (!isHydrated) {
+      syncAll({ showToast: false });
+    }
+  }, [isHydrated, syncAll]);
+
   // 게임 설정 로드 (하드코딩 대체)
   const { config: gameConfig, loading: configLoading } = useGameConfig();
-  
+
   // 통합 대시보드 데이터 (profile + events summary 등) - streak, vip/status 등 개별 일부 호출 단계적 병합 예정
   const {
     data: unifiedDash,
@@ -240,7 +245,7 @@ export function HomeDashboard({
 
   // 마운트 시 1회 권위 잔액으로 동기화(DEV 토스트 포함)
   useEffect(() => {
-    reconcileBalance().catch(() => {});
+    syncAll({ showToast: false }).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -249,13 +254,18 @@ export function HomeDashboard({
     const n = Number((user as any)?.id);
     return Number.isFinite(n) ? n : undefined;
   })();
-  const { actions: recentActions, reload: reloadRecentActions } = useRecentActions(numericUserId, 10, true);
+  const { actions: recentActions, reload: reloadRecentActions } = useRecentActions(
+    numericUserId,
+    10,
+    true
+  );
 
   // 선택: 실시간 반영 (NEXT_PUBLIC_REALTIME_ENABLED=1 일 때만 연결)
   useEffect(() => {
     try {
       // @ts-ignore - Node 타입 미설치 환경 대비
-      const enabled = (typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_REALTIME_ENABLED) || '0';
+      const enabled =
+        (typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_REALTIME_ENABLED) || '0';
       if (!(enabled === '1' || enabled?.toLowerCase() === 'true')) return;
       if (!numericUserId) return;
       const tokens = getTokens();
@@ -272,7 +282,9 @@ export function HomeDashboard({
             const uid = (msg as any)?.data?.user_id;
             if (!uid || Number(uid) !== numericUserId) return;
             // 간단히 재조회로 동기화
-            try { reloadRecentActions(); } catch {}
+            try {
+              reloadRecentActions();
+            } catch {}
           }
         },
         onError: () => {},
@@ -613,7 +625,9 @@ export function HomeDashboard({
                 className="bg-gradient-gold text-black px-4 py-3 rounded-xl font-bold cursor-pointer btn-hover-lift"
               >
                 <Coins className="w-6 h-6 mx-auto mb-1" />
-                <div className="text-xl lg:text-2xl">{(goldFromStore ?? user.goldBalance).toLocaleString()}</div>
+                <div className="text-xl lg:text-2xl">
+                  {(goldFromStore ?? user.goldBalance).toLocaleString()}
+                </div>
                 <div className="text-xs opacity-80">골드</div>
               </motion.div>
             </div>
@@ -763,9 +777,14 @@ export function HomeDashboard({
               <div className="space-y-2">
                 {recentActions && recentActions.length > 0 ? (
                   recentActions.map((a: any) => (
-                    <div key={a.id} className="bg-secondary/40 rounded-md px-3 py-2 text-sm flex items-center justify-between">
+                    <div
+                      key={a.id}
+                      className="bg-secondary/40 rounded-md px-3 py-2 text-sm flex items-center justify-between"
+                    >
                       <span className="font-medium text-foreground">{a.action_type}</span>
-                      <span className="text-xs text-muted-foreground">{new Date(a.created_at).toLocaleString()}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {new Date(a.created_at).toLocaleString()}
+                      </span>
                     </div>
                   ))
                 ) : (
@@ -991,10 +1010,18 @@ export function HomeDashboard({
               <div className="bg-gold-soft rounded-lg p-4 mb-6">
                 <div className="text-gold font-bold text-xl">
                   {/* 서버 설정 기반 일일 보너스 계산 */}
-                  {(gameConfig.dailyBonusBase + (streak.count ?? user.dailyStreak) * gameConfig.dailyBonusPerStreak).toLocaleString()}G
+                  {(
+                    gameConfig.dailyBonusBase +
+                    (streak.count ?? user.dailyStreak) * gameConfig.dailyBonusPerStreak
+                  ).toLocaleString()}
+                  G
                 </div>
                 <div className="text-sm text-muted-foreground">
-                  {/* 서버 설정 기반 XP 계산 */}+ {Math.floor(gameConfig.dailyBonusBase / 20) + (streak.count ?? user.dailyStreak) * Math.floor(gameConfig.dailyBonusPerStreak / 8)} XP
+                  {/* 서버 설정 기반 XP 계산 */}+{' '}
+                  {Math.floor(gameConfig.dailyBonusBase / 20) +
+                    (streak.count ?? user.dailyStreak) *
+                      Math.floor(gameConfig.dailyBonusPerStreak / 8)}{' '}
+                  XP
                 </div>
               </div>
 
