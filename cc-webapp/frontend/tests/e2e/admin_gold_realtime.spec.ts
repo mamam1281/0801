@@ -26,6 +26,17 @@ async function getBalance(ctx: import('@playwright/test').APIRequestContext, tok
   try { const j = await res.json(); return Number(j?.gold ?? j?.gold_balance ?? j?.cyber_token_balance ?? 0); } catch { return null; }
 }
 
+async function waitBalanceAtLeast(ctx: import('@playwright/test').APIRequestContext, token: string, min: number, timeoutMs = 5000, intervalMs = 200) {
+  const start = Date.now();
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const v = await getBalance(ctx, token);
+    if (typeof v === 'number' && v >= min) return v;
+    if (Date.now() - start > timeoutMs) return v ?? null;
+    await new Promise((r) => setTimeout(r, intervalMs));
+  }
+}
+
 /**
  * 시나리오
  * 1) 관리자 계정 생성 → elevate로 권한 부여
@@ -82,8 +93,8 @@ test('[Admin] 골드 지급 → UI 실시간 반영', async ({ page, request }: 
   }, initialGold + amount, { timeout: 5000, polling: 100 }).catch(() => false);
 
   if (!ok) {
-    // 간접 검증: API 기준 값이라도 증가했는지 확인하여 느슨한 스모크 유지
-    const after = await getBalance(request, targetToken);
+    // 간접 검증: API 기준 값 증가를 재시도 루프로 확인하여 느슨한 스모크 유지
+    const after = await waitBalanceAtLeast(request, targetToken, initialGold + amount, 6000, 250);
     expect(typeof after).toBe('number');
     if (typeof after === 'number') {
       expect(after).toBeGreaterThanOrEqual(initialGold + amount);

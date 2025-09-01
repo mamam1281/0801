@@ -6,22 +6,15 @@ import { rewardMessages } from '@/lib/rewardMessages';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Crown,
-  TrendingUp,
   Gift,
   Zap,
   Trophy,
-  Star,
   Settings,
   LogOut,
   Timer,
-  Coins,
   ChevronRight,
-  Gem,
   Sparkles,
   Menu,
-  ChevronDown,
-  ChevronUp,
-  Award,
 } from 'lucide-react';
 import { User } from '../types';
 import { calculateExperiencePercentage, calculateWinRate, checkLevelUp } from '../utils/userUtils';

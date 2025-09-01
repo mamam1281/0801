@@ -168,6 +168,23 @@ export async function apiCall<T=any>(path: string, opts: UnifiedRequestOptions<T
       'Accept': 'application/json',
       ...headers,
     };
+    // 무토큰 인증 상황 보정: auth=true인데 토큰이 없으면 네트워크 호출 자체를 생략
+    // - GET: 조용히 null 반환 (호출 측에서 data null 처리)
+    // - 쓰기 계열: 표준화 에러(code/status 포함) 던짐
+    if (auth && !tokens?.access_token) {
+      const upper = method.toUpperCase();
+      const logEnabled = __logGateEnabled();
+      if (upper === 'GET') {
+        if (logEnabled) console.info(`[unifiedApi] skip GET (no token, silent)`);
+        // @ts-ignore
+        return (null) as T;
+      }
+      const unauthErr: any = new Error('UNAUTHENTICATED_NO_TOKEN');
+      unauthErr.code = 'UNAUTHENTICATED_NO_TOKEN';
+      unauthErr.status = 401;
+      if (logEnabled) console.warn(`[unifiedApi] skip ${upper} (no token)`);
+      throw unauthErr;
+    }
     if (auth && tokens?.access_token) {
       finalHeaders['Authorization'] = `Bearer ${tokens.access_token}`;
     }
@@ -223,10 +240,14 @@ export async function apiCall<T=any>(path: string, opts: UnifiedRequestOptions<T
         attempt++; continue;
       }
       const errText = await response.text().catch(() => `HTTP ${response.status}`);
-      // 403 Not authenticated & 토큰 없음 → 초기 하이드레이트 등에서 경고만
+      // 403 Not authenticated & 토큰 없음 → 이전 동작은 에러 throw였으나,
+      // 상단 무토큰 가드가 선제 처리하므로 일반적으로 도달하지 않음. 방어적 처리만 유지.
       if (response.status === 403 && !getTokens()?.access_token) {
         if (logEnabled) console.warn(`[unifiedApi] 403 Not authenticated (no token)`, errText);
-        throw new Error(`Not authenticated`);
+        const unauthErr: any = new Error('UNAUTHENTICATED_NO_TOKEN');
+        unauthErr.code = 'UNAUTHENTICATED_NO_TOKEN';
+        unauthErr.status = 403;
+        throw unauthErr;
       }
       // 일일보상 중복(400) 메시지 한국어/영문 패턴 정규화
       if (response.status === 400 && /하루에 1번|already\s*claimed/i.test(errText)) {
