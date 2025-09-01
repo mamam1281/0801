@@ -122,10 +122,13 @@ export function useGlobalSync() {
     const syncGameStats = useCallback(async (): Promise<boolean> => {
         try {
             const response = await api.get(AUTHORITY_ENDPOINTS.GAME_STATS);
-
-            // 다양한 응답 포맷을 안전하게 stats 오브젝트로 변환
+            // 단일 포맷: { success: boolean, stats: {...} }
             const raw = (response as any)?.data ?? response;
-            const statsRoot = (raw && typeof raw === 'object' && 'stats' in raw) ? (raw as any).stats : raw;
+            if (!raw || typeof raw !== 'object' || !('stats' in (raw as any))) {
+                console.warn('[GlobalSync] Unexpected stats format; expected {success, stats}. Got:', raw);
+                return false;
+            }
+            const statsRoot = (raw as any).stats;
 
             const gameStats: Record<string, any> = {};
 

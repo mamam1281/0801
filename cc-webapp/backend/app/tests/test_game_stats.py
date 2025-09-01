@@ -4,6 +4,7 @@ from decimal import Decimal
 
 from app.services.game_stats_service import GameStatsService
 from app.models.game_stats_models import UserGameStats
+from app.models.history_models import GameHistory
 
 # NOTE: Assuming a pytest fixture `db` (Session) exists elsewhere in test suite.
 # If not, this test will need a fixture providing a transactional session.
@@ -74,3 +75,14 @@ class TestGameStatsService:
         assert after.total_losses == 1
         assert after.total_profit == Decimal('150')
         assert float(after.highest_multiplier) == 3.0
+
+    def test_history_visibility_same_session(self, db: Session):
+        """update_from_round 직후 동일 세션에서 GameHistory가 조회 가능한지 확인."""
+        svc = GameStatsService(db)
+        svc.update_from_round(user_id=3, bet_amount=40, win_amount=0, final_multiplier=1.05)
+        rows = (
+            db.query(GameHistory)
+            .filter(GameHistory.user_id == 3, GameHistory.game_type == "crash")
+            .all()
+        )
+        assert any(r.action_type in ("BET", "WIN") for r in rows)

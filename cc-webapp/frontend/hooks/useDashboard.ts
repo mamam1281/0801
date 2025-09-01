@@ -6,6 +6,7 @@ import { api } from '@/lib/unifiedApi';
  * - /api/dashboard 통합 응답 fetch
  * - 1초(TTL_MS) 내 중복 호출 dedupe
  * - invalidate() 호출로 강제 재갱신
+ * @deprecated 다음 릴리스에서 제거 예정. 전역 스토어 셀렉터(useGlobalStore)와 useGameStats/useGlobalSync 조합으로 대체하세요.
  */
 
 interface DashboardData {

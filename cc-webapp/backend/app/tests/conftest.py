@@ -219,11 +219,21 @@ def db():
 	at the end of the test, keeping tests isolated and fast.
 	"""
 	from sqlalchemy.orm import sessionmaker as _sessionmaker
+	from sqlalchemy import event as _event
 	# Use the shared engine created by app.database
 	conn = engine.connect()
+	# 외부 트랜잭션(롤백 전용) 시작
 	trans = conn.begin()
-	TestingSessionLocal = _sessionmaker(bind=conn, autocommit=False, autoflush=False)
+	TestingSessionLocal = _sessionmaker(bind=conn, autocommit=False, autoflush=False, expire_on_commit=False)
 	sess = TestingSessionLocal()
+	# 내부 세이브포인트 시작: 서비스 코드의 sess.commit()이 와도 여기까지만 커밋되도록
+	sess.begin_nested()
+
+	# 세이브포인트가 종료되면 재생성하여, 다중 커밋에도 격리를 유지
+	@_event.listens_for(sess, "after_transaction_end")
+	def _restart_savepoint(session_, trans_):  # noqa: ANN001
+		if trans_.nested and not getattr(trans_._parent, 'nested', False):  # type: ignore[attr-defined]
+			session_.begin_nested()
 	try:
 		yield sess
 	finally:
@@ -231,6 +241,7 @@ def db():
 			sess.close()
 		finally:
 			try:
+				# 외부 트랜잭션 전체 롤백으로 테스트 중 생성된 모든 변경을 폐기
 				trans.rollback()
 			finally:
 				conn.close()
@@ -321,6 +332,32 @@ def _seed_users_for_gamestats():
 	except Exception:
 		# Non-fatal: if seeding fails, affected tests will surface FK errors
 		pass
+
+
+	# --- Ensure clean GameHistory for common test users per test (determinism) ---
+	@pytest.fixture(autouse=True)
+	def _cleanup_gamestats_history(db):  # noqa: D401
+		"""각 테스트 시작 시 GameHistory를 정리해 이전 실행/수동 디버그 잔여분 영향 제거."""
+		try:
+			from app.models.history_models import GameHistory as _GH
+			from app.models.game_stats_models import UserGameStats as _UGS
+			# 히스토리 삭제
+			(db.query(_GH)
+			 	.filter(_GH.user_id.in_([1, 2, 3]), _GH.game_type == 'crash')
+			 	.delete(synchronize_session=False))
+			# 누적 스탯 초기화
+			for uid in [1, 2, 3]:
+				stats = db.get(_UGS, uid)
+				if stats:
+					stats.total_bets = 0
+					stats.total_wins = 0
+					stats.total_losses = 0
+					stats.total_profit = 0
+					stats.highest_multiplier = None
+			db.commit()
+		except Exception:
+			# 비치명적 – 청소 실패 시 해당 테스트에서 드러남
+			pass
 
 
 # ---- Global deterministic PaymentGateway patch (session scope) ----

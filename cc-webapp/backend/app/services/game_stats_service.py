@@ -10,6 +10,11 @@ from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
+# --- Constants (unified across update/recalc) ---
+GAME_TYPE_CRASH = "crash"
+ACTION_BET = "BET"
+ACTION_WIN = "WIN"
+
 class GameStatsService:
     """Server-authoritative aggregated user game stats.
 
@@ -30,23 +35,17 @@ class GameStatsService:
         return stats
 
     def update_from_round(self, *, user_id: int, bet_amount: int, win_amount: int, final_multiplier: float) -> UserGameStats:
-        """Apply a single crash round result.
+    """Apply a single crash round result.
 
-        bet_amount: amount wagered (positive integer)
-        win_amount: amount returned (0 if loss) (positive int) -> profit = win_amount - bet_amount
-        final_multiplier: achieved multiplier (>=1.0). If win, this is the cashout multiplier; if loss, the crash multiplier.
-        """
-        stats = self.get_or_create(user_id)
-        profit = win_amount - bet_amount
-        # Increment counters
-        stats.total_bets = (stats.total_bets or 0) + 1
-        if win_amount > 0:
-            stats.total_wins = (stats.total_wins or 0) + 1
-        else:
-            stats.total_losses = (stats.total_losses or 0) + 1
+    bet_amount: amount wagered (positive integer)
+    win_amount: amount returned (0 if loss) (positive int) -> profit = win_amount - bet_amount
+    final_multiplier: achieved multiplier (>=1.0). If win, this is the cashout multiplier; if loss, the crash multiplier.
+    """
+    stats = self.get_or_create(user_id)
+    profit = win_amount - bet_amount
         # Highest multiplier update (monotonic non-decreasing)
-        try:
-            if final_multiplier and final_multiplier > 0:
+        if final_multiplier and final_multiplier > 0:
+            try:
                 if stats.highest_multiplier is None or float(final_multiplier) > float(stats.highest_multiplier):
                     stats.highest_multiplier = Decimal(str(final_multiplier))
                 elif float(final_multiplier) < float(stats.highest_multiplier):
@@ -56,46 +55,71 @@ class GameStatsService:
                         final_multiplier,
                         stats.highest_multiplier,
                     )
-        except Exception:  # pragma: no cover
-            logger.debug("highest_multiplier compare failed", exc_info=True)
+            except Exception:
+                # 축소: 불필요 억제 최소화, 문제는 드러내되 테스트 안정성을 위해 경고만 남김
+                logger.warning("highest_multiplier update failed", exc_info=True)
 
-        # Append authoritative history row for recomputation/parity
-        try:
-            if win_amount > 0:
-                self.db.add(
-                    GameHistory(
-                        user_id=user_id,
-                        game_type="crash",
-                        action_type="WIN",
-                        delta_coin=int(win_amount - bet_amount),
-                        delta_gem=0,
-                        result_meta={
-                            "bet_amount": int(bet_amount),
-                            "win_amount": int(win_amount),
-                            "final_multiplier": float(final_multiplier) if final_multiplier is not None else None,
-                        },
-                    )
-                )
-            else:
-                self.db.add(
-                    GameHistory(
-                        user_id=user_id,
-                        game_type="crash",
-                        action_type="BET",
-                        delta_coin=-int(bet_amount),
-                        delta_gem=0,
-                        result_meta={
-                            "bet_amount": int(bet_amount),
-                            "win_amount": int(win_amount),
-                            "final_multiplier": float(final_multiplier) if final_multiplier is not None else None,
-                        },
-                    )
-                )
-        except Exception:  # pragma: no cover
-            logger.debug("history append failed", exc_info=True)
+        # Append authoritative history row for recomputation/parity (explicit logging + flush)
+        if win_amount > 0:
+            delta = int(win_amount - bet_amount)
+            if delta <= 0:
+                logger.warning("WIN delta non-positive user=%s bet=%s win=%s -> delta=%s", user_id, bet_amount, win_amount, delta)
+            rec = GameHistory(
+                user_id=user_id,
+                game_type=GAME_TYPE_CRASH,
+                action_type=ACTION_WIN,
+                delta_coin=delta,
+                delta_gem=0,
+                result_meta={
+                    "bet_amount": int(bet_amount),
+                    "win_amount": int(win_amount),
+                    "final_multiplier": float(final_multiplier) if final_multiplier is not None else None,
+                },
+            )
+            self.db.add(rec)
+            self.db.flush()  # ensure visible within current transaction
+            logger.info("GameHistory appended: user=%s type=%s action=%s id=%s delta=%s", user_id, GAME_TYPE_CRASH, ACTION_WIN, getattr(rec, 'id', None), delta)
+        else:
+            delta = -int(bet_amount)
+            rec = GameHistory(
+                user_id=user_id,
+                game_type=GAME_TYPE_CRASH,
+                action_type=ACTION_BET,
+                delta_coin=delta,
+                delta_gem=0,
+                result_meta={
+                    "bet_amount": int(bet_amount),
+                    "win_amount": int(win_amount),
+                    "final_multiplier": float(final_multiplier) if final_multiplier is not None else None,
+                },
+            )
+            self.db.add(rec)
+            self.db.flush()
+            logger.info("GameHistory appended: user=%s type=%s action=%s id=%s delta=%s", user_id, GAME_TYPE_CRASH, ACTION_BET, getattr(rec, 'id', None), delta)
 
-        # Profit accumulation and finalize
-        stats.total_profit = Decimal(str(stats.total_profit or 0)) + Decimal(str(profit))
+        # Recompute authoritative aggregates from history (crash only)
+        agg = (
+            self.db.query(
+                func.sum(
+                    case(((GameHistory.action_type == ACTION_WIN) & (GameHistory.delta_coin > 0), 1), else_=0)
+                ).label('win_rows'),
+                func.sum(
+                    case(((GameHistory.action_type == ACTION_BET) & (GameHistory.delta_coin < 0), 1), else_=0)
+                ).label('loss_rows'),
+                func.coalesce(func.sum(GameHistory.delta_coin), 0).label('delta_sum'),
+            )
+            .filter(GameHistory.user_id == user_id, GameHistory.game_type == GAME_TYPE_CRASH)
+        ).one()
+
+        wins = int(agg.win_rows or 0)
+        losses = int(agg.loss_rows or 0)
+        total_bets = wins + losses
+        delta_sum = int(agg.delta_sum or 0)
+
+        stats.total_bets = total_bets
+        stats.total_wins = wins
+        stats.total_losses = losses
+        stats.total_profit = Decimal(str(delta_sum))
         stats.updated_at = datetime.utcnow()
         self.db.commit()
         return stats
@@ -109,22 +133,22 @@ class GameStatsService:
         q = (
             self.db.query(
                 func.sum(
-                    case((GameHistory.action_type == 'BET', 1), else_=0)
-                ).label('bet_rows'),
-                func.sum(
-                    case((GameHistory.action_type == 'WIN', 1), else_=0)
+                    case(((GameHistory.action_type == ACTION_WIN) & (GameHistory.delta_coin > 0), 1), else_=0)
                 ).label('win_rows'),
+                func.sum(
+                    case(((GameHistory.action_type == ACTION_BET) & (GameHistory.delta_coin < 0), 1), else_=0)
+                ).label('loss_rows'),
                 func.coalesce(func.sum(GameHistory.delta_coin), 0).label('delta_sum'),
             )
-            .filter(GameHistory.user_id == user_id, GameHistory.game_type == 'crash')
+            .filter(GameHistory.user_id == user_id, GameHistory.game_type == GAME_TYPE_CRASH)
         )
         row = q.one()
-        bets = int(row.bet_rows or 0)
         wins = int(row.win_rows or 0)
-        losses = max(0, bets - wins)
+        losses = int(row.loss_rows or 0)
+        total_bets = wins + losses
         delta_sum = int(row.delta_sum or 0)
         stats = self.get_or_create(user_id)
-        stats.total_bets = bets
+        stats.total_bets = total_bets
         stats.total_wins = wins
         stats.total_losses = losses
         stats.total_profit = Decimal(str(delta_sum))
