@@ -77,8 +77,7 @@ test.describe('[Games] stats UI ↔ API parity (guarded)', () => {
     const existGames = await gamesEl.count().catch(() => 0);
     const existWins = await winsEl.count().catch(() => 0);
     if (!existGames || !existWins) {
-      if (REQUIRE) throw new Error('stats total testids not present');
-      test.skip(true, 'stats total testids not present');
+      test.skip(true, 'stats total testids not present (main page stats removed)');
       return;
     }
 

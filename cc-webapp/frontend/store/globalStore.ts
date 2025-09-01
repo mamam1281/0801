@@ -62,6 +62,7 @@ type Actions =
     | { type: "SET_BALANCES"; balances: { gold: number; gems?: number } }
     | { type: "SET_STREAK"; streak: Record<string, any> }
     | { type: "SET_EVENTS"; events: Record<string, any> }
+    | { type: "SET_GAME_STATS"; gameStats: Record<string, any> }
     | { type: "PUSH_NOTIFICATION"; item: { id: string; type: string; message: string; at: number } };
 
 const initialState: GlobalState = {
@@ -172,6 +173,8 @@ function reducer(state: GlobalState, action: Actions): GlobalState {
             return { ...state, streak: { ...action.streak } };
         case "SET_EVENTS":
             return { ...state, events: { ...action.events } };
+        case "SET_GAME_STATS":
+            return { ...state, gameStats: { ...action.gameStats } };
         case "PUSH_NOTIFICATION":
             return { ...state, notifications: [{ ...action.item }, ...(state.notifications || [])].slice(0, 50) };
         default:

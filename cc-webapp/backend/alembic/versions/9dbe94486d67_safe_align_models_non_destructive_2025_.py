@@ -220,12 +220,15 @@ def upgrade() -> None:
         op.create_index(op.f('ix_user_missions_mission_id'), 'user_missions', ['mission_id'], unique=False)
     if 'ix_user_missions_user_id' not in existing_um_indexes:
         op.create_index(op.f('ix_user_missions_user_id'), 'user_missions', ['user_id'], unique=False)
-    op.alter_column('user_rewards', 'reward_id',
-               existing_type=sa.INTEGER(),
-               nullable=True)
-    existing_ur_indexes = {i['name'] for i in insp.get_indexes('user_rewards')}
-    if 'ix_user_rewards_claimed_at' not in existing_ur_indexes:
-        op.create_index(op.f('ix_user_rewards_claimed_at'), 'user_rewards', ['claimed_at'], unique=False)
+    # Guard: only alter/index if user_rewards table exists
+    existing_tables = set(insp.get_table_names())
+    if 'user_rewards' in existing_tables:
+        op.alter_column('user_rewards', 'reward_id',
+                   existing_type=sa.INTEGER(),
+                   nullable=True)
+        existing_ur_indexes = {i['name'] for i in insp.get_indexes('user_rewards')}
+        if 'ix_user_rewards_claimed_at' not in existing_ur_indexes:
+            op.create_index(op.f('ix_user_rewards_claimed_at'), 'user_rewards', ['claimed_at'], unique=False)
     op.alter_column('user_segments', 'last_updated',
                existing_type=postgresql.TIMESTAMP(),
                nullable=True,
@@ -330,10 +333,24 @@ def downgrade() -> None:
                existing_type=postgresql.TIMESTAMP(),
                nullable=False,
                existing_server_default=sa.text('now()'))
-    op.drop_index(op.f('ix_user_rewards_claimed_at'), table_name='user_rewards')
-    op.alter_column('user_rewards', 'reward_id',
-               existing_type=sa.INTEGER(),
-               nullable=False)
+    # Guard: drop indexes/alter only if user_rewards table exists
+    bind = op.get_bind()
+    try:
+        inspector = sa.inspect(bind)
+        has_user_rewards = 'user_rewards' in set(inspector.get_table_names())
+    except Exception:
+        has_user_rewards = False
+    if has_user_rewards:
+        try:
+            op.drop_index(op.f('ix_user_rewards_claimed_at'), table_name='user_rewards')
+        except Exception:
+            pass
+        try:
+            op.alter_column('user_rewards', 'reward_id',
+                       existing_type=sa.INTEGER(),
+                       nullable=False)
+        except Exception:
+            pass
     op.drop_index(op.f('ix_user_missions_user_id'), table_name='user_missions')
     op.drop_index(op.f('ix_user_missions_mission_id'), table_name='user_missions')
     op.drop_index(op.f('ix_user_missions_id'), table_name='user_missions')

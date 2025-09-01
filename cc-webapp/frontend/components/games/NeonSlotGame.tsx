@@ -7,6 +7,13 @@ import { api } from '@/lib/unifiedApi';
 import { useWithReconcile } from '@/lib/sync';
 import { useUserGold } from '@/hooks/useSelectors';
 import { useGlobalStore, mergeProfile, mergeGameStats } from '@/store/globalStore';
+import { useGameTileStats } from '@/hooks/useGameStats';
+import {
+  PLAY_COUNT_KEYS_BY_GAME,
+  SLOT_JACKPOT_KEYS,
+  SLOT_TOTAL_WINNINGS_KEYS,
+} from '@/constants/gameStatsKeys';
+import { useGlobalSync } from '@/hooks/useGlobalSync';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft,
@@ -106,10 +113,12 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
     onUpdateUser,
     onAddNotification,
   });
+  const { syncAfterGame } = useGlobalSync();
   const withReconcile = useWithReconcile();
   // 전역 권위 잔액(셀렉터)
   const gold = useUserGold();
-  const { dispatch } = useGlobalStore();
+  // 전역 스토어 훅은 컴포넌트 최상단에서만 호출 (rules-of-hooks 준수)
+  const { state, dispatch } = useGlobalStore();
 
   // unifiedApi: call games endpoints with relative paths
   const [reels, setReels] = useState([
@@ -146,10 +155,13 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
     }
   }, [configLoading, gameConfig.slotGameCost]);
 
-  // Jackpot calculation
+  // 전역 통계 우선 플레이 카운트 추출(슬롯)
+  const { playCount: slotPlays } = useGameTileStats('slot', user?.gameStats?.slot);
+
+  // Jackpot calculation (전역 통계 기반; fallback은 0)
   useEffect(() => {
-    setCurrentJackpot(50000 + user.gameStats.slot.totalSpins * 50);
-  }, [user.gameStats.slot.totalSpins]);
+    setCurrentJackpot(50000 + (slotPlays || 0) * 50);
+  }, [slotPlays]);
 
   // Auto spin logic
   useEffect(() => {
@@ -305,8 +317,9 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
     // Deduct bet amount (locally; authoritative balance will come from server if call succeeds)
     const costAmount = betAmount;
 
-  let serverResult: SlotSpinApiResponse | null = null;
-  let hasMergedBalance = false;
+    let serverResult: SlotSpinApiResponse | null = null;
+    let hasMergedBalance = false;
+    let authoritativeUsed = false;
     // Attempt authoritative server spin with reconcile + idempotency
     try {
       setErrorMessage(null);
@@ -326,6 +339,7 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
         mergeProfile(dispatch, { goldBalance: Number(serverResult.balance) });
         hasMergedBalance = true;
       }
+      authoritativeUsed = !!(serverResult && serverResult.success);
     } catch (_e) {
       serverResult = null; // fallback to local simulation (no local balance mutation)
       const msg =
@@ -406,7 +420,7 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
 
     // Process final result after all reels stop
     setTimeout(async () => {
-  if (result.winAmount > 0) {
+      if (result.winAmount > 0) {
         setIsWin(true);
         setWinAmount(result.winAmount);
         setWinningPositions(result.winningPositions);
@@ -425,42 +439,20 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
 
         // 🎯 잔액 동기화: 서버 응답에 balance가 없을 때만 reconcile 수행
         if (!hasMergedBalance) {
-          await reconcileBalance();
+          await syncAfterGame();
         }
 
-        // 전역 게임 통계 누적(가산)
-        mergeGameStats(dispatch, 'slot', {
-          totalSpins: 1,
-          totalBet: costAmount,
-          totalPayout: result.winAmount,
-          totalWins: 1,
-          jackpots: result.isJackpot ? 1 : 0,
-        });
-
-        // 게임 통계만 업데이트 (잔액은 reconcileBalance에서 처리됨)
-        const updatedUser = {
-          ...user,
-          gameStats: {
-            ...user.gameStats,
-            slot: {
-              ...user.gameStats.slot,
-              totalSpins: user.gameStats.slot.totalSpins + 1,
-              totalWinnings: user.gameStats.slot.totalWinnings + result.winAmount,
-              biggestWin: Math.max(user.gameStats.slot.biggestWin, result.winAmount),
-              jackpotHits: result.isJackpot
-                ? user.gameStats.slot.jackpotHits + 1
-                : user.gameStats.slot.jackpotHits,
-            },
-          },
-          stats: {
-            ...user.stats,
-            gamesPlayed: user.stats.gamesPlayed + 1,
-            gamesWon: user.stats.gamesWon + 1,
-            totalEarnings: user.stats.totalEarnings + (result.winAmount - costAmount),
-            winStreak: user.stats.winStreak + 1,
-          },
-        };
-        onUpdateUser(updatedUser);
+        // 전역 게임 통계 누적(표시용 캐시). 서버 실패(로컬 시뮬레이션) 시에는 증가하지 않음
+        if (authoritativeUsed) {
+          mergeGameStats(dispatch, 'slot', {
+            totalSpins: 1,
+            totalBet: costAmount,
+            totalPayout: result.winAmount,
+            totalWins: 1,
+            jackpots: result.isJackpot ? 1 : 0,
+          });
+        }
+        // 로컬 user.gameStats 직접 증분 제거 (서버 권위 동기화 사용)
 
         // Only important notifications
         if (result.isJackpot) {
@@ -474,35 +466,20 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
 
         // 🎯 패배 시에도 잔액 동기화 필요: 서버 balance 없을 때만 reconcile
         if (!hasMergedBalance) {
-          await reconcileBalance();
+          await syncAfterGame();
         }
 
-        // 전역 게임 통계 누적(가산)
-        mergeGameStats(dispatch, 'slot', {
-          totalSpins: 1,
-          totalBet: costAmount,
-          totalPayout: 0,
-          totalWins: 0,
-          jackpots: 0,
-        });
-
-        // 게임 통계만 업데이트 (잔액은 reconcileBalance에서 처리됨)
-        const updatedUser = {
-          ...user,
-          gameStats: {
-            ...user.gameStats,
-            slot: {
-              ...user.gameStats.slot,
-              totalSpins: user.gameStats.slot.totalSpins + 1, // spins -> totalSpins
-            },
-          },
-          stats: {
-            ...user.stats,
-            gamesPlayed: user.stats.gamesPlayed + 1,
-            winStreak: 0,
-          },
-        };
-        onUpdateUser(updatedUser);
+        // 전역 게임 통계 누적(표시용 캐시). 서버 실패(로컬 시뮬레이션) 시에는 증가하지 않음
+        if (authoritativeUsed) {
+          mergeGameStats(dispatch, 'slot', {
+            totalSpins: 1,
+            totalBet: costAmount,
+            totalPayout: 0,
+            totalWins: 0,
+            jackpots: 0,
+          });
+        }
+        // 로컬 user.gameStats 직접 증분 제거 (서버 권위 동기화 사용)
         // 실패 스핀도 서버 feedback이 push 되었을 수 있음 (serverResult)
       }
 
@@ -733,7 +710,6 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
                               />
                             </div>
                           ))}
-
                       </motion.div>
                     )}
                   </AnimatePresence>
@@ -848,13 +824,13 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
               </div>
 
               <div className="grid grid-cols-4 gap-2">
-        {[100, 500, 1000, 5000].map((amount) => (
+                {[100, 500, 1000, 5000].map((amount) => (
                   <Button
                     key={amount}
                     size="sm"
                     variant="outline"
-          onClick={() => setBetAmount(Math.min(amount, gold))}
-          disabled={isSpinning || isAutoSpinning || gold < amount}
+                    onClick={() => setBetAmount(Math.min(amount, gold))}
+                    disabled={isSpinning || isAutoSpinning || gold < amount}
                     className="border-border-secondary hover:border-primary text-xs btn-hover-lift"
                   >
                     {amount}G
@@ -921,33 +897,67 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
           </div>
         </motion.div>
 
-        {/* Game Stats */}
+        {/* Game Stats - 전역 store.gameStats 우선 */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.6 }}
           className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6"
         >
-          <div className="glass-effect rounded-xl p-4 text-center card-hover-float">
-            <div className="text-xl font-bold text-primary">{user.gameStats.slot.totalSpins}</div>
-            <div className="text-sm text-muted-foreground">총 스핀</div>
-          </div>
-          <div className="glass-effect rounded-xl p-4 text-center card-hover-float">
-            <div className="text-xl font-bold text-gold">{user.gameStats.slot.jackpotHits}</div>
-            <div className="text-sm text-muted-foreground">잭팟 횟수</div>
-          </div>
-          <div className="glass-effect rounded-xl p-4 text-center card-hover-float">
-            <div className="text-xl font-bold text-success">
-              {user.gameStats.slot.biggestWin.toLocaleString()}G
-            </div>
-            <div className="text-sm text-muted-foreground">최대 승리</div>
-          </div>
-          <div className="glass-effect rounded-xl p-4 text-center card-hover-float">
-            <div className="text-xl font-bold text-warning">
-              {user.gameStats.slot.totalWinnings.toLocaleString()}G
-            </div>
-            <div className="text-sm text-muted-foreground">총 획득</div>
-          </div>
+          {(() => {
+            // 전역 store는 상단에서 훅으로 추출됨 (hooks inside callback 금지)
+            const slotStats =
+              (state?.gameStats?.slot as any) || (state?.gameStats as any)?.['slot'];
+            const slotData =
+              slotStats && (slotStats as any).data ? (slotStats as any).data : slotStats;
+
+            const plays = slotPlays || 0;
+            const jackpots = (() => {
+              if (!slotData) return user?.gameStats?.slot?.jackpotHits || 0;
+              for (const k of SLOT_JACKPOT_KEYS as readonly string[]) {
+                const v = (slotData as any)[k];
+                if (typeof v === 'number') return v;
+              }
+              return user?.gameStats?.slot?.jackpotHits || 0;
+            })();
+            const biggestWin = (() => {
+              const v = (slotData as any)?.biggestWin;
+              return typeof v === 'number' ? v : user?.gameStats?.slot?.biggestWin || 0;
+            })();
+            const totalWinnings = (() => {
+              if (!slotData) return user?.gameStats?.slot?.totalWinnings || 0;
+              for (const k of SLOT_TOTAL_WINNINGS_KEYS as readonly string[]) {
+                const v = (slotData as any)[k];
+                if (typeof v === 'number') return v;
+              }
+              return user?.gameStats?.slot?.totalWinnings || 0;
+            })();
+
+            return (
+              <>
+                <div className="glass-effect rounded-xl p-4 text-center card-hover-float">
+                  <div className="text-xl font-bold text-primary">{plays}</div>
+                  <div className="text-sm text-muted-foreground">총 스핀</div>
+                </div>
+                <div className="glass-effect rounded-xl p-4 text-center card-hover-float">
+                  <div className="text-xl font-bold text-gold">{jackpots}</div>
+                  <div className="text-sm text-muted-foreground">잭팟 횟수</div>
+                </div>
+                <div className="glass-effect rounded-xl p-4 text-center card-hover-float">
+                  <div className="text-xl font-bold text-success">
+                    {biggestWin.toLocaleString()}G
+                  </div>
+                  <div className="text-sm text-muted-foreground">최대 승리</div>
+                </div>
+                <div className="glass-effect rounded-xl p-4 text-center card-hover-float">
+                  <div className="text-xl font-bold text-warning">
+                    {totalWinnings.toLocaleString()}G
+                  </div>
+                  <div className="text-sm text-muted-foreground">총 획득</div>
+                </div>
+              </>
+            );
+          })()}
         </motion.div>
 
         {/* Paytable */}

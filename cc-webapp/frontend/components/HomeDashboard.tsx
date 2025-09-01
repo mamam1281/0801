@@ -6,23 +6,15 @@ import { rewardMessages } from '@/lib/rewardMessages';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Crown,
-  TrendingUp,
   Gift,
   Zap,
   Trophy,
-  Star,
   Settings,
   LogOut,
   Timer,
-  Coins,
   ChevronRight,
-  BarChart3,
-  Gem,
   Sparkles,
   Menu,
-  ChevronDown,
-  ChevronUp,
-  Award,
 } from 'lucide-react';
 import { User } from '../types';
 import { calculateExperiencePercentage, calculateWinRate, checkLevelUp } from '../utils/userUtils';
@@ -41,7 +33,8 @@ import useDashboard from '@/hooks/useDashboard';
 import useRecentActions from '@/hooks/useRecentActions';
 import { API_ORIGIN } from '@/lib/unifiedApi';
 import { createWSClient, WSClient, WebSocketMessage } from '@/utils/wsClient';
-import useBalanceSync from '@/hooks/useBalanceSync';
+import { useGlobalSync } from '@/hooks/useGlobalSync';
+import { useGlobalProfile } from '@/store/globalStore';
 import { useUserGold, useUserLevel } from '@/hooks/useSelectors';
 
 interface HomeDashboardProps {
@@ -69,19 +62,23 @@ export function HomeDashboard({
   onAddNotification,
   onToggleSideMenu,
 }: HomeDashboardProps) {
-  // 전역 프로필 셀렉터(표시 우선)
+  // 전역 동기화 사용
+  const globalProfile = useGlobalProfile();
+  const { syncAll, syncAfterGame, isHydrated } = useGlobalSync();
   const goldFromStore = useUserGold();
   const levelFromStore = useUserLevel();
   const router = useRouter();
-  const { reconcileBalance } = useBalanceSync({
-    sharedUser: user,
-    onUpdateUser,
-    onAddNotification,
-  });
-  
+
+  // 초기 동기화
+  useEffect(() => {
+    if (!isHydrated) {
+      syncAll({ showToast: false });
+    }
+  }, [isHydrated, syncAll]);
+
   // 게임 설정 로드 (하드코딩 대체)
   const { config: gameConfig, loading: configLoading } = useGameConfig();
-  
+
   // 통합 대시보드 데이터 (profile + events summary 등) - streak, vip/status 등 개별 일부 호출 단계적 병합 예정
   const {
     data: unifiedDash,
@@ -240,7 +237,7 @@ export function HomeDashboard({
 
   // 마운트 시 1회 권위 잔액으로 동기화(DEV 토스트 포함)
   useEffect(() => {
-    reconcileBalance().catch(() => {});
+    syncAll({ showToast: false }).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -249,13 +246,18 @@ export function HomeDashboard({
     const n = Number((user as any)?.id);
     return Number.isFinite(n) ? n : undefined;
   })();
-  const { actions: recentActions, reload: reloadRecentActions } = useRecentActions(numericUserId, 10, true);
+  const { actions: recentActions, reload: reloadRecentActions } = useRecentActions(
+    numericUserId,
+    10,
+    true
+  );
 
   // 선택: 실시간 반영 (NEXT_PUBLIC_REALTIME_ENABLED=1 일 때만 연결)
   useEffect(() => {
     try {
       // @ts-ignore - Node 타입 미설치 환경 대비
-      const enabled = (typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_REALTIME_ENABLED) || '0';
+      const enabled =
+        (typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_REALTIME_ENABLED) || '0';
       if (!(enabled === '1' || enabled?.toLowerCase() === 'true')) return;
       if (!numericUserId) return;
       const tokens = getTokens();
@@ -272,7 +274,9 @@ export function HomeDashboard({
             const uid = (msg as any)?.data?.user_id;
             if (!uid || Number(uid) !== numericUserId) return;
             // 간단히 재조회로 동기화
-            try { reloadRecentActions(); } catch {}
+            try {
+              reloadRecentActions();
+            } catch {}
           }
         },
         onError: () => {},
@@ -348,7 +352,7 @@ export function HomeDashboard({
         invalidateDash?.();
         reloadDash();
       } catch {}
-    } catch (e: any) {
+  } catch (e: any) {
       // 상태코드/메시지 기반 분류 로깅 지원 (apiRequest는 status를 직접 던지지 않으므로 message 패턴 사용)
       if (e?.message === 'Failed to fetch') {
         onAddNotification(rewardMessages.networkFail);
@@ -358,7 +362,7 @@ export function HomeDashboard({
       }
       if (
         e?.message?.includes('한 회원당 하루에 1번만') ||
-        e?.message?.includes('already claimed')
+        /already[_\s]?claimed/i.test(e?.message || '')
       ) {
         // 요구사항: 이미 수령 케이스 문구 통일
         onAddNotification(rewardMessages.alreadyClaimed);
@@ -599,64 +603,11 @@ export function HomeDashboard({
 
       {/* Main Content */}
       <div className="relative z-10 p-4 lg:p-6 max-w-7xl mx-auto">
-        {/* User Stats Bar */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className="glass-effect rounded-2xl p-4 lg:p-6 mb-6"
-        >
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="text-center">
-              <motion.div
-                whileHover={{ scale: 1.05 }}
-                className="bg-gradient-gold text-black px-4 py-3 rounded-xl font-bold cursor-pointer btn-hover-lift"
-              >
-                <Coins className="w-6 h-6 mx-auto mb-1" />
-                <div className="text-xl lg:text-2xl">{(goldFromStore ?? user.goldBalance).toLocaleString()}</div>
-                <div className="text-xs opacity-80">골드</div>
-              </motion.div>
-            </div>
-
-            <div className="text-center">
-              <div className="bg-gradient-game text-white px-4 py-3 rounded-xl">
-                <Star className="w-6 h-6 mx-auto mb-1" />
-                <div className="text-xl lg:text-2xl">레벨 {levelFromStore ?? user.level}</div>
-                <div className="w-full bg-white/20 rounded-full h-1.5 mt-1">
-                  <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: `${experiencePercentage}%` }}
-                    transition={{ duration: 1, delay: 0.5 }}
-                    className="bg-white h-full rounded-full"
-                  />
-                </div>
-                <div className="text-xs opacity-80 mt-1">
-                  {user.experience}/{user.maxExperience} XP
-                </div>
-              </div>
-            </div>
-
-            <div className="text-center">
-              <motion.div className="px-4 py-3 rounded-xl bg-gradient-to-r from-info to-success text-white treasure-bounce">
-                <Gem className="w-6 h-6 mx-auto mb-1" />
-                <div className="text-xl lg:text-2xl">{treasureProgress}%</div>
-                <div className="text-xs opacity-80">보물찾기</div>
-              </motion.div>
-            </div>
-
-            <div className="text-center">
-              <motion.div
-                whileHover={{ scale: 1.05 }}
-                onClick={() => setShowDailyReward(true)}
-                className="bg-gradient-to-r from-warning to-gold text-black px-4 py-3 rounded-xl cursor-pointer btn-hover-lift"
-              >
-                <Sparkles className="w-6 h-6 mx-auto mb-1" />
-                <div className="text-xl lg:text-2xl">{vipPoints}</div>
-                <div className="text-xs opacity-80">VIP 포인트</div>
-              </motion.div>
-            </div>
-          </div>
-        </motion.div>
+        {/**
+         * 메인 페이지 전용 "게임 통계/상태 바" 제거 요청 반영
+         * - 기존: 골드/레벨/보물찾기/VIP 포인트 4블록 표시
+         * - 사양: 메인 페이지에서만 제거 (다른 페이지 영향 없음)
+         */}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left Column - Quick Actions */}
@@ -709,40 +660,6 @@ export function HomeDashboard({
               </div>
             </motion.div>
 
-            <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.6 }}
-            >
-              <h2 className="text-xl font-bold text-foreground mb-4 flex items-center gap-2">
-                <BarChart3 className="w-5 h-5 text-success" />
-                게임 통계
-              </h2>
-              <div className="glass-effect rounded-xl p-6">
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-primary">{user.stats.gamesPlayed}</div>
-                    <div className="text-sm text-muted-foreground">총 게임</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-success">{user.stats.gamesWon}</div>
-                    <div className="text-sm text-muted-foreground">승리</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-gold">
-                      {user.stats.totalEarnings.toLocaleString()}
-                    </div>
-                    <div className="text-sm text-muted-foreground">총 수익</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-warning">
-                      {user.stats.highestScore.toLocaleString()}
-                    </div>
-                    <div className="text-sm text-muted-foreground">최고 점수</div>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
           </div>
 
           {/* Right Column - Streak & Events */}
@@ -763,9 +680,14 @@ export function HomeDashboard({
               <div className="space-y-2">
                 {recentActions && recentActions.length > 0 ? (
                   recentActions.map((a: any) => (
-                    <div key={a.id} className="bg-secondary/40 rounded-md px-3 py-2 text-sm flex items-center justify-between">
+                    <div
+                      key={a.id}
+                      className="bg-secondary/40 rounded-md px-3 py-2 text-sm flex items-center justify-between"
+                    >
                       <span className="font-medium text-foreground">{a.action_type}</span>
-                      <span className="text-xs text-muted-foreground">{new Date(a.created_at).toLocaleString()}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {new Date(a.created_at).toLocaleString()}
+                      </span>
                     </div>
                   ))
                 ) : (
@@ -991,10 +913,18 @@ export function HomeDashboard({
               <div className="bg-gold-soft rounded-lg p-4 mb-6">
                 <div className="text-gold font-bold text-xl">
                   {/* 서버 설정 기반 일일 보너스 계산 */}
-                  {(gameConfig.dailyBonusBase + (streak.count ?? user.dailyStreak) * gameConfig.dailyBonusPerStreak).toLocaleString()}G
+                  {(
+                    gameConfig.dailyBonusBase +
+                    (streak.count ?? user.dailyStreak) * gameConfig.dailyBonusPerStreak
+                  ).toLocaleString()}
+                  G
                 </div>
                 <div className="text-sm text-muted-foreground">
-                  {/* 서버 설정 기반 XP 계산 */}+ {Math.floor(gameConfig.dailyBonusBase / 20) + (streak.count ?? user.dailyStreak) * Math.floor(gameConfig.dailyBonusPerStreak / 8)} XP
+                  {/* 서버 설정 기반 XP 계산 */}+{' '}
+                  {Math.floor(gameConfig.dailyBonusBase / 20) +
+                    (streak.count ?? user.dailyStreak) *
+                      Math.floor(gameConfig.dailyBonusPerStreak / 8)}{' '}
+                  XP
                 </div>
               </div>
 

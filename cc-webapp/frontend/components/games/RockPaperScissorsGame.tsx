@@ -18,8 +18,8 @@ import {
 import { User } from '../../types';
 import { Button } from '../ui/button';
 import { useWithReconcile } from '@/lib/sync';
-import { useUserGold } from '@/hooks/useSelectors';
-import { useGlobalStore } from '@/store/globalStore';
+import { useGlobalSync } from '@/hooks/useGlobalSync';
+import { useGlobalStore, useGlobalProfile } from '@/store/globalStore';
 import { mergeGameStats } from '@/store/globalStore';
 
 interface RockPaperScissorsGameProps {
@@ -88,10 +88,20 @@ export function RockPaperScissorsGame({
   const [isSpecialMove, setIsSpecialMove] = useState(false);
   const [errorMessage, setErrorMessage] = useState(null as string | null);
   const withReconcile = useWithReconcile();
-  const gold = useUserGold();
-  const { dispatch } = useGlobalStore();
+  const globalProfile = useGlobalProfile();
+  const { syncAfterGame } = useGlobalSync();
+  const { state, dispatch } = useGlobalStore();
+  const gold = globalProfile?.goldBalance ?? 0;
 
   // Play sound effect (visual simulation)
+  // 전역 store의 rps 승수 우선 표시 컴포넌트
+  function RpsWins({ userWins }: { userWins: number }) {
+    const { state } = useGlobalStore();
+    const r = (state?.gameStats?.rps as any) || (state?.gameStats as any)?.['rps'];
+    const rData = r && (r as any).data ? (r as any).data : r;
+    const wins = typeof (rData as any)?.wins === 'number' ? (rData as any).wins : userWins;
+    return <div className="text-xl font-bold text-primary">{wins}</div>;
+  }
   const playSoundEffect = (effectName: string) => {
     if (!soundEnabled) return;
 
@@ -138,13 +148,13 @@ export function RockPaperScissorsGame({
   const playGame = async (choice: Choice) => {
     if (isPlaying) return;
 
-  if (gold < betAmount) {
+    if (gold < betAmount) {
       onAddNotification('❌ 골드가 부족합니다!');
       return;
     }
 
-  setIsPlaying(true);
-  setErrorMessage(null);
+    setIsPlaying(true);
+    setErrorMessage(null);
     // 🚫 사용자 선택을 미리 보여주지 않음!
     setPlayerChoice(null);
     setAiChoice(null);
@@ -186,7 +196,7 @@ export function RockPaperScissorsGame({
           isSpecialMove: false,
         };
         setRoundHistory((prev: GameRound[]) => [round, ...prev.slice(0, 9)]);
-        // 통계 병합
+        // 통계 병합(표시용 캐시) — 최종 값은 syncAfterGame으로 서버 권위 반영
         mergeGameStats(dispatch, 'rps', {
           totalGames: 1,
           wins: result === 'win' ? 1 : 0,
@@ -195,10 +205,13 @@ export function RockPaperScissorsGame({
           totalBet: betAmount,
           totalPayout: winnings,
         });
+        // 게임 후 전역 동기화 (권위 반영)
+        await syncAfterGame();
         return res;
       });
     } catch (e: any) {
-      const msg = e?.message || (typeof e === 'string' ? e : '플레이 실패. 네트워크 상태를 확인해주세요.');
+      const msg =
+        e?.message || (typeof e === 'string' ? e : '플레이 실패. 네트워크 상태를 확인해주세요.');
       setErrorMessage(msg);
       onAddNotification('플레이 실패. 네트워크 상태를 확인해주세요.');
     }
@@ -219,15 +232,42 @@ export function RockPaperScissorsGame({
     setParticles([]);
   };
 
-  // gameStats 속성 이름 수정
-  const winRate =
-    user.gameStats.rps.totalGames > 0 // matches -> totalGames
-      ? Math.round((user.gameStats.rps.wins / user.gameStats.rps.totalGames) * 100)
-      : 0;
+  // 기존 user.gameStats 직접 참조 제거: 전역 store 우선 + legacy 폴백 계산을 사용
+  // UI 표시는 전역 store의 gameStats 우선, 없으면 legacy user.gameStats로 폴백
+  function firstNum(obj: any, keys: string[]): number | undefined {
+    if (!obj) return undefined;
+    for (const k of keys) {
+      const v = obj?.[k];
+      if (typeof v === 'number' && !Number.isNaN(v)) return v;
+    }
+    return undefined;
+  }
 
-  // losses 변수 정의 추가
-  const losses = user.gameStats.rps.totalGames - user.gameStats.rps.wins;
-  const draws = user.gameStats.rps.totalGames - user.gameStats.rps.wins - losses;
+  const rpsRaw = (state?.gameStats as any)?.rps ?? (state?.gameStats as any)?.['rps'];
+  const rpsData = rpsRaw && (rpsRaw as any).data ? (rpsRaw as any).data : rpsRaw;
+  const totalFromStore = firstNum(rpsData, [
+    'totalGames',
+    'matches',
+    'games',
+    'plays',
+    'total_games',
+  ]);
+  const winsFromStore = firstNum(rpsData, ['wins', 'totalWins']);
+  const lossesFromStore = firstNum(rpsData, ['losses']);
+  const drawsFromStore = firstNum(rpsData, ['draws']);
+
+  const totalGames = (totalFromStore ??
+    (user as any)?.gameStats?.rps?.totalGames ??
+    (user as any)?.gameStats?.rps?.matches ??
+    0) as number;
+  const wins = (winsFromStore ?? (user as any)?.gameStats?.rps?.wins ?? 0) as number;
+  const losses = (lossesFromStore ??
+    (user as any)?.gameStats?.rps?.losses ??
+    Math.max(0, totalGames - wins)) as number;
+  const draws = (drawsFromStore ??
+    (user as any)?.gameStats?.rps?.draws ??
+    Math.max(0, totalGames - wins - losses)) as number;
+  const winRate = totalGames > 0 ? Math.round((wins / totalGames) * 100) : 0;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-black to-success/10 relative overflow-hidden">
@@ -243,8 +283,21 @@ export function RockPaperScissorsGame({
             <div className="flex items-start justify-between gap-3">
               <div className="text-sm leading-relaxed break-all">{errorMessage}</div>
               <div className="flex gap-2">
-                <Button size="sm" variant="outline" onClick={() => { setErrorMessage(null); if (playerChoice) { void playGame(playerChoice); } }}>재시도</Button>
-                <Button size="sm" variant="ghost" onClick={() => setErrorMessage(null)}>닫기</Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setErrorMessage(null);
+                    if (playerChoice) {
+                      void playGame(playerChoice);
+                    }
+                  }}
+                >
+                  재시도
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => setErrorMessage(null)}>
+                  닫기
+                </Button>
               </div>
             </div>
           </motion.div>
@@ -726,7 +779,7 @@ export function RockPaperScissorsGame({
             </h3>
             <div className="grid grid-cols-2 gap-4">
               <div className="text-center p-3 rounded-lg bg-primary/10 border border-primary/20">
-                <div className="text-xl font-bold text-primary">{user.gameStats.rps.wins}</div>
+                  <RpsWins userWins={user?.gameStats?.rps?.wins ?? 0} />
                 <div className="text-sm text-muted-foreground">승리</div>
               </div>
               <div className="text-center p-3 rounded-lg bg-error/10 border border-error/20">

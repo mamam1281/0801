@@ -5,6 +5,7 @@ import { api } from '@/lib/unifiedApi';
 import { useWithReconcile } from '@/lib/sync';
 import { useUserGold } from '@/hooks/useSelectors';
 import { useGlobalStore, mergeProfile, mergeGameStats, applyPurchase } from '@/store/globalStore';
+import { useGlobalSync } from '@/hooks/useGlobalSync';
 import useAuthToken from '../../hooks/useAuthToken';
 import useFeedback from '../../hooks/useFeedback';
 import useBalanceSync from '../../hooks/useBalanceSync';
@@ -32,6 +33,7 @@ import {
   BackgroundEffects, // BackgroundEffects 컴포넌트 추가
 } from './gacha/components';
 import type { GachaBanner } from '../../types/gacha';
+import { useGameTileStats } from '@/hooks/useGameStats';
 
 interface GachaSystemProps {
   user: User;
@@ -65,8 +67,12 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
     onAddNotification,
   });
   const withReconcile = useWithReconcile();
+  const { syncAfterGame } = useGlobalSync();
   const gold = useUserGold();
-  const { dispatch } = useGlobalStore();
+  // 전역 스토어 훅은 컴포넌트 최상단에서만 호출 (rules-of-hooks 준수)
+  const { state, dispatch } = useGlobalStore();
+  // 전역 통계 셀렉터(가챠 플레이수)
+  const { playCount: gachaPlays } = useGameTileStats('gacha', user?.gameStats?.gacha);
 
   const [selectedBanner, setSelectedBanner] = useState(GACHA_BANNERS[0] as GachaBanner);
   const [isPulling, setIsPulling] = useState(false);
@@ -109,39 +115,13 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
     return () => clearInterval(interval);
   }, []);
 
-  // 컴포넌트 마운트 시 실행되는 초기화 함수
-  useEffect(() => {
-    // User 객체의 gameStats.gacha 초기화
-    if (
-      !user.gameStats.gacha ||
-      user.gameStats.gacha.pulls === undefined ||
-      user.gameStats.gacha.totalSpent === undefined ||
-      user.gameStats.gacha.epicCount === undefined ||
-      user.gameStats.gacha.legendaryCount === undefined
-    ) {
-      onUpdateUser({
-        ...user,
-        gameStats: {
-          ...user.gameStats,
-          gacha: {
-            totalPulls: user.gameStats.gacha?.totalPulls || 0,
-            legendaryPulls: user.gameStats.gacha?.legendaryPulls || 0,
-            totalValue: user.gameStats.gacha?.totalValue || 0,
-            // 누락된 필드 초기화
-            pulls: [],
-            totalSpent: 0,
-            epicCount: 0,
-            legendaryCount: 0,
-          },
-        },
-      });
-    }
-  }, []);
+  // 주의: 로컬 user.gameStats 구조를 임의로 초기화하지 않습니다.
+  // 서버 권위(state.gameStats) 우선 정책에 따라 표시만 셀렉터/폴백으로 처리합니다.
 
   // Perform single pull
   const performSinglePull = async () => {
-  const cost = getSinglePullCost();
-  if (gold < cost) {
+    const cost = getSinglePullCost();
+    if (gold < cost) {
       onAddNotification('❌ 골드가 부족합니다!');
       return;
     }
@@ -153,7 +133,11 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
     try {
       setErrorMessage(null);
       const res = await withReconcile(async (idemKey: string) =>
-        api.post<GachaPullApiResponse>('games/gacha/pull', { pull_count: 1 }, { headers: { 'X-Idempotency-Key': idemKey } })
+        api.post<GachaPullApiResponse>(
+          'games/gacha/pull',
+          { pull_count: 1 },
+          { headers: { 'X-Idempotency-Key': idemKey } }
+        )
       );
       fromApi(res);
       if (res?.items?.length) {
@@ -175,7 +159,11 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
         setCurrentPullIndex(0);
         setShowResults(true);
         // 전역 스토어 반영: balance/인벤토리/통계
-        const newBalance = res.balance ?? res.currency_balance?.tokens ?? (res as any)?.gold ?? (res as any)?.gold_balance;
+        const newBalance =
+          res.balance ??
+          res.currency_balance?.tokens ??
+          (res as any)?.gold ??
+          (res as any)?.gold_balance;
         if (typeof newBalance === 'number' && Number.isFinite(newBalance)) {
           mergeProfile(dispatch, { goldBalance: Number(newBalance) });
         }
@@ -195,44 +183,36 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
         }
         const epicAdds1 = mapped.filter((i) => i.rarity === 'epic').length;
         const ultraAdds1 = mapped.filter((i) => ['legendary', 'mythic'].includes(i.rarity)).length;
+        // 전역 통계는 표시용 캐시만 가산, 최종 값은 syncAfterGame으로 반영
         mergeGameStats(dispatch, 'gacha', {
           pulls: 1,
           totalSpent: cost,
           epicCount: epicAdds1,
           legendaryCount: ultraAdds1,
         });
-        // 기존 onUpdateUser 경로는 하위 UI 표시 호환을 위해 유지
+        // onUpdateUser는 인벤토리 표시 호환만 유지(합계 누적 제거)
         const first = mapped[0];
         const updatedUser = updateUserInventory(
           {
             ...user,
-            // 잔액은 서버 응답/재동기화에만 의존(전역 mergeProfile도 수행)
             goldBalance: typeof newBalance === 'number' ? newBalance : user.goldBalance,
-            gameStats: {
-              ...user.gameStats,
-              gacha: {
-                ...user.gameStats.gacha,
-                pulls: user.gameStats.gacha.pulls + 1,
-                totalSpent: user.gameStats.gacha.totalSpent + cost,
-                epicCount:
-                  (user.gameStats.gacha.epicCount || 0) + (first.rarity === 'epic' ? 1 : 0),
-                legendaryCount:
-                  (user.gameStats.gacha.legendaryCount || 0) +
-                  (['legendary', 'mythic'].includes(first.rarity) ? 1 : 0),
-              },
-            },
           } as User,
           first
         );
         try {
-          const bal = await api.get<any>('users/balance');
-          const cyber = bal?.cyber_token_balance;
-          onUpdateUser({
-            ...(updatedUser as User),
-            goldBalance: typeof cyber === 'number' ? cyber : (updatedUser as User).goldBalance,
-          });
-        } catch {
-          onUpdateUser(updatedUser as User);
+          await syncAfterGame();
+        } finally {
+          // 하위 UI 상태 호환을 위해 onUpdateUser도 유지
+          try {
+            const bal = await api.get<any>('users/balance');
+            const cyber = bal?.cyber_token_balance;
+            onUpdateUser({
+              ...(updatedUser as User),
+              goldBalance: typeof cyber === 'number' ? cyber : (updatedUser as User).goldBalance,
+            });
+          } catch {
+            onUpdateUser(updatedUser as User);
+          }
         }
         onAddNotification(getRarityMessage(first));
       }
@@ -253,7 +233,13 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
       setCurrentPullIndex(0);
       setShowResults(true);
       onAddNotification(getRarityMessage(item));
-      try { await reconcileBalance(); } catch {}
+      try {
+        await syncAfterGame();
+      } catch {
+        try {
+          await reconcileBalance();
+        } catch {}
+      }
     }
     setIsPulling(false);
     setPullAnimation(null);
@@ -261,8 +247,8 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
 
   // Perform 10-pull
   const performTenPull = async () => {
-  const discountedCost = getTenPullCost();
-  if (gold < discountedCost) {
+    const discountedCost = getTenPullCost();
+    if (gold < discountedCost) {
       onAddNotification('❌ 골드가 부족합니다!');
       return;
     }
@@ -274,7 +260,11 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
     try {
       setErrorMessage(null);
       const res = await withReconcile(async (idemKey: string) =>
-        api.post<GachaPullApiResponse>('games/gacha/pull', { pull_count: 10 }, { headers: { 'X-Idempotency-Key': idemKey } })
+        api.post<GachaPullApiResponse>(
+          'games/gacha/pull',
+          { pull_count: 10 },
+          { headers: { 'X-Idempotency-Key': idemKey } }
+        )
       );
       fromApi(res);
       if (res?.items?.length) {
@@ -309,7 +299,11 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
         setParticles(generateParticles(bestItem.rarity));
         const ultraAdds = mapped.filter((i) => ['legendary', 'mythic'].includes(i.rarity)).length;
         const epicAdds = mapped.filter((i) => i.rarity === 'epic').length;
-        const newBalance = res.balance ?? res.currency_balance?.tokens ?? (res as any)?.gold ?? (res as any)?.gold_balance;
+        const newBalance =
+          res.balance ??
+          res.currency_balance?.tokens ??
+          (res as any)?.gold ??
+          (res as any)?.gold_balance;
         if (typeof newBalance === 'number' && Number.isFinite(newBalance)) {
           mergeProfile(dispatch, { goldBalance: Number(newBalance) });
         }
@@ -326,6 +320,7 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
             }))
           );
         }
+        // 전역 통계는 표시용 캐시만 가산, 최종 값은 syncAfterGame으로 반영
         mergeGameStats(dispatch, 'gacha', {
           pulls: 10,
           totalSpent: discountedCost,
@@ -336,29 +331,23 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
           (acc, item) => updateUserInventory(acc as User, item) as User,
           {
             ...user,
-            // 잔액은 서버 응답/재동기화에만 의존(전역 mergeProfile도 수행)
             goldBalance: typeof newBalance === 'number' ? newBalance : user.goldBalance,
-            gameStats: {
-              ...user.gameStats,
-              gacha: {
-                ...user.gameStats.gacha,
-                pulls: user.gameStats.gacha.pulls + 10,
-                totalSpent: user.gameStats.gacha.totalSpent + discountedCost,
-                epicCount: (user.gameStats.gacha.epicCount || 0) + epicAdds,
-                legendaryCount: (user.gameStats.gacha.legendaryCount || 0) + ultraAdds,
-              },
-            },
           } as User
         );
         try {
-          const bal = await api.get<any>('users/balance');
-          const cyber = bal?.cyber_token_balance;
-          onUpdateUser({
-            ...(updatedUser as User),
-            goldBalance: typeof cyber === 'number' ? cyber : (updatedUser as User).goldBalance,
-          });
-        } catch {
-          onUpdateUser(updatedUser as User);
+          await syncAfterGame();
+        } finally {
+          // 하위 UI 상태 호환을 위해 onUpdateUser도 유지
+          try {
+            const bal = await api.get<any>('users/balance');
+            const cyber = bal?.cyber_token_balance;
+            onUpdateUser({
+              ...(updatedUser as User),
+              goldBalance: typeof cyber === 'number' ? cyber : (updatedUser as User).goldBalance,
+            });
+          } catch {
+            onUpdateUser(updatedUser as User);
+          }
         }
         onAddNotification(getTenPullMessage(mapped));
       }
@@ -376,14 +365,28 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
       for (let i = 0; i < 10; i++) {
         items.push(getRandomItem(selectedBanner, user));
       }
-      const rarityOrder: Record<string, number> = { common:1, rare:2, epic:3, legendary:4, mythic:5 };
-      const bestItem = items.reduce((b, c) => (rarityOrder[c.rarity] > rarityOrder[b.rarity] ? c : b));
+      const rarityOrder: Record<string, number> = {
+        common: 1,
+        rare: 2,
+        epic: 3,
+        legendary: 4,
+        mythic: 5,
+      };
+      const bestItem = items.reduce((b, c) =>
+        rarityOrder[c.rarity] > rarityOrder[b.rarity] ? c : b
+      );
       setParticles(generateParticles(bestItem.rarity));
       setPullResults(items);
       setCurrentPullIndex(0);
       setShowResults(true);
       onAddNotification(getTenPullMessage(items));
-      try { await reconcileBalance(); } catch {}
+      try {
+        await syncAfterGame();
+      } catch {
+        try {
+          await reconcileBalance();
+        } catch {}
+      }
     }
     setIsPulling(false);
     setPullAnimation(null);
@@ -417,9 +420,29 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
             <div className="flex items-start justify-between gap-3">
               <div className="text-sm leading-relaxed break-all">{errorMessage}</div>
               <div className="flex gap-2">
-                <Button size="sm" variant="outline" onClick={() => { setErrorMessage(null); void performSinglePull(); }}>단일 재시도</Button>
-                <Button size="sm" variant="outline" onClick={() => { setErrorMessage(null); void performTenPull(); }}>10회 재시도</Button>
-                <Button size="sm" variant="ghost" onClick={() => setErrorMessage(null)}>닫기</Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setErrorMessage(null);
+                    void performSinglePull();
+                  }}
+                >
+                  단일 재시도
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setErrorMessage(null);
+                    void performTenPull();
+                  }}
+                >
+                  10회 재시도
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => setErrorMessage(null)}>
+                  닫기
+                </Button>
               </div>
             </div>
           </motion.div>
@@ -526,9 +549,7 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
 
             <div className="text-right">
               <div className="text-sm text-pink-300/60">보유 골드</div>
-              <div className="text-xl font-bold text-yellow-400">
-                {gold.toLocaleString()}G
-              </div>
+              <div className="text-xl font-bold text-yellow-400">{gold.toLocaleString()}G</div>
             </div>
           </div>
         </div>
@@ -536,35 +557,67 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
 
       {/* Main Content */}
       <div className="relative z-10 p-4 lg:p-6 max-w-6xl mx-auto">
-        {/* Game Stats */}
+        {/* Game Stats - 전역 store 우선 */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
           className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6"
         >
-          <div className="glass-effect rounded-xl p-4 text-center bg-pink-900/20 border-pink-500/30">
-            <div className="text-xl font-bold text-pink-300">{user.gameStats.gacha.pulls}</div>
-            <div className="text-sm text-pink-400/60">총 뽑기</div>
-          </div>
-          <div className="glass-effect rounded-xl p-4 text-center bg-purple-900/20 border-purple-500/30">
-            <div className="text-xl font-bold text-purple-300">
-              {user.gameStats.gacha.epicCount}
-            </div>
-            <div className="text-sm text-purple-400/60">에픽 획득</div>
-          </div>
-          <div className="glass-effect rounded-xl p-4 text-center bg-yellow-900/20 border-yellow-500/30">
-            <div className="text-xl font-bold text-yellow-300">
-              {user.gameStats.gacha.legendaryCount}
-            </div>
-            <div className="text-sm text-yellow-400/60">레전더리+</div>
-          </div>
-          <div className="glass-effect rounded-xl p-4 text-center bg-red-900/20 border-red-500/30">
-            <div className="text-xl font-bold text-red-300">
-              {user?.gameStats?.gacha?.totalSpent?.toLocaleString() || '0'}G
-            </div>
-            <div className="text-sm text-red-400/60">총 소모</div>
-          </div>
+          {(() => {
+            const g = (state?.gameStats?.gacha as any) || (state?.gameStats as any)?.['gacha'];
+            const gData = g && (g as any).data ? (g as any).data : g;
+            const pulls =
+              gachaPlays ||
+              user?.gameStats?.gacha?.pulls ||
+              user?.gameStats?.gacha?.totalPulls ||
+              0;
+            const epicCount = (() => {
+              if (!gData) return user?.gameStats?.gacha?.epicCount || 0;
+              const keys = ['epicCount', 'epic_count'] as const;
+              for (const k of keys) {
+                const v = (gData as any)[k];
+                if (typeof v === 'number') return v;
+              }
+              return user?.gameStats?.gacha?.epicCount || 0;
+            })();
+            const legendaryCount = (() => {
+              if (!gData) return user?.gameStats?.gacha?.legendaryCount || 0;
+              const keys = ['legendaryCount', 'legendary_count', 'ultra_rare_item_count'] as const;
+              for (const k of keys) {
+                const v = (gData as any)[k];
+                if (typeof v === 'number') return v;
+              }
+              return user?.gameStats?.gacha?.legendaryCount || 0;
+            })();
+            const totalSpent = (() => {
+              if (!gData) return user?.gameStats?.gacha?.totalSpent || 0;
+              const v = (gData as any)['totalSpent'] ?? (gData as any)['total_spent'];
+              return typeof v === 'number' ? v : user?.gameStats?.gacha?.totalSpent || 0;
+            })();
+            return (
+              <>
+                <div className="glass-effect rounded-xl p-4 text-center bg-pink-900/20 border-pink-500/30">
+                  <div className="text-xl font-bold text-pink-300">{pulls}</div>
+                  <div className="text-sm text-pink-400/60">총 뽑기</div>
+                </div>
+                <div className="glass-effect rounded-xl p-4 text-center bg-purple-900/20 border-purple-500/30">
+                  <div className="text-xl font-bold text-purple-300">{epicCount}</div>
+                  <div className="text-sm text-purple-400/60">에픽 획득</div>
+                </div>
+                <div className="glass-effect rounded-xl p-4 text-center bg-yellow-900/20 border-yellow-500/30">
+                  <div className="text-xl font-bold text-yellow-300">{legendaryCount}</div>
+                  <div className="text-sm text-yellow-400/60">레전더리+</div>
+                </div>
+                <div className="glass-effect rounded-xl p-4 text-center bg-red-900/20 border-red-500/30">
+                  <div className="text-xl font-bold text-red-300">
+                    {totalSpent.toLocaleString()}G
+                  </div>
+                  <div className="text-sm text-red-400/60">총 소모</div>
+                </div>
+              </>
+            );
+          })()}
         </motion.div>
 
         {/* Banner Selection */}
