@@ -6232,6 +6232,31 @@
         ]
       }
     },
+    "/api/games/stats/me": {
+      "get": {
+        "tags": [
+          "Games"
+        ],
+        "summary": "Get My Authoritative Game Stats",
+        "description": "현재 로그인 사용자에 대한 서버 권위 Crash GameStats.\n\nuser_game_stats 테이블 row 없으면 생성 후 반환. (MVP: crash 전용)\nTODO: 멀티 게임 타입 확장 시 game_type 파라미터 도입.",
+        "operationId": "get_my_authoritative_game_stats_api_games_stats_me_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/games/stats/{user_id}": {
       "get": {
         "tags": [
@@ -6273,31 +6298,6 @@
             }
           }
         }
-      }
-    },
-    "/api/games/stats/me": {
-      "get": {
-        "tags": [
-          "Games"
-        ],
-        "summary": "Get My Authoritative Game Stats",
-        "description": "현재 로그인 사용자에 대한 서버 권위 Crash GameStats.\n\nuser_game_stats 테이블 row 없으면 생성 후 반환. (MVP: crash 전용)\nTODO: 멀티 게임 타입 확장 시 game_type 파라미터 도입.",
-        "operationId": "get_my_authoritative_game_stats_api_games_stats_me_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
       }
     },
     "/api/games/profile/{user_id}/stats": {
