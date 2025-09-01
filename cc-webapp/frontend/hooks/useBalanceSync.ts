@@ -17,9 +17,11 @@ interface UseBalanceSyncResult {
   reconcileWith: (fetchedBalance: number | null | undefined) => void;
 }
 
-// 단일 권위 소스(/api/users/balance) 기반 GOLD 동기화 훅
-// - 컴포넌트에서 공용 user 상태를 업데이트하고, DEV에서 불일치 토스트를 표시합니다.
-// @deprecated 다음 릴리스에서 제거 예정. 전역 동기화 훅 useGlobalSync.syncBalance로 대체하세요.
+/**
+ * 단일 권위 소스(/api/users/balance) 기반 GOLD 동기화 훅
+ * - 컴포넌트에서 공용 user 상태를 업데이트하고, DEV에서 불일치 토스트를 표시합니다.
+ * @deprecated 다음 릴리스에서 제거 예정. 전역 동기화 훅 useGlobalSync.syncBalance로 대체하세요.
+ */
 export function useBalanceSync(options: UseBalanceSyncOptions = {}): UseBalanceSyncResult {
   const { sharedUser, onUpdateUser, onAddNotification } = options;
   const [lastBalance, setLastBalance] = useState(null as number | null);

@@ -8,7 +8,6 @@ import { useGlobalStore, mergeProfile, mergeGameStats, applyPurchase } from '@/s
 import { useGlobalSync } from '@/hooks/useGlobalSync';
 import useAuthToken from '../../hooks/useAuthToken';
 import useFeedback from '../../hooks/useFeedback';
-import useBalanceSync from '../../hooks/useBalanceSync';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Coins, RefreshCw, Package, Heart, Crown } from 'lucide-react';
 import { User } from '../../types'; // App.tsx가 아닌 types에서 import
@@ -61,13 +60,8 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
   const { fromApi } = useFeedback();
   const { getAccessToken } = useAuthToken();
   const { config: gameConfig, loading: configLoading } = useGameConfig();
-  const { reconcileBalance } = useBalanceSync({
-    sharedUser: user,
-    onUpdateUser,
-    onAddNotification,
-  });
   const withReconcile = useWithReconcile();
-  const { syncAfterGame } = useGlobalSync();
+  const { syncAfterGame, syncBalance } = useGlobalSync();
   const gold = useUserGold();
   // 전역 스토어 훅은 컴포넌트 최상단에서만 호출 (rules-of-hooks 준수)
   const { state, dispatch } = useGlobalStore();
@@ -237,7 +231,7 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
         await syncAfterGame();
       } catch {
         try {
-          await reconcileBalance();
+          await syncBalance();
         } catch {}
       }
     }
@@ -384,7 +378,7 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
         await syncAfterGame();
       } catch {
         try {
-          await reconcileBalance();
+          await syncBalance();
         } catch {}
       }
     }

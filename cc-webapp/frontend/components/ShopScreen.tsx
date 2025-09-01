@@ -23,7 +23,7 @@ import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { Badge } from './ui/badge';
 import { User, GameItem } from '../types';
-import useBalanceSync from '@/hooks/useBalanceSync';
+import { useGlobalSync } from '@/hooks/useGlobalSync';
 import { api } from '@/lib/unifiedApi';
 import { useWithReconcile } from '@/lib/sync';
 import { useUserGold } from '@/hooks/useSelectors';
@@ -161,14 +161,14 @@ export function ShopScreen({
   const [showPurchaseModal, setShowPurchaseModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null as import('../types').GameItem | null);
   const [catalog, setCatalog] = useState(null as any[] | null);
-  const { reconcileBalance } = useBalanceSync({ sharedUser: user, onUpdateUser, onAddNotification });
+  const { syncBalance } = useGlobalSync();
   const withReconcile = useWithReconcile();
   const gold = useUserGold();
   const { dispatch } = useGlobalStore();
 
   // 마운트 시 1회 권위 잔액으로 정합화
   useEffect(() => {
-    reconcileBalance().catch(() => {});
+    syncBalance().catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -321,8 +321,8 @@ export function ShopScreen({
       // 실패 시에도 최종적으로 권위 잔액과 동기화 시도
       onAddNotification('구매 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
     }
-    // 구매 후 권위 잔액 재조회로 최종 정합 유지
-    try { await reconcileBalance(); } catch {}
+  // 구매 후 권위 잔액 재조회로 최종 정합 유지(권위 동기화 훅 사용)
+  try { await syncBalance(); } catch {}
     setShowPurchaseModal(false);
   };
 

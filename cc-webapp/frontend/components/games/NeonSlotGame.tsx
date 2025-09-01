@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import useFeedback from '../../hooks/useFeedback';
-import useBalanceSync from '../../hooks/useBalanceSync';
 import { api } from '@/lib/unifiedApi';
 import { useWithReconcile } from '@/lib/sync';
 import { useUserGold } from '@/hooks/useSelectors';
@@ -108,11 +107,6 @@ interface SlotSpinApiResponse {
 export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: NeonSlotGameProps) {
   const { fromApi } = useFeedback();
   const { config: gameConfig, loading: configLoading } = useGameConfig();
-  const { reconcileBalance } = useBalanceSync({
-    sharedUser: user,
-    onUpdateUser,
-    onAddNotification,
-  });
   const { syncAfterGame } = useGlobalSync();
   const withReconcile = useWithReconcile();
   // 전역 권위 잔액(셀렉터)

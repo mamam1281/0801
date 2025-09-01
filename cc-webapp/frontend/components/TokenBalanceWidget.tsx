@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { TrendingUp, TrendingDown, Coins, AlertTriangle } from 'lucide-react';
-import useBalanceSync from '@/hooks/useBalanceSync';
+import { useGlobalSync } from '@/hooks/useGlobalSync';
 import { useUserGold } from '@/hooks/useSelectors';
 import { useRealtimePurchases, useRealtimeRewards } from '@/hooks/useRealtimeData';
 
@@ -25,7 +25,7 @@ export function TokenBalanceWidget({
   onUpdateUser,
   onAddNotification,
 }: TokenBalanceProps) {
-  const { reconcileBalance } = useBalanceSync({ sharedUser, onUpdateUser, onAddNotification });
+  const { syncBalance } = useGlobalSync();
   const goldFromStore = useUserGold();
   const displayAmount = useMemo(() => goldFromStore, [goldFromStore]);
   const [open, setOpen] = useState(false);
@@ -34,7 +34,7 @@ export function TokenBalanceWidget({
   // 마운트 시 1회 권위 동기화(옵션: sharedUser 전달된 경우에만)
   useEffect(() => {
     if (sharedUser && onUpdateUser) {
-      reconcileBalance().catch(() => {});
+      syncBalance().catch(() => {});
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
