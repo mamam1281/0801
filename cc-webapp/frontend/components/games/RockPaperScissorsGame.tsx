@@ -90,18 +90,18 @@ export function RockPaperScissorsGame({
   const withReconcile = useWithReconcile();
   const globalProfile = useGlobalProfile();
   const { syncAfterGame } = useGlobalSync();
-  const { dispatch } = useGlobalStore();
+  const { state, dispatch } = useGlobalStore();
   const gold = globalProfile?.goldBalance ?? 0;
 
   // Play sound effect (visual simulation)
-    // 전역 store의 rps 승수 우선 표시 컴포넌트
-    function RpsWins({ userWins }: { userWins: number }) {
-      const { state } = useGlobalStore();
-      const r = (state?.gameStats?.rps as any) || (state?.gameStats as any)?.['rps'];
-      const rData = r && (r as any).data ? (r as any).data : r;
-      const wins = typeof (rData as any)?.wins === 'number' ? (rData as any).wins : userWins;
-      return <div className="text-xl font-bold text-primary">{wins}</div>;
-    }
+  // 전역 store의 rps 승수 우선 표시 컴포넌트
+  function RpsWins({ userWins }: { userWins: number }) {
+    const { state } = useGlobalStore();
+    const r = (state?.gameStats?.rps as any) || (state?.gameStats as any)?.['rps'];
+    const rData = r && (r as any).data ? (r as any).data : r;
+    const wins = typeof (rData as any)?.wins === 'number' ? (rData as any).wins : userWins;
+    return <div className="text-xl font-bold text-primary">{wins}</div>;
+  }
   const playSoundEffect = (effectName: string) => {
     if (!soundEnabled) return;
 
@@ -232,11 +232,41 @@ export function RockPaperScissorsGame({
     setParticles([]);
   };
 
-  // 주의: UI 표시는 전역 store의 gameStats를 권장. user.gameStats 의존은 하위 호환 전용.
-  const totalGames = user?.gameStats?.rps?.totalGames ?? 0;
-  const wins = user?.gameStats?.rps?.wins ?? 0;
-  const losses = Math.max(0, (user as any)?.gameStats?.rps?.losses ?? totalGames - wins);
-  const draws = Math.max(0, (user as any)?.gameStats?.rps?.draws ?? totalGames - wins - losses);
+  // 기존 user.gameStats 직접 참조 제거: 전역 store 우선 + legacy 폴백 계산을 사용
+  // UI 표시는 전역 store의 gameStats 우선, 없으면 legacy user.gameStats로 폴백
+  function firstNum(obj: any, keys: string[]): number | undefined {
+    if (!obj) return undefined;
+    for (const k of keys) {
+      const v = obj?.[k];
+      if (typeof v === 'number' && !Number.isNaN(v)) return v;
+    }
+    return undefined;
+  }
+
+  const rpsRaw = (state?.gameStats as any)?.rps ?? (state?.gameStats as any)?.['rps'];
+  const rpsData = rpsRaw && (rpsRaw as any).data ? (rpsRaw as any).data : rpsRaw;
+  const totalFromStore = firstNum(rpsData, [
+    'totalGames',
+    'matches',
+    'games',
+    'plays',
+    'total_games',
+  ]);
+  const winsFromStore = firstNum(rpsData, ['wins', 'totalWins']);
+  const lossesFromStore = firstNum(rpsData, ['losses']);
+  const drawsFromStore = firstNum(rpsData, ['draws']);
+
+  const totalGames = (totalFromStore ??
+    (user as any)?.gameStats?.rps?.totalGames ??
+    (user as any)?.gameStats?.rps?.matches ??
+    0) as number;
+  const wins = (winsFromStore ?? (user as any)?.gameStats?.rps?.wins ?? 0) as number;
+  const losses = (lossesFromStore ??
+    (user as any)?.gameStats?.rps?.losses ??
+    Math.max(0, totalGames - wins)) as number;
+  const draws = (drawsFromStore ??
+    (user as any)?.gameStats?.rps?.draws ??
+    Math.max(0, totalGames - wins - losses)) as number;
   const winRate = totalGames > 0 ? Math.round((wins / totalGames) * 100) : 0;
 
   return (

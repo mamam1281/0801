@@ -484,6 +484,51 @@ export function ProfileScreen({
   const displayTotalGames = (rtTotals.totalGames ?? 0) || (stats?.total_games_played ?? 0) || 0;
   const displayTotalWins = (rtTotals.totalWins ?? 0) || (stats?.total_wins ?? 0) || 0;
 
+  // 게임별 요약: 전역 store.gameStats 우선, legacy user.gameStats 폴백
+  const pickFromEntry = (entry: any, keys: string[]) => {
+    const src = entry?.data ? entry.data : entry;
+    if (!src) return undefined;
+    for (const k of keys) {
+      const v = src?.[k];
+      if (typeof v === 'number' && !Number.isNaN(v)) return v;
+    }
+    return undefined;
+  };
+  const slotEntry = (storeGameStats as any)?.slot ?? (storeGameStats as any)?.['slot'];
+  const rpsEntry = (storeGameStats as any)?.rps ?? (storeGameStats as any)?.['rps'];
+  const crashEntry = (storeGameStats as any)?.crash ?? (storeGameStats as any)?.['crash'];
+  const gachaEntry = (storeGameStats as any)?.gacha ?? (storeGameStats as any)?.['gacha'];
+
+  const slotBiggestWin =
+    pickFromEntry(slotEntry, ['biggestWin', 'max_win', 'highest_win']) ??
+    (user as any)?.gameStats?.slot?.biggestWin ??
+    0;
+  const rpsMatches =
+    pickFromEntry(rpsEntry, ['totalGames', 'matches', 'games', 'plays']) ??
+    (user as any)?.gameStats?.rps?.matches ??
+    (user as any)?.gameStats?.rps?.totalGames ??
+    0;
+  const rpsWinStreak =
+    pickFromEntry(rpsEntry, ['winStreak', 'bestStreak', 'best_streak', 'max_streak']) ??
+    (user as any)?.gameStats?.rps?.winStreak ??
+    0;
+  const crashGames =
+    pickFromEntry(crashEntry, ['totalGames', 'games', 'plays']) ??
+    (user as any)?.gameStats?.crash?.games ??
+    0;
+  const crashBiggestWin =
+    pickFromEntry(crashEntry, ['biggestWin', 'max_win', 'highest_win']) ??
+    (user as any)?.gameStats?.crash?.biggestWin ??
+    0;
+  const gachaPulls =
+    pickFromEntry(gachaEntry, ['totalPulls', 'pulls', 'plays']) ??
+    (user as any)?.gameStats?.gacha?.pulls ??
+    0;
+  const gachaLegendary =
+    pickFromEntry(gachaEntry, ['legendaryCount', 'legendary_count', 'ultra_rare_item_count']) ??
+    (user as any)?.gameStats?.gacha?.legendaryCount ??
+    0;
+
   return (
     <div
       className="min-h-screen bg-gradient-to-br from-background via-black/95 to-primary/5 relative"
@@ -661,7 +706,7 @@ export function ProfileScreen({
                     <div className="text-right">
                       <div className="text-lg font-bold text-primary">{displayTotalGames}회</div>
                       <div className="text-xs text-gold">
-                        최고: {user?.gameStats?.slot?.biggestWin?.toLocaleString() || 0}G
+                        최고: {Number(slotBiggestWin).toLocaleString()}G
                       </div>
                     </div>
                   </div>
@@ -675,12 +720,8 @@ export function ProfileScreen({
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="text-lg font-bold text-success">
-                        {user?.gameStats?.rps?.matches || 0}회
-                      </div>
-                      <div className="text-xs text-primary">
-                        연승: {user?.gameStats?.rps?.winStreak || 0}회
-                      </div>
+                      <div className="text-lg font-bold text-success">{rpsMatches}회</div>
+                      <div className="text-xs text-primary">연승: {rpsWinStreak}회</div>
                     </div>
                   </div>
 
@@ -693,11 +734,9 @@ export function ProfileScreen({
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="text-lg font-bold text-error">
-                        {user?.gameStats?.crash?.games || 0}회
-                      </div>
+                      <div className="text-lg font-bold text-error">{crashGames}회</div>
                       <div className="text-xs text-gold">
-                        최고: {user?.gameStats?.crash?.biggestWin?.toLocaleString() || 0}G
+                        최고: {Number(crashBiggestWin).toLocaleString()}G
                       </div>
                     </div>
                   </div>
@@ -711,12 +750,8 @@ export function ProfileScreen({
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="text-lg font-bold text-warning">
-                        {user?.gameStats?.gacha?.pulls || 0}회
-                      </div>
-                      <div className="text-xs text-error">
-                        전설: {user?.gameStats?.gacha?.legendaryCount || 0}개
-                      </div>
+                      <div className="text-lg font-bold text-warning">{gachaPulls}회</div>
+                      <div className="text-xs text-error">전설: {gachaLegendary}개</div>
                     </div>
                   </div>
                 </div>

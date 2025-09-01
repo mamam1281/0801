@@ -117,7 +117,8 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
   const withReconcile = useWithReconcile();
   // 전역 권위 잔액(셀렉터)
   const gold = useUserGold();
-  const { dispatch } = useGlobalStore();
+  // 전역 스토어 훅은 컴포넌트 최상단에서만 호출 (rules-of-hooks 준수)
+  const { state, dispatch } = useGlobalStore();
 
   // unifiedApi: call games endpoints with relative paths
   const [reels, setReels] = useState([
@@ -316,175 +317,175 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
     // Deduct bet amount (locally; authoritative balance will come from server if call succeeds)
     const costAmount = betAmount;
 
-  let serverResult: SlotSpinApiResponse | null = null;
-  let hasMergedBalance = false;
-  let authoritativeUsed = false;
-  // Attempt authoritative server spin with reconcile + idempotency
-  try {
-    setErrorMessage(null);
-    const raw = await withReconcile(async (idemKey: string) =>
-      api.post<SlotSpinApiResponse>(
-        'games/slot/spin',
-        { bet_amount: betAmount },
-        { headers: { 'X-Idempotency-Key': idemKey } }
-      )
-    );
-    serverResult = raw;
-    if (serverResult?.feedback) {
-      fromApi(serverResult as any);
-    }
-    // 서버 응답에 최신 잔액이 포함된 경우 전역 스토어에 즉시 반영
-    if (serverResult && typeof serverResult.balance === 'number') {
-      mergeProfile(dispatch, { goldBalance: Number(serverResult.balance) });
-      hasMergedBalance = true;
-    }
-    authoritativeUsed = !!(serverResult && serverResult.success);
-  } catch (_e) {
-    serverResult = null; // fallback to local simulation (no local balance mutation)
-    const msg =
-      (_e as any)?.message ||
-      (typeof _e === 'string' ? (_e as string) : '스핀 요청에 실패했습니다. 다시 시도해주세요.');
-    setErrorMessage(msg);
-    onAddNotification('네트워크 오류: 스핀 재시도 가능');
-  }
-
-  // Helper to map server unicode symbol to local symbol
-  const mapServerSymbol = (sym: string): SlotSymbol => {
-    if (sym.includes('7')) return SLOT_SYMBOLS.find((s) => s.id === 'seven')!;
-    if (sym.includes('💎')) return SLOT_SYMBOLS.find((s) => s.id === 'diamond')!;
-    if (sym.includes('🍒')) return SLOT_SYMBOLS.find((s) => s.id === 'cherry')!;
-    if (sym.includes('🍋') || sym.includes('🍊') || sym.includes('🍇'))
-      return SLOT_SYMBOLS.find((s) => s.id === 'lemon')!;
-    return SLOT_SYMBOLS[0];
-  };
-
-  let result: SpinResult;
-  if (serverResult && serverResult.success) {
-    const srvRow = serverResult.reels[0] || [];
-    const finalReels = srvRow.slice(0, 3).map(mapServerSymbol);
-    // Build animated spinning reel data
-    const spinning = generateSpinningReels();
-    spinning.forEach((reel, idx) => {
-      if (reel.length) reel[reel.length - 1] = finalReels[idx];
-    });
-    // Determine winning positions heuristically
-    const winningPositions = [false, false, false];
-    if (serverResult.is_jackpot) {
-      winningPositions.fill(true);
-    } else if (serverResult.win_amount > 0) {
-      if (finalReels[0].id === finalReels[1].id) {
-        winningPositions[0] = winningPositions[1] = true;
+    let serverResult: SlotSpinApiResponse | null = null;
+    let hasMergedBalance = false;
+    let authoritativeUsed = false;
+    // Attempt authoritative server spin with reconcile + idempotency
+    try {
+      setErrorMessage(null);
+      const raw = await withReconcile(async (idemKey: string) =>
+        api.post<SlotSpinApiResponse>(
+          'games/slot/spin',
+          { bet_amount: betAmount },
+          { headers: { 'X-Idempotency-Key': idemKey } }
+        )
+      );
+      serverResult = raw;
+      if (serverResult?.feedback) {
+        fromApi(serverResult as any);
       }
-      if (finalReels[1].id === finalReels[2].id) {
-        winningPositions[1] = winningPositions[2] = true;
+      // 서버 응답에 최신 잔액이 포함된 경우 전역 스토어에 즉시 반영
+      if (serverResult && typeof serverResult.balance === 'number') {
+        mergeProfile(dispatch, { goldBalance: Number(serverResult.balance) });
+        hasMergedBalance = true;
       }
+      authoritativeUsed = !!(serverResult && serverResult.success);
+    } catch (_e) {
+      serverResult = null; // fallback to local simulation (no local balance mutation)
+      const msg =
+        (_e as any)?.message ||
+        (typeof _e === 'string' ? (_e as string) : '스핀 요청에 실패했습니다. 다시 시도해주세요.');
+      setErrorMessage(msg);
+      onAddNotification('네트워크 오류: 스핀 재시도 가능');
     }
-    result = {
-      reels: spinning,
-      finalReels,
-      winAmount: serverResult.win_amount,
-      isJackpot: serverResult.is_jackpot,
-      isBigWin: serverResult.win_amount >= betAmount * 10,
-      hasWilds: finalReels.some((f) => f.isWild),
-      multiplier:
-        serverResult.multiplier ||
-        (serverResult.win_amount > 0 ? Math.max(1, serverResult.win_amount / betAmount) : 1),
-      winningPositions,
+
+    // Helper to map server unicode symbol to local symbol
+    const mapServerSymbol = (sym: string): SlotSymbol => {
+      if (sym.includes('7')) return SLOT_SYMBOLS.find((s) => s.id === 'seven')!;
+      if (sym.includes('💎')) return SLOT_SYMBOLS.find((s) => s.id === 'diamond')!;
+      if (sym.includes('🍒')) return SLOT_SYMBOLS.find((s) => s.id === 'cherry')!;
+      if (sym.includes('🍋') || sym.includes('🍊') || sym.includes('🍇'))
+        return SLOT_SYMBOLS.find((s) => s.id === 'lemon')!;
+      return SLOT_SYMBOLS[0];
     };
-    setSpinningReels(result.reels);
-  } else {
-    // Local simulation fallback
-    result = generateSpinResult();
-    setSpinningReels(result.reels);
-  }
 
-  // Create staggered reel stop timing (more realistic)
-  const stopOrder = [0, 1, 2];
-  setReelStopOrder([]);
-
-  // 🎯 개별 릴 회전 시뮬레이션 - 각 릴을 개별적으로 제어
-  const reelStopTimes = [1200, 1800, 2400]; // Different timing for each reel
-
-  // Stop reels one by one
-  for (let i = 0; i < stopOrder.length; i++) {
-    setTimeout(() => {
-      setReels((prev: SlotSymbol[]) => {
-        const newReels = [...prev];
-        newReels[stopOrder[i]] = result.finalReels[stopOrder[i]];
-        return newReels;
+    let result: SpinResult;
+    if (serverResult && serverResult.success) {
+      const srvRow = serverResult.reels[0] || [];
+      const finalReels = srvRow.slice(0, 3).map(mapServerSymbol);
+      // Build animated spinning reel data
+      const spinning = generateSpinningReels();
+      spinning.forEach((reel, idx) => {
+        if (reel.length) reel[reel.length - 1] = finalReels[idx];
       });
-      setReelStopOrder((prev: number[]) => [...prev, stopOrder[i]]);
-    }, reelStopTimes[i]);
-  }
-
-  // Process final result after all reels stop
-  setTimeout(async () => {
-    if (result.winAmount > 0) {
-      setIsWin(true);
-      setWinAmount(result.winAmount);
-      setWinningPositions(result.winningPositions);
-      setConsecutiveWins((prev: number) => prev + 1);
-
-      // Enhanced particle effects based on win type
-      if (result.isJackpot) {
-        generateParticles('jackpot');
-      } else if (result.isBigWin) {
-        generateParticles('bigwin');
-      } else {
-        generateParticles('win');
+      // Determine winning positions heuristically
+      const winningPositions = [false, false, false];
+      if (serverResult.is_jackpot) {
+        winningPositions.fill(true);
+      } else if (serverResult.win_amount > 0) {
+        if (finalReels[0].id === finalReels[1].id) {
+          winningPositions[0] = winningPositions[1] = true;
+        }
+        if (finalReels[1].id === finalReels[2].id) {
+          winningPositions[1] = winningPositions[2] = true;
+        }
       }
-
-      generateCoinDrops();
-
-      // 🎯 잔액 동기화: 서버 응답에 balance가 없을 때만 reconcile 수행
-      if (!hasMergedBalance) {
-        await syncAfterGame();
-      }
-
-      // 전역 게임 통계 누적(표시용 캐시). 서버 실패(로컬 시뮬레이션) 시에는 증가하지 않음
-      if (authoritativeUsed) {
-        mergeGameStats(dispatch, 'slot', {
-          totalSpins: 1,
-          totalBet: costAmount,
-          totalPayout: result.winAmount,
-          totalWins: 1,
-          jackpots: result.isJackpot ? 1 : 0,
-        });
-      }
-      // 로컬 user.gameStats 직접 증분 제거 (서버 권위 동기화 사용)
-
-      // Only important notifications
-      if (result.isJackpot) {
-        setShowWinModal(true);
-        onAddNotification(`🎰 JACKPOT! ${result.winAmount.toLocaleString()}G 획득!`);
-      } else if (result.isBigWin) {
-        onAddNotification(`🔥 BIG WIN! ${result.winAmount.toLocaleString()}G 획득!`);
-      }
+      result = {
+        reels: spinning,
+        finalReels,
+        winAmount: serverResult.win_amount,
+        isJackpot: serverResult.is_jackpot,
+        isBigWin: serverResult.win_amount >= betAmount * 10,
+        hasWilds: finalReels.some((f) => f.isWild),
+        multiplier:
+          serverResult.multiplier ||
+          (serverResult.win_amount > 0 ? Math.max(1, serverResult.win_amount / betAmount) : 1),
+        winningPositions,
+      };
+      setSpinningReels(result.reels);
     } else {
-      setConsecutiveWins(0);
-
-      // 🎯 패배 시에도 잔액 동기화 필요: 서버 balance 없을 때만 reconcile
-      if (!hasMergedBalance) {
-        await syncAfterGame();
-      }
-
-      // 전역 게임 통계 누적(표시용 캐시). 서버 실패(로컬 시뮬레이션) 시에는 증가하지 않음
-      if (authoritativeUsed) {
-        mergeGameStats(dispatch, 'slot', {
-          totalSpins: 1,
-          totalBet: costAmount,
-          totalPayout: 0,
-          totalWins: 0,
-          jackpots: 0,
-        });
-      }
-      // 로컬 user.gameStats 직접 증분 제거 (서버 권위 동기화 사용)
-      // 실패 스핀도 서버 feedback이 push 되었을 수 있음 (serverResult)
+      // Local simulation fallback
+      result = generateSpinResult();
+      setSpinningReels(result.reels);
     }
 
-    setIsSpinning(false);
-    setReelStopOrder([]); // Reset for next spin
-  }, 3000);
+    // Create staggered reel stop timing (more realistic)
+    const stopOrder = [0, 1, 2];
+    setReelStopOrder([]);
+
+    // 🎯 개별 릴 회전 시뮬레이션 - 각 릴을 개별적으로 제어
+    const reelStopTimes = [1200, 1800, 2400]; // Different timing for each reel
+
+    // Stop reels one by one
+    for (let i = 0; i < stopOrder.length; i++) {
+      setTimeout(() => {
+        setReels((prev: SlotSymbol[]) => {
+          const newReels = [...prev];
+          newReels[stopOrder[i]] = result.finalReels[stopOrder[i]];
+          return newReels;
+        });
+        setReelStopOrder((prev: number[]) => [...prev, stopOrder[i]]);
+      }, reelStopTimes[i]);
+    }
+
+    // Process final result after all reels stop
+    setTimeout(async () => {
+      if (result.winAmount > 0) {
+        setIsWin(true);
+        setWinAmount(result.winAmount);
+        setWinningPositions(result.winningPositions);
+        setConsecutiveWins((prev: number) => prev + 1);
+
+        // Enhanced particle effects based on win type
+        if (result.isJackpot) {
+          generateParticles('jackpot');
+        } else if (result.isBigWin) {
+          generateParticles('bigwin');
+        } else {
+          generateParticles('win');
+        }
+
+        generateCoinDrops();
+
+        // 🎯 잔액 동기화: 서버 응답에 balance가 없을 때만 reconcile 수행
+        if (!hasMergedBalance) {
+          await syncAfterGame();
+        }
+
+        // 전역 게임 통계 누적(표시용 캐시). 서버 실패(로컬 시뮬레이션) 시에는 증가하지 않음
+        if (authoritativeUsed) {
+          mergeGameStats(dispatch, 'slot', {
+            totalSpins: 1,
+            totalBet: costAmount,
+            totalPayout: result.winAmount,
+            totalWins: 1,
+            jackpots: result.isJackpot ? 1 : 0,
+          });
+        }
+        // 로컬 user.gameStats 직접 증분 제거 (서버 권위 동기화 사용)
+
+        // Only important notifications
+        if (result.isJackpot) {
+          setShowWinModal(true);
+          onAddNotification(`🎰 JACKPOT! ${result.winAmount.toLocaleString()}G 획득!`);
+        } else if (result.isBigWin) {
+          onAddNotification(`🔥 BIG WIN! ${result.winAmount.toLocaleString()}G 획득!`);
+        }
+      } else {
+        setConsecutiveWins(0);
+
+        // 🎯 패배 시에도 잔액 동기화 필요: 서버 balance 없을 때만 reconcile
+        if (!hasMergedBalance) {
+          await syncAfterGame();
+        }
+
+        // 전역 게임 통계 누적(표시용 캐시). 서버 실패(로컬 시뮬레이션) 시에는 증가하지 않음
+        if (authoritativeUsed) {
+          mergeGameStats(dispatch, 'slot', {
+            totalSpins: 1,
+            totalBet: costAmount,
+            totalPayout: 0,
+            totalWins: 0,
+            jackpots: 0,
+          });
+        }
+        // 로컬 user.gameStats 직접 증분 제거 (서버 권위 동기화 사용)
+        // 실패 스핀도 서버 feedback이 push 되었을 수 있음 (serverResult)
+      }
+
+      setIsSpinning(false);
+      setReelStopOrder([]); // Reset for next spin
+    }, 3000);
   };
 
   return (
@@ -709,7 +710,6 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
                               />
                             </div>
                           ))}
-
                       </motion.div>
                     )}
                   </AnimatePresence>
@@ -824,13 +824,13 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
               </div>
 
               <div className="grid grid-cols-4 gap-2">
-        {[100, 500, 1000, 5000].map((amount) => (
+                {[100, 500, 1000, 5000].map((amount) => (
                   <Button
                     key={amount}
                     size="sm"
                     variant="outline"
-          onClick={() => setBetAmount(Math.min(amount, gold))}
-          disabled={isSpinning || isAutoSpinning || gold < amount}
+                    onClick={() => setBetAmount(Math.min(amount, gold))}
+                    disabled={isSpinning || isAutoSpinning || gold < amount}
                     className="border-border-secondary hover:border-primary text-xs btn-hover-lift"
                   >
                     {amount}G
@@ -905,10 +905,11 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
           className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6"
         >
           {(() => {
-            // 전역 store에서 안전 추출
-            const { state } = useGlobalStore();
-            const slotStats = (state?.gameStats?.slot as any) || (state?.gameStats as any)?.['slot'];
-            const slotData = (slotStats && (slotStats as any).data) ? (slotStats as any).data : slotStats;
+            // 전역 store는 상단에서 훅으로 추출됨 (hooks inside callback 금지)
+            const slotStats =
+              (state?.gameStats?.slot as any) || (state?.gameStats as any)?.['slot'];
+            const slotData =
+              slotStats && (slotStats as any).data ? (slotStats as any).data : slotStats;
 
             const plays = slotPlays || 0;
             const jackpots = (() => {
@@ -943,11 +944,15 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
                   <div className="text-sm text-muted-foreground">잭팟 횟수</div>
                 </div>
                 <div className="glass-effect rounded-xl p-4 text-center card-hover-float">
-                  <div className="text-xl font-bold text-success">{biggestWin.toLocaleString()}G</div>
+                  <div className="text-xl font-bold text-success">
+                    {biggestWin.toLocaleString()}G
+                  </div>
                   <div className="text-sm text-muted-foreground">최대 승리</div>
                 </div>
                 <div className="glass-effect rounded-xl p-4 text-center card-hover-float">
-                  <div className="text-xl font-bold text-warning">{totalWinnings.toLocaleString()}G</div>
+                  <div className="text-xl font-bold text-warning">
+                    {totalWinnings.toLocaleString()}G
+                  </div>
                   <div className="text-sm text-muted-foreground">총 획득</div>
                 </div>
               </>

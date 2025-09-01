@@ -69,7 +69,8 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
   const withReconcile = useWithReconcile();
   const { syncAfterGame } = useGlobalSync();
   const gold = useUserGold();
-  const { dispatch } = useGlobalStore();
+  // 전역 스토어 훅은 컴포넌트 최상단에서만 호출 (rules-of-hooks 준수)
+  const { state, dispatch } = useGlobalStore();
   // 전역 통계 셀렉터(가챠 플레이수)
   const { playCount: gachaPlays } = useGameTileStats('gacha', user?.gameStats?.gacha);
 
@@ -114,34 +115,8 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
     return () => clearInterval(interval);
   }, []);
 
-  // 컴포넌트 마운트 시 실행되는 초기화 함수
-  useEffect(() => {
-    // User 객체의 gameStats.gacha 초기화
-    if (
-      !user.gameStats.gacha ||
-      user.gameStats.gacha.pulls === undefined ||
-      user.gameStats.gacha.totalSpent === undefined ||
-      user.gameStats.gacha.epicCount === undefined ||
-      user.gameStats.gacha.legendaryCount === undefined
-    ) {
-      onUpdateUser({
-        ...user,
-        gameStats: {
-          ...user.gameStats,
-          gacha: {
-            totalPulls: user.gameStats.gacha?.totalPulls || 0,
-            legendaryPulls: user.gameStats.gacha?.legendaryPulls || 0,
-            totalValue: user.gameStats.gacha?.totalValue || 0,
-            // 누락된 필드 초기화
-            pulls: [],
-            totalSpent: 0,
-            epicCount: 0,
-            legendaryCount: 0,
-          },
-        },
-      });
-    }
-  }, []);
+  // 주의: 로컬 user.gameStats 구조를 임의로 초기화하지 않습니다.
+  // 서버 권위(state.gameStats) 우선 정책에 따라 표시만 셀렉터/폴백으로 처리합니다.
 
   // Perform single pull
   const performSinglePull = async () => {
@@ -445,9 +420,29 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
             <div className="flex items-start justify-between gap-3">
               <div className="text-sm leading-relaxed break-all">{errorMessage}</div>
               <div className="flex gap-2">
-                <Button size="sm" variant="outline" onClick={() => { setErrorMessage(null); void performSinglePull(); }}>단일 재시도</Button>
-                <Button size="sm" variant="outline" onClick={() => { setErrorMessage(null); void performTenPull(); }}>10회 재시도</Button>
-                <Button size="sm" variant="ghost" onClick={() => setErrorMessage(null)}>닫기</Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setErrorMessage(null);
+                    void performSinglePull();
+                  }}
+                >
+                  단일 재시도
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setErrorMessage(null);
+                    void performTenPull();
+                  }}
+                >
+                  10회 재시도
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => setErrorMessage(null)}>
+                  닫기
+                </Button>
               </div>
             </div>
           </motion.div>
@@ -554,9 +549,7 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
 
             <div className="text-right">
               <div className="text-sm text-pink-300/60">보유 골드</div>
-              <div className="text-xl font-bold text-yellow-400">
-                {gold.toLocaleString()}G
-              </div>
+              <div className="text-xl font-bold text-yellow-400">{gold.toLocaleString()}G</div>
             </div>
           </div>
         </div>
@@ -572,10 +565,13 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
           className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6"
         >
           {(() => {
-            const { state } = useGlobalStore();
             const g = (state?.gameStats?.gacha as any) || (state?.gameStats as any)?.['gacha'];
             const gData = g && (g as any).data ? (g as any).data : g;
-            const pulls = gachaPlays || user?.gameStats?.gacha?.pulls || user?.gameStats?.gacha?.totalPulls || 0;
+            const pulls =
+              gachaPlays ||
+              user?.gameStats?.gacha?.pulls ||
+              user?.gameStats?.gacha?.totalPulls ||
+              0;
             const epicCount = (() => {
               if (!gData) return user?.gameStats?.gacha?.epicCount || 0;
               const keys = ['epicCount', 'epic_count'] as const;
@@ -614,7 +610,9 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
                   <div className="text-sm text-yellow-400/60">레전더리+</div>
                 </div>
                 <div className="glass-effect rounded-xl p-4 text-center bg-red-900/20 border-red-500/30">
-                  <div className="text-xl font-bold text-red-300">{totalSpent.toLocaleString()}G</div>
+                  <div className="text-xl font-bold text-red-300">
+                    {totalSpent.toLocaleString()}G
+                  </div>
                   <div className="text-sm text-red-400/60">총 소모</div>
                 </div>
               </>
