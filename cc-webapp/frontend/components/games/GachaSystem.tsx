@@ -33,6 +33,7 @@ import {
   BackgroundEffects, // BackgroundEffects 컴포넌트 추가
 } from './gacha/components';
 import type { GachaBanner } from '../../types/gacha';
+import { useGameTileStats } from '@/hooks/useGameStats';
 
 interface GachaSystemProps {
   user: User;
@@ -69,6 +70,8 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
   const { syncAfterGame } = useGlobalSync();
   const gold = useUserGold();
   const { dispatch } = useGlobalStore();
+  // 전역 통계 셀렉터(가챠 플레이수)
+  const { playCount: gachaPlays } = useGameTileStats('gacha', user?.gameStats?.gacha);
 
   const [selectedBanner, setSelectedBanner] = useState(GACHA_BANNERS[0] as GachaBanner);
   const [isPulling, setIsPulling] = useState(false);
@@ -561,35 +564,62 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
 
       {/* Main Content */}
       <div className="relative z-10 p-4 lg:p-6 max-w-6xl mx-auto">
-        {/* Game Stats */}
+        {/* Game Stats - 전역 store 우선 */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
           className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6"
         >
-          <div className="glass-effect rounded-xl p-4 text-center bg-pink-900/20 border-pink-500/30">
-            <div className="text-xl font-bold text-pink-300">{user.gameStats.gacha.pulls}</div>
-            <div className="text-sm text-pink-400/60">총 뽑기</div>
-          </div>
-          <div className="glass-effect rounded-xl p-4 text-center bg-purple-900/20 border-purple-500/30">
-            <div className="text-xl font-bold text-purple-300">
-              {user.gameStats.gacha.epicCount}
-            </div>
-            <div className="text-sm text-purple-400/60">에픽 획득</div>
-          </div>
-          <div className="glass-effect rounded-xl p-4 text-center bg-yellow-900/20 border-yellow-500/30">
-            <div className="text-xl font-bold text-yellow-300">
-              {user.gameStats.gacha.legendaryCount}
-            </div>
-            <div className="text-sm text-yellow-400/60">레전더리+</div>
-          </div>
-          <div className="glass-effect rounded-xl p-4 text-center bg-red-900/20 border-red-500/30">
-            <div className="text-xl font-bold text-red-300">
-              {user?.gameStats?.gacha?.totalSpent?.toLocaleString() || '0'}G
-            </div>
-            <div className="text-sm text-red-400/60">총 소모</div>
-          </div>
+          {(() => {
+            const { state } = useGlobalStore();
+            const g = (state?.gameStats?.gacha as any) || (state?.gameStats as any)?.['gacha'];
+            const gData = g && (g as any).data ? (g as any).data : g;
+            const pulls = gachaPlays || user?.gameStats?.gacha?.pulls || user?.gameStats?.gacha?.totalPulls || 0;
+            const epicCount = (() => {
+              if (!gData) return user?.gameStats?.gacha?.epicCount || 0;
+              const keys = ['epicCount', 'epic_count'] as const;
+              for (const k of keys) {
+                const v = (gData as any)[k];
+                if (typeof v === 'number') return v;
+              }
+              return user?.gameStats?.gacha?.epicCount || 0;
+            })();
+            const legendaryCount = (() => {
+              if (!gData) return user?.gameStats?.gacha?.legendaryCount || 0;
+              const keys = ['legendaryCount', 'legendary_count', 'ultra_rare_item_count'] as const;
+              for (const k of keys) {
+                const v = (gData as any)[k];
+                if (typeof v === 'number') return v;
+              }
+              return user?.gameStats?.gacha?.legendaryCount || 0;
+            })();
+            const totalSpent = (() => {
+              if (!gData) return user?.gameStats?.gacha?.totalSpent || 0;
+              const v = (gData as any)['totalSpent'] ?? (gData as any)['total_spent'];
+              return typeof v === 'number' ? v : user?.gameStats?.gacha?.totalSpent || 0;
+            })();
+            return (
+              <>
+                <div className="glass-effect rounded-xl p-4 text-center bg-pink-900/20 border-pink-500/30">
+                  <div className="text-xl font-bold text-pink-300">{pulls}</div>
+                  <div className="text-sm text-pink-400/60">총 뽑기</div>
+                </div>
+                <div className="glass-effect rounded-xl p-4 text-center bg-purple-900/20 border-purple-500/30">
+                  <div className="text-xl font-bold text-purple-300">{epicCount}</div>
+                  <div className="text-sm text-purple-400/60">에픽 획득</div>
+                </div>
+                <div className="glass-effect rounded-xl p-4 text-center bg-yellow-900/20 border-yellow-500/30">
+                  <div className="text-xl font-bold text-yellow-300">{legendaryCount}</div>
+                  <div className="text-sm text-yellow-400/60">레전더리+</div>
+                </div>
+                <div className="glass-effect rounded-xl p-4 text-center bg-red-900/20 border-red-500/30">
+                  <div className="text-xl font-bold text-red-300">{totalSpent.toLocaleString()}G</div>
+                  <div className="text-sm text-red-400/60">총 소모</div>
+                </div>
+              </>
+            );
+          })()}
         </motion.div>
 
         {/* Banner Selection */}

@@ -7,6 +7,12 @@ import { api } from '@/lib/unifiedApi';
 import { useWithReconcile } from '@/lib/sync';
 import { useUserGold } from '@/hooks/useSelectors';
 import { useGlobalStore, mergeProfile, mergeGameStats } from '@/store/globalStore';
+import { useGameTileStats } from '@/hooks/useGameStats';
+import {
+  PLAY_COUNT_KEYS_BY_GAME,
+  SLOT_JACKPOT_KEYS,
+  SLOT_TOTAL_WINNINGS_KEYS,
+} from '@/constants/gameStatsKeys';
 import { useGlobalSync } from '@/hooks/useGlobalSync';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -148,10 +154,13 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
     }
   }, [configLoading, gameConfig.slotGameCost]);
 
-  // Jackpot calculation
+  // 전역 통계 우선 플레이 카운트 추출(슬롯)
+  const { playCount: slotPlays } = useGameTileStats('slot', user?.gameStats?.slot);
+
+  // Jackpot calculation (전역 통계 기반; fallback은 0)
   useEffect(() => {
-    setCurrentJackpot(50000 + user.gameStats.slot.totalSpins * 50);
-  }, [user.gameStats.slot.totalSpins]);
+    setCurrentJackpot(50000 + (slotPlays || 0) * 50);
+  }, [slotPlays]);
 
   // Auto spin logic
   useEffect(() => {
@@ -888,33 +897,62 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
           </div>
         </motion.div>
 
-        {/* Game Stats */}
+        {/* Game Stats - 전역 store.gameStats 우선 */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.6 }}
           className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6"
         >
-          <div className="glass-effect rounded-xl p-4 text-center card-hover-float">
-            <div className="text-xl font-bold text-primary">{user.gameStats.slot.totalSpins}</div>
-            <div className="text-sm text-muted-foreground">총 스핀</div>
-          </div>
-          <div className="glass-effect rounded-xl p-4 text-center card-hover-float">
-            <div className="text-xl font-bold text-gold">{user.gameStats.slot.jackpotHits}</div>
-            <div className="text-sm text-muted-foreground">잭팟 횟수</div>
-          </div>
-          <div className="glass-effect rounded-xl p-4 text-center card-hover-float">
-            <div className="text-xl font-bold text-success">
-              {user.gameStats.slot.biggestWin.toLocaleString()}G
-            </div>
-            <div className="text-sm text-muted-foreground">최대 승리</div>
-          </div>
-          <div className="glass-effect rounded-xl p-4 text-center card-hover-float">
-            <div className="text-xl font-bold text-warning">
-              {user.gameStats.slot.totalWinnings.toLocaleString()}G
-            </div>
-            <div className="text-sm text-muted-foreground">총 획득</div>
-          </div>
+          {(() => {
+            // 전역 store에서 안전 추출
+            const { state } = useGlobalStore();
+            const slotStats = (state?.gameStats?.slot as any) || (state?.gameStats as any)?.['slot'];
+            const slotData = (slotStats && (slotStats as any).data) ? (slotStats as any).data : slotStats;
+
+            const plays = slotPlays || 0;
+            const jackpots = (() => {
+              if (!slotData) return user?.gameStats?.slot?.jackpotHits || 0;
+              for (const k of SLOT_JACKPOT_KEYS as readonly string[]) {
+                const v = (slotData as any)[k];
+                if (typeof v === 'number') return v;
+              }
+              return user?.gameStats?.slot?.jackpotHits || 0;
+            })();
+            const biggestWin = (() => {
+              const v = (slotData as any)?.biggestWin;
+              return typeof v === 'number' ? v : user?.gameStats?.slot?.biggestWin || 0;
+            })();
+            const totalWinnings = (() => {
+              if (!slotData) return user?.gameStats?.slot?.totalWinnings || 0;
+              for (const k of SLOT_TOTAL_WINNINGS_KEYS as readonly string[]) {
+                const v = (slotData as any)[k];
+                if (typeof v === 'number') return v;
+              }
+              return user?.gameStats?.slot?.totalWinnings || 0;
+            })();
+
+            return (
+              <>
+                <div className="glass-effect rounded-xl p-4 text-center card-hover-float">
+                  <div className="text-xl font-bold text-primary">{plays}</div>
+                  <div className="text-sm text-muted-foreground">총 스핀</div>
+                </div>
+                <div className="glass-effect rounded-xl p-4 text-center card-hover-float">
+                  <div className="text-xl font-bold text-gold">{jackpots}</div>
+                  <div className="text-sm text-muted-foreground">잭팟 횟수</div>
+                </div>
+                <div className="glass-effect rounded-xl p-4 text-center card-hover-float">
+                  <div className="text-xl font-bold text-success">{biggestWin.toLocaleString()}G</div>
+                  <div className="text-sm text-muted-foreground">최대 승리</div>
+                </div>
+                <div className="glass-effect rounded-xl p-4 text-center card-hover-float">
+                  <div className="text-xl font-bold text-warning">{totalWinnings.toLocaleString()}G</div>
+                  <div className="text-sm text-muted-foreground">총 획득</div>
+                </div>
+              </>
+            );
+          })()}
         </motion.div>
 
         {/* Paytable */}

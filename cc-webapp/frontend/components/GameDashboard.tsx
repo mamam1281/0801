@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import {
   ArrowLeft,
@@ -25,6 +25,8 @@ import { GameBackground } from './games/GameBackground';
 import { GameCard } from './games/GameCard';
 import { createLeaderboardData } from '../constants/gameConstants';
 import { createGameNavigator, handleModelNavigation } from '../utils/gameUtils';
+import { useGlobalStore } from '@/store/globalStore';
+import { useGlobalTotalGames, useGameTileStats } from '@/hooks/useGameStats';
 
 export interface GameDashboardProps {
   user: User;
@@ -51,6 +53,7 @@ export function GameDashboard({
 }: GameDashboardProps) {
   const [popularityIndex, setPopularityIndex] = useState(85);
   const [totalPlayTime] = useState(245);
+  const totalGamesFromStore = useGlobalTotalGames();
 
   // 로컬 게임 데이터 (API 호출 없이)
   const games: GameDashboardGame[] = [
@@ -61,8 +64,7 @@ export function GameDashboard({
       icon: Dice1,
       color: 'from-purple-600 to-pink-600',  // 원래 네온 색상 복원
       description: '잭팟의 짜릿함! 네온 빛나는 슬롯머신',
-      playCount: user.gameStats?.slot?.totalSpins || 0,
-      bestScore: user.gameStats?.slot?.biggestWin || 0,
+  ...useGameTileStats('slot', user.gameStats?.slot),
       lastPlayed: new Date(),
       difficulty: 'Easy',
       rewards: ['골드', '경험치', '특별 스킨'],
@@ -76,8 +78,7 @@ export function GameDashboard({
       icon: Swords,
       color: 'from-blue-600 to-cyan-600',  // 원래 네온 색상 복원
       description: 'AI와 두뇌 대결! 승부의 짜릿함!',
-      playCount: user.gameStats?.rps?.totalGames || 0,
-      bestScore: user.gameStats?.rps?.bestStreak || 0,
+  ...useGameTileStats('rps', user.gameStats?.rps),
       lastPlayed: new Date(),
       difficulty: 'Medium',
       rewards: ['골드', '전략 포인트', '승부사 배지'],
@@ -91,8 +92,7 @@ export function GameDashboard({
       icon: Gift,
       color: 'from-pink-600 to-purple-600',  // 원래 네온 색상 복원
       description: '희귀 아이템 획득 찬스! 운명의 뽑기',
-      playCount: user.gameStats?.gacha?.totalPulls || 0,
-      bestScore: user.gameStats?.gacha?.legendaryPulls || 0,
+  ...useGameTileStats('gacha', user.gameStats?.gacha),
       lastPlayed: new Date(),
       difficulty: 'Extreme',
       rewards: ['전설 아이템', '희귀 스킨', '특별 캐릭터'],
@@ -106,8 +106,7 @@ export function GameDashboard({
       icon: Zap,
       color: 'from-red-600 to-orange-600',  // 원래 네온 색상 복원
       description: '배율 상승의 스릴! 언제 터질까?',
-      playCount: user.gameStats?.crash?.totalGames || 0,
-      bestScore: Math.floor((user.gameStats?.crash?.highestMultiplier || 0) * 100),
+  ...useGameTileStats('crash', user.gameStats?.crash),
       lastPlayed: new Date(),
       difficulty: 'Hard',
       rewards: ['대박 골드', '아드레날린 포인트'],
@@ -215,6 +214,10 @@ export function GameDashboard({
                 </div>
                 <Progress value={popularityIndex} className="h-2 bg-purple-900/50" />
                 <p className="text-sm text-gray-400">현재 서버 활성도</p>
+                {/* 전역 게임 합계(서버 권위 동기화 기준). 디자인 영향 최소화 표시 */}
+                <div className="text-sm text-gray-300">
+                  총 플레이 <span data-testid="games-stats-total">{totalGamesFromStore}</span>회
+                </div>
               </div>
             </div>
 

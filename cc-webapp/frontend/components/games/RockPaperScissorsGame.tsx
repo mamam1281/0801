@@ -94,6 +94,14 @@ export function RockPaperScissorsGame({
   const gold = globalProfile?.goldBalance ?? 0;
 
   // Play sound effect (visual simulation)
+    // 전역 store의 rps 승수 우선 표시 컴포넌트
+    function RpsWins({ userWins }: { userWins: number }) {
+      const { state } = useGlobalStore();
+      const r = (state?.gameStats?.rps as any) || (state?.gameStats as any)?.['rps'];
+      const rData = r && (r as any).data ? (r as any).data : r;
+      const wins = typeof (rData as any)?.wins === 'number' ? (rData as any).wins : userWins;
+      return <div className="text-xl font-bold text-primary">{wins}</div>;
+    }
   const playSoundEffect = (effectName: string) => {
     if (!soundEnabled) return;
 
@@ -741,7 +749,7 @@ export function RockPaperScissorsGame({
             </h3>
             <div className="grid grid-cols-2 gap-4">
               <div className="text-center p-3 rounded-lg bg-primary/10 border border-primary/20">
-                <div className="text-xl font-bold text-primary">{user.gameStats.rps.wins}</div>
+                  <RpsWins userWins={user?.gameStats?.rps?.wins ?? 0} />
                 <div className="text-sm text-muted-foreground">승리</div>
               </div>
               <div className="text-center p-3 rounded-lg bg-error/10 border border-error/20">
