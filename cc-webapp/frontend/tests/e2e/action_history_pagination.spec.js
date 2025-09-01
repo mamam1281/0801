@@ -38,10 +38,10 @@ test.describe('Action history pagination', () => {
       }, nickname);
 
   await page.goto(base + '/e2e/profile');
-  await expect(page.getByTestId('profile-screen')).toBeVisible({ timeout: 20000 });
+  await expect(page.getByTestId('profile-screen').first()).toBeVisible({ timeout: 20000 });
 
     // 리스트 로드 대기
-  const list = page.locator('[data-testid="action-history-list"]');
+  const list = page.locator('[data-testid="action-history-list"]').first();
   await expect(list).toBeVisible({ timeout: 20000 });
 
   const firstPageIds = await list.locator('> div').evaluateAll((rows) => rows.map((r) => (r.getAttribute('data-key') || r.getAttribute('key'))));

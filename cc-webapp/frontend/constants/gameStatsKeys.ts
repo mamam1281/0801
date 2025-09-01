@@ -10,14 +10,17 @@ export const TOTAL_KEYS_GLOBAL = [
 ] as const;
 
 export const GAME_ID_ALIASES: Record<string, string[]> = {
-  slot: ['slot'],
+  // 슬롯 통계가 slots/slot_machine/neon_slot 등으로 올 수 있어 별칭 확장
+  slot: ['slot', 'slots', 'slot_machine', 'neon_slot'],
   rps: ['rps', 'rock_paper_scissors'],
   gacha: ['gacha'],
-  crash: ['crash'],
+  // crash_game 변형 대비
+  crash: ['crash', 'crash_game'],
 };
 
 export const PLAY_COUNT_KEYS_BY_GAME: Record<string, string[]> = {
-  slot: ['totalSpins', 'spins', 'plays', 'games', 'total_games'],
+  // total_spins/sin_count 등의 스네이크/다양 키도 추적
+  slot: ['totalSpins', 'total_spins', 'spin_count', 'spins', 'plays', 'games', 'total_games'],
   rps: ['totalGames', 'matches', 'games', 'plays'],
   gacha: ['totalPulls', 'pulls', 'plays'],
   crash: ['totalGames', 'games', 'plays'],

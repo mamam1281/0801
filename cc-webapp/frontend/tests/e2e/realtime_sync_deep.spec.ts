@@ -124,7 +124,7 @@ test.describe('Realtime sync deep', () => {
       headers: { Authorization: `Bearer ${access_token}` }
     });
 
-    // 토스트가 노출되지 않는 테마일 수 있으므로 존재하면 개수<=1 확인, 없으면 패스
+    // 오빠       가 노출되지 않는 테마일 수 있으므로 존재하면 개수<=1 확인, 없으면 패스
     const toasts = page.locator('[data-testid="toast"], [role="status" i], .toast');
     const count = await toasts.count().catch(() => 0);
     if (count > 0) {

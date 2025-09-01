@@ -16,7 +16,6 @@ import {
   Timer,
   Coins,
   ChevronRight,
-  BarChart3,
   Gem,
   Sparkles,
   Menu,
@@ -360,7 +359,7 @@ export function HomeDashboard({
         invalidateDash?.();
         reloadDash();
       } catch {}
-    } catch (e: any) {
+  } catch (e: any) {
       // 상태코드/메시지 기반 분류 로깅 지원 (apiRequest는 status를 직접 던지지 않으므로 message 패턴 사용)
       if (e?.message === 'Failed to fetch') {
         onAddNotification(rewardMessages.networkFail);
@@ -370,7 +369,7 @@ export function HomeDashboard({
       }
       if (
         e?.message?.includes('한 회원당 하루에 1번만') ||
-        e?.message?.includes('already claimed')
+        /already[_\s]?claimed/i.test(e?.message || '')
       ) {
         // 요구사항: 이미 수령 케이스 문구 통일
         onAddNotification(rewardMessages.alreadyClaimed);
@@ -611,66 +610,11 @@ export function HomeDashboard({
 
       {/* Main Content */}
       <div className="relative z-10 p-4 lg:p-6 max-w-7xl mx-auto">
-        {/* User Stats Bar */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className="glass-effect rounded-2xl p-4 lg:p-6 mb-6"
-        >
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="text-center">
-              <motion.div
-                whileHover={{ scale: 1.05 }}
-                className="bg-gradient-gold text-black px-4 py-3 rounded-xl font-bold cursor-pointer btn-hover-lift"
-              >
-                <Coins className="w-6 h-6 mx-auto mb-1" />
-                <div className="text-xl lg:text-2xl">
-                  {(goldFromStore ?? user.goldBalance).toLocaleString()}
-                </div>
-                <div className="text-xs opacity-80">골드</div>
-              </motion.div>
-            </div>
-
-            <div className="text-center">
-              <div className="bg-gradient-game text-white px-4 py-3 rounded-xl">
-                <Star className="w-6 h-6 mx-auto mb-1" />
-                <div className="text-xl lg:text-2xl">레벨 {levelFromStore ?? user.level}</div>
-                <div className="w-full bg-white/20 rounded-full h-1.5 mt-1">
-                  <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: `${experiencePercentage}%` }}
-                    transition={{ duration: 1, delay: 0.5 }}
-                    className="bg-white h-full rounded-full"
-                  />
-                </div>
-                <div className="text-xs opacity-80 mt-1">
-                  {user.experience}/{user.maxExperience} XP
-                </div>
-              </div>
-            </div>
-
-            <div className="text-center">
-              <motion.div className="px-4 py-3 rounded-xl bg-gradient-to-r from-info to-success text-white treasure-bounce">
-                <Gem className="w-6 h-6 mx-auto mb-1" />
-                <div className="text-xl lg:text-2xl">{treasureProgress}%</div>
-                <div className="text-xs opacity-80">보물찾기</div>
-              </motion.div>
-            </div>
-
-            <div className="text-center">
-              <motion.div
-                whileHover={{ scale: 1.05 }}
-                onClick={() => setShowDailyReward(true)}
-                className="bg-gradient-to-r from-warning to-gold text-black px-4 py-3 rounded-xl cursor-pointer btn-hover-lift"
-              >
-                <Sparkles className="w-6 h-6 mx-auto mb-1" />
-                <div className="text-xl lg:text-2xl">{vipPoints}</div>
-                <div className="text-xs opacity-80">VIP 포인트</div>
-              </motion.div>
-            </div>
-          </div>
-        </motion.div>
+        {/**
+         * 메인 페이지 전용 "게임 통계/상태 바" 제거 요청 반영
+         * - 기존: 골드/레벨/보물찾기/VIP 포인트 4블록 표시
+         * - 사양: 메인 페이지에서만 제거 (다른 페이지 영향 없음)
+         */}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left Column - Quick Actions */}
@@ -723,40 +667,6 @@ export function HomeDashboard({
               </div>
             </motion.div>
 
-            <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.6 }}
-            >
-              <h2 className="text-xl font-bold text-foreground mb-4 flex items-center gap-2">
-                <BarChart3 className="w-5 h-5 text-success" />
-                게임 통계
-              </h2>
-              <div className="glass-effect rounded-xl p-6">
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-primary">{user.stats.gamesPlayed}</div>
-                    <div className="text-sm text-muted-foreground">총 게임</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-success">{user.stats.gamesWon}</div>
-                    <div className="text-sm text-muted-foreground">승리</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-gold">
-                      {user.stats.totalEarnings.toLocaleString()}
-                    </div>
-                    <div className="text-sm text-muted-foreground">총 수익</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-warning">
-                      {user.stats.highestScore.toLocaleString()}
-                    </div>
-                    <div className="text-sm text-muted-foreground">최고 점수</div>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
           </div>
 
           {/* Right Column - Streak & Events */}

@@ -1027,15 +1027,64 @@ async def place_crash_bet(
     - broadcast 에 status 추가 (placed|auto_cashed)
     - potential_win 과 별도로 simulated_max_win 제공 (auto_cashout 미지정 시 혼동 제거)
     """
+    import logging, math
+    from ..core.logging import request_id_ctx
+
     bet_amount = request.bet_amount
     auto_cashout_multiplier = request.auto_cashout_multiplier
+
+    # 입력값 사전 검증 (최소 변경: 설정이 있으면 사용, 없으면 안전한 기본값)
+    from ..core.config import settings as _settings
+    MIN_BET = int(getattr(_settings, "CRASH_MIN_BET", 10))
+    MAX_BET = int(getattr(_settings, "CRASH_MAX_BET", 100_000))
+    MIN_CASHOUT = float(getattr(_settings, "CRASH_MIN_AUTO_CASHOUT", 1.01))
+    MAX_CASHOUT = float(getattr(_settings, "CRASH_MAX_AUTO_CASHOUT", 100.0))
+
+    _rid = request_id_ctx.get()
+    _logger = logging.getLogger("games.crash")
+    _logger.info(
+        "crash_bet_request",
+        extra={
+            "request_id": _rid,
+            "user_id": getattr(current_user, "id", None),
+            "bet_amount": bet_amount,
+            "auto_cashout_multiplier": auto_cashout_multiplier,
+        },
+    )
+
+    # 금액 유효성
+    if not isinstance(bet_amount, int) or bet_amount <= 0:
+        _logger.warning("validation_error: invalid_bet_amount", extra={"request_id": _rid, "bet_amount": bet_amount})
+        raise HTTPException(status_code=400, detail="베팅 금액이 올바르지 않습니다")
+    if bet_amount < MIN_BET or bet_amount > MAX_BET:
+        _logger.warning(
+            "validation_error: bet_amount_out_of_range",
+            extra={"request_id": _rid, "bet_amount": bet_amount, "min": MIN_BET, "max": MAX_BET},
+        )
+        raise HTTPException(status_code=400, detail=f"베팅 금액은 {MIN_BET}~{MAX_BET} 사이여야 합니다")
+
+    # 자동 캐시아웃 배수 유효성(옵션)
+    if auto_cashout_multiplier is not None:
+        try:
+            am = float(auto_cashout_multiplier)
+        except Exception:
+            _logger.warning("validation_error: invalid_cashout_type", extra={"request_id": _rid, "auto_cashout_multiplier": auto_cashout_multiplier})
+            raise HTTPException(status_code=400, detail="자동 캐시아웃 배수가 올바르지 않습니다")
+        if math.isinf(am) or math.isnan(am):
+            _logger.warning("validation_error: invalid_cashout_nan_inf", extra={"request_id": _rid, "auto_cashout_multiplier": auto_cashout_multiplier})
+            raise HTTPException(status_code=400, detail="자동 캐시아웃 배수가 올바르지 않습니다")
+        if am < MIN_CASHOUT or am > MAX_CASHOUT:
+            _logger.warning(
+                "validation_error: cashout_out_of_range",
+                extra={"request_id": _rid, "auto_cashout_multiplier": am, "min": MIN_CASHOUT, "max": MAX_CASHOUT},
+            )
+            raise HTTPException(status_code=400, detail=f"자동 캐시아웃 배수는 {MIN_CASHOUT}~{MAX_CASHOUT} 사이여야 합니다")
 
     # ---- 트랜잭션 스코프 시작 ----
     from sqlalchemy import select, text as _text
     from sqlalchemy.exc import SQLAlchemyError
     from ..models.auth_models import User as UserModel
     from ..core import economy
-    from ..core.config import settings as _settings
 
     try:
         # 사용자 행 잠금 (비관적 락) → 동시 중복 베팅 중복 차감 방지
@@ -1221,10 +1270,24 @@ async def place_crash_bet(
         db.commit()
     except HTTPException:
         db.rollback()
+        # 이미 상위 핸들러에서 request_id 포함 응답 포맷으로 처리됨
         raise
     except SQLAlchemyError as e:
         db.rollback()
-        logger.error(f"crash bet failed: {e}")
+        # 내부 오류 상세 로그(요청 컨텍스트 포함)
+        try:
+            _logger.error(
+                "crash_bet_failed",
+                extra={
+                    "request_id": _rid,
+                    "user_id": getattr(current_user, "id", None),
+                    "bet_amount": bet_amount,
+                    "auto_cashout_multiplier": auto_cashout_multiplier,
+                    "error": str(e),
+                },
+            )
+        except Exception:
+            pass
         raise HTTPException(status_code=500, detail="크래시 베팅 처리 오류")
 
     # 실시간 브로드캐스트 (commit 후)

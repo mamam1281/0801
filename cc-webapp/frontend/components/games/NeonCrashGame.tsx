@@ -188,13 +188,17 @@ export function NeonCrashGame({
       fetchAuthoritativeStats();
     } catch (error) {
       console.error('크래시 게임 시작 실패:', error);
-      const msg =
-        (error as any)?.message ||
-        (typeof error === 'string'
-          ? (error as string)
-          : '게임 시작에 실패했습니다. 다시 시도해주세요.');
-      setErrorMessage(msg);
-      onAddNotification('게임 시작에 실패했습니다. 다시 시도해주세요.');
+      const raw = (error as any)?.message || (typeof error === 'string' ? (error as string) : '');
+      // 서버 표준 에러 포맷을 UX 메시지로 매핑
+      const isServer500 = /HTTP_500|500\s+Internal|크래시 베팅 처리 오류/.test(raw);
+      const userMsg = isServer500
+        ? '일시적인 오류로 베팅을 처리하지 못했습니다. 잠시 후 다시 시도해주세요.'
+        : '게임 시작에 실패했습니다. 다시 시도해주세요.';
+      setErrorMessage(userMsg);
+      onAddNotification(userMsg);
+      // 부분적으로 증가한 로컬 상태가 있으면 되돌림(실행 플래그 등)
+      setIsRunning(false);
+      setHasCashedOut(false);
     }
   };
 

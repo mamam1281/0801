@@ -53,13 +53,13 @@ test.describe('Action history pagination', () => {
 			} catch {}
 		});
 
-		// 1-1) 진입 후 전역 E2E 헬퍼로 즉시 유저/화면 세팅
-		await page.goto(base + '/e2e/profile');
-		// 프로필 화면 렌더 대기
-		await expect(page.getByTestId('profile-screen')).toBeVisible({ timeout: 20000 });
+	// 1-1) 진입 후 전역 E2E 헬퍼로 즉시 유저/화면 세팅
+	await page.goto(base + '/e2e/profile');
+	// 프로필 화면 렌더 대기 (엄격 모드에서 다중 매치 시 첫 요소 기준)
+	await expect(page.getByTestId('profile-screen').first()).toBeVisible({ timeout: 20000 });
 
 		// 리스트 로드 대기
-		const list = page.locator('[data-testid="action-history-list"]');
+	const list = page.locator('[data-testid="action-history-list"]').first();
 		await expect(list).toBeVisible({ timeout: 20000 });
 
 		const firstPageIds = await list.locator('> div').evaluateAll((rows: Element[]) => rows.map((r: Element) => (r.getAttribute('key') || r.getAttribute('data-key')) as string | null));
