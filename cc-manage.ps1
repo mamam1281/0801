@@ -236,10 +236,12 @@ function Check-Health {
     Write-Host "Probing service health..." -ForegroundColor Cyan
     $apiPort = 8000
     $webPort = 3000
+    # 기본 포트는 8000/3000, 로컬 오버라이드 파일이 있으면 8001/3001로 시도
     if (Test-Path "docker-compose.override.local.yml") {
         $apiPort = 8001
         $webPort = 3001
     }
+    # .env.local에 명시된 포트가 있으면 최우선 적용
     if (Test-Path ".env.local") {
         $lines = Get-Content .env.local
         foreach ($l in $lines) {
@@ -247,8 +249,43 @@ function Check-Health {
             if ($l -match '^FRONTEND_PORT=(\d+)$') { $webPort = [int]$Matches[1] }
         }
     }
-    try { $api = Invoke-RestMethod -Uri "http://localhost:$apiPort/health" -TimeoutSec 5; Write-Host ("API /health => {0}" -f ($api.status)) -ForegroundColor Green } catch { Write-Host "API not responding on http://localhost:$apiPort/health" -ForegroundColor Yellow }
-    try { $web = Invoke-WebRequest -Uri "http://localhost:$webPort" -UseBasicParsing -TimeoutSec 5; Write-Host ("Web / => {0}" -f $web.StatusCode) -ForegroundColor Green } catch { Write-Host "Web not responding on http://localhost:$webPort" -ForegroundColor Yellow }
+
+    # 현재 계산된 포트 우선 시도 후 실패 시 기본/오버라이드 포트 쌍으로 자동 폴백
+    $attempts = @()
+    $current = @{ api = $apiPort; web = $webPort }
+    $pairA = @{ api = 8000; web = 3000 }
+    $pairB = @{ api = 8001; web = 3001 }
+    $attempts += $current
+    # 현재 값이 A/B와 다를 때만 보조 시도 목록에 추가
+    if (-not ($current.api -eq $pairA.api -and $current.web -eq $pairA.web)) { $attempts += $pairA }
+    if (-not ($current.api -eq $pairB.api -and $current.web -eq $pairB.web)) { $attempts += $pairB }
+
+    $apiOk = $false
+    $webOk = $false
+    foreach ($p in $attempts) {
+        if (-not $apiOk) {
+            try {
+                $api = Invoke-RestMethod -Uri ("http://localhost:{0}/health" -f $p.api) -TimeoutSec 5
+                Write-Host ("API /health => {0} (port {1})" -f ($api.status), $p.api) -ForegroundColor Green
+                $apiOk = $true
+            } catch {
+                Write-Host ("API not responding on http://localhost:{0}/health" -f $p.api) -ForegroundColor Yellow
+            }
+        }
+        if (-not $webOk) {
+            try {
+                $web = Invoke-WebRequest -Uri ("http://localhost:{0}" -f $p.web) -UseBasicParsing -TimeoutSec 5
+                Write-Host ("Web / => {0} (port {1})" -f $web.StatusCode, $p.web) -ForegroundColor Green
+                $webOk = $true
+            } catch {
+                Write-Host ("Web not responding on http://localhost:{0}" -f $p.web) -ForegroundColor Yellow
+            }
+        }
+        if ($apiOk -and $webOk) { break }
+    }
+    if (-not $apiOk -or -not $webOk) {
+        Write-Host "Tip: 포트 불일치 가능성. 'docker compose ps'로 실제 매핑을 확인하거나 .env.local의 BACKEND_PORT/FRONTEND_PORT를 지정하세요." -ForegroundColor DarkYellow
+    }
 }
 
 function Check-DBConnection {

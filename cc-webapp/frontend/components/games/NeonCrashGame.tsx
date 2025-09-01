@@ -34,6 +34,7 @@ import { api } from '@/lib/unifiedApi';
 import { useWithReconcile } from '@/lib/sync';
 import { useUserGold } from '@/hooks/useSelectors';
 import { useGlobalStore, mergeProfile, mergeGameStats } from '@/store/globalStore';
+import { useGlobalSync } from '@/hooks/useGlobalSync';
 
 interface NeonCrashGameProps {
   user: User;
@@ -51,6 +52,7 @@ export function NeonCrashGame({
   const withReconcile = useWithReconcile();
   const gold = useUserGold();
   const { dispatch } = useGlobalStore();
+  const { syncAfterGame } = useGlobalSync();
   const [betAmount, setBetAmount] = useState(10);
   const [multiplier, setMultiplier] = useState(1.0);
   const [isRunning, setIsRunning] = useState(false);
@@ -183,7 +185,9 @@ export function NeonCrashGame({
         totalProfit: (winAmount - betAmount),
         highestMultiplier: finalMultiplier,
       });
-      fetchAuthoritativeStats();
+  // 서버잔액 포함되었더라도 후처리 스냅샷 동기화
+  await syncAfterGame();
+  fetchAuthoritativeStats();
     } catch (error) {
       console.error('크래시 게임 시작 실패:', error);
       const msg =
@@ -438,7 +442,8 @@ export function NeonCrashGame({
       highestMultiplier: Math.max(multiplier, (authoritativeStats?.highest_multiplier ?? 0)),
     });
 
-    fetchAuthoritativeStats();
+  await syncAfterGame();
+  fetchAuthoritativeStats();
 
     // 알림
     onAddNotification(`${winnings} 골드를 획득했습니다! (${multiplier.toFixed(2)}x)`);
@@ -487,7 +492,8 @@ export function NeonCrashGame({
           ...prev,
         ]);
 
-        fetchAuthoritativeStats();
+  void syncAfterGame();
+  fetchAuthoritativeStats();
 
         onAddNotification(`크래시! ${finalMultiplier.toFixed(2)}x에서 터졌습니다.`);
       }

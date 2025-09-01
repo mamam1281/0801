@@ -7,6 +7,7 @@ import { api } from '@/lib/unifiedApi';
 import { useWithReconcile } from '@/lib/sync';
 import { useUserGold } from '@/hooks/useSelectors';
 import { useGlobalStore, mergeProfile, mergeGameStats } from '@/store/globalStore';
+import { useGlobalSync } from '@/hooks/useGlobalSync';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft,
@@ -106,6 +107,7 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
     onUpdateUser,
     onAddNotification,
   });
+  const { syncAfterGame } = useGlobalSync();
   const withReconcile = useWithReconcile();
   // 전역 권위 잔액(셀렉터)
   const gold = useUserGold();
@@ -425,7 +427,7 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
 
         // 🎯 잔액 동기화: 서버 응답에 balance가 없을 때만 reconcile 수행
         if (!hasMergedBalance) {
-          await reconcileBalance();
+          await syncAfterGame();
         }
 
         // 전역 게임 통계 누적(가산)
@@ -474,7 +476,7 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
 
         // 🎯 패배 시에도 잔액 동기화 필요: 서버 balance 없을 때만 reconcile
         if (!hasMergedBalance) {
-          await reconcileBalance();
+          await syncAfterGame();
         }
 
         // 전역 게임 통계 누적(가산)

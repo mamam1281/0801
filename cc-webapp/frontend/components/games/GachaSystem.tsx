@@ -5,6 +5,7 @@ import { api } from '@/lib/unifiedApi';
 import { useWithReconcile } from '@/lib/sync';
 import { useUserGold } from '@/hooks/useSelectors';
 import { useGlobalStore, mergeProfile, mergeGameStats, applyPurchase } from '@/store/globalStore';
+import { useGlobalSync } from '@/hooks/useGlobalSync';
 import useAuthToken from '../../hooks/useAuthToken';
 import useFeedback from '../../hooks/useFeedback';
 import useBalanceSync from '../../hooks/useBalanceSync';
@@ -65,6 +66,7 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
     onAddNotification,
   });
   const withReconcile = useWithReconcile();
+  const { syncAfterGame } = useGlobalSync();
   const gold = useUserGold();
   const { dispatch } = useGlobalStore();
 
@@ -225,14 +227,19 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
           first
         );
         try {
-          const bal = await api.get<any>('users/balance');
-          const cyber = bal?.cyber_token_balance;
-          onUpdateUser({
-            ...(updatedUser as User),
-            goldBalance: typeof cyber === 'number' ? cyber : (updatedUser as User).goldBalance,
-          });
-        } catch {
-          onUpdateUser(updatedUser as User);
+          await syncAfterGame();
+        } finally {
+          // 하위 UI 상태 호환을 위해 onUpdateUser도 유지
+          try {
+            const bal = await api.get<any>('users/balance');
+            const cyber = bal?.cyber_token_balance;
+            onUpdateUser({
+              ...(updatedUser as User),
+              goldBalance: typeof cyber === 'number' ? cyber : (updatedUser as User).goldBalance,
+            });
+          } catch {
+            onUpdateUser(updatedUser as User);
+          }
         }
         onAddNotification(getRarityMessage(first));
       }
@@ -253,7 +260,7 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
       setCurrentPullIndex(0);
       setShowResults(true);
       onAddNotification(getRarityMessage(item));
-      try { await reconcileBalance(); } catch {}
+  try { await syncAfterGame(); } catch { try { await reconcileBalance(); } catch {} }
     }
     setIsPulling(false);
     setPullAnimation(null);
@@ -351,14 +358,19 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
           } as User
         );
         try {
-          const bal = await api.get<any>('users/balance');
-          const cyber = bal?.cyber_token_balance;
-          onUpdateUser({
-            ...(updatedUser as User),
-            goldBalance: typeof cyber === 'number' ? cyber : (updatedUser as User).goldBalance,
-          });
-        } catch {
-          onUpdateUser(updatedUser as User);
+          await syncAfterGame();
+        } finally {
+          // 하위 UI 상태 호환을 위해 onUpdateUser도 유지
+          try {
+            const bal = await api.get<any>('users/balance');
+            const cyber = bal?.cyber_token_balance;
+            onUpdateUser({
+              ...(updatedUser as User),
+              goldBalance: typeof cyber === 'number' ? cyber : (updatedUser as User).goldBalance,
+            });
+          } catch {
+            onUpdateUser(updatedUser as User);
+          }
         }
         onAddNotification(getTenPullMessage(mapped));
       }
@@ -383,7 +395,7 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
       setCurrentPullIndex(0);
       setShowResults(true);
       onAddNotification(getTenPullMessage(items));
-      try { await reconcileBalance(); } catch {}
+  try { await syncAfterGame(); } catch { try { await reconcileBalance(); } catch {} }
     }
     setIsPulling(false);
     setPullAnimation(null);
