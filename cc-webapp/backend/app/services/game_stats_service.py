@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import Optional
 from sqlalchemy.orm import Session
-from sqlalchemy import select, func
+from sqlalchemy import func, case
 from decimal import Decimal
 from ..models.game_stats_models import UserGameStats
 from ..models.history_models import GameHistory
@@ -38,21 +38,63 @@ class GameStatsService:
         """
         stats = self.get_or_create(user_id)
         profit = win_amount - bet_amount
+        # Increment counters
         stats.total_bets = (stats.total_bets or 0) + 1
         if win_amount > 0:
             stats.total_wins = (stats.total_wins or 0) + 1
         else:
             stats.total_losses = (stats.total_losses or 0) + 1
-        # highest multiplier logic: only update if larger
+        # Highest multiplier update (monotonic non-decreasing)
         try:
             if final_multiplier and final_multiplier > 0:
                 if stats.highest_multiplier is None or float(final_multiplier) > float(stats.highest_multiplier):
                     stats.highest_multiplier = Decimal(str(final_multiplier))
                 elif float(final_multiplier) < float(stats.highest_multiplier):
-                    logger.warning("highest_multiplier regression observed user=%s final=%s stored=%s", user_id, final_multiplier, stats.highest_multiplier)
+                    logger.warning(
+                        "highest_multiplier regression observed user=%s final=%s stored=%s",
+                        user_id,
+                        final_multiplier,
+                        stats.highest_multiplier,
+                    )
         except Exception:  # pragma: no cover
             logger.debug("highest_multiplier compare failed", exc_info=True)
-        # profit accumulation
+
+        # Append authoritative history row for recomputation/parity
+        try:
+            if win_amount > 0:
+                self.db.add(
+                    GameHistory(
+                        user_id=user_id,
+                        game_type="crash",
+                        action_type="WIN",
+                        delta_coin=int(win_amount - bet_amount),
+                        delta_gem=0,
+                        result_meta={
+                            "bet_amount": int(bet_amount),
+                            "win_amount": int(win_amount),
+                            "final_multiplier": float(final_multiplier) if final_multiplier is not None else None,
+                        },
+                    )
+                )
+            else:
+                self.db.add(
+                    GameHistory(
+                        user_id=user_id,
+                        game_type="crash",
+                        action_type="BET",
+                        delta_coin=-int(bet_amount),
+                        delta_gem=0,
+                        result_meta={
+                            "bet_amount": int(bet_amount),
+                            "win_amount": int(win_amount),
+                            "final_multiplier": float(final_multiplier) if final_multiplier is not None else None,
+                        },
+                    )
+                )
+        except Exception:  # pragma: no cover
+            logger.debug("history append failed", exc_info=True)
+
+        # Profit accumulation and finalize
         stats.total_profit = Decimal(str(stats.total_profit or 0)) + Decimal(str(profit))
         stats.updated_at = datetime.utcnow()
         self.db.commit()
@@ -66,8 +108,12 @@ class GameStatsService:
         """
         q = (
             self.db.query(
-                func.sum(func.case((GameHistory.action_type == 'BET', 1), else_=0)).label('bet_rows'),
-                func.sum(func.case((GameHistory.action_type == 'WIN', 1), else_=0)).label('win_rows'),
+                func.sum(
+                    case((GameHistory.action_type == 'BET', 1), else_=0)
+                ).label('bet_rows'),
+                func.sum(
+                    case((GameHistory.action_type == 'WIN', 1), else_=0)
+                ).label('win_rows'),
                 func.coalesce(func.sum(GameHistory.delta_coin), 0).label('delta_sum'),
             )
             .filter(GameHistory.user_id == user_id, GameHistory.game_type == 'crash')

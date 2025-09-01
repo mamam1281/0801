@@ -40,7 +40,7 @@ async def vip_status(current_user: User = Depends(get_current_user), db: Session
     return VipStatusResponse(
         claimed_today=claimed,
         vip_points=current_user.vip_points or 0,
-        last_claim_at=reward.created_at if reward else None,
+    last_claim_at=reward.claimed_at if reward else None,
     )
 
 @router.post("/claim", response_model=VipClaimResponse)
@@ -53,7 +53,9 @@ async def claim_vip_daily(
     redis_flag_key = f"vip_claimed:{current_user.id}:{today}"
     r = None
     try:
-        r = get_redis_manager().redis if hasattr(get_redis_manager(), 'redis') else None
+        # RedisManager는 redis_client 속성을 사용합니다.
+        mgr = get_redis_manager()
+        r = getattr(mgr, 'redis_client', None)
         if r and r.get(redis_flag_key):
             # Check DB for existing reward
             existing = (
@@ -65,7 +67,7 @@ async def claim_vip_daily(
                 return VipClaimResponse(
                     awarded_points=existing.reward_metadata.get("vip_points", VIP_DAILY_POINTS) if existing.reward_metadata else VIP_DAILY_POINTS,
                     new_vip_points=current_user.vip_points,
-                    claimed_at=existing.created_at,
+                    claimed_at=existing.claimed_at,
                     idempotent=True,
                 )
     except Exception:
@@ -81,7 +83,7 @@ async def claim_vip_daily(
         return VipClaimResponse(
             awarded_points=existing.reward_metadata.get("vip_points", VIP_DAILY_POINTS) if existing.reward_metadata else VIP_DAILY_POINTS,
             new_vip_points=current_user.vip_points,
-            claimed_at=existing.created_at,
+            claimed_at=existing.claimed_at,
             idempotent=True,
         )
 
@@ -122,6 +124,6 @@ async def claim_vip_daily(
     return VipClaimResponse(
         awarded_points=VIP_DAILY_POINTS,
         new_vip_points=current_user.vip_points,
-        claimed_at=reward.created_at,
+        claimed_at=reward.claimed_at,
         idempotent=False,
     )

@@ -203,6 +203,39 @@ def _ensure_schema():
 	yield
 
 
+# --- Session fixture for DB-bound service tests (e.g., GameStats) ---
+# 각 테스트를 트랜잭션으로 샌드박싱하여 commit 호출이 있어도 테스트 종료 시 롤백되도록 함.
+@pytest.fixture
+def db():
+	"""Function-scoped SQLAlchemy Session with transactional sandbox.
+
+	- Opens a dedicated connection
+	- Starts a transaction
+	- Binds a new Session to that connection
+	- Yields the Session to the test
+	- On teardown, closes the Session and rolls back the transaction
+
+	This ensures that any DB writes (even after session.commit()) are rolled back
+	at the end of the test, keeping tests isolated and fast.
+	"""
+	from sqlalchemy.orm import sessionmaker as _sessionmaker
+	# Use the shared engine created by app.database
+	conn = engine.connect()
+	trans = conn.begin()
+	TestingSessionLocal = _sessionmaker(bind=conn, autocommit=False, autoflush=False)
+	sess = TestingSessionLocal()
+	try:
+		yield sess
+	finally:
+		try:
+			sess.close()
+		finally:
+			try:
+				trans.rollback()
+			finally:
+				conn.close()
+
+
 @pytest.fixture(scope="session")
 def client():
 	from fastapi.testclient import TestClient as _TC
@@ -255,6 +288,39 @@ def client():
 	# TestClient 버전에서 lifespan 인자 미지원 가능성이 있어, 상단에서 router.lifespan_context를 no-op으로 교체한 방식만 사용
 	with _TC(fastapi_app) as c:
 		yield c
+
+
+# --- Seed users required by GameStats tests (FK integrity) ---
+@pytest.fixture(scope="session", autouse=True)
+def _seed_users_for_gamestats():
+	"""Ensure users with ids used in GameStats tests exist (1,2,3,123).
+
+	Uses a dedicated session and commits so that per-test transactional sessions can see the rows.
+	"""
+	try:
+		from app.database import SessionLocal as _Sess
+		from app.models.auth_models import User as _User
+		sess = _Sess()
+		try:
+			needed = [1, 2, 3, 123]
+			for uid in needed:
+				exists = sess.query(_User).filter(_User.id == uid).first()
+				if not exists:
+					u = _User(
+						id=uid,
+						site_id=f"gamestats-{uid}",
+						nickname=f"gamestats-{uid}",
+						phone_number=f"000-0000-{uid:04d}",
+						password_hash="x",
+						invite_code="5858",
+					)
+					sess.add(u)
+			sess.commit()
+		finally:
+			sess.close()
+	except Exception:
+		# Non-fatal: if seeding fails, affected tests will surface FK errors
+		pass
 
 
 # ---- Global deterministic PaymentGateway patch (session scope) ----

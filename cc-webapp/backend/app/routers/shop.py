@@ -279,6 +279,7 @@ def list_limited_catalog_compat():
         remaining_stock = LimitedPackageService.get_stock(p.code)
         packages.append(LimitedPackageOut(
             code=p.code,
+            package_id=p.code,
             name=p.name,
             description=p.description,
             price_cents=p.price_cents,
@@ -334,10 +335,18 @@ def buy_limited_compat(req: LimitedBuyCompatRequest, *, db = Depends(get_db), ba
         try:
             now_ts = int(time.time())
             zkey = f"user:buy:ts:{user_id}"
-            rclient.zremrangebyscore(zkey, 0, now_ts - FRAUD_WINDOW)
-            count = rclient.zcount(zkey, now_ts - FRAUD_WINDOW, now_ts)
+            if hasattr(rclient, 'zremrangebyscore'):
+                rclient.zremrangebyscore(zkey, 0, now_ts - FRAUD_WINDOW)
+            count = 0
+            if hasattr(rclient, 'zcount'):
+                count = rclient.zcount(zkey, now_ts - FRAUD_WINDOW, now_ts)
             skey = f"user:buy:cards:{user_id}"
-            card_uniques = rclient.scard(skey) if rclient.exists(skey) else 0
+            exists_fn = getattr(rclient, 'exists', None)
+            scard_fn = getattr(rclient, 'scard', None)
+            if callable(exists_fn) and callable(scard_fn) and exists_fn(skey):
+                card_uniques = scard_fn(skey)
+            else:
+                card_uniques = 0
             if count >= FRAUD_MAX_COUNT or card_uniques >= FRAUD_MAX_CARD_UNIQUE:
                 _metric_inc("limited", "fail", "FRAUD_BLOCK")
                 try:
@@ -1402,9 +1411,11 @@ def buy_limited(req: LimitedBuyRequest, *, db = Depends(get_db), current_user = 
     if rman.redis_client and not defer_rate_limit_check:
         try:
             rl_key = f"rl:buy-limited:{user_id}"
-            cnt = rman.redis_client.incr(rl_key)
-            if cnt == 1:
-                rman.redis_client.expire(rl_key, 10)
+            incr_fn = getattr(rman.redis_client, 'incr', None)
+            expire_fn = getattr(rman.redis_client, 'expire', None)
+            cnt = incr_fn(rl_key) if callable(incr_fn) else 1
+            if cnt == 1 and callable(expire_fn):
+                expire_fn(rl_key, 10)
             if cnt > 5:
                 rate_limited = True
                 _metric_inc("limited", "fail", "RATE_LIMIT")
@@ -1415,12 +1426,15 @@ def buy_limited(req: LimitedBuyRequest, *, db = Depends(get_db), current_user = 
     # Idempotency pre-lock: 동시 중복 처리 방지
     if idem and rman.redis_client:
         try:
-            if rman.redis_client.exists(_idem_key(user_id, req.package_id, idem)):
+            exists_fn = getattr(rman.redis_client, 'exists', None)
+            if callable(exists_fn) and exists_fn(_idem_key(user_id, req.package_id, idem)):
                 # 이미 성공 처리됨
                 cur_user = db.query(models.User).filter(models.User.id == user_id).first()
                 return LimitedBuyReceipt(success=True, message="중복 요청 처리됨", user_id=user_id, code=req.package_id, new_gold_balance=getattr(cur_user, 'gold_balance', 0) if cur_user else None)
             # pre-lock 획득 시도
-            if not rman.redis_client.set(_idem_lock_key(user_id, req.package_id, idem), "1", nx=True, ex=60):
+            set_fn = getattr(rman.redis_client, 'set', None)
+            ok = set_fn(_idem_lock_key(user_id, req.package_id, idem), "1", nx=True, ex=60) if callable(set_fn) else True
+            if not ok:
                 _metric_inc("limited", "fail", "PROCESSING")
                 return LimitedBuyReceipt(success=False, message="Processing duplicate", user_id=user_id, code=req.package_id, reason_code="PROCESSING")
         except Exception:
@@ -1579,9 +1593,11 @@ def buy_limited(req: LimitedBuyRequest, *, db = Depends(get_db), current_user = 
     if defer_rate_limit_check and rman.redis_client:
         try:
             rl_key = f"rl:buy-limited:{user_id}"
-            cnt = rman.redis_client.incr(rl_key)
-            if cnt == 1:
-                rman.redis_client.expire(rl_key, 10)
+            incr_fn = getattr(rman.redis_client, 'incr', None)
+            expire_fn = getattr(rman.redis_client, 'expire', None)
+            cnt = incr_fn(rl_key) if callable(incr_fn) else 1
+            if cnt == 1 and callable(expire_fn):
+                expire_fn(rl_key, 10)
             if cnt > 5:
                 _metric_inc("limited", "fail", "RATE_LIMIT")
                 return LimitedBuyReceipt(success=False, message="Rate limit exceeded", user_id=user_id, code=req.package_id, reason_code="RATE_LIMIT")
@@ -1778,13 +1794,22 @@ def buy_limited(req: LimitedBuyRequest, *, db = Depends(get_db), current_user = 
         try:
             zkey = f"user:buy:ts:{user_id}"
             now_ts = int(time.time())
-            rman.redis_client.zadd(zkey, {str(now_ts): now_ts})
-            rman.redis_client.zremrangebyscore(zkey, 0, now_ts - 300)
-            rman.redis_client.expire(zkey, 600)
+            zadd_fn = getattr(rman.redis_client, 'zadd', None)
+            zrem_fn = getattr(rman.redis_client, 'zremrangebyscore', None)
+            expire_fn = getattr(rman.redis_client, 'expire', None)
+            if callable(zadd_fn):
+                zadd_fn(zkey, {str(now_ts): now_ts})
+            if callable(zrem_fn):
+                zrem_fn(zkey, 0, now_ts - 300)
+            if callable(expire_fn):
+                expire_fn(zkey, 600)
             if req.card_token:
                 skey = f"user:buy:cards:{user_id}"
-                rman.redis_client.sadd(skey, req.card_token)
-                rman.redis_client.expire(skey, 600)
+                sadd_fn = getattr(rman.redis_client, 'sadd', None)
+                if callable(sadd_fn):
+                    sadd_fn(skey, req.card_token)
+                if callable(expire_fn):
+                    expire_fn(skey, 600)
         except Exception:
             pass
 
