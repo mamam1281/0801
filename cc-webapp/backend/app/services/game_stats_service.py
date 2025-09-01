@@ -35,14 +35,15 @@ class GameStatsService:
         return stats
 
     def update_from_round(self, *, user_id: int, bet_amount: int, win_amount: int, final_multiplier: float) -> UserGameStats:
-    """Apply a single crash round result.
+        """Apply a single crash round result.
 
-    bet_amount: amount wagered (positive integer)
-    win_amount: amount returned (0 if loss) (positive int) -> profit = win_amount - bet_amount
-    final_multiplier: achieved multiplier (>=1.0). If win, this is the cashout multiplier; if loss, the crash multiplier.
-    """
-    stats = self.get_or_create(user_id)
-    profit = win_amount - bet_amount
+        bet_amount: amount wagered (positive integer)
+        win_amount: amount returned (0 if loss) (positive int) -> profit = win_amount - bet_amount
+        final_multiplier: achieved multiplier (>=1.0). If win, this is the cashout multiplier; if loss, the crash multiplier.
+        """
+        stats = self.get_or_create(user_id)
+        profit = win_amount - bet_amount
+
         # Highest multiplier update (monotonic non-decreasing)
         if final_multiplier and final_multiplier > 0:
             try:
@@ -56,14 +57,19 @@ class GameStatsService:
                         stats.highest_multiplier,
                     )
             except Exception:
-                # 축소: 불필요 억제 최소화, 문제는 드러내되 테스트 안정성을 위해 경고만 남김
                 logger.warning("highest_multiplier update failed", exc_info=True)
 
         # Append authoritative history row for recomputation/parity (explicit logging + flush)
         if win_amount > 0:
             delta = int(win_amount - bet_amount)
             if delta <= 0:
-                logger.warning("WIN delta non-positive user=%s bet=%s win=%s -> delta=%s", user_id, bet_amount, win_amount, delta)
+                logger.warning(
+                    "WIN delta non-positive user=%s bet=%s win=%s -> delta=%s",
+                    user_id,
+                    bet_amount,
+                    win_amount,
+                    delta,
+                )
             rec = GameHistory(
                 user_id=user_id,
                 game_type=GAME_TYPE_CRASH,
@@ -77,8 +83,15 @@ class GameStatsService:
                 },
             )
             self.db.add(rec)
-            self.db.flush()  # ensure visible within current transaction
-            logger.info("GameHistory appended: user=%s type=%s action=%s id=%s delta=%s", user_id, GAME_TYPE_CRASH, ACTION_WIN, getattr(rec, 'id', None), delta)
+            self.db.flush()
+            logger.info(
+                "GameHistory appended: user=%s type=%s action=%s id=%s delta=%s",
+                user_id,
+                GAME_TYPE_CRASH,
+                ACTION_WIN,
+                getattr(rec, 'id', None),
+                delta,
+            )
         else:
             delta = -int(bet_amount)
             rec = GameHistory(
@@ -95,18 +108,25 @@ class GameStatsService:
             )
             self.db.add(rec)
             self.db.flush()
-            logger.info("GameHistory appended: user=%s type=%s action=%s id=%s delta=%s", user_id, GAME_TYPE_CRASH, ACTION_BET, getattr(rec, 'id', None), delta)
+            logger.info(
+                "GameHistory appended: user=%s type=%s action=%s id=%s delta=%s",
+                user_id,
+                GAME_TYPE_CRASH,
+                ACTION_BET,
+                getattr(rec, 'id', None),
+                delta,
+            )
 
         # Recompute authoritative aggregates from history (crash only)
         agg = (
             self.db.query(
                 func.sum(
                     case(((GameHistory.action_type == ACTION_WIN) & (GameHistory.delta_coin > 0), 1), else_=0)
-                ).label('win_rows'),
+                ).label("win_rows"),
                 func.sum(
                     case(((GameHistory.action_type == ACTION_BET) & (GameHistory.delta_coin < 0), 1), else_=0)
-                ).label('loss_rows'),
-                func.coalesce(func.sum(GameHistory.delta_coin), 0).label('delta_sum'),
+                ).label("loss_rows"),
+                func.coalesce(func.sum(GameHistory.delta_coin), 0).label("delta_sum"),
             )
             .filter(GameHistory.user_id == user_id, GameHistory.game_type == GAME_TYPE_CRASH)
         ).one()
@@ -121,24 +141,24 @@ class GameStatsService:
         stats.total_losses = losses
         stats.total_profit = Decimal(str(delta_sum))
         stats.updated_at = datetime.utcnow()
-        self.db.commit()
+        self.db.flush()
         return stats
 
     def recalculate_user(self, user_id: int) -> Optional[UserGameStats]:
         """Full authoritative recomputation from GameHistory for crash only (MVP).
 
-        Current history logging stores WIN rows with positive delta_coin (net) and BET rows for losses (delta negative +win_amount 0).
+        Current history logging stores WIN rows with positive delta_coin (net) and BET rows for losses (delta negative + win_amount 0).
         We infer losses = bets - wins. Profit is simply sum(delta_coin) (wins add net positive, bets subtract wager).
         """
         q = (
             self.db.query(
                 func.sum(
                     case(((GameHistory.action_type == ACTION_WIN) & (GameHistory.delta_coin > 0), 1), else_=0)
-                ).label('win_rows'),
+                ).label("win_rows"),
                 func.sum(
                     case(((GameHistory.action_type == ACTION_BET) & (GameHistory.delta_coin < 0), 1), else_=0)
-                ).label('loss_rows'),
-                func.coalesce(func.sum(GameHistory.delta_coin), 0).label('delta_sum'),
+                ).label("loss_rows"),
+                func.coalesce(func.sum(GameHistory.delta_coin), 0).label("delta_sum"),
             )
             .filter(GameHistory.user_id == user_id, GameHistory.game_type == GAME_TYPE_CRASH)
         )
@@ -154,5 +174,5 @@ class GameStatsService:
         stats.total_profit = Decimal(str(delta_sum))
         # highest_multiplier cannot be recomputed without multiplier in history -> leave as-is
         stats.updated_at = datetime.utcnow()
-        self.db.commit()
+        self.db.flush()
         return stats

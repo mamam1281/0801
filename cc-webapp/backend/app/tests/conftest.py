@@ -334,30 +334,30 @@ def _seed_users_for_gamestats():
 		pass
 
 
-	# --- Ensure clean GameHistory for common test users per test (determinism) ---
-	@pytest.fixture(autouse=True)
-	def _cleanup_gamestats_history(db):  # noqa: D401
-		"""각 테스트 시작 시 GameHistory를 정리해 이전 실행/수동 디버그 잔여분 영향 제거."""
-		try:
-			from app.models.history_models import GameHistory as _GH
-			from app.models.game_stats_models import UserGameStats as _UGS
-			# 히스토리 삭제
-			(db.query(_GH)
-			 	.filter(_GH.user_id.in_([1, 2, 3]), _GH.game_type == 'crash')
-			 	.delete(synchronize_session=False))
-			# 누적 스탯 초기화
-			for uid in [1, 2, 3]:
-				stats = db.get(_UGS, uid)
-				if stats:
-					stats.total_bets = 0
-					stats.total_wins = 0
-					stats.total_losses = 0
-					stats.total_profit = 0
-					stats.highest_multiplier = None
-			db.commit()
-		except Exception:
-			# 비치명적 – 청소 실패 시 해당 테스트에서 드러남
-			pass
+# --- Ensure clean GameHistory for common test users per test (determinism) ---
+@pytest.fixture(autouse=True)
+def _cleanup_gamestats_history(db):  # noqa: D401
+	"""각 테스트 시작 시 GameHistory를 정리해 이전 실행/수동 디버그 잔여분 영향 제거."""
+	try:
+		from app.models.history_models import GameHistory as _GH
+		from app.models.game_stats_models import UserGameStats as _UGS
+		# 히스토리 삭제
+		(db.query(_GH)
+		 	.filter(_GH.user_id.in_([1, 2, 3]), _GH.game_type == 'crash')
+		 	.delete(synchronize_session=False))
+		# 누적 스탯 초기화
+		for uid in [1, 2, 3]:
+			stats = db.get(_UGS, uid)
+			if stats:
+				stats.total_bets = 0
+				stats.total_wins = 0
+				stats.total_losses = 0
+				stats.total_profit = 0
+				stats.highest_multiplier = None
+		db.commit()
+	except Exception:
+		# 비치명적 – 청소 실패 시 해당 테스트에서 드러남
+		pass
 
 
 # ---- Global deterministic PaymentGateway patch (session scope) ----
