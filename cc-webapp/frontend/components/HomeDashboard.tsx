@@ -21,7 +21,7 @@ import { calculateExperiencePercentage, calculateWinRate, checkLevelUp } from '.
 import { QUICK_ACTIONS, ACHIEVEMENTS_DATA } from '../constants/dashboardData';
 import { Button } from './ui/button';
 import { useGameConfig } from '../hooks/useGameConfig';
-import { Progress } from './ui/progress';
+// import { Progress } from './ui/progress';
 import { getTokens } from '../utils/tokenStorage';
 import { useEvents } from '../hooks/useEvents';
 // useAuthGate 훅: default + named export 모두 지원. 경로/타입 오류 해결 위해 명시적 import
@@ -29,7 +29,7 @@ import { useEvents } from '../hooks/useEvents';
 import useAuthGate from '@/hooks/useAuthGate';
 import { BUILD_ID } from '@/lib/buildInfo';
 import { api as unifiedApi } from '@/lib/unifiedApi';
-import useDashboard from '@/hooks/useDashboard';
+// useDashboard 제거(전역 셀렉터 + 개별 엔드포인트로 대체)
 import useRecentActions from '@/hooks/useRecentActions';
 import { API_ORIGIN } from '@/lib/unifiedApi';
 import { createWSClient, WSClient, WebSocketMessage } from '@/utils/wsClient';
@@ -80,13 +80,7 @@ export function HomeDashboard({
   const { config: gameConfig, loading: configLoading } = useGameConfig();
 
   // 통합 대시보드 데이터 (profile + events summary 등) - streak, vip/status 등 개별 일부 호출 단계적 병합 예정
-  const {
-    data: unifiedDash,
-    loading: dashLoading,
-    error: dashError,
-    reload: reloadDash,
-    invalidate: invalidateDash,
-  } = useDashboard(true);
+  // useDashboard 제거: streak/status 등 필요한 정보는 개별 엔드포인트로 최소 조회
   // Auth Gate (클라이언트 마운트 후 토큰 판정)
   const { isReady: authReady, authenticated } = useAuthGate();
   // 이벤트: 비로그인 시 자동 로드 skip
@@ -175,45 +169,29 @@ export function HomeDashboard({
     return () => clearInterval(id);
   }, [hotEvent?.end_date]);
 
-  // Fetch & tick with client once-per-day guard (auth gate 의존)
-  // 1) 통합 대시보드(unifiedDash)로부터 streak / vip 매핑 (백엔드 확장 시 자동 적용)
+  // Auth 준비 후 streak/status 1회 조회 → TTL/다음보상 등 채움 (대시보드 훅 대체)
   useEffect(() => {
-    if (!unifiedDash) return;
-    // 예상 unified 응답 확장 형태 예:
-    // {
-    //   streak: { count, ttl_seconds, next_reward },
-    //   vip: { vip_points, claimed_today },
-    //   ...기존 main/games/social_proof
-    // }
-    try {
-      const us: any = unifiedDash as any;
-      if (us.streak && typeof us.streak === 'object') {
-        const s = us.streak;
+    if (!authReady || !authenticated) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const s: any = await unifiedApi.get('streak/status');
+        if (cancelled) return;
         safeSetStreak({
-          count: s.count ?? 0,
-          ttl_seconds: s.ttl_seconds ?? null,
-          next_reward: s.next_reward ?? null,
+          count: s?.count ?? 0,
+          ttl_seconds: s?.ttl_seconds ?? null,
+          next_reward: s?.next_reward ?? null,
         });
-      }
-      if (us.vip && typeof us.vip === 'object') {
-        if (typeof us.vip.vip_points === 'number') setVipPoints(us.vip.vip_points);
-        if (typeof us.vip.claimed_today !== 'undefined') setDailyClaimed(!!us.vip.claimed_today);
-      }
-    } catch (e) {
-      // eslint-disable-next-line no-console
-      console.warn('[HomeDashboard] unifiedDash mapping failed', e);
-    }
-  }, [unifiedDash]);
+        if (typeof s?.claimed_today !== 'undefined') setDailyClaimed(!!s.claimed_today);
+      } catch {}
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [authReady, authenticated]);
 
-  // attendanceDays 는 unifiedDash.streak.attendance_week 기반으로 표시 (주간)
-  useEffect(() => {
-    if (!unifiedDash) return;
-    try {
-      const us: any = unifiedDash;
-      const week = us?.streak?.attendance_week;
-      if (Array.isArray(week)) setAttendanceDays(week);
-    } catch {}
-  }, [unifiedDash]);
+  // attendanceDays: 기존 대시보드 응답의 streak.attendance_week 활용 제거
+  // 필요 시 /api/streak/history(year,month)로 확장 예정. 현재는 null 유지 시 UI 비표시.
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -347,10 +325,15 @@ export function HomeDashboard({
       );
       setShowDailyReward(false);
       setDailyClaimed(true);
-      // 통합 대시보드 강제 갱신
+      // streak/status 재조회로 상태 동기화
       try {
-        invalidateDash?.();
-        reloadDash();
+        const s: any = await unifiedApi.get('streak/status');
+        safeSetStreak({
+          count: s?.count ?? 0,
+          ttl_seconds: s?.ttl_seconds ?? null,
+          next_reward: s?.next_reward ?? null,
+        });
+        if (typeof s?.claimed_today !== 'undefined') setDailyClaimed(!!s.claimed_today);
       } catch {}
   } catch (e: any) {
       // 상태코드/메시지 기반 분류 로깅 지원 (apiRequest는 status를 직접 던지지 않으므로 message 패턴 사용)
