@@ -142,8 +142,8 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
 
   // Perform single pull
   const performSinglePull = async () => {
-  const cost = getSinglePullCost();
-  if (gold < cost) {
+    const cost = getSinglePullCost();
+    if (gold < cost) {
       onAddNotification('❌ 골드가 부족합니다!');
       return;
     }
@@ -155,7 +155,11 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
     try {
       setErrorMessage(null);
       const res = await withReconcile(async (idemKey: string) =>
-        api.post<GachaPullApiResponse>('games/gacha/pull', { pull_count: 1 }, { headers: { 'X-Idempotency-Key': idemKey } })
+        api.post<GachaPullApiResponse>(
+          'games/gacha/pull',
+          { pull_count: 1 },
+          { headers: { 'X-Idempotency-Key': idemKey } }
+        )
       );
       fromApi(res);
       if (res?.items?.length) {
@@ -177,7 +181,11 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
         setCurrentPullIndex(0);
         setShowResults(true);
         // 전역 스토어 반영: balance/인벤토리/통계
-        const newBalance = res.balance ?? res.currency_balance?.tokens ?? (res as any)?.gold ?? (res as any)?.gold_balance;
+        const newBalance =
+          res.balance ??
+          res.currency_balance?.tokens ??
+          (res as any)?.gold ??
+          (res as any)?.gold_balance;
         if (typeof newBalance === 'number' && Number.isFinite(newBalance)) {
           mergeProfile(dispatch, { goldBalance: Number(newBalance) });
         }
@@ -197,32 +205,19 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
         }
         const epicAdds1 = mapped.filter((i) => i.rarity === 'epic').length;
         const ultraAdds1 = mapped.filter((i) => ['legendary', 'mythic'].includes(i.rarity)).length;
+        // 전역 통계는 표시용 캐시만 가산, 최종 값은 syncAfterGame으로 반영
         mergeGameStats(dispatch, 'gacha', {
           pulls: 1,
           totalSpent: cost,
           epicCount: epicAdds1,
           legendaryCount: ultraAdds1,
         });
-        // 기존 onUpdateUser 경로는 하위 UI 표시 호환을 위해 유지
+        // onUpdateUser는 인벤토리 표시 호환만 유지(합계 누적 제거)
         const first = mapped[0];
         const updatedUser = updateUserInventory(
           {
             ...user,
-            // 잔액은 서버 응답/재동기화에만 의존(전역 mergeProfile도 수행)
             goldBalance: typeof newBalance === 'number' ? newBalance : user.goldBalance,
-            gameStats: {
-              ...user.gameStats,
-              gacha: {
-                ...user.gameStats.gacha,
-                pulls: user.gameStats.gacha.pulls + 1,
-                totalSpent: user.gameStats.gacha.totalSpent + cost,
-                epicCount:
-                  (user.gameStats.gacha.epicCount || 0) + (first.rarity === 'epic' ? 1 : 0),
-                legendaryCount:
-                  (user.gameStats.gacha.legendaryCount || 0) +
-                  (['legendary', 'mythic'].includes(first.rarity) ? 1 : 0),
-              },
-            },
           } as User,
           first
         );
@@ -260,7 +255,13 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
       setCurrentPullIndex(0);
       setShowResults(true);
       onAddNotification(getRarityMessage(item));
-  try { await syncAfterGame(); } catch { try { await reconcileBalance(); } catch {} }
+      try {
+        await syncAfterGame();
+      } catch {
+        try {
+          await reconcileBalance();
+        } catch {}
+      }
     }
     setIsPulling(false);
     setPullAnimation(null);
@@ -268,8 +269,8 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
 
   // Perform 10-pull
   const performTenPull = async () => {
-  const discountedCost = getTenPullCost();
-  if (gold < discountedCost) {
+    const discountedCost = getTenPullCost();
+    if (gold < discountedCost) {
       onAddNotification('❌ 골드가 부족합니다!');
       return;
     }
@@ -281,7 +282,11 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
     try {
       setErrorMessage(null);
       const res = await withReconcile(async (idemKey: string) =>
-        api.post<GachaPullApiResponse>('games/gacha/pull', { pull_count: 10 }, { headers: { 'X-Idempotency-Key': idemKey } })
+        api.post<GachaPullApiResponse>(
+          'games/gacha/pull',
+          { pull_count: 10 },
+          { headers: { 'X-Idempotency-Key': idemKey } }
+        )
       );
       fromApi(res);
       if (res?.items?.length) {
@@ -316,7 +321,11 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
         setParticles(generateParticles(bestItem.rarity));
         const ultraAdds = mapped.filter((i) => ['legendary', 'mythic'].includes(i.rarity)).length;
         const epicAdds = mapped.filter((i) => i.rarity === 'epic').length;
-        const newBalance = res.balance ?? res.currency_balance?.tokens ?? (res as any)?.gold ?? (res as any)?.gold_balance;
+        const newBalance =
+          res.balance ??
+          res.currency_balance?.tokens ??
+          (res as any)?.gold ??
+          (res as any)?.gold_balance;
         if (typeof newBalance === 'number' && Number.isFinite(newBalance)) {
           mergeProfile(dispatch, { goldBalance: Number(newBalance) });
         }
@@ -333,6 +342,7 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
             }))
           );
         }
+        // 전역 통계는 표시용 캐시만 가산, 최종 값은 syncAfterGame으로 반영
         mergeGameStats(dispatch, 'gacha', {
           pulls: 10,
           totalSpent: discountedCost,
@@ -343,18 +353,7 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
           (acc, item) => updateUserInventory(acc as User, item) as User,
           {
             ...user,
-            // 잔액은 서버 응답/재동기화에만 의존(전역 mergeProfile도 수행)
             goldBalance: typeof newBalance === 'number' ? newBalance : user.goldBalance,
-            gameStats: {
-              ...user.gameStats,
-              gacha: {
-                ...user.gameStats.gacha,
-                pulls: user.gameStats.gacha.pulls + 10,
-                totalSpent: user.gameStats.gacha.totalSpent + discountedCost,
-                epicCount: (user.gameStats.gacha.epicCount || 0) + epicAdds,
-                legendaryCount: (user.gameStats.gacha.legendaryCount || 0) + ultraAdds,
-              },
-            },
           } as User
         );
         try {
@@ -388,14 +387,28 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
       for (let i = 0; i < 10; i++) {
         items.push(getRandomItem(selectedBanner, user));
       }
-      const rarityOrder: Record<string, number> = { common:1, rare:2, epic:3, legendary:4, mythic:5 };
-      const bestItem = items.reduce((b, c) => (rarityOrder[c.rarity] > rarityOrder[b.rarity] ? c : b));
+      const rarityOrder: Record<string, number> = {
+        common: 1,
+        rare: 2,
+        epic: 3,
+        legendary: 4,
+        mythic: 5,
+      };
+      const bestItem = items.reduce((b, c) =>
+        rarityOrder[c.rarity] > rarityOrder[b.rarity] ? c : b
+      );
       setParticles(generateParticles(bestItem.rarity));
       setPullResults(items);
       setCurrentPullIndex(0);
       setShowResults(true);
       onAddNotification(getTenPullMessage(items));
-  try { await syncAfterGame(); } catch { try { await reconcileBalance(); } catch {} }
+      try {
+        await syncAfterGame();
+      } catch {
+        try {
+          await reconcileBalance();
+        } catch {}
+      }
     }
     setIsPulling(false);
     setPullAnimation(null);

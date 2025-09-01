@@ -62,9 +62,7 @@ export function NeonCrashGame({
   const [gameHistory, setGameHistory] = useState(
     [] as Array<{ multiplier: number; win: boolean; amount: number }>
   );
-  const [lastCrashMultipliers, setLastCrashMultipliers] = useState([
-    1.2, 3.7, 1.5, 8.2, 2.1,
-  ] as number[]);
+  const [lastCrashMultipliers, setLastCrashMultipliers] = useState([] as number[]);
   const [winAmount, setWinAmount] = useState(0);
   const [showGraph, setShowGraph] = useState(true);
   const [gameDataPoints, setGameDataPoints] = useState([] as Array<{ x: number; y: number }>);
@@ -115,7 +113,7 @@ export function NeonCrashGame({
 
   // 게임 시작 - 서버에서 실제 베팅 처리 (서버 권위; withReconcile로 멱등+재동기화)
   const startGame = async () => {
-  if (gold < betAmount) {
+    if (gold < betAmount) {
       onAddNotification('베팅할 골드가 부족합니다.');
       return;
     }
@@ -126,8 +124,8 @@ export function NeonCrashGame({
     }
 
     try {
-  // 이전 오류 상태 초기화
-  setErrorMessage(null);
+      // 이전 오류 상태 초기화
+      setErrorMessage(null);
       // 서버에 크래시 베팅 요청 (멱등키 포함)
       const gameResult = await withReconcile(async (idemKey: string) =>
         api.post<any>(
@@ -177,22 +175,24 @@ export function NeonCrashGame({
       animationRef.current = requestAnimationFrame(updateGame);
 
       // 통계는 별도 fetch, 잔액은 withReconcile 후 하이드레이트에 위임
-      // 통계 병합(1회 베팅)
+      // 통계 병합(표시용 캐시). 최종 값은 syncAfterGame으로 서버 권위 반영
       mergeGameStats(dispatch, 'crash', {
         totalBets: 1,
         totalWagered: betAmount,
         totalWins: winAmount > 0 ? 1 : 0,
-        totalProfit: (winAmount - betAmount),
+        totalProfit: winAmount - betAmount,
         highestMultiplier: finalMultiplier,
       });
-  // 서버잔액 포함되었더라도 후처리 스냅샷 동기화
-  await syncAfterGame();
-  fetchAuthoritativeStats();
+      // 서버잔액 포함되었더라도 후처리 스냅샷 동기화
+      await syncAfterGame();
+      fetchAuthoritativeStats();
     } catch (error) {
       console.error('크래시 게임 시작 실패:', error);
       const msg =
         (error as any)?.message ||
-        (typeof error === 'string' ? (error as string) : '게임 시작에 실패했습니다. 다시 시도해주세요.');
+        (typeof error === 'string'
+          ? (error as string)
+          : '게임 시작에 실패했습니다. 다시 시도해주세요.');
       setErrorMessage(msg);
       onAddNotification('게임 시작에 실패했습니다. 다시 시도해주세요.');
     }

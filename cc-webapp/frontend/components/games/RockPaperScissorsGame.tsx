@@ -188,7 +188,7 @@ export function RockPaperScissorsGame({
           isSpecialMove: false,
         };
         setRoundHistory((prev: GameRound[]) => [round, ...prev.slice(0, 9)]);
-        // 통계 병합
+        // 통계 병합(표시용 캐시) — 최종 값은 syncAfterGame으로 서버 권위 반영
         mergeGameStats(dispatch, 'rps', {
           totalGames: 1,
           wins: result === 'win' ? 1 : 0,
@@ -197,7 +197,7 @@ export function RockPaperScissorsGame({
           totalBet: betAmount,
           totalPayout: winnings,
         });
-        // 게임 후 전역 동기화
+        // 게임 후 전역 동기화 (권위 반영)
         await syncAfterGame();
         return res;
       });
@@ -224,15 +224,12 @@ export function RockPaperScissorsGame({
     setParticles([]);
   };
 
-  // gameStats 속성 이름 수정
-  const winRate =
-    user.gameStats.rps.totalGames > 0 // matches -> totalGames
-      ? Math.round((user.gameStats.rps.wins / user.gameStats.rps.totalGames) * 100)
-      : 0;
-
-  // losses 변수 정의 추가
-  const losses = user.gameStats.rps.totalGames - user.gameStats.rps.wins;
-  const draws = user.gameStats.rps.totalGames - user.gameStats.rps.wins - losses;
+  // 주의: UI 표시는 전역 store의 gameStats를 권장. user.gameStats 의존은 하위 호환 전용.
+  const totalGames = user?.gameStats?.rps?.totalGames ?? 0;
+  const wins = user?.gameStats?.rps?.wins ?? 0;
+  const losses = Math.max(0, (user as any)?.gameStats?.rps?.losses ?? totalGames - wins);
+  const draws = Math.max(0, (user as any)?.gameStats?.rps?.draws ?? totalGames - wins - losses);
+  const winRate = totalGames > 0 ? Math.round((wins / totalGames) * 100) : 0;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-black to-success/10 relative overflow-hidden">
