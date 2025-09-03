@@ -6,14 +6,18 @@ const __env: any = (typeof process !== 'undefined' ? (process as any).env : {});
 const API = __env.API_BASE_URL || 'http://localhost:8000';
 
 async function getProfile(ctx: any, token: string) {
-  const res = await ctx.get(`${API}/api/auth/profile`, { headers: { Authorization: `Bearer ${token}` } }).catch(() => null as any);
-  if (!res || !res.ok()) return null;
+  const res = await ctx.get(`${API}/api/auth/profile`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok()) return null;
   try { return await res.json(); } catch { return null; }
 }
 
 async function getBalance(ctx: any, token: string) {
-  const res = await ctx.get(`${API}/api/users/balance`, { headers: { Authorization: `Bearer ${token}` } }).catch(() => null as any);
-  if (!res || !res.ok()) return null;
+  const res = await ctx.get(`${API}/api/users/balance`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok()) return null;
   try { const j = await res.json(); return Number(j?.cyber_token_balance ?? 0); } catch { return null; }
 }
 
@@ -23,12 +27,8 @@ test('Admin Points Gold Grant: idempotent grant updates target balance', async (
 
   // 1) 관리자 계정 생성 및 로그인 토큰
   const adminNick = `admin_points_${Date.now().toString(36)}`;
-  // signup → register 폴백
-  let regAdmin = await ctx.post(`${API}/api/auth/signup`, { data: { invite_code: invite, nickname: adminNick, site_id: 'adm_' + Math.random().toString(36).slice(2,8), phone_number: '010-3333-4444', password: 'password123' } }).catch(() => null as any);
-  if (!regAdmin || !regAdmin.ok()) {
-    regAdmin = await ctx.post(`${API}/api/auth/register`, { data: { invite_code: invite, nickname: adminNick } }).catch(() => null as any);
-  }
-  test.skip(!regAdmin || !regAdmin.ok(), `admin register failed`);
+  const regAdmin = await ctx.post(`${API}/api/auth/register`, { data: { invite_code: invite, nickname: adminNick } });
+  test.skip(!regAdmin.ok(), `admin register failed: ${regAdmin.status()}`);
   const adminJson = await regAdmin.json();
   const adminToken: string = adminJson?.access_token;
   test.skip(!adminToken, 'no admin access_token');
@@ -45,11 +45,8 @@ test('Admin Points Gold Grant: idempotent grant updates target balance', async (
 
   // 2) 대상 사용자 생성
   const targetNick = `target_points_${Date.now().toString(36)}`;
-  let regTarget = await ctx.post(`${API}/api/auth/signup`, { data: { invite_code: invite, nickname: targetNick, site_id: 'tgt_' + Math.random().toString(36).slice(2,8), phone_number: '010-5555-6666', password: 'password123' } }).catch(() => null as any);
-  if (!regTarget || !regTarget.ok()) {
-    regTarget = await ctx.post(`${API}/api/auth/register`, { data: { invite_code: invite, nickname: targetNick } }).catch(() => null as any);
-  }
-  test.skip(!regTarget || !regTarget.ok(), `target register failed`);
+  const regTarget = await ctx.post(`${API}/api/auth/register`, { data: { invite_code: invite, nickname: targetNick } });
+  test.skip(!regTarget.ok(), `target register failed: ${regTarget.status()}`);
   const targetJson = await regTarget.json();
   const targetToken: string = targetJson?.access_token;
   test.skip(!targetToken, 'no target access_token');

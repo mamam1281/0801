@@ -9,16 +9,9 @@ import { test, expect } from '@playwright/test';
 const API = process.env.API_BASE_URL || 'http://localhost:8000';
 
 async function register(ctx: import('@playwright/test').APIRequestContext, nickname: string) {
-  const invite_code = process.env.E2E_INVITE_CODE || '5858';
-  const site_id = 'adm_' + Math.random().toString(36).slice(2, 8);
-  const phone_number = '010-1111-2222';
-  const password = 'password123';
-  // 우선 signup 시도 → 실패 시 register 폴백
-  let res = await ctx.post(`${API}/api/auth/signup`, { data: { invite_code, nickname, site_id, phone_number, password } }).catch(() => null as any);
-  if (res && res.ok()) { try { return await res.json(); } catch {} }
-  res = await ctx.post(`${API}/api/auth/register`, { data: { invite_code, nickname } }).catch(() => null as any);
-  if (res && res.ok()) { try { return await res.json(); } catch {} }
-  return null;
+  const res = await ctx.post(`${API}/api/auth/register`, { data: { invite_code: process.env.E2E_INVITE_CODE || '5858', nickname } });
+  if (!res.ok()) return null;
+  try { return await res.json(); } catch { return null; }
 }
 
 async function getProfile(ctx: import('@playwright/test').APIRequestContext, token: string) {

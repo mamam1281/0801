@@ -1,4 +1,3 @@
-
 ### 트러블슈팅 표준 순서 (반드시 지킬 것)
 1. **1차 오류 수집**: 실제 프론트(웹앱)에서 모든 페이지/기능별로 발생하는 에러/경고/이슈를 빠짐없이 기록한다. (콘솔, 네트워크, UI, API 등)
 2. **상관관계/유기적 분석**: 수집된 오류/이슈를 기능/데이터/흐름/의존성/상태/동기화/보안 등 관점에서 유기적으로 연결해 원인/관계/패턴을 분석한다.
@@ -14,18 +13,18 @@
 
 ### 1차 진단/계획
 1. 실제 프론트엔드 실행/접속
-  - 주요 페이지(홈, 로그인, 상점, 게임, 미션, 이벤트, 프로필 등) 직접 접속/동작 확인
-  - SSR/클라이언트/라우팅/동기화/컴포넌트/상태관리/API 연동 등에서 발생하는 모든 에러/경고/이상 동작 기록
+	- 주요 페이지(홈, 로그인, 상점, 게임, 미션, 이벤트, 프로필 등) 직접 접속/동작 확인
+	- SSR/클라이언트/라우팅/동기화/컴포넌트/상태관리/API 연동 등에서 발생하는 모든 에러/경고/이상 동작 기록
 2. 에러/이슈 유형별 분류
-  - 빌드/런타임/SSR/네트워크/API/상태/동기화/권한/보안/UI/UX/테스트 등
+	- 빌드/런타임/SSR/네트워크/API/상태/동기화/권한/보안/UI/UX/테스트 등
 3. 원인 분석
-  - 로그/콘솔/네트워크/백엔드/DB/컨테이너/환경변수/설정/버전/의존성 등 다각도 분석
+	- 로그/콘솔/네트워크/백엔드/DB/컨테이너/환경변수/설정/버전/의존성 등 다각도 분석
 4. 해결/수정
-  - 코드/설정/환경/데이터/테스트/문서 등에서 필요한 수정/보완
+	- 코드/설정/환경/데이터/테스트/문서 등에서 필요한 수정/보완
 5. 검증/재현
-  - 수정 후 실제 동작/테스트/E2E/수동 검증
+	- 수정 후 실제 동작/테스트/E2E/수동 검증
 6. 최종 트러블슈팅 문서화
-  - 개선안2.md 또는 별도 TROUBLESHOOTING.md에 진단→원인→해결→검증→예방책까지 기록
+	- 개선안2.md 또는 별도 TROUBLESHOOTING.md에 진단→원인→해결→검증→예방책까지 기록
 
 ---
 
@@ -46,7 +45,6 @@
 
 
 
-
 #### [게임 플레이]
 프론트(게임 컴포넌트: 슬롯, 가챠, 크래시, RPS) → API(/api/games/slot, /api/games/gacha, /api/games/crash, /api/games/rps) → 백엔드 → DB(game_sessions, user_actions) → 실시간/비동기 처리(카프카, Redis) → 프론트 결과/피드백 표시
 
@@ -61,13 +59,8 @@
 
 
 
-
-
-
 #### [상점/구매]
 프론트(ShopScreen) → API(/api/shop/buy, /api/shop/history) → 백엔드 → DB(shop_transactions) → 결제/멱등성/보안 처리 → 프론트 잔액/구매내역 동기화
-
-
 
 
 
@@ -79,13 +72,8 @@
 
 
 
-
-
 #### [잔액/통계/전역 동기화]
 프론트(useGlobalSync) → API(/api/users/me, /api/games/stats/me) → 백엔드 → DB → 프론트 전역 상태 갱신
-
-
-
 
 
 
@@ -167,17 +155,17 @@
 
 ## 2. cc-webapp/
 - `backend/`
-  - `app/`
-    - `models/`: DB 모델(게임, 상점, 이벤트, 미션 등)
-    - `routers/`: API 엔드포인트(게임, 인증, 상점 등)
-    - `services/`: 비즈니스 로직, DB 트랜잭션, 멱등성 처리
-    - `scripts/`: 시드 데이터, 마이그레이션, smoke test
-    - `core/`: 설정, 환경 변수, 공통 유틸
-    - `tests/`: pytest 기반 단위/E2E 테스트, conftest.py 픽스처
-  - `requirements.txt`, `Dockerfile`: 의존성, 컨테이너 빌드
+	- `app/`
+		- `models/`: DB 모델(게임, 상점, 이벤트, 미션 등)
+		- `routers/`: API 엔드포인트(게임, 인증, 상점 등)
+		- `services/`: 비즈니스 로직, DB 트랜잭션, 멱등성 처리
+		- `scripts/`: 시드 데이터, 마이그레이션, smoke test
+		- `core/`: 설정, 환경 변수, 공통 유틸
+		- `tests/`: pytest 기반 단위/E2E 테스트, conftest.py 픽스처
+	- `requirements.txt`, `Dockerfile`: 의존성, 컨테이너 빌드
 - `frontend/`
-  - `app/`, `components/`: Next.js 페이지, React 컴포넌트, SSR 미들웨어
-  - `package.json`, `Dockerfile`: 프론트 의존성, 빌드
+	- `app/`, `components/`: Next.js 페이지, React 컴포넌트, SSR 미들웨어
+	- `package.json`, `Dockerfile`: 프론트 의존성, 빌드
 
 ## 3. data/, logs/, scripts/
 - `data/`: DB 초기화, 백업, 임시 데이터
@@ -189,9 +177,7 @@
 - `compare-duplicates.ps1`, `merge-frontend.ps1`: 중복/병합 관리
 - `개선안2.md`, `API_MAPPING.md`: 변경 이력, 정책, API 매핑
 
----
-
-## 기능/연계성 요약
+## 5. 기능/연계성 요약
 - 모든 서비스는 docker-compose로 통합 관리
 - 백엔드 FastAPI, 프론트 Next.js, DB PostgreSQL, 캐시 Redis, 메시지 Kafka, OLAP ClickHouse
 - 시드 데이터/테스트/마이그레이션은 backend/app/scripts에서 관리
@@ -203,3 +189,4 @@
 
 이 가이드 파일은 전체 구조/기능/연계성 파악을 위한 1차 초안입니다.
 추가 분석/세부 기능/테스트/보안/운영 포인트는 2~5회에 걸쳐 더 깊게 정리 가능합니다.
+

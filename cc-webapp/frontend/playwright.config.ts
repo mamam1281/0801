@@ -3,8 +3,6 @@ import { defineConfig } from '@playwright/test';
 
 export default defineConfig({
   testDir: './tests',
-  // Only pick Playwright specs, exclude generic *.test.js (e.g., jsdom unit tests)
-  testMatch: /.*\.(spec|e2e)\.(ts|js)/,
   timeout: 30_000,
   // Ensure backend/front are up before tests begin
   globalSetup: './tests/global-setup.js',

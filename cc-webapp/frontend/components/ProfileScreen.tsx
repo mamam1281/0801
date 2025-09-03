@@ -54,7 +54,7 @@ export function ProfileScreen({
   // Realtime 전역 상태 구독(골드 등 핵심 값은 전역 프로필 우선 사용)
   const { profile: rtProfile, refresh: refreshRtProfile } = useRealtimeProfile();
   const { allStats: rtAllStats } = useRealtimeStats();
-  const [localUser, setLocalUser] = useState(null);
+  const [user, setUser] = useState(null);
   const [stats, setStats] = useState(null);
   const [balance, setBalance] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -125,36 +125,6 @@ export function ProfileScreen({
       throw error;
     }
   };
-
-  // source-of-truth: prefer global store profile, fallback to localUser
-  const user = state?.profile ?? localUser;
-
-  // Profile edit helper: send patch to server and overwrite global store on success
-  async function submitProfileEdit(patch: Partial<Record<string, any>>) {
-    try {
-      onAddNotification('프로필 수정 요청 중...');
-      // Use PUT to update authoritative profile; server contract should accept this.
-      const res: any = await unifiedApi.put('auth/me', patch);
-      // Normalize response into GlobalUserProfile shape and overwrite store
-      const updatedProfile = {
-        id: res?.id ?? res?.user_id ?? user?.id ?? '',
-        nickname: res?.nickname ?? res?.name ?? patch.nickname ?? user?.nickname ?? '사용자',
-        goldBalance: res?.gold ?? res?.cyber_token_balance ?? user?.goldBalance ?? 0,
-        gemsBalance: res?.gems ?? res?.gems_balance ?? user?.gemsBalance,
-        level: res?.level ?? user?.level,
-        xp: res?.experience ?? res?.xp ?? user?.xp,
-        updatedAt: res?.updatedAt ?? res?.updated_at ?? new Date().toISOString(),
-        raw: res ?? patch,
-      };
-      setProfile(dispatch, updatedProfile as any);
-      onAddNotification('프로필이 업데이트되었습니다.');
-      return updatedProfile;
-    } catch (e) {
-      console.error('[submitProfileEdit] 실패:', e);
-      onAddNotification('프로필 수정에 실패했습니다.');
-      throw e;
-    }
-  }
 
   // DEV 전용 자동 로그인/부트스트랩: NEXT_PUBLIC_DEV_AUTO_LOGIN=1 일 때만 수행
   const maybeDevAutoLogin = async (): Promise<boolean> => {
