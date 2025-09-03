@@ -197,6 +197,8 @@ export function EventMissionPanel({
     fetchData();
   }, [authReady, authenticated]);
 
+  const { dispatch } = useGlobalStore();
+
   // Statistics
   const activeEvents = events.filter((e: Event) => e.status === 'active').length;
   const completedMissions = missions.filter((m: Mission) => m.status === 'completed').length;

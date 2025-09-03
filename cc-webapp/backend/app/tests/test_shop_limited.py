@@ -88,6 +88,10 @@ class _FakeRedis:
         # ignore in fake
         return True
 
+    def exists(self, key):
+        # redis-py returns 1 if exists, 0 otherwise; tests expect truthy/falsy
+        return 1 if key in self.store else 0
+
     def pipeline(self):
         return _FakePipeline(self.store)
 

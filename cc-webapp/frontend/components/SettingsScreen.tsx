@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useState } from 'react';
+import { api as unifiedApi } from '@/lib/unifiedApi';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
+import {
   ArrowLeft,
   Volume2,
   VolumeX,
@@ -18,9 +19,11 @@ import {
   ExternalLink,
   Video,
   Crown,
-  Sparkles
+  Sparkles,
 } from 'lucide-react';
 import { User as UserType } from '../types';
+import { useGlobalStore, setProfile } from '@/store/globalStore';
+import api from '../utils/api';
 import { Button } from './ui/button';
 import { Switch } from './ui/switch';
 import { Slider } from './ui/slider';
@@ -32,7 +35,13 @@ interface SettingsScreenProps {
   onAddNotification: (message: string) => void;
 }
 
-export function SettingsScreen({ user, onBack, onUpdateUser, onAddNotification }: SettingsScreenProps) {
+export function SettingsScreen({
+  user,
+  onBack,
+  onUpdateUser,
+  onAddNotification,
+}: SettingsScreenProps) {
+  const { dispatch } = useGlobalStore();
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [soundVolume, setSoundVolume] = useState([80]);
   const [musicEnabled, setMusicEnabled] = useState(true);
@@ -40,6 +49,8 @@ export function SettingsScreen({ user, onBack, onUpdateUser, onAddNotification }
   const [vibrationEnabled, setVibrationEnabled] = useState(true);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [showBalance, setShowBalance] = useState(true);
+  const [editingNickname, setEditingNickname] = useState(user.nickname ?? '');
+  const [saving, setSaving] = useState(false);
 
   const handleSoundToggle = (enabled: boolean) => {
     setSoundEnabled(enabled);
@@ -56,6 +67,34 @@ export function SettingsScreen({ user, onBack, onUpdateUser, onAddNotification }
     onAddNotification(enabled ? '🔔 알림이 활성화되었습니다' : '🔕 알림이 비활성화되었습니다');
   };
 
+  // 프로필 닉네임 저장 처리
+  const handleSaveProfile = async () => {
+    if (!editingNickname || editingNickname.trim().length < 2) {
+      onAddNotification('닉네임은 최소 2자 이상이어야 합니다.');
+      return;
+    }
+    try {
+      setSaving(true);
+      // Use unifiedApi per project convention: auth/me is the canonical profile endpoint
+      // PUT via unifiedApi will include standard headers (X-Idempotency-Key, auth handling)
+      const serverProfile = await unifiedApi.put('auth/me', { nickname: editingNickname.trim() });
+      if (serverProfile) {
+        // 덮어쓰기: 전역 스토어를 서버 응답으로 업데이트
+        setProfile(dispatch, serverProfile as any);
+        onAddNotification('프로필이 성공적으로 저장되었습니다.');
+        // 로컬 UI 업데이트
+        onUpdateUser(serverProfile as any);
+      } else {
+        onAddNotification('서버 응답이 없습니다. 다시 시도해주세요.');
+      }
+    } catch (err) {
+      console.error('Failed to save profile', err);
+      onAddNotification('프로필 저장 중 오류가 발생했습니다.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   // 🗑️ 자동플레이 기능 완전 제거 + 간소화
   const settingsSections = [
     {
@@ -65,12 +104,7 @@ export function SettingsScreen({ user, onBack, onUpdateUser, onAddNotification }
         {
           title: '사운드 효과',
           description: '게임 내 효과음',
-          control: (
-            <Switch 
-              checked={soundEnabled} 
-              onCheckedChange={handleSoundToggle}
-            />
-          )
+          control: <Switch checked={soundEnabled} onCheckedChange={handleSoundToggle} />,
         },
         {
           title: '사운드 볼륨',
@@ -85,17 +119,12 @@ export function SettingsScreen({ user, onBack, onUpdateUser, onAddNotification }
                 disabled={!soundEnabled}
               />
             </div>
-          )
+          ),
         },
         {
           title: '배경 음악',
           description: '게임 BGM',
-          control: (
-            <Switch 
-              checked={musicEnabled} 
-              onCheckedChange={setMusicEnabled}
-            />
-          )
+          control: <Switch checked={musicEnabled} onCheckedChange={setMusicEnabled} />,
         },
         {
           title: '음악 볼륨',
@@ -110,9 +139,9 @@ export function SettingsScreen({ user, onBack, onUpdateUser, onAddNotification }
                 disabled={!musicEnabled}
               />
             </div>
-          )
-        }
-      ]
+          ),
+        },
+      ],
     },
     {
       title: '알림 설정',
@@ -122,23 +151,15 @@ export function SettingsScreen({ user, onBack, onUpdateUser, onAddNotification }
           title: '푸시 알림',
           description: '게임 알림 받기',
           control: (
-            <Switch 
-              checked={notificationsEnabled} 
-              onCheckedChange={handleNotificationToggle}
-            />
-          )
+            <Switch checked={notificationsEnabled} onCheckedChange={handleNotificationToggle} />
+          ),
         },
         {
           title: '진동',
           description: '햅틱 피드백',
-          control: (
-            <Switch 
-              checked={vibrationEnabled} 
-              onCheckedChange={handleVibrationToggle}
-            />
-          )
-        }
-      ]
+          control: <Switch checked={vibrationEnabled} onCheckedChange={handleVibrationToggle} />,
+        },
+      ],
     },
     {
       title: '프라이버시',
@@ -147,15 +168,10 @@ export function SettingsScreen({ user, onBack, onUpdateUser, onAddNotification }
         {
           title: '골드 표시',
           description: '다른 사용자에게 골드 공개',
-          control: (
-            <Switch 
-              checked={showBalance} 
-              onCheckedChange={setShowBalance}
-            />
-          )
-        }
-      ]
-    }
+          control: <Switch checked={showBalance} onCheckedChange={setShowBalance} />,
+        },
+      ],
+    },
   ];
 
   return (
@@ -165,21 +181,21 @@ export function SettingsScreen({ user, onBack, onUpdateUser, onAddNotification }
         {[...Array(15)].map((_, i) => (
           <motion.div
             key={i}
-            initial={{ 
+            initial={{
               opacity: 0,
               x: Math.random() * (typeof window !== 'undefined' ? window.innerWidth : 1000),
-              y: Math.random() * (typeof window !== 'undefined' ? window.innerHeight : 1000)
+              y: Math.random() * (typeof window !== 'undefined' ? window.innerHeight : 1000),
             }}
-            animate={{ 
+            animate={{
               opacity: [0, 0.2, 0],
               scale: [0, 1, 0],
-              rotate: 360
+              rotate: 360,
             }}
             transition={{
               duration: 10,
               repeat: Infinity,
               delay: i * 0.5,
-              ease: "easeInOut"
+              ease: 'easeInOut',
             }}
             className="absolute w-1 h-1 bg-primary rounded-full"
           />
@@ -202,19 +218,15 @@ export function SettingsScreen({ user, onBack, onUpdateUser, onAddNotification }
               <ArrowLeft className="w-4 h-4 mr-2" />
               뒤로가기
             </Button>
-            
+
             <div>
-              <h1 className="text-xl lg:text-2xl font-bold text-gradient-primary">
-                설정
-              </h1>
+              <h1 className="text-xl lg:text-2xl font-bold text-gradient-primary">설정</h1>
             </div>
           </div>
 
           <div className="text-right">
             <div className="text-sm text-muted-foreground">{user.nickname}</div>
-            <div className="text-lg font-bold text-gold">
-              레벨 {user.level}
-            </div>
+            <div className="text-lg font-bold text-gold">레벨 {user.level}</div>
           </div>
         </div>
       </motion.div>
@@ -233,9 +245,22 @@ export function SettingsScreen({ user, onBack, onUpdateUser, onAddNotification }
               <User className="w-8 h-8 text-white" />
             </div>
             <div className="flex-1">
-              <h3 className="text-lg font-bold text-foreground">{user.nickname}</h3>
-              <p className="text-sm text-muted-foreground">레벨 {user.level} • {user.goldBalance.toLocaleString()}G</p>
-              <p className="text-xs text-primary">{user.stats.gamesPlayed}게임 플레이 • {user.stats.gamesWon}승</p>
+              <div className="flex items-center gap-2">
+                <input
+                  className="bg-transparent border-b border-border-secondary px-2 py-1 text-lg font-bold text-foreground focus:outline-none"
+                  value={editingNickname}
+                  onChange={(e: any) => setEditingNickname((e.target as HTMLInputElement).value)}
+                />
+                <Button size="sm" onClick={handleSaveProfile} disabled={saving}>
+                  {saving ? '저장 중...' : '저장'}
+                </Button>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                레벨 {user.level} • {user.goldBalance.toLocaleString()}G
+              </p>
+              <p className="text-xs text-primary">
+                {user.stats.gamesPlayed}게임 플레이 • {user.stats.gamesWon}승
+              </p>
             </div>
             <div className="text-right">
               <div className="text-2xl font-bold text-gold">{user.dailyStreak}</div>
@@ -254,30 +279,28 @@ export function SettingsScreen({ user, onBack, onUpdateUser, onAddNotification }
           <div className="glass-metal rounded-xl p-8 border-2 border-gold/30 relative overflow-hidden metal-shine">
             {/* 배경 효과 */}
             <div className="absolute inset-0 bg-gradient-to-r from-gold/5 to-primary/5"></div>
-            
+
             <div className="relative z-10 text-center">
               <motion.div
                 animate={{
                   scale: [1, 1.1, 1],
-                  rotate: [0, 5, -5, 0]
+                  rotate: [0, 5, -5, 0],
                 }}
                 transition={{
                   duration: 3,
                   repeat: Infinity,
-                  ease: "easeInOut"
+                  ease: 'easeInOut',
                 }}
                 className="w-20 h-20 mx-auto mb-4 bg-gradient-to-br from-gold to-gold-light rounded-full flex items-center justify-center"
               >
                 <Sparkles className="w-10 h-10 text-black" />
               </motion.div>
-              
-              <h3 className="text-2xl font-bold text-gradient-gold mb-3">
-                ✨ 프리미엄 모델 ✨
-              </h3>
+
+              <h3 className="text-2xl font-bold text-gradient-gold mb-3">✨ 프리미엄 모델 ✨</h3>
               <p className="text-lg text-muted-foreground mb-6">
                 전속 VJ "Luna Star"와 함께하는 특별한 경험
               </p>
-              
+
               <div className="grid grid-cols-2 gap-4 mb-6 text-sm">
                 <div className="glass-metal rounded-lg p-3">
                   <Video className="w-5 h-5 text-primary mx-auto mb-2" />
@@ -290,8 +313,8 @@ export function SettingsScreen({ user, onBack, onUpdateUser, onAddNotification }
                   <div className="text-muted-foreground">프리미엄 혜택</div>
                 </div>
               </div>
-              
-              <Button 
+
+              <Button
                 onClick={() => {
                   window.open('https://md-01.com', '_blank');
                   onAddNotification('🌟 프리미엄 모델 페이지로 이동합니다!');
@@ -301,12 +324,12 @@ export function SettingsScreen({ user, onBack, onUpdateUser, onAddNotification }
                 <motion.div
                   animate={{
                     x: ['100%', '-100%'],
-                    opacity: [0, 1, 0]
+                    opacity: [0, 1, 0],
                   }}
                   transition={{
                     duration: 2,
                     repeat: Infinity,
-                    ease: "easeInOut"
+                    ease: 'easeInOut',
                   }}
                   className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent"
                 />
@@ -339,9 +362,7 @@ export function SettingsScreen({ user, onBack, onUpdateUser, onAddNotification }
                     <div className="font-medium text-foreground">{item.title}</div>
                     <div className="text-sm text-muted-foreground">{item.description}</div>
                   </div>
-                  <div className="ml-4">
-                    {item.control}
-                  </div>
+                  <div className="ml-4">{item.control}</div>
                 </div>
               ))}
             </div>
@@ -377,15 +398,15 @@ export function SettingsScreen({ user, onBack, onUpdateUser, onAddNotification }
 
           <div className="mt-6 pt-4 border-t border-border-secondary">
             <div className="grid grid-cols-2 gap-4">
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 className="border-border-secondary hover:border-info text-info btn-hover-lift"
                 onClick={() => onAddNotification('📚 도움말을 확인해보세요')}
               >
                 <HelpCircle className="w-4 h-4 mr-2" />
                 도움말
               </Button>
-              <Button 
+              <Button
                 variant="outline"
                 className="border-border-secondary hover:border-success text-success btn-hover-lift"
                 onClick={() => onAddNotification('✉️ 문의사항을 보내주세요')}

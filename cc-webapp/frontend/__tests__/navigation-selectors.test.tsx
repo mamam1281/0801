@@ -1,4 +1,9 @@
 // @ts-nocheck
+// Mock realtime hooks to avoid provider dependency during SSR render in tests.
+jest.mock('@/hooks/useRealtimeData', () => ({
+  useRealtimePurchaseBadge: () => ({ pendingCount: 0 })
+}));
+
 import React from 'react';
 import ReactDOMServer from 'react-dom/server';
 import { BottomNavigation } from '@/components/BottomNavigation';

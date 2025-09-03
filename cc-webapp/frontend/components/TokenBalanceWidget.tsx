@@ -100,6 +100,32 @@ export function TokenBalanceWidget({
   const changeIcon = getChangeIcon();
   const statusIcon = getStatusIcon();
 
+  // Prefer global store amount if available to ensure canonical display
+  const displayAmount = useMemo(() => {
+    if (typeof globalGold === 'number' && globalGold > 0) return globalGold;
+    // fallback to prop
+    return amount;
+  }, [globalGold, amount]);
+
+  const openHistoryModal = useCallback(async () => {
+    setOpenHistory(true);
+    if (history.length > 0) return; // already loaded
+    if (!globalUser?.id) return;
+    setLoadingHistory(true);
+    try {
+      const res = await unifiedApi.get(`actions/recent/${globalUser.id}?limit=20`);
+      // unifiedApi returns parsed json body
+      setHistory(res?.actions || res?.data || []);
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.warn('Failed load balance history', e);
+    } finally {
+      setLoadingHistory(false);
+    }
+  }, [globalUser?.id, history.length]);
+
+  const closeHistoryModal = useCallback(() => setOpenHistory(false), []);
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
