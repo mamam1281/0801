@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { verifyTokenSSR } from './lib/verifyToken';
 
 // 보호 경로 패턴: 로그인/정적/헬스 제외 모든 앱 페이지 보호(필요시 확장)
 const PUBLIC_PATHS = [
@@ -17,13 +18,23 @@ function isPublicPath(pathname: string) {
   return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + '/'));
 }
 
-export function middleware(req: NextRequest) {
+export async function middleware(req: NextRequest) {
   const { pathname, search } = req.nextUrl;
   if (isPublicPath(pathname)) return NextResponse.next();
 
-  // SSR에서 쿠키 기반으로 인증 여부 판정
+  // SSR에서 쿠키 기반 인증 + 토큰 검증
   const authed = req.cookies.get('cc_authed')?.value === '1';
-  if (!authed) {
+  const token = req.cookies.get('cc_token')?.value;
+  if (!authed || !token) {
+    const url = req.nextUrl.clone();
+    url.pathname = '/login';
+    const orig = pathname + (search || '');
+    url.searchParams.set('redirect', orig);
+    return NextResponse.redirect(url);
+  }
+  // SSR 토큰 실제 검증(백엔드 API 호출)
+  const valid = await verifyTokenSSR(token);
+  if (!valid) {
     const url = req.nextUrl.clone();
     url.pathname = '/login';
     const orig = pathname + (search || '');

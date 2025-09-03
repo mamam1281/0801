@@ -8,6 +8,7 @@ COPY package.json package-lock.json* ./
 # 빌드 단계에서는 devDependencies도 필요(Tailwind/PostCSS 등)
 # lock 불일치 시 install로 폴백
 RUN npm ci || npm install
+RUN npm install axios
 
 # 빌드 단계
 FROM base AS builder
