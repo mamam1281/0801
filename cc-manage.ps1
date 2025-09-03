@@ -323,6 +323,71 @@ function Check-DBConnection {
     Write-Host "DB check complete." -ForegroundColor Cyan
 }
 
+function Run-PlaywrightTests {
+    param(
+        [string]$Flags = ""
+    )
+    
+    Detect-Compose
+    Write-Host "Running Playwright E2E tests..." -ForegroundColor Cyan
+    
+    # Set environment variables for E2E flags
+    $envVars = @()
+    if ($Flags -match "stats") {
+        $envVars += "E2E_REQUIRE_STATS_PARITY=1"
+        Write-Host "→ Enabling stats parity tests" -ForegroundColor Yellow
+    }
+    if ($Flags -match "strict") {
+        $envVars += "STRICT_STATS_PARITY=1"
+        Write-Host "→ Enabling strict stats parity mode" -ForegroundColor Yellow
+    }
+    if ($Flags -match "shop") {
+        $envVars += "E2E_REQUIRE_SHOP_SYNC=1"
+        Write-Host "→ Enabling shop sync tests" -ForegroundColor Yellow
+    }
+    if ($Flags -match "realtime") {
+        $envVars += "E2E_REQUIRE_REALTIME=1"
+        Write-Host "→ Enabling realtime tests" -ForegroundColor Yellow
+    }
+    
+    # Build the docker compose command
+    $composeArgs = @('-f', 'docker-compose.yml', '-f', 'docker-compose.playwright.yml')
+    
+    try {
+        # Set environment variables
+        foreach ($envVar in $envVars) {
+            $parts = $envVar -split '=', 2
+            Set-Item -Path "Env:$($parts[0])" -Value $parts[1]
+        }
+        
+        # Run Playwright tests
+        if ($UseComposeV2) {
+            & docker compose @composeArgs up --abort-on-container-exit --exit-code-from playwright playwright
+        } else {
+            & docker-compose @composeArgs up --abort-on-container-exit --exit-code-from playwright playwright
+        }
+        
+        $exitCode = $LASTEXITCODE
+        
+        # Clean up environment variables
+        foreach ($envVar in $envVars) {
+            $parts = $envVar -split '=', 2
+            Remove-Item "Env:$($parts[0])" -ErrorAction SilentlyContinue
+        }
+        
+        if ($exitCode -eq 0) {
+            Write-Host "✔ Playwright tests completed successfully" -ForegroundColor Green
+        } else {
+            Write-Host "✖ Playwright tests failed (exit code: $exitCode)" -ForegroundColor Red
+        }
+        
+        return $exitCode
+    } catch {
+        Write-Host "✖ Failed to run Playwright tests: $($_.Exception.Message)" -ForegroundColor Red
+        return 1
+    }
+}
+
 function Show-Help {
     Write-Host "Casino-Club F2P Management Script" -ForegroundColor Green
     Write-Host "====================================" -ForegroundColor DarkGray
@@ -337,12 +402,22 @@ function Show-Help {
     Write-Host "  check       Verify prerequisites (Docker, ports, compose)" -ForegroundColor White
     Write-Host "  health      Probe http://localhost:8000/health and :3000" -ForegroundColor White
     Write-Host "  db-check    Verify PostgreSQL connectivity (port, pg_isready, SELECT 1)" -ForegroundColor White
+    Write-Host "  e2e         Run Playwright E2E tests (usage: e2e [flags])" -ForegroundColor White
     Write-Host "  tools       Manage monitoring tools (usage: tools start|stop|status)" -ForegroundColor White
     Write-Host "  help        Show this help" -ForegroundColor White
+    Write-Host "" 
+    Write-Host "E2E Test Flags:" -ForegroundColor Cyan
+    Write-Host "  stats       Enable stats parity tests (E2E_REQUIRE_STATS_PARITY=1)" -ForegroundColor White
+    Write-Host "  strict      Enable strict stats mode (STRICT_STATS_PARITY=1)" -ForegroundColor White
+    Write-Host "  shop        Enable shop sync tests (E2E_REQUIRE_SHOP_SYNC=1)" -ForegroundColor White
+    Write-Host "  realtime    Enable realtime tests (E2E_REQUIRE_REALTIME=1)" -ForegroundColor White
     Write-Host "" 
     Write-Host "Examples:" -ForegroundColor Cyan
     Write-Host "  ./cc-manage.ps1 check" -ForegroundColor White
     Write-Host "  ./cc-manage.ps1 start" -ForegroundColor White
+    Write-Host "  ./cc-manage.ps1 e2e" -ForegroundColor White
+    Write-Host "  ./cc-manage.ps1 e2e stats" -ForegroundColor White
+    Write-Host "  ./cc-manage.ps1 e2e strict,realtime" -ForegroundColor White
     Write-Host "  ./cc-manage.ps1 db-check" -ForegroundColor White
     Write-Host "  ./cc-manage.ps1 logs backend" -ForegroundColor White
     Write-Host "  ./cc-manage.ps1 shell postgres" -ForegroundColor White
@@ -358,6 +433,7 @@ switch ($Command) {
     "check" { Check-Prerequisites }
     "health" { Check-Health }
     "db-check" { Check-DBConnection }
+    "e2e" { Run-PlaywrightTests -Flags $Service }
     "tools" {
         switch ($Service) {
             "start" { Tools-Start }
