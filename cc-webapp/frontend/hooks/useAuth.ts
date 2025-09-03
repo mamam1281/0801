@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { api } from '@/lib/unifiedApi';
 
 interface AuthUser {
@@ -35,6 +36,7 @@ const LEGACY_EXP_KEY = 'cc_access_exp';
 const BUNDLE_KEY = 'cc_auth_tokens';
 
 import { setTokens } from '../utils/tokenStorage';
+import { markAuthedCookie, clearAuthedCookie } from '../lib/authGuard';
 function writeBundle(access: string, refresh?: string | null, expSeconds?: number | null | undefined) {
     // Unified bundle structure consumed by existing tokenStorage.js & useAuthToken.ts
     const bundle: Record<string, any> = { access_token: access };
@@ -59,6 +61,7 @@ function readLegacyToken(): { token: string | null; exp: number | null } {
 }
 
 export function useAuth() {
+    const router = useRouter();
     // NOTE: build env currently flags generics; fallback to assertion
     const [user, setUser] = useState(null as AuthUser | null);
     const [loading, setLoading] = useState(false);
@@ -83,6 +86,8 @@ export function useAuth() {
             const payload = JSON.parse(atob(t.access_token.split('.')[1]));
             if (payload.exp) scheduleRefresh(payload.exp * 1000);
         } catch { /* silent */ }
+        // SSR 미들웨어 쿠키 플래그 동기화
+        try { markAuthedCookie(); } catch {}
     }, [scheduleRefresh]);
 
     // 권위 잔액 동기화: /users/balance → { cyber_token_balance }
@@ -191,7 +196,10 @@ export function useAuth() {
             localStorage.removeItem(BUNDLE_KEY);
         } catch { }
         setUser(null);
-    }, []);
+        try { clearAuthedCookie(); } catch {}
+        // 로그인 화면으로 이동(원위치 필요 시 caller에서 redirect 파라미터 부여 가능)
+        try { router.replace('/login'); } catch {}
+    }, [router]);
 
     const refresh = useCallback(async () => {
         let bundle: any = undefined;

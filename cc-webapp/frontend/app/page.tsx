@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import App from './App';
+import { readClientTokens, markAuthedCookie } from '../lib/authGuard';
 
 export const metadata = {
   title: 'Home - Casino-Club F2P',
@@ -17,16 +18,17 @@ export default function Home() {
   // 토큰 존재 여부를 로컬에서만 판단 (SSR 불가)
   useEffect(() => {
     try {
-      const legacy = localStorage.getItem('cc_access_token');
-      const bundleRaw = localStorage.getItem('cc_auth_tokens');
-      const bundle = bundleRaw ? JSON.parse(bundleRaw) : null;
-      const token = legacy || bundle?.access_token;
+      const { access_token: token } = readClientTokens();
       const hasToken = typeof token === 'string' && token.length > 0;
       setAuthed(hasToken);
       setReady(true);
       if (!hasToken) {
         // 메인 접근 시 비로그인이면 로그인 페이지로 이동
         router.replace('/login');
+      }
+      if (hasToken) {
+        // SSR 미들웨어가 참조하는 쿠키 플래그 동기화
+        markAuthedCookie();
       }
     } catch {
       setAuthed(false);
