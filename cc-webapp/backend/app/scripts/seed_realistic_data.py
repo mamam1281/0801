@@ -43,41 +43,78 @@ def main():
         user = sess.execute(select(User).where(User.site_id == site_id)).scalar_one()
         # 게임 세션
         for i in range(GAME_COUNT):
-                gs = GameSession(
-                    external_session_id=f"{site_id}-sess-{i+1}",
-                    user_id=user.id,
-                    game_type=GAME_TYPES[i % len(GAME_TYPES)],
-                    initial_bet=100 * (i+1),
-                    total_bet=100 * (i+1),
-                    total_win=50 * (i+1),
-                    total_rounds=1,
-                    start_time=None,
-                    end_time=None,
-                    status='ended',
-                    created_at=None,
-                    result_data={"result": "win" if i % 2 == 0 else "lose"}
-                )
-                sess.add(gs)
+            gs = GameSession(
+                external_session_id=f"{site_id}-sess-{i+1}",
+                user_id=user.id,
+                game_type=GAME_TYPES[i % len(GAME_TYPES)],
+                initial_bet=100 * (i+1),
+                total_bet=100 * (i+1),
+                total_win=50 * (i+1),
+                total_rounds=1,
+                start_time=None,
+                end_time=None,
+                status='ended',
+                created_at=None,
+                result_data={"result": "win" if i % 2 == 0 else "lose"}
+            )
+            sess.add(gs)
         # 상점 거래
         for i in range(SHOP_COUNT):
-                st = ShopTransaction(
-                    user_id=user.id,
-                    product_id='prod-basic',
-                    kind='gems',
-                    quantity=1,
-                    unit_price=1000,
-                    amount=1000 * (i+1),
-                    payment_method='seed',
-                    status='success',
-                    receipt_code=f"{site_id}-rcpt-{i+1}",
-                    created_at=None,
-                )
-                sess.add(st)
+            st = ShopTransaction(
+                user_id=user.id,
+                product_id='prod-basic',
+                kind='gems',
+                quantity=1,
+                unit_price=1000,
+                amount=1000 * (i+1),
+                payment_method='seed',
+                status='success',
+                receipt_code=f"{site_id}-rcpt-{i+1}",
+                created_at=None,
+                updated_at=None,
+                failure_reason=None,
+                integrity_hash=None,
+                idempotency_key=f"{site_id}-idem-{i+1}",
+                extra=None,
+                receipt_signature=None,
+                original_tx_id=None
+            )
+            sess.add(st)
     # 이벤트/미션(모든 계정에 동일하게 부여)
+    from datetime import datetime
     for e in EVENTS:
-        sess.add(Event(**e))
+        now = datetime.utcnow()
+        event = Event(
+            title=e['title'],
+            description=e['title'],
+            event_type='special',
+            start_date=now,
+            end_date=now,
+            rewards={"gold": e.get('reward_gold', 0), "gems": e.get('reward_gem', 0)},
+            requirements={},
+            image_url=None,
+            is_active=True,
+            priority=0,
+            created_at=now
+        )
+        sess.add(event)
     for m in MISSIONS:
-        sess.add(Mission(**m))
+        mission = Mission(
+            title=m['title'],
+            description=m['title'],
+            mission_type='achievement',
+            category='game',
+            target_value=m['goal'],
+            target_type='play_count',
+            rewards={"gold": m.get('reward_gold', 0), "exp": m.get('reward_exp', 0)},
+            requirements={},
+            reset_period='never',
+            icon=None,
+            is_active=True,
+            sort_order=0,
+            created_at=None
+        )
+        sess.add(mission)
     sess.commit()
     print('시드계정 데이터 초기화 및 생성 완료')
     sess.close()
