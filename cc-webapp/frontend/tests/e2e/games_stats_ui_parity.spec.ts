@@ -4,11 +4,19 @@ import { test, expect, request } from '@playwright/test';
 // 실행 조건: E2E_REQUIRE_STATS_PARITY=1 이고, /api/games/stats/me 가 200일 때만
 
 const API = process.env.API_BASE_URL || 'http://localhost:8000';
+const REQUIRE = process.env.E2E_REQUIRE_STATS_PARITY === '1';
 
 async function apiSignup(ctx: any) {
-    const nickname = `ui_parity_${Date.now().toString(36)}`;
+    const nonce = Date.now().toString(36);
+    const nickname = `ui_parity_${nonce}`;
+    const site_id = `ui_parity_${nonce}`;
+    const password = 'password123';
+    const phone_number = '010-0000-0000';
     const invite = process.env.E2E_INVITE_CODE || '5858';
-    const res = await ctx.post(`${API}/api/auth/register`, { data: { invite_code: invite, nickname } });
+    // Backend 요구 스키마: invite_code, nickname, site_id, phone_number, password
+    const res = await ctx.post(`${API}/api/auth/signup`, {
+        data: { invite_code: invite, nickname, site_id, phone_number, password },
+    });
     if (!res.ok()) return null;
     try { return await res.json(); } catch { return null; }
 }
@@ -61,15 +69,47 @@ async function fetchServerStats(ctx: any, token: string) {
     try { return await res.json(); } catch { return null; }
 }
 
+function extractServerTotal(server: any): number | null {
+    if (!server || typeof server !== 'object') return null;
+    const pick = (obj: any): number | null => {
+        const cands = [obj?.total, obj?.total_actions, obj?.actions, obj?.sum].filter((v) => typeof v === 'number');
+        if (cands.length > 0) return Number(cands[0]);
+        // 히유리스틱: 키 이름에 total/actions/plays/pulls/rounds 포함된 숫자 합산
+        let sum = 0;
+        let found = 0;
+        for (const [k, v] of Object.entries(obj)) {
+            if (typeof v === 'number' && /(total|actions|plays|pulls|rounds)/i.test(k)) {
+                sum += Number(v);
+                found++;
+            }
+        }
+        return found > 0 ? sum : null;
+    };
+    // 루트 → 래핑(stats/data) 순으로 탐색
+    const root = pick(server);
+    if (root != null) return root;
+    const nested = server?.stats || server?.data || null;
+    if (nested && typeof nested === 'object') {
+        const n = pick(nested);
+        if (n != null) return n;
+    }
+    return null;
+}
+
 async function readUiTotal(page: import('@playwright/test').Page): Promise<number | null> {
     // 우선순위 셀렉터: 명시적 testid → 대체 testid → 텍스트 패턴
     const trySelectors = [
         '[data-testid="stats-total"]',
         '[data-testid="stats-total-actions"]',
+    '[data-testid="stats-total-games"]',
         '[data-testid="games-stats-total"]',
     ];
     for (const sel of trySelectors) {
         const el = page.locator(sel).first();
+        // 렌더레이스 완화: 최대 2초 대기 후 판정
+        if (await el.count() > 0) {
+            await el.waitFor({ state: 'visible', timeout: 2000 }).catch(() => {});
+        }
         if (await el.count() > 0 && await el.isVisible().catch(() => false)) {
             const txt = await el.textContent().catch(() => '');
             const n = Number((txt || '').replace(/[^0-9.-]/g, ''));
@@ -102,25 +142,29 @@ test('[Games] UI total equals /games/stats/me (guarded)', async ({ page }: { pag
     const probe = await ctx.get(`${API}/api/games/stats/me`, { headers: { Authorization: `Bearer ${token}` } }).catch(() => null);
     test.skip(!probe || !probe.ok(), `stats endpoint unavailable: ${probe ? probe.status() : 'no-resp'}`);
 
+    // 브라우저에 토큰 주입하여 로그인 상태로 진입
+    const refreshToken = (reg as any)?.refresh_token || token;
+    await page.addInitScript(([bundle, legacy]: [{ access_token: string; refresh_token?: string | null }, string]) => {
+        try {
+            localStorage.setItem('cc_auth_tokens', JSON.stringify(bundle));
+            localStorage.setItem('cc_access_token', legacy);
+        } catch {}
+    }, [{ access_token: token, refresh_token: refreshToken }, token]);
+
     // 앱 진입 후 게임 액션 유도
     await page.goto('/');
     await page.waitForLoadState('domcontentloaded');
     await page.waitForTimeout(200);
+    // 홈 대시보드에 합계가 노출되는 경우를 대비해 사전 대기
+    await page.locator('[data-testid="games-stats-total"]').first().waitFor({ state: 'visible', timeout: 2000 }).catch(() => {});
     await ensureSomeGameActions(page, ctx, token);
 
     // 서버 합계 조회
     const server = await fetchServerStats(ctx, token);
     test.skip(!server || typeof server !== 'object', 'no server stats');
-
-    // 서버 합계 숫자 후보: total, total_actions, actions, sum 등 – 존재하는 첫 숫자 사용
-    const serverCandidates = [
-        (server as any)?.total,
-        (server as any)?.total_actions,
-        (server as any)?.actions,
-        (server as any)?.sum,
-    ].filter(v => typeof v === 'number');
-    test.skip(serverCandidates.length === 0, 'no numeric total in server stats');
-    const serverTotal: number = Number(serverCandidates[0]);
+    const extracted = extractServerTotal(server);
+    test.skip(extracted == null, 'no numeric total in server stats');
+    const serverTotal: number = Number(extracted);
 
     // 대시보드/프로필에서 UI 합계 추출 시도
     // 홈에 노출되지 않으면 내비 버튼으로 이동 시도
@@ -129,8 +173,25 @@ test('[Games] UI total equals /games/stats/me (guarded)', async ({ page }: { pag
         await toDashboard.click().catch(() => { });
         await page.waitForTimeout(200);
     }
-    const uiTotal = await readUiTotal(page);
-    test.skip(uiTotal == null, 'no UI total testid/text detected');
+    let uiTotal = await readUiTotal(page);
+    if (uiTotal == null) {
+        // 폴백: 프로필 테스트 라우트 → 일반 프로필 라우트 순서로 이동하여 시도
+        await page.goto('/e2e/profile').catch(() => {});
+        await page.waitForTimeout(200);
+        uiTotal = await readUiTotal(page);
+    }
+    if (uiTotal == null) {
+        await page.goto('/profile').catch(() => {});
+        await page.waitForTimeout(200);
+        uiTotal = await readUiTotal(page);
+    }
+    if (uiTotal == null) {
+        if (REQUIRE) {
+            throw new Error('no UI total testid/text detected');
+        }
+        test.skip(true, 'no UI total testid/text detected');
+        return;
+    }
 
     expect(typeof uiTotal).toBe('number');
     expect(uiTotal).toBe(serverTotal);
