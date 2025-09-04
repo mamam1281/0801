@@ -1,3 +1,25 @@
+---
+## [2025-09-05] 인증/보호 강화 작업 내역
+
+### 주요 변경
+- 프론트엔드 미들웨어에 인증 체크 로직 추가: 주요 경로(메인, 상점, 게임 등) 접근 시 토큰 없으면 /login으로 리다이렉트
+- 메인/상점 페이지에 클라이언트 인증 가드(useEffect) 추가: 토큰 없으면 /login 이동
+- 백엔드 API 인증 미포함 요청 401 반환 정상 동작 확인 (users/profile 등)
+- 모든 변경/검증/예방책은 개선안2.md에 기록
+
+### 표준 절차
+1. 미들웨어 및 주요 페이지에 인증 체크 코드 패치 적용
+2. 백엔드 인증 미포함 요청 401 반환 테스트(E2E/수동)
+3. 개선안2.md에 변경 요약/검증/예방책 기록
+
+### 검증 결과
+- 비로그인 상태에서 메인/상점 접근 시 /login으로 자동 이동됨 (수동/E2E 테스트 통과)
+- API 인증 미포함 요청 시 401 Unauthorized 반환 확인
+
+### 예방책/운영 기준
+- 신규/중요 페이지 추가 시 인증 가드/미들웨어 적용 필수
+- 백엔드 신규 엔드포인트에도 항상 Depends(get_current_user) 적용 여부 점검
+- 인증/보호 관련 변경은 개선안2.md에 즉시 기록 및 운영 매뉴얼 반영
 ### 트러블슈팅 표준 순서 (반드시 지킬 것)
 1. **1차 오류 수집**: 실제 프론트(웹앱)에서 모든 페이지/기능별로 발생하는 에러/경고/이슈를 빠짐없이 기록한다. (콘솔, 네트워크, UI, API 등)
 2. **상관관계/유기적 분석**: 수집된 오류/이슈를 기능/데이터/흐름/의존성/상태/동기화/보안 등 관점에서 유기적으로 연결해 원인/관계/패턴을 분석한다.
@@ -40,10 +62,955 @@
 #### [회원가입/로그인]
 프론트(Next.js) → API(/api/users/signup, /api/users/login) → 백엔드(FastAPI) → DB(users) → JWT 발급 → 프론트 저장/동기화
 
+react-dom-client.development.js:25582 Download the React DevTools for a better development experience: https://react.dev/link/react-devtools
+unifiedApi.ts:53 [unifiedApi] NEXT_PUBLIC_API_ORIGIN 미설정 → fallback: http://localhost:8000
+resolveOrigin @ unifiedApi.ts:53
+unifiedApi.ts:77 [unifiedApi] 초기화 - ctx=CSR build=dev origin=http://localhost:8000
+unifiedApi.ts:178 [unifiedApi] skip GET (no token, silent)
+unifiedApi.ts:178 [unifiedApi] skip GET (no token, silent)
+unifiedApi.ts:178 [unifiedApi] skip GET (no token, silent)
+useGameConfig.ts:69 [useGameConfig] 게임 설정 로딩 중...
+useGameConfig.ts:72 [useGameConfig] 비인증 상태 → 서버 설정 호출을 건너뜀
+fetchConfig @ useGameConfig.ts:72
+unifiedApi.ts:178 [unifiedApi] skip GET (no token, silent)
+Unable to add filesystem: <illegal path>
 
 
+react-dom-client.development.js:25582 Download the React DevTools for a better development experience: https://react.dev/link/react-devtools
+unifiedApi.ts:53 [unifiedApi] NEXT_PUBLIC_API_ORIGIN 미설정 → fallback: http://localhost:8000
+resolveOrigin @ unifiedApi.ts:53
+unifiedApi.ts:77 [unifiedApi] 초기화 - ctx=CSR build=dev origin=http://localhost:8000
+unifiedApi.ts:178 [unifiedApi] skip GET (no token, silent)
+unifiedApi.ts:178 [unifiedApi] skip GET (no token, silent)
+unifiedApi.ts:178 [unifiedApi] skip GET (no token, silent)
+useGameConfig.ts:69 [useGameConfig] 게임 설정 로딩 중...
+useGameConfig.ts:72 [useGameConfig] 비인증 상태 → 서버 설정 호출을 건너뜀
+fetchConfig @ useGameConfig.ts:72
+unifiedApi.ts:178 [unifiedApi] skip GET (no token, silent)
+Unable to add filesystem: <illegal path>
 
 
+react-dom-client.development.js:25582 Download the React DevTools for a better development experience: https://react.dev/link/react-devtools
+unifiedApi.ts:53 [unifiedApi] NEXT_PUBLIC_API_ORIGIN 미설정 → fallback: http://localhost:8000
+resolveOrigin @ unifiedApi.ts:53
+unifiedApi.ts:77 [unifiedApi] 초기화 - ctx=CSR build=dev origin=http://localhost:8000
+unifiedApi.ts:178 [unifiedApi] skip GET (no token, silent)
+unifiedApi.ts:178 [unifiedApi] skip GET (no token, silent)
+unifiedApi.ts:178 [unifiedApi] skip GET (no token, silent)
+useGameConfig.ts:69 [useGameConfig] 게임 설정 로딩 중...
+useGameConfig.ts:72 [useGameConfig] 비인증 상태 → 서버 설정 호출을 건너뜀
+fetchConfig @ useGameConfig.ts:72
+unifiedApi.ts:178 [unifiedApi] skip GET (no token, silent)
+Unable to add filesystem: <illegal path>
+
+apiLogger.js:17 [API 요청] POST /api/auth/login
+apiLogger.js:18 ⏱️ 오후 10:30:55
+unifiedApi.ts:185 [unifiedApi] skip POST (no token)
+apiCall @ unifiedApi.ts:185
+post @ unifiedApi.ts:275
+useAuth.useCallback[login] @ useAuth.ts:128
+App.useCallback[handleLogin] @ App.tsx:85
+handleLogin @ LoginScreen.tsx:58
+executeDispatch @ react-dom-client.development.js:16922
+runWithFiberInDEV @ react-dom-client.development.js:873
+processDispatchQueue @ react-dom-client.development.js:16972
+eval @ react-dom-client.development.js:17573
+batchedUpdates$1 @ react-dom-client.development.js:3313
+dispatchEventForPluginEventSystem @ react-dom-client.development.js:17126
+dispatchEvent @ react-dom-client.development.js:21309
+dispatchDiscreteEvent @ react-dom-client.development.js:21277
+App.tsx:94 [App] 로그인 실패: Error: UNAUTHENTICATED_NO_TOKEN
+    at apiCall (unifiedApi.ts:182:30)
+    at Object.post (unifiedApi.ts:275:71)
+    at useAuth.useCallback[login] [as login] (useAuth.ts:128:39)
+    at App.useCallback[handleLogin] (App.tsx:85:20)
+    at handleLogin (LoginScreen.tsx:58:39)
+    at executeDispatch (react-dom-client.development.js:16922:9)
+    at runWithFiberInDEV (react-dom-client.development.js:873:30)
+    at processDispatchQueue (react-dom-client.development.js:16972:19)
+    at eval (react-dom-client.development.js:17573:9)
+    at batchedUpdates$1 (react-dom-client.development.js:3313:40)
+    at dispatchEventForPluginEventSystem (react-dom-client.development.js:17126:7)
+    at dispatchEvent (react-dom-client.development.js:21309:11)
+    at dispatchDiscreteEvent (react-dom-client.development.js:21277:11)
+error @ intercept-console-error.js:57
+App.useCallback[handleLogin] @ App.tsx:94
+await in App.useCallback[handleLogin]
+handleLogin @ LoginScreen.tsx:58
+executeDispatch @ react-dom-client.development.js:16922
+runWithFiberInDEV @ react-dom-client.development.js:873
+processDispatchQueue @ react-dom-client.development.js:16972
+eval @ react-dom-client.development.js:17573
+batchedUpdates$1 @ react-dom-client.development.js:3313
+dispatchEventForPluginEventSystem @ react-dom-client.development.js:17126
+dispatchEvent @ react-dom-client.development.js:21309
+dispatchDiscreteEvent @ react-dom-client.development.js:21277
+apiLogger.js:35 [API 실패] POST /api/auth/login
+error @ intercept-console-error.js:57
+apiLogFail @ apiLogger.js:35
+handleLogin @ LoginScreen.tsx:62
+await in handleLogin
+executeDispatch @ react-dom-client.development.js:16922
+runWithFiberInDEV @ react-dom-client.development.js:873
+processDispatchQueue @ react-dom-client.development.js:16972
+eval @ react-dom-client.development.js:17573
+batchedUpdates$1 @ react-dom-client.development.js:3313
+dispatchEventForPluginEventSystem @ react-dom-client.development.js:17126
+dispatchEvent @ react-dom-client.development.js:21309
+dispatchDiscreteEvent @ react-dom-client.development.js:21277
+apiLogger.js:36 ❌ 에러 내용: 잘못된 정보 또는 서버 거부
+error @ intercept-console-error.js:57
+apiLogFail @ apiLogger.js:36
+handleLogin @ LoginScreen.tsx:62
+await in handleLogin
+executeDispatch @ react-dom-client.development.js:16922
+runWithFiberInDEV @ react-dom-client.development.js:873
+processDispatchQueue @ react-dom-client.development.js:16972
+eval @ react-dom-client.development.js:17573
+batchedUpdates$1 @ react-dom-client.development.js:3313
+dispatchEventForPluginEventSystem @ react-dom-client.development.js:17126
+dispatchEvent @ react-dom-client.development.js:21309
+dispatchDiscreteEvent @ react-dom-client.development.js:21277
+
+ㄴ 이건 틀린게 유저01 / 123455 로 맞는 시드계정임! 
+
+
+react-dom-client.development.js:25582 Download the React DevTools for a better development experience: https://react.dev/link/react-devtools
+unifiedApi.ts:53 [unifiedApi] NEXT_PUBLIC_API_ORIGIN 미설정 → fallback: http://localhost:8000
+resolveOrigin @ unifiedApi.ts:53
+unifiedApi.ts:77 [unifiedApi] 초기화 - ctx=CSR build=dev origin=http://localhost:8000
+unifiedApi.ts:178 [unifiedApi] skip GET (no token, silent)
+unifiedApi.ts:178 [unifiedApi] skip GET (no token, silent)
+unifiedApi.ts:178 [unifiedApi] skip GET (no token, silent)
+useGameConfig.ts:69 [useGameConfig] 게임 설정 로딩 중...
+useGameConfig.ts:72 [useGameConfig] 비인증 상태 → 서버 설정 호출을 건너뜀
+fetchConfig @ useGameConfig.ts:72
+unifiedApi.ts:178 [unifiedApi] skip GET (no token, silent)
+Unable to add filesystem: <illegal path>
+
+
+react-dom-client.development.js:25582 Download the React DevTools for a better development experience: https://react.dev/link/react-devtools
+unifiedApi.ts:53 [unifiedApi] NEXT_PUBLIC_API_ORIGIN 미설정 → fallback: http://localhost:8000
+resolveOrigin @ unifiedApi.ts:53
+unifiedApi.ts:77 [unifiedApi] 초기화 - ctx=CSR build=dev origin=http://localhost:8000
+unifiedApi.ts:178 [unifiedApi] skip GET (no token, silent)
+unifiedApi.ts:178 [unifiedApi] skip GET (no token, silent)
+unifiedApi.ts:178 [unifiedApi] skip GET (no token, silent)
+useGameConfig.ts:69 [useGameConfig] 게임 설정 로딩 중...
+useGameConfig.ts:72 [useGameConfig] 비인증 상태 → 서버 설정 호출을 건너뜀
+fetchConfig @ useGameConfig.ts:72
+unifiedApi.ts:178 [unifiedApi] skip GET (no token, silent)
+Unable to add filesystem: <illegal path>
+
+react-dom-client.development.js:25582 Download the React DevTools for a better development experience: https://react.dev/link/react-devtools
+unifiedApi.ts:53 [unifiedApi] NEXT_PUBLIC_API_ORIGIN 미설정 → fallback: http://localhost:8000
+resolveOrigin @ unifiedApi.ts:53
+unifiedApi.ts:77 [unifiedApi] 초기화 - ctx=CSR build=dev origin=http://localhost:8000
+unifiedApi.ts:178 [unifiedApi] skip GET (no token, silent)
+unifiedApi.ts:178 [unifiedApi] skip GET (no token, silent)
+unifiedApi.ts:178 [unifiedApi] skip GET (no token, silent)
+useGameConfig.ts:69 [useGameConfig] 게임 설정 로딩 중...
+useGameConfig.ts:72 [useGameConfig] 비인증 상태 → 서버 설정 호출을 건너뜀
+fetchConfig @ useGameConfig.ts:72
+unifiedApi.ts:178 [unifiedApi] skip GET (no token, silent)
+Unable to add filesystem: <illegal path>
+apiLogger.js:17 [API 요청] POST /api/auth/login
+apiLogger.js:18 ⏱️ 오전 12:32:50
+unifiedApi.ts:185 [unifiedApi] skip POST (no token)
+apiCall @ unifiedApi.ts:185
+post @ unifiedApi.ts:275
+useAuth.useCallback[login] @ useAuth.ts:128
+App.useCallback[handleLogin] @ App.tsx:85
+handleLogin @ LoginScreen.tsx:58
+executeDispatch @ react-dom-client.development.js:16922
+runWithFiberInDEV @ react-dom-client.development.js:873
+processDispatchQueue @ react-dom-client.development.js:16972
+eval @ react-dom-client.development.js:17573
+batchedUpdates$1 @ react-dom-client.development.js:3313
+dispatchEventForPluginEventSystem @ react-dom-client.development.js:17126
+dispatchEvent @ react-dom-client.development.js:21309
+dispatchDiscreteEvent @ react-dom-client.development.js:21277
+<form>
+exports.createElement @ react.development.js:1040
+useRender @ use-render.mjs:35
+MotionComponent @ index.mjs:82
+react_stack_bottom_frame @ react-dom-client.development.js:23553
+renderWithHooks @ react-dom-client.development.js:6764
+updateForwardRef @ react-dom-client.development.js:8778
+beginWork @ react-dom-client.development.js:11019
+runWithFiberInDEV @ react-dom-client.development.js:873
+performUnitOfWork @ react-dom-client.development.js:15678
+workLoopSync @ react-dom-client.development.js:15498
+renderRootSync @ react-dom-client.development.js:15478
+performWorkOnRoot @ react-dom-client.development.js:14942
+performWorkOnRootViaSchedulerTask @ react-dom-client.development.js:16767
+performWorkUntilDeadline @ scheduler.development.js:45
+<ForwardRef(motion.form)>
+exports.jsxDEV @ react-jsx-dev-runtime.development.js:345
+LoginScreen @ LoginScreen.tsx:152
+react_stack_bottom_frame @ react-dom-client.development.js:23553
+renderWithHooks @ react-dom-client.development.js:6764
+updateFunctionComponent @ react-dom-client.development.js:9070
+beginWork @ react-dom-client.development.js:10680
+runWithFiberInDEV @ react-dom-client.development.js:873
+performUnitOfWork @ react-dom-client.development.js:15678
+workLoopSync @ react-dom-client.development.js:15498
+renderRootSync @ react-dom-client.development.js:15478
+performWorkOnRoot @ react-dom-client.development.js:14942
+performWorkOnRootViaSchedulerTask @ react-dom-client.development.js:16767
+performWorkUntilDeadline @ scheduler.development.js:45
+<LoginScreen>
+exports.jsxDEV @ react-jsx-dev-runtime.development.js:345
+App @ App.tsx:373
+react_stack_bottom_frame @ react-dom-client.development.js:23553
+renderWithHooks @ react-dom-client.development.js:6764
+updateFunctionComponent @ react-dom-client.development.js:9070
+beginWork @ react-dom-client.development.js:10680
+runWithFiberInDEV @ react-dom-client.development.js:873
+performUnitOfWork @ react-dom-client.development.js:15678
+workLoopSync @ react-dom-client.development.js:15498
+renderRootSync @ react-dom-client.development.js:15478
+performWorkOnRoot @ react-dom-client.development.js:14942
+performSyncWorkOnRoot @ react-dom-client.development.js:16782
+flushSyncWorkAcrossRoots_impl @ react-dom-client.development.js:16628
+processRootScheduleInMicrotask @ react-dom-client.development.js:16666
+eval @ react-dom-client.development.js:16801
+App.tsx:94 [App] 로그인 실패: Error: UNAUTHENTICATED_NO_TOKEN
+    at apiCall (unifiedApi.ts:182:30)
+    at Object.post (unifiedApi.ts:275:71)
+    at useAuth.useCallback[login] [as login] (useAuth.ts:128:39)
+    at App.useCallback[handleLogin] (App.tsx:85:20)
+    at handleLogin (LoginScreen.tsx:58:39)
+    at executeDispatch (react-dom-client.development.js:16922:9)
+    at runWithFiberInDEV (react-dom-client.development.js:873:30)
+    at processDispatchQueue (react-dom-client.development.js:16972:19)
+    at eval (react-dom-client.development.js:17573:9)
+    at batchedUpdates$1 (react-dom-client.development.js:3313:40)
+    at dispatchEventForPluginEventSystem (react-dom-client.development.js:17126:7)
+    at dispatchEvent (react-dom-client.development.js:21309:11)
+    at dispatchDiscreteEvent (react-dom-client.development.js:21277:11)
+error @ intercept-console-error.js:57
+App.useCallback[handleLogin] @ App.tsx:94
+await in App.useCallback[handleLogin]
+handleLogin @ LoginScreen.tsx:58
+executeDispatch @ react-dom-client.development.js:16922
+runWithFiberInDEV @ react-dom-client.development.js:873
+processDispatchQueue @ react-dom-client.development.js:16972
+eval @ react-dom-client.development.js:17573
+batchedUpdates$1 @ react-dom-client.development.js:3313
+dispatchEventForPluginEventSystem @ react-dom-client.development.js:17126
+dispatchEvent @ react-dom-client.development.js:21309
+dispatchDiscreteEvent @ react-dom-client.development.js:21277
+<form>
+exports.createElement @ react.development.js:1040
+useRender @ use-render.mjs:35
+MotionComponent @ index.mjs:82
+react_stack_bottom_frame @ react-dom-client.development.js:23553
+renderWithHooks @ react-dom-client.development.js:6764
+updateForwardRef @ react-dom-client.development.js:8778
+beginWork @ react-dom-client.development.js:11019
+runWithFiberInDEV @ react-dom-client.development.js:873
+performUnitOfWork @ react-dom-client.development.js:15678
+workLoopSync @ react-dom-client.development.js:15498
+renderRootSync @ react-dom-client.development.js:15478
+performWorkOnRoot @ react-dom-client.development.js:14942
+performWorkOnRootViaSchedulerTask @ react-dom-client.development.js:16767
+performWorkUntilDeadline @ scheduler.development.js:45
+<ForwardRef(motion.form)>
+exports.jsxDEV @ react-jsx-dev-runtime.development.js:345
+LoginScreen @ LoginScreen.tsx:152
+react_stack_bottom_frame @ react-dom-client.development.js:23553
+renderWithHooks @ react-dom-client.development.js:6764
+updateFunctionComponent @ react-dom-client.development.js:9070
+beginWork @ react-dom-client.development.js:10680
+runWithFiberInDEV @ react-dom-client.development.js:873
+performUnitOfWork @ react-dom-client.development.js:15678
+workLoopSync @ react-dom-client.development.js:15498
+renderRootSync @ react-dom-client.development.js:15478
+performWorkOnRoot @ react-dom-client.development.js:14942
+performWorkOnRootViaSchedulerTask @ react-dom-client.development.js:16767
+performWorkUntilDeadline @ scheduler.development.js:45
+<LoginScreen>
+exports.jsxDEV @ react-jsx-dev-runtime.development.js:345
+App @ App.tsx:373
+react_stack_bottom_frame @ react-dom-client.development.js:23553
+renderWithHooks @ react-dom-client.development.js:6764
+updateFunctionComponent @ react-dom-client.development.js:9070
+beginWork @ react-dom-client.development.js:10680
+runWithFiberInDEV @ react-dom-client.development.js:873
+performUnitOfWork @ react-dom-client.development.js:15678
+workLoopSync @ react-dom-client.development.js:15498
+renderRootSync @ react-dom-client.development.js:15478
+performWorkOnRoot @ react-dom-client.development.js:14942
+performSyncWorkOnRoot @ react-dom-client.development.js:16782
+flushSyncWorkAcrossRoots_impl @ react-dom-client.development.js:16628
+processRootScheduleInMicrotask @ react-dom-client.development.js:16666
+eval @ react-dom-client.development.js:16801
+apiLogger.js:35 [API 실패] POST /api/auth/login
+error @ intercept-console-error.js:57
+apiLogFail @ apiLogger.js:35
+handleLogin @ LoginScreen.tsx:62
+await in handleLogin
+executeDispatch @ react-dom-client.development.js:16922
+runWithFiberInDEV @ react-dom-client.development.js:873
+processDispatchQueue @ react-dom-client.development.js:16972
+eval @ react-dom-client.development.js:17573
+batchedUpdates$1 @ react-dom-client.development.js:3313
+dispatchEventForPluginEventSystem @ react-dom-client.development.js:17126
+dispatchEvent @ react-dom-client.development.js:21309
+dispatchDiscreteEvent @ react-dom-client.development.js:21277
+<form>
+exports.createElement @ react.development.js:1040
+useRender @ use-render.mjs:35
+MotionComponent @ index.mjs:82
+react_stack_bottom_frame @ react-dom-client.development.js:23553
+renderWithHooks @ react-dom-client.development.js:6764
+updateForwardRef @ react-dom-client.development.js:8778
+beginWork @ react-dom-client.development.js:11019
+runWithFiberInDEV @ react-dom-client.development.js:873
+performUnitOfWork @ react-dom-client.development.js:15678
+workLoopSync @ react-dom-client.development.js:15498
+renderRootSync @ react-dom-client.development.js:15478
+performWorkOnRoot @ react-dom-client.development.js:14942
+performWorkOnRootViaSchedulerTask @ react-dom-client.development.js:16767
+performWorkUntilDeadline @ scheduler.development.js:45
+<ForwardRef(motion.form)>
+exports.jsxDEV @ react-jsx-dev-runtime.development.js:345
+LoginScreen @ LoginScreen.tsx:152
+react_stack_bottom_frame @ react-dom-client.development.js:23553
+renderWithHooks @ react-dom-client.development.js:6764
+updateFunctionComponent @ react-dom-client.development.js:9070
+beginWork @ react-dom-client.development.js:10680
+runWithFiberInDEV @ react-dom-client.development.js:873
+performUnitOfWork @ react-dom-client.development.js:15678
+workLoopSync @ react-dom-client.development.js:15498
+renderRootSync @ react-dom-client.development.js:15478
+performWorkOnRoot @ react-dom-client.development.js:14942
+performWorkOnRootViaSchedulerTask @ react-dom-client.development.js:16767
+performWorkUntilDeadline @ scheduler.development.js:45
+<LoginScreen>
+exports.jsxDEV @ react-jsx-dev-runtime.development.js:345
+App @ App.tsx:373
+react_stack_bottom_frame @ react-dom-client.development.js:23553
+renderWithHooks @ react-dom-client.development.js:6764
+updateFunctionComponent @ react-dom-client.development.js:9070
+beginWork @ react-dom-client.development.js:10680
+runWithFiberInDEV @ react-dom-client.development.js:873
+performUnitOfWork @ react-dom-client.development.js:15678
+workLoopSync @ react-dom-client.development.js:15498
+renderRootSync @ react-dom-client.development.js:15478
+performWorkOnRoot @ react-dom-client.development.js:14942
+performSyncWorkOnRoot @ react-dom-client.development.js:16782
+flushSyncWorkAcrossRoots_impl @ react-dom-client.development.js:16628
+processRootScheduleInMicrotask @ react-dom-client.development.js:16666
+eval @ react-dom-client.development.js:16801
+apiLogger.js:36 ❌ 에러 내용: 잘못된 정보 또는 서버 거부
+error @ intercept-console-error.js:57
+apiLogFail @ apiLogger.js:36
+handleLogin @ LoginScreen.tsx:62
+await in handleLogin
+executeDispatch @ react-dom-client.development.js:16922
+runWithFiberInDEV @ react-dom-client.development.js:873
+processDispatchQueue @ react-dom-client.development.js:16972
+eval @ react-dom-client.development.js:17573
+batchedUpdates$1 @ react-dom-client.development.js:3313
+dispatchEventForPluginEventSystem @ react-dom-client.development.js:17126
+dispatchEvent @ react-dom-client.development.js:21309
+dispatchDiscreteEvent @ react-dom-client.development.js:21277
+<form>
+exports.createElement @ react.development.js:1040
+useRender @ use-render.mjs:35
+MotionComponent @ index.mjs:82
+react_stack_bottom_frame @ react-dom-client.development.js:23553
+renderWithHooks @ react-dom-client.development.js:6764
+updateForwardRef @ react-dom-client.development.js:8778
+beginWork @ react-dom-client.development.js:11019
+runWithFiberInDEV @ react-dom-client.development.js:873
+performUnitOfWork @ react-dom-client.development.js:15678
+workLoopSync @ react-dom-client.development.js:15498
+renderRootSync @ react-dom-client.development.js:15478
+performWorkOnRoot @ react-dom-client.development.js:14942
+performWorkOnRootViaSchedulerTask @ react-dom-client.development.js:16767
+performWorkUntilDeadline @ scheduler.development.js:45
+<ForwardRef(motion.form)>
+exports.jsxDEV @ react-jsx-dev-runtime.development.js:345
+LoginScreen @ LoginScreen.tsx:152
+react_stack_bottom_frame @ react-dom-client.development.js:23553
+renderWithHooks @ react-dom-client.development.js:6764
+updateFunctionComponent @ react-dom-client.development.js:9070
+beginWork @ react-dom-client.development.js:10680
+runWithFiberInDEV @ react-dom-client.development.js:873
+performUnitOfWork @ react-dom-client.development.js:15678
+workLoopSync @ react-dom-client.development.js:15498
+renderRootSync @ react-dom-client.development.js:15478
+performWorkOnRoot @ react-dom-client.development.js:14942
+performWorkOnRootViaSchedulerTask @ react-dom-client.development.js:16767
+performWorkUntilDeadline @ scheduler.development.js:45
+<LoginScreen>
+exports.jsxDEV @ react-jsx-dev-runtime.development.js:345
+App @ App.tsx:373
+react_stack_bottom_frame @ react-dom-client.development.js:23553
+renderWithHooks @ react-dom-client.development.js:6764
+updateFunctionComponent @ react-dom-client.development.js:9070
+beginWork @ react-dom-client.development.js:10680
+runWithFiberInDEV @ react-dom-client.development.js:873
+performUnitOfWork @ react-dom-client.development.js:15678
+workLoopSync @ react-dom-client.development.js:15498
+renderRootSync @ react-dom-client.development.js:15478
+performWorkOnRoot @ react-dom-client.development.js:14942
+performSyncWorkOnRoot @ react-dom-client.development.js:16782
+flushSyncWorkAcrossRoots_impl @ react-dom-client.development.js:16628
+processRootScheduleInMicrotask @ react-dom-client.development.js:16666
+eval @ react-dom-client.development.js:16801
+
+
+react-dom-client.development.js:25582 Download the React DevTools for a better development experience: https://react.dev/link/react-devtools
+unifiedApi.ts:53 [unifiedApi] NEXT_PUBLIC_API_ORIGIN 미설정 → fallback: http://localhost:8000
+resolveOrigin @ unifiedApi.ts:53
+unifiedApi.ts:77 [unifiedApi] 초기화 - ctx=CSR build=dev origin=http://localhost:8000
+unifiedApi.ts:178 [unifiedApi] skip GET (no token, silent)
+unifiedApi.ts:178 [unifiedApi] skip GET (no token, silent)
+unifiedApi.ts:178 [unifiedApi] skip GET (no token, silent)
+useGameConfig.ts:69 [useGameConfig] 게임 설정 로딩 중...
+useGameConfig.ts:72 [useGameConfig] 비인증 상태 → 서버 설정 호출을 건너뜀
+fetchConfig @ useGameConfig.ts:72
+unifiedApi.ts:178 [unifiedApi] skip GET (no token, silent)
+Unable to add filesystem: <illegal path>
+apiLogger.js:17 [API 요청] POST /api/auth/login
+apiLogger.js:18 ⏱️ 오전 12:32:50
+unifiedApi.ts:185 [unifiedApi] skip POST (no token)
+apiCall @ unifiedApi.ts:185
+post @ unifiedApi.ts:275
+useAuth.useCallback[login] @ useAuth.ts:128
+App.useCallback[handleLogin] @ App.tsx:85
+handleLogin @ LoginScreen.tsx:58
+executeDispatch @ react-dom-client.development.js:16922
+runWithFiberInDEV @ react-dom-client.development.js:873
+processDispatchQueue @ react-dom-client.development.js:16972
+eval @ react-dom-client.development.js:17573
+batchedUpdates$1 @ react-dom-client.development.js:3313
+dispatchEventForPluginEventSystem @ react-dom-client.development.js:17126
+dispatchEvent @ react-dom-client.development.js:21309
+dispatchDiscreteEvent @ react-dom-client.development.js:21277
+<form>
+exports.createElement @ react.development.js:1040
+useRender @ use-render.mjs:35
+MotionComponent @ index.mjs:82
+react_stack_bottom_frame @ react-dom-client.development.js:23553
+renderWithHooks @ react-dom-client.development.js:6764
+updateForwardRef @ react-dom-client.development.js:8778
+beginWork @ react-dom-client.development.js:11019
+runWithFiberInDEV @ react-dom-client.development.js:873
+performUnitOfWork @ react-dom-client.development.js:15678
+workLoopSync @ react-dom-client.development.js:15498
+renderRootSync @ react-dom-client.development.js:15478
+performWorkOnRoot @ react-dom-client.development.js:14942
+performWorkOnRootViaSchedulerTask @ react-dom-client.development.js:16767
+performWorkUntilDeadline @ scheduler.development.js:45
+<ForwardRef(motion.form)>
+exports.jsxDEV @ react-jsx-dev-runtime.development.js:345
+LoginScreen @ LoginScreen.tsx:152
+react_stack_bottom_frame @ react-dom-client.development.js:23553
+renderWithHooks @ react-dom-client.development.js:6764
+updateFunctionComponent @ react-dom-client.development.js:9070
+beginWork @ react-dom-client.development.js:10680
+runWithFiberInDEV @ react-dom-client.development.js:873
+performUnitOfWork @ react-dom-client.development.js:15678
+workLoopSync @ react-dom-client.development.js:15498
+renderRootSync @ react-dom-client.development.js:15478
+performWorkOnRoot @ react-dom-client.development.js:14942
+performWorkOnRootViaSchedulerTask @ react-dom-client.development.js:16767
+performWorkUntilDeadline @ scheduler.development.js:45
+<LoginScreen>
+exports.jsxDEV @ react-jsx-dev-runtime.development.js:345
+App @ App.tsx:373
+react_stack_bottom_frame @ react-dom-client.development.js:23553
+renderWithHooks @ react-dom-client.development.js:6764
+updateFunctionComponent @ react-dom-client.development.js:9070
+beginWork @ react-dom-client.development.js:10680
+runWithFiberInDEV @ react-dom-client.development.js:873
+performUnitOfWork @ react-dom-client.development.js:15678
+workLoopSync @ react-dom-client.development.js:15498
+renderRootSync @ react-dom-client.development.js:15478
+performWorkOnRoot @ react-dom-client.development.js:14942
+performSyncWorkOnRoot @ react-dom-client.development.js:16782
+flushSyncWorkAcrossRoots_impl @ react-dom-client.development.js:16628
+processRootScheduleInMicrotask @ react-dom-client.development.js:16666
+eval @ react-dom-client.development.js:16801
+App.tsx:94 [App] 로그인 실패: Error: UNAUTHENTICATED_NO_TOKEN
+    at apiCall (unifiedApi.ts:182:30)
+    at Object.post (unifiedApi.ts:275:71)
+    at useAuth.useCallback[login] [as login] (useAuth.ts:128:39)
+    at App.useCallback[handleLogin] (App.tsx:85:20)
+    at handleLogin (LoginScreen.tsx:58:39)
+    at executeDispatch (react-dom-client.development.js:16922:9)
+    at runWithFiberInDEV (react-dom-client.development.js:873:30)
+    at processDispatchQueue (react-dom-client.development.js:16972:19)
+    at eval (react-dom-client.development.js:17573:9)
+    at batchedUpdates$1 (react-dom-client.development.js:3313:40)
+    at dispatchEventForPluginEventSystem (react-dom-client.development.js:17126:7)
+    at dispatchEvent (react-dom-client.development.js:21309:11)
+    at dispatchDiscreteEvent (react-dom-client.development.js:21277:11)
+error @ intercept-console-error.js:57
+App.useCallback[handleLogin] @ App.tsx:94
+await in App.useCallback[handleLogin]
+handleLogin @ LoginScreen.tsx:58
+executeDispatch @ react-dom-client.development.js:16922
+runWithFiberInDEV @ react-dom-client.development.js:873
+processDispatchQueue @ react-dom-client.development.js:16972
+eval @ react-dom-client.development.js:17573
+batchedUpdates$1 @ react-dom-client.development.js:3313
+dispatchEventForPluginEventSystem @ react-dom-client.development.js:17126
+dispatchEvent @ react-dom-client.development.js:21309
+dispatchDiscreteEvent @ react-dom-client.development.js:21277
+<form>
+exports.createElement @ react.development.js:1040
+useRender @ use-render.mjs:35
+MotionComponent @ index.mjs:82
+react_stack_bottom_frame @ react-dom-client.development.js:23553
+renderWithHooks @ react-dom-client.development.js:6764
+updateForwardRef @ react-dom-client.development.js:8778
+beginWork @ react-dom-client.development.js:11019
+runWithFiberInDEV @ react-dom-client.development.js:873
+performUnitOfWork @ react-dom-client.development.js:15678
+workLoopSync @ react-dom-client.development.js:15498
+renderRootSync @ react-dom-client.development.js:15478
+performWorkOnRoot @ react-dom-client.development.js:14942
+performWorkOnRootViaSchedulerTask @ react-dom-client.development.js:16767
+performWorkUntilDeadline @ scheduler.development.js:45
+<ForwardRef(motion.form)>
+exports.jsxDEV @ react-jsx-dev-runtime.development.js:345
+LoginScreen @ LoginScreen.tsx:152
+react_stack_bottom_frame @ react-dom-client.development.js:23553
+renderWithHooks @ react-dom-client.development.js:6764
+updateFunctionComponent @ react-dom-client.development.js:9070
+beginWork @ react-dom-client.development.js:10680
+runWithFiberInDEV @ react-dom-client.development.js:873
+performUnitOfWork @ react-dom-client.development.js:15678
+workLoopSync @ react-dom-client.development.js:15498
+renderRootSync @ react-dom-client.development.js:15478
+performWorkOnRoot @ react-dom-client.development.js:14942
+performWorkOnRootViaSchedulerTask @ react-dom-client.development.js:16767
+performWorkUntilDeadline @ scheduler.development.js:45
+<LoginScreen>
+exports.jsxDEV @ react-jsx-dev-runtime.development.js:345
+App @ App.tsx:373
+react_stack_bottom_frame @ react-dom-client.development.js:23553
+renderWithHooks @ react-dom-client.development.js:6764
+updateFunctionComponent @ react-dom-client.development.js:9070
+beginWork @ react-dom-client.development.js:10680
+runWithFiberInDEV @ react-dom-client.development.js:873
+performUnitOfWork @ react-dom-client.development.js:15678
+workLoopSync @ react-dom-client.development.js:15498
+renderRootSync @ react-dom-client.development.js:15478
+performWorkOnRoot @ react-dom-client.development.js:14942
+performSyncWorkOnRoot @ react-dom-client.development.js:16782
+flushSyncWorkAcrossRoots_impl @ react-dom-client.development.js:16628
+processRootScheduleInMicrotask @ react-dom-client.development.js:16666
+eval @ react-dom-client.development.js:16801
+apiLogger.js:35 [API 실패] POST /api/auth/login
+error @ intercept-console-error.js:57
+apiLogFail @ apiLogger.js:35
+handleLogin @ LoginScreen.tsx:62
+await in handleLogin
+executeDispatch @ react-dom-client.development.js:16922
+runWithFiberInDEV @ react-dom-client.development.js:873
+processDispatchQueue @ react-dom-client.development.js:16972
+eval @ react-dom-client.development.js:17573
+batchedUpdates$1 @ react-dom-client.development.js:3313
+dispatchEventForPluginEventSystem @ react-dom-client.development.js:17126
+dispatchEvent @ react-dom-client.development.js:21309
+dispatchDiscreteEvent @ react-dom-client.development.js:21277
+<form>
+exports.createElement @ react.development.js:1040
+useRender @ use-render.mjs:35
+MotionComponent @ index.mjs:82
+react_stack_bottom_frame @ react-dom-client.development.js:23553
+renderWithHooks @ react-dom-client.development.js:6764
+updateForwardRef @ react-dom-client.development.js:8778
+beginWork @ react-dom-client.development.js:11019
+runWithFiberInDEV @ react-dom-client.development.js:873
+performUnitOfWork @ react-dom-client.development.js:15678
+workLoopSync @ react-dom-client.development.js:15498
+renderRootSync @ react-dom-client.development.js:15478
+performWorkOnRoot @ react-dom-client.development.js:14942
+performWorkOnRootViaSchedulerTask @ react-dom-client.development.js:16767
+performWorkUntilDeadline @ scheduler.development.js:45
+<ForwardRef(motion.form)>
+exports.jsxDEV @ react-jsx-dev-runtime.development.js:345
+LoginScreen @ LoginScreen.tsx:152
+react_stack_bottom_frame @ react-dom-client.development.js:23553
+renderWithHooks @ react-dom-client.development.js:6764
+updateFunctionComponent @ react-dom-client.development.js:9070
+beginWork @ react-dom-client.development.js:10680
+runWithFiberInDEV @ react-dom-client.development.js:873
+performUnitOfWork @ react-dom-client.development.js:15678
+workLoopSync @ react-dom-client.development.js:15498
+renderRootSync @ react-dom-client.development.js:15478
+performWorkOnRoot @ react-dom-client.development.js:14942
+performWorkOnRootViaSchedulerTask @ react-dom-client.development.js:16767
+performWorkUntilDeadline @ scheduler.development.js:45
+<LoginScreen>
+exports.jsxDEV @ react-jsx-dev-runtime.development.js:345
+App @ App.tsx:373
+react_stack_bottom_frame @ react-dom-client.development.js:23553
+renderWithHooks @ react-dom-client.development.js:6764
+updateFunctionComponent @ react-dom-client.development.js:9070
+beginWork @ react-dom-client.development.js:10680
+runWithFiberInDEV @ react-dom-client.development.js:873
+performUnitOfWork @ react-dom-client.development.js:15678
+workLoopSync @ react-dom-client.development.js:15498
+renderRootSync @ react-dom-client.development.js:15478
+performWorkOnRoot @ react-dom-client.development.js:14942
+performSyncWorkOnRoot @ react-dom-client.development.js:16782
+flushSyncWorkAcrossRoots_impl @ react-dom-client.development.js:16628
+processRootScheduleInMicrotask @ react-dom-client.development.js:16666
+eval @ react-dom-client.development.js:16801
+apiLogger.js:36 ❌ 에러 내용: 잘못된 정보 또는 서버 거부
+error @ intercept-console-error.js:57
+apiLogFail @ apiLogger.js:36
+handleLogin @ LoginScreen.tsx:62
+await in handleLogin
+executeDispatch @ react-dom-client.development.js:16922
+runWithFiberInDEV @ react-dom-client.development.js:873
+processDispatchQueue @ react-dom-client.development.js:16972
+eval @ react-dom-client.development.js:17573
+batchedUpdates$1 @ react-dom-client.development.js:3313
+dispatchEventForPluginEventSystem @ react-dom-client.development.js:17126
+dispatchEvent @ react-dom-client.development.js:21309
+dispatchDiscreteEvent @ react-dom-client.development.js:21277
+<form>
+exports.createElement @ react.development.js:1040
+useRender @ use-render.mjs:35
+MotionComponent @ index.mjs:82
+react_stack_bottom_frame @ react-dom-client.development.js:23553
+renderWithHooks @ react-dom-client.development.js:6764
+updateForwardRef @ react-dom-client.development.js:8778
+beginWork @ react-dom-client.development.js:11019
+runWithFiberInDEV @ react-dom-client.development.js:873
+performUnitOfWork @ react-dom-client.development.js:15678
+workLoopSync @ react-dom-client.development.js:15498
+renderRootSync @ react-dom-client.development.js:15478
+performWorkOnRoot @ react-dom-client.development.js:14942
+performWorkOnRootViaSchedulerTask @ react-dom-client.development.js:16767
+performWorkUntilDeadline @ scheduler.development.js:45
+<ForwardRef(motion.form)>
+exports.jsxDEV @ react-jsx-dev-runtime.development.js:345
+LoginScreen @ LoginScreen.tsx:152
+react_stack_bottom_frame @ react-dom-client.development.js:23553
+renderWithHooks @ react-dom-client.development.js:6764
+updateFunctionComponent @ react-dom-client.development.js:9070
+beginWork @ react-dom-client.development.js:10680
+runWithFiberInDEV @ react-dom-client.development.js:873
+performUnitOfWork @ react-dom-client.development.js:15678
+workLoopSync @ react-dom-client.development.js:15498
+renderRootSync @ react-dom-client.development.js:15478
+performWorkOnRoot @ react-dom-client.development.js:14942
+performWorkOnRootViaSchedulerTask @ react-dom-client.development.js:16767
+performWorkUntilDeadline @ scheduler.development.js:45
+<LoginScreen>
+exports.jsxDEV @ react-jsx-dev-runtime.development.js:345
+App @ App.tsx:373
+react_stack_bottom_frame @ react-dom-client.development.js:23553
+renderWithHooks @ react-dom-client.development.js:6764
+updateFunctionComponent @ react-dom-client.development.js:9070
+beginWork @ react-dom-client.development.js:10680
+runWithFiberInDEV @ react-dom-client.development.js:873
+performUnitOfWork @ react-dom-client.development.js:15678
+workLoopSync @ react-dom-client.development.js:15498
+renderRootSync @ react-dom-client.development.js:15478
+performWorkOnRoot @ react-dom-client.development.js:14942
+performSyncWorkOnRoot @ react-dom-client.development.js:16782
+flushSyncWorkAcrossRoots_impl @ react-dom-client.development.js:16628
+processRootScheduleInMicrotask @ react-dom-client.development.js:16666
+eval @ react-dom-client.development.js:16801
+
+react-dom-client.development.js:25582 Download the React DevTools for a better development experience: https://react.dev/link/react-devtools
+unifiedApi.ts:53 [unifiedApi] NEXT_PUBLIC_API_ORIGIN 미설정 → fallback: http://localhost:8000
+resolveOrigin @ unifiedApi.ts:53
+unifiedApi.ts:77 [unifiedApi] 초기화 - ctx=CSR build=dev origin=http://localhost:8000
+unifiedApi.ts:178 [unifiedApi] skip GET (no token, silent)
+unifiedApi.ts:178 [unifiedApi] skip GET (no token, silent)
+unifiedApi.ts:178 [unifiedApi] skip GET (no token, silent)
+useGameConfig.ts:69 [useGameConfig] 게임 설정 로딩 중...
+useGameConfig.ts:72 [useGameConfig] 비인증 상태 → 서버 설정 호출을 건너뜀
+fetchConfig @ useGameConfig.ts:72
+unifiedApi.ts:178 [unifiedApi] skip GET (no token, silent)
+Unable to add filesystem: <illegal path>
+apiLogger.js:17 [API 요청] POST /api/auth/login
+apiLogger.js:18 ⏱️ 오전 12:32:50
+unifiedApi.ts:185 [unifiedApi] skip POST (no token)
+apiCall @ unifiedApi.ts:185
+post @ unifiedApi.ts:275
+useAuth.useCallback[login] @ useAuth.ts:128
+App.useCallback[handleLogin] @ App.tsx:85
+handleLogin @ LoginScreen.tsx:58
+executeDispatch @ react-dom-client.development.js:16922
+runWithFiberInDEV @ react-dom-client.development.js:873
+processDispatchQueue @ react-dom-client.development.js:16972
+eval @ react-dom-client.development.js:17573
+batchedUpdates$1 @ react-dom-client.development.js:3313
+dispatchEventForPluginEventSystem @ react-dom-client.development.js:17126
+dispatchEvent @ react-dom-client.development.js:21309
+dispatchDiscreteEvent @ react-dom-client.development.js:21277
+<form>
+exports.createElement @ react.development.js:1040
+useRender @ use-render.mjs:35
+MotionComponent @ index.mjs:82
+react_stack_bottom_frame @ react-dom-client.development.js:23553
+renderWithHooks @ react-dom-client.development.js:6764
+updateForwardRef @ react-dom-client.development.js:8778
+beginWork @ react-dom-client.development.js:11019
+runWithFiberInDEV @ react-dom-client.development.js:873
+performUnitOfWork @ react-dom-client.development.js:15678
+workLoopSync @ react-dom-client.development.js:15498
+renderRootSync @ react-dom-client.development.js:15478
+performWorkOnRoot @ react-dom-client.development.js:14942
+performWorkOnRootViaSchedulerTask @ react-dom-client.development.js:16767
+performWorkUntilDeadline @ scheduler.development.js:45
+<ForwardRef(motion.form)>
+exports.jsxDEV @ react-jsx-dev-runtime.development.js:345
+LoginScreen @ LoginScreen.tsx:152
+react_stack_bottom_frame @ react-dom-client.development.js:23553
+renderWithHooks @ react-dom-client.development.js:6764
+updateFunctionComponent @ react-dom-client.development.js:9070
+beginWork @ react-dom-client.development.js:10680
+runWithFiberInDEV @ react-dom-client.development.js:873
+performUnitOfWork @ react-dom-client.development.js:15678
+workLoopSync @ react-dom-client.development.js:15498
+renderRootSync @ react-dom-client.development.js:15478
+performWorkOnRoot @ react-dom-client.development.js:14942
+performWorkOnRootViaSchedulerTask @ react-dom-client.development.js:16767
+performWorkUntilDeadline @ scheduler.development.js:45
+<LoginScreen>
+exports.jsxDEV @ react-jsx-dev-runtime.development.js:345
+App @ App.tsx:373
+react_stack_bottom_frame @ react-dom-client.development.js:23553
+renderWithHooks @ react-dom-client.development.js:6764
+updateFunctionComponent @ react-dom-client.development.js:9070
+beginWork @ react-dom-client.development.js:10680
+runWithFiberInDEV @ react-dom-client.development.js:873
+performUnitOfWork @ react-dom-client.development.js:15678
+workLoopSync @ react-dom-client.development.js:15498
+renderRootSync @ react-dom-client.development.js:15478
+performWorkOnRoot @ react-dom-client.development.js:14942
+performSyncWorkOnRoot @ react-dom-client.development.js:16782
+flushSyncWorkAcrossRoots_impl @ react-dom-client.development.js:16628
+processRootScheduleInMicrotask @ react-dom-client.development.js:16666
+eval @ react-dom-client.development.js:16801
+App.tsx:94 [App] 로그인 실패: Error: UNAUTHENTICATED_NO_TOKEN
+    at apiCall (unifiedApi.ts:182:30)
+    at Object.post (unifiedApi.ts:275:71)
+    at useAuth.useCallback[login] [as login] (useAuth.ts:128:39)
+    at App.useCallback[handleLogin] (App.tsx:85:20)
+    at handleLogin (LoginScreen.tsx:58:39)
+    at executeDispatch (react-dom-client.development.js:16922:9)
+    at runWithFiberInDEV (react-dom-client.development.js:873:30)
+    at processDispatchQueue (react-dom-client.development.js:16972:19)
+    at eval (react-dom-client.development.js:17573:9)
+    at batchedUpdates$1 (react-dom-client.development.js:3313:40)
+    at dispatchEventForPluginEventSystem (react-dom-client.development.js:17126:7)
+    at dispatchEvent (react-dom-client.development.js:21309:11)
+    at dispatchDiscreteEvent (react-dom-client.development.js:21277:11)
+error @ intercept-console-error.js:57
+App.useCallback[handleLogin] @ App.tsx:94
+await in App.useCallback[handleLogin]
+handleLogin @ LoginScreen.tsx:58
+executeDispatch @ react-dom-client.development.js:16922
+runWithFiberInDEV @ react-dom-client.development.js:873
+processDispatchQueue @ react-dom-client.development.js:16972
+eval @ react-dom-client.development.js:17573
+batchedUpdates$1 @ react-dom-client.development.js:3313
+dispatchEventForPluginEventSystem @ react-dom-client.development.js:17126
+dispatchEvent @ react-dom-client.development.js:21309
+dispatchDiscreteEvent @ react-dom-client.development.js:21277
+<form>
+exports.createElement @ react.development.js:1040
+useRender @ use-render.mjs:35
+MotionComponent @ index.mjs:82
+react_stack_bottom_frame @ react-dom-client.development.js:23553
+renderWithHooks @ react-dom-client.development.js:6764
+updateForwardRef @ react-dom-client.development.js:8778
+beginWork @ react-dom-client.development.js:11019
+runWithFiberInDEV @ react-dom-client.development.js:873
+performUnitOfWork @ react-dom-client.development.js:15678
+workLoopSync @ react-dom-client.development.js:15498
+renderRootSync @ react-dom-client.development.js:15478
+performWorkOnRoot @ react-dom-client.development.js:14942
+performWorkOnRootViaSchedulerTask @ react-dom-client.development.js:16767
+performWorkUntilDeadline @ scheduler.development.js:45
+<ForwardRef(motion.form)>
+exports.jsxDEV @ react-jsx-dev-runtime.development.js:345
+LoginScreen @ LoginScreen.tsx:152
+react_stack_bottom_frame @ react-dom-client.development.js:23553
+renderWithHooks @ react-dom-client.development.js:6764
+updateFunctionComponent @ react-dom-client.development.js:9070
+beginWork @ react-dom-client.development.js:10680
+runWithFiberInDEV @ react-dom-client.development.js:873
+performUnitOfWork @ react-dom-client.development.js:15678
+workLoopSync @ react-dom-client.development.js:15498
+renderRootSync @ react-dom-client.development.js:15478
+performWorkOnRoot @ react-dom-client.development.js:14942
+performWorkOnRootViaSchedulerTask @ react-dom-client.development.js:16767
+performWorkUntilDeadline @ scheduler.development.js:45
+<LoginScreen>
+exports.jsxDEV @ react-jsx-dev-runtime.development.js:345
+App @ App.tsx:373
+react_stack_bottom_frame @ react-dom-client.development.js:23553
+renderWithHooks @ react-dom-client.development.js:6764
+updateFunctionComponent @ react-dom-client.development.js:9070
+beginWork @ react-dom-client.development.js:10680
+runWithFiberInDEV @ react-dom-client.development.js:873
+performUnitOfWork @ react-dom-client.development.js:15678
+workLoopSync @ react-dom-client.development.js:15498
+renderRootSync @ react-dom-client.development.js:15478
+performWorkOnRoot @ react-dom-client.development.js:14942
+performSyncWorkOnRoot @ react-dom-client.development.js:16782
+flushSyncWorkAcrossRoots_impl @ react-dom-client.development.js:16628
+processRootScheduleInMicrotask @ react-dom-client.development.js:16666
+eval @ react-dom-client.development.js:16801
+apiLogger.js:35 [API 실패] POST /api/auth/login
+error @ intercept-console-error.js:57
+apiLogFail @ apiLogger.js:35
+handleLogin @ LoginScreen.tsx:62
+await in handleLogin
+executeDispatch @ react-dom-client.development.js:16922
+runWithFiberInDEV @ react-dom-client.development.js:873
+processDispatchQueue @ react-dom-client.development.js:16972
+eval @ react-dom-client.development.js:17573
+batchedUpdates$1 @ react-dom-client.development.js:3313
+dispatchEventForPluginEventSystem @ react-dom-client.development.js:17126
+dispatchEvent @ react-dom-client.development.js:21309
+dispatchDiscreteEvent @ react-dom-client.development.js:21277
+<form>
+exports.createElement @ react.development.js:1040
+useRender @ use-render.mjs:35
+MotionComponent @ index.mjs:82
+react_stack_bottom_frame @ react-dom-client.development.js:23553
+renderWithHooks @ react-dom-client.development.js:6764
+updateForwardRef @ react-dom-client.development.js:8778
+beginWork @ react-dom-client.development.js:11019
+runWithFiberInDEV @ react-dom-client.development.js:873
+performUnitOfWork @ react-dom-client.development.js:15678
+workLoopSync @ react-dom-client.development.js:15498
+renderRootSync @ react-dom-client.development.js:15478
+performWorkOnRoot @ react-dom-client.development.js:14942
+performWorkOnRootViaSchedulerTask @ react-dom-client.development.js:16767
+performWorkUntilDeadline @ scheduler.development.js:45
+<ForwardRef(motion.form)>
+exports.jsxDEV @ react-jsx-dev-runtime.development.js:345
+LoginScreen @ LoginScreen.tsx:152
+react_stack_bottom_frame @ react-dom-client.development.js:23553
+renderWithHooks @ react-dom-client.development.js:6764
+updateFunctionComponent @ react-dom-client.development.js:9070
+beginWork @ react-dom-client.development.js:10680
+runWithFiberInDEV @ react-dom-client.development.js:873
+performUnitOfWork @ react-dom-client.development.js:15678
+workLoopSync @ react-dom-client.development.js:15498
+renderRootSync @ react-dom-client.development.js:15478
+performWorkOnRoot @ react-dom-client.development.js:14942
+performWorkOnRootViaSchedulerTask @ react-dom-client.development.js:16767
+performWorkUntilDeadline @ scheduler.development.js:45
+<LoginScreen>
+exports.jsxDEV @ react-jsx-dev-runtime.development.js:345
+App @ App.tsx:373
+react_stack_bottom_frame @ react-dom-client.development.js:23553
+renderWithHooks @ react-dom-client.development.js:6764
+updateFunctionComponent @ react-dom-client.development.js:9070
+beginWork @ react-dom-client.development.js:10680
+runWithFiberInDEV @ react-dom-client.development.js:873
+performUnitOfWork @ react-dom-client.development.js:15678
+workLoopSync @ react-dom-client.development.js:15498
+renderRootSync @ react-dom-client.development.js:15478
+performWorkOnRoot @ react-dom-client.development.js:14942
+performSyncWorkOnRoot @ react-dom-client.development.js:16782
+flushSyncWorkAcrossRoots_impl @ react-dom-client.development.js:16628
+processRootScheduleInMicrotask @ react-dom-client.development.js:16666
+eval @ react-dom-client.development.js:16801
+apiLogger.js:36 ❌ 에러 내용: 잘못된 정보 또는 서버 거부
+error @ intercept-console-error.js:57
+apiLogFail @ apiLogger.js:36
+handleLogin @ LoginScreen.tsx:62
+await in handleLogin
+executeDispatch @ react-dom-client.development.js:16922
+runWithFiberInDEV @ react-dom-client.development.js:873
+processDispatchQueue @ react-dom-client.development.js:16972
+eval @ react-dom-client.development.js:17573
+batchedUpdates$1 @ react-dom-client.development.js:3313
+dispatchEventForPluginEventSystem @ react-dom-client.development.js:17126
+dispatchEvent @ react-dom-client.development.js:21309
+dispatchDiscreteEvent @ react-dom-client.development.js:21277
+<form>
+exports.createElement @ react.development.js:1040
+useRender @ use-render.mjs:35
+MotionComponent @ index.mjs:82
+react_stack_bottom_frame @ react-dom-client.development.js:23553
+renderWithHooks @ react-dom-client.development.js:6764
+updateForwardRef @ react-dom-client.development.js:8778
+beginWork @ react-dom-client.development.js:11019
+runWithFiberInDEV @ react-dom-client.development.js:873
+performUnitOfWork @ react-dom-client.development.js:15678
+workLoopSync @ react-dom-client.development.js:15498
+renderRootSync @ react-dom-client.development.js:15478
+performWorkOnRoot @ react-dom-client.development.js:14942
+performWorkOnRootViaSchedulerTask @ react-dom-client.development.js:16767
+performWorkUntilDeadline @ scheduler.development.js:45
+<ForwardRef(motion.form)>
+exports.jsxDEV @ react-jsx-dev-runtime.development.js:345
+LoginScreen @ LoginScreen.tsx:152
+react_stack_bottom_frame @ react-dom-client.development.js:23553
+renderWithHooks @ react-dom-client.development.js:6764
+updateFunctionComponent @ react-dom-client.development.js:9070
+beginWork @ react-dom-client.development.js:10680
+runWithFiberInDEV @ react-dom-client.development.js:873
+performUnitOfWork @ react-dom-client.development.js:15678
+workLoopSync @ react-dom-client.development.js:15498
+renderRootSync @ react-dom-client.development.js:15478
+performWorkOnRoot @ react-dom-client.development.js:14942
+performWorkOnRootViaSchedulerTask @ react-dom-client.development.js:16767
+performWorkUntilDeadline @ scheduler.development.js:45
+<LoginScreen>
+exports.jsxDEV @ react-jsx-dev-runtime.development.js:345
+App @ App.tsx:373
+react_stack_bottom_frame @ react-dom-client.development.js:23553
+renderWithHooks @ react-dom-client.development.js:6764
+updateFunctionComponent @ react-dom-client.development.js:9070
+beginWork @ react-dom-client.development.js:10680
+runWithFiberInDEV @ react-dom-client.development.js:873
+performUnitOfWork @ react-dom-client.development.js:15678
+workLoopSync @ react-dom-client.development.js:15498
+renderRootSync @ react-dom-client.development.js:15478
+performWorkOnRoot @ react-dom-client.development.js:14942
+performSyncWorkOnRoot @ react-dom-client.development.js:16782
+flushSyncWorkAcrossRoots_impl @ react-dom-client.development.js:16628
+processRootScheduleInMicrotask @ react-dom-client.development.js:16666
+eval @ react-dom-client.development.js:16801
+
+, 상용 서비스 기준으로 "로그인하지 않은 사용자가 메인페이지(혹은 주요 기능 페이지)에 접근 가능한 것"은 명확한 보안/UX 결함입니다.
+
+상용앱 기준 정상 동작
+비로그인 상태: 메인페이지, 대시보드, 게임, 상점 등 핵심 기능 접근 불가. 로그인/회원가입 화면 또는 게스트용 제한 페이지로 리다이렉트.
+로그인 후: 정상적으로 메인/대시보드/게임 등 접근 가능.
+개선 방안
+라우팅 가드 적용
+
+Next.js/React에서 useAuth 또는 withAuth HOC/미들웨어로 인증 체크.
+인증 토큰 없으면 /login 또는 /signup으로 강제 리다이렉트.
+서버/API 레벨에서도 인증 필수
+
+백엔드(FastAPI)에서 JWT 미포함 요청은 401 Unauthorized 반환.
+프론트에서 401 응답 시 자동 로그아웃 및 로그인 페이지 이동.
+게스트/공개 페이지 분리
+
+홈/소개/FAQ 등만 비로그인 접근 허용, 나머지는 인증 필수.
+테스트/E2E 자동화
+
+비로그인 상태에서 메인/게임/상점 접근 시 항상 로그인 페이지로 이동되는지 테스트 케이스 작성.
+즉시 적용 가능한 액션
+
+프론트엔드 라우터에 인증 체크 미들웨어 추가.
+메인/대시보드/게임/상점 등 모든 주요 페이지에 인증 없으면 리다이렉트 로직 삽입.
+백엔드 API도 인증 미포함 요청은 401 반환 재확인.
 
 #### [게임 플레이]
 프론트(게임 컴포넌트: 슬롯, 가챠, 크래시, RPS) → API(/api/games/slot, /api/games/gacha, /api/games/crash, /api/games/rps) → 백엔드 → DB(game_sessions, user_actions) → 실시간/비동기 처리(카프카, Redis) → 프론트 결과/피드백 표시

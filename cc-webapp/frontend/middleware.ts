@@ -4,9 +4,22 @@ import type { NextRequest } from 'next/server';
 // @ts-ignore
 import { NextResponse } from 'next/server';
 
-// 기본 미들웨어: 통과 시키되 명시적으로 Response를 반환하여 런타임 오류를 방지합니다.
-export default function middleware(_req: NextRequest) {
-	// 필요 시 향후 A/B 라우팅, 보안 헤더 추가 등 확장
+
+export default function middleware(req: NextRequest) {
+	const token = req.cookies.get('auth_token')?.value || req.headers.get('Authorization');
+	const protectedPaths = [
+		'/', '/shop', '/games', '/dashboard', '/profile', '/admin'
+	];
+	const { pathname } = req.nextUrl;
+
+	// 로그인/회원가입/공개페이지는 예외
+	if (protectedPaths.some(path => pathname.startsWith(path))) {
+		if (!token) {
+			const loginUrl = req.nextUrl.clone();
+			loginUrl.pathname = '/login';
+			return NextResponse.redirect(loginUrl);
+		}
+	}
 	return NextResponse.next();
 }
 

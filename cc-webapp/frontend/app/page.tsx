@@ -1,3 +1,7 @@
+
+"use client";
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import App from './App';
 
 export const metadata = {
@@ -6,5 +10,10 @@ export const metadata = {
 };
 
 export default function Home() {
+  const router = useRouter();
+  useEffect(() => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+    if (!token) router.replace('/login');
+  }, []);
   return <App />;
 }

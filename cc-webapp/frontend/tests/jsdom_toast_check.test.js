@@ -8,11 +8,28 @@ const ToastProvider = require('../components/NotificationToast.tsx').ToastProvid
   const dom = new JSDOM('<!doctype html><html><body><div id="root"></div></body></html>', { url: 'http://localhost' });
   global.window = dom.window;
   global.document = dom.window.document;
-  global.navigator = { userAgent: 'node.js' };
-  global.localStorage = dom.window.localStorage;
+  // Node >=20에서는 navigator를 직접 할당하면 TypeError가 발생할 수 있어 defineProperty 사용
+  Object.defineProperty(global, 'navigator', { value: { userAgent: 'node.js' }, writable: false, configurable: true });
+  // jsdom이 제공하지 않는 경우를 대비한 폴백
+  global.localStorage = dom.window.localStorage || (function(){
+    let store = {};
+    return {
+      getItem: (k) => (k in store ? store[k] : null),
+      setItem: (k, v) => { store[k] = String(v); },
+      removeItem: (k) => { delete store[k]; },
+      clear: () => { store = {}; },
+    };
+  })();
 
   // Render ToastProvider
-  render(React.createElement(ToastProvider, null, React.createElement('div', null, 'root')));
+  // 올바른 JSX 구조로 수정: children을 배열로 전달
+  render(
+    React.createElement(
+      ToastProvider,
+      null,
+      [React.createElement('div', { key: 'root' }, 'root')]
+    )
+  );
 
   // Dispatch event
   window.dispatchEvent(new dom.window.CustomEvent('app:notification', { detail: { message: 'X', type: 'info' } }));
