@@ -1,28 +1,51 @@
-// 에디터 타입 오류 회피: 로컬에서 node_modules 미설치 시 타입 선언 경고가 날 수 있어 무시 처리
-// @ts-ignore
-import type { NextRequest } from 'next/server';
-// @ts-ignore
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 
-
-
+// 강제 게스트 차단: auth_token 쿠키 없으면 /login으로 즉시 리다이렉트
 export default function middleware(req: NextRequest) {
-	const token = req.cookies.get('auth_token');
-	const protectedPaths = ['/', '/shop', '/games', '/dashboard', '/profile', '/admin'];
-	const { pathname } = req.nextUrl;
+  const { pathname, search } = req.nextUrl;
+  
+  console.log(`[MIDDLEWARE] 요청: ${pathname}`);
 
-	// 로그인/회원가입/공개페이지는 예외
-	if (protectedPaths.some(path => pathname.startsWith(path))) {
-		if (!token) {
-			const loginUrl = req.nextUrl.clone();
-			loginUrl.pathname = '/login';
-			return NextResponse.redirect(loginUrl);
-		}
-	}
-	return NextResponse.next();
+  // 허용 경로 (인증 불필요)
+  const allowedPaths = [
+    '/_next',
+    '/api', 
+    '/login',
+    '/signup',
+    '/favicon.ico',
+    '/public'
+  ];
+  
+  // 허용 경로인지 확인
+  const isAllowed = allowedPaths.some(path => 
+    pathname === path || pathname.startsWith(path + '/')
+  );
+  
+  if (isAllowed) {
+    console.log(`[MIDDLEWARE] 허용 경로: ${pathname}`);
+    return NextResponse.next();
+  }
+
+  // 인증 토큰 확인
+  const token = req.cookies.get('auth_token')?.value;
+  console.log(`[MIDDLEWARE] 토큰 상태: ${token ? '있음' : '없음'}`);
+  
+  if (!token) {
+    console.log(`[MIDDLEWARE] 비인증 → /login 리다이렉트`);
+    const loginUrl = req.nextUrl.clone();
+    loginUrl.pathname = '/login';
+    loginUrl.search = `?next=${encodeURIComponent(pathname)}`;
+    return NextResponse.redirect(loginUrl);
+  }
+
+  console.log(`[MIDDLEWARE] 인증됨 → 계속`);
+  return NextResponse.next();
 }
 
+// 강력한 매처: 루트 및 모든 보호 경로 매칭
 export const config = {
-	matcher: ['/((?!_next/static|_next/image|favicon.ico|api|login|signup|public).*)'],
+  matcher: [
+    '/((?!_next/static|_next/image|favicon.ico|api/).*)',
+  ],
 };
 

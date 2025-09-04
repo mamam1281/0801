@@ -127,6 +127,39 @@ API ORIGIN 환경변수 누락 여부
 
 , 상용 서비스 기준으로 "로그인하지 않은 사용자가 메인페이지(혹은 주요 기능 페이지)에 접근 가능한 것"은 명확한 보안/UX 결함입니다.
 
+
+Error: ./app/shop/page.tsx
+Error:   [31mx[0m You are attempting to export "metadata" from a component marked with "use client", which is disallowed. Either remove the export, or the "use client" directive. Read more: https://nextjs.org/docs/app/api-reference/directives/use-client
+  [31m|[0m
+
+   ,-[[36;1;4m/app/app/shop/page.tsx[0m:7:1]
+ [2m4[0m | import { useRouter } from 'next/navigation';
+ [2m5[0m | import App from '../App';
+ [2m6[0m | 
+ [2m7[0m | export const metadata = {
+   : [35;1m             ^^^^^^^^[0m
+ [2m8[0m |   title: 'Shop - Casino-Club F2P',
+ [2m9[0m |   description: 'Browse and purchase in-game items in the Casino-Club F2P shop.',
+ [2m9[0m | };
+   `----
+
+Import trace for requested module:
+./app/shop/page.tsx
+    at tr (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/next-devtools/index.js:552:164429)
+    at o6 (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/next-devtools/index.js:541:62116)
+    at iP (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/next-devtools/index.js:541:81700)
+    at i$ (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/next-devtools/index.js:541:92800)
+    at sv (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/next-devtools/index.js:541:125399)
+    at eval (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/next-devtools/index.js:541:125244)
+    at sm (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/next-devtools/index.js:541:125252)
+    at sa (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/next-devtools/index.js:541:121554)
+    at sZ (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/next-devtools/index.js:541:143648)
+    at MessagePort._ (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/next-devtools/index.js:541:196942)
+
+
+
+
+
 상용앱 기준 정상 동작
 비로그인 상태: 메인페이지, 대시보드, 게임, 상점 등 핵심 기능 접근 불가. 로그인/회원가입 화면 또는 게스트용 제한 페이지로 리다이렉트.
 로그인 후: 정상적으로 메인/대시보드/게임 등 접근 가능.

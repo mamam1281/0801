@@ -184,22 +184,23 @@ export default function App() {
         if (savedUser) {
           updateUser(savedUser);
         } else {
-          // 저장 유저가 없을 때: 테스트 강제 or 개발용 스텁 허용 시 게스트 생성
+          // production 환경에서는 절대 게스트 스텁 유저 생성 금지
           let allowStub = false;
           try {
-            const env = (process as any)?.env?.NEXT_PUBLIC_ALLOW_STUB_USER;
-            if (env && (String(env) === '1' || String(env).toLowerCase() === 'true')) allowStub = true;
-          } catch {}
-          try {
-            if (!allowStub && typeof window !== 'undefined') {
-              allowStub = window.localStorage.getItem('E2E_ALLOW_STUB') === '1';
+            const env = (process as any)?.env?.NODE_ENV;
+            if (env && String(env) === 'production') {
+              allowStub = false;
+            } else {
+              // 개발/테스트 환경에서만 허용
+              const stubEnv = (process as any)?.env?.NEXT_PUBLIC_ALLOW_STUB_USER;
+              if (stubEnv && (String(stubEnv) === '1' || String(stubEnv).toLowerCase() === 'true')) allowStub = true;
+              if (!allowStub && typeof window !== 'undefined') {
+                allowStub = window.localStorage.getItem('E2E_ALLOW_STUB') === '1';
+              }
+              if (!allowStub) allowStub = true; // 개발 기본 허용
             }
           } catch {}
-          try {
-            if (!allowStub) allowStub = (process as any)?.env?.NODE_ENV !== 'production';
-          } catch {}
-
-          if (forced || allowStub) {
+          if ((forced || allowStub) && String((process as any)?.env?.NODE_ENV) !== 'production') {
             const stub = createUserData(forced ? 'E2E' : 'GUEST', '', false);
             updateUser(stub);
           }
@@ -285,23 +286,23 @@ export default function App() {
       currentScreen === 'neon-crash'
     );
     if (!isGameScreen || user) return;
-
+    // production 환경에서는 절대 게스트 스텁 유저 생성 금지
     let allow = false;
     try {
-      const env = (process as any)?.env?.NEXT_PUBLIC_ALLOW_STUB_USER;
-      if (env && (String(env) === '1' || String(env).toLowerCase() === 'true')) allow = true;
-    } catch {/* ignore */}
-    try {
-      if (!allow && typeof window !== 'undefined') {
-        allow = window.localStorage.getItem('E2E_ALLOW_STUB') === '1';
+      const env = (process as any)?.env?.NODE_ENV;
+      if (env && String(env) === 'production') {
+        allow = false;
+      } else {
+        // 개발/테스트 환경에서만 허용
+        const stubEnv = (process as any)?.env?.NEXT_PUBLIC_ALLOW_STUB_USER;
+        if (stubEnv && (String(stubEnv) === '1' || String(stubEnv).toLowerCase() === 'true')) allow = true;
+        if (!allow && typeof window !== 'undefined') {
+          allow = window.localStorage.getItem('E2E_ALLOW_STUB') === '1';
+        }
+        if (!allow) allow = true; // 개발 기본 허용
       }
     } catch {/* ignore */}
-    try {
-      // 개발 환경 기본 허용 (프로덕션은 비활성)
-      if (!allow) allow = (process as any)?.env?.NODE_ENV !== 'production';
-    } catch {/* ignore */}
-
-    if (allow) {
+    if (allow && String((process as any)?.env?.NODE_ENV) !== 'production') {
       const stub = createUserData('GUEST', '', false);
       updateUser(stub);
     }
