@@ -84,9 +84,15 @@ export function ToastProvider(props: ToastProviderProps) {
     if (lastKeyRef.current === key && now - lastAtRef.current < 1500) return;
     lastKeyRef.current = key;
     lastAtRef.current = now;
-    const id = `${now}-${Math.random().toString(36).slice(2, 8)}`;
-    setToasts((prev: Toast[]) => [{ id, message, type }, ...prev].slice(0, 4));
-    setTimeout(() => setToasts((prev: Toast[]) => prev.filter((t: Toast) => t.id !== id)), 3500);
+    // 추가 dedupe: 이미 같은 메시지/타입이 toasts에 있으면 추가하지 않음
+    setToasts((prev: Toast[]) => {
+      if (prev.some(t => t.message === message && (t.type ?? 'info') === (type ?? 'info'))) {
+        return prev;
+      }
+      const id = `${now}-${Math.random().toString(36).slice(2, 8)}`;
+      setTimeout(() => setToasts((p: Toast[]) => p.filter((tt: Toast) => tt.id !== id)), 3500);
+      return [{ id, message, type }, ...prev].slice(0, 4);
+    });
   }, []);
 
   useEffect(() => {
@@ -128,6 +134,7 @@ export function ToastProvider(props: ToastProviderProps) {
         {toasts.map((t: Toast) => (
           <div
             key={t.id}
+            data-testid="toast"
             className={`min-w-[220px] max-w-[360px] rounded border px-3 py-2 text-sm shadow-md ${
               t.type === 'error'
                 ? 'bg-red-900/70 border-red-500/50 text-white'

@@ -1,17 +1,17 @@
+
 const { JSDOM } = require('jsdom');
 const React = require('react');
-const { render, screen, waitFor } = require('@testing-library/react');
+const { render, screen, waitFor, act } = require('@testing-library/react');
 const moduleExport = require('../components/NotificationToast.tsx');
 const ToastProvider = moduleExport.default || moduleExport.ToastProvider;
 
-(async () => {
+test('ToastProvider dedupe 및 children 오류 검증', async () => {
+  jest.useFakeTimers();
   // Setup JSDOM global
   const dom = new JSDOM('<!doctype html><html><body><div id="root"></div></body></html>', { url: 'http://localhost' });
   global.window = dom.window;
   global.document = dom.window.document;
-  // Node >=20에서는 navigator를 직접 할당하면 TypeError가 발생할 수 있어 defineProperty 사용
   Object.defineProperty(global, 'navigator', { value: { userAgent: 'node.js' }, writable: false, configurable: true });
-  // jsdom이 제공하지 않는 경우를 대비한 폴백
   global.localStorage = dom.window.localStorage || (function(){
     let store = {};
     return {
@@ -23,7 +23,6 @@ const ToastProvider = moduleExport.default || moduleExport.ToastProvider;
   })();
 
   // Render ToastProvider
-  // 올바른 JSX 구조로 수정: children을 배열로 전달
   render(
     React.createElement(
       ToastProvider,
@@ -32,40 +31,46 @@ const ToastProvider = moduleExport.default || moduleExport.ToastProvider;
     )
   );
 
-    // Dispatch event
+  // Dispatch event (act로 감싸기)
+  await act(async () => {
     window.dispatchEvent(new window.CustomEvent('app:notification', { detail: { message: 'X', type: 'info' } }));
+  });
 
   // Wait for toast
   try {
-    await waitFor(() => screen.getByText('X'), { timeout: 2000 });
-    console.log('First toast found');
+    await waitFor(() => screen.getByText('X'), { timeout: 2500 });
   } catch (e) {
-    console.error('First toast not found');
-    process.exit(2);
+    // body 전체 출력하여 실제 렌더링 여부 확인
+    console.log('BODY:', document.body.innerHTML);
+    throw e;
   }
 
-    // Dispatch duplicate quickly
+  // Dispatch duplicate quickly (act로 감싸기)
+  await act(async () => {
     window.dispatchEvent(new window.CustomEvent('app:notification', { detail: { message: 'X', type: 'info' } }));
-  // Wait briefly and count elements
-  await new Promise((r) => setTimeout(r, 500));
-  const nodes = document.querySelectorAll('div');
-  // crude check: should not have duplicate message elements more than 1
-  const count = Array.from(nodes).filter(n => n.textContent && n.textContent.includes('X')).length;
-  if (count > 1) {
-    console.error('Duplicate not suppressed, count=', count);
-    process.exit(3);
-  }
+  });
+  await act(async () => {
+    jest.advanceTimersByTime(500);
+  });
+  let nodes = document.querySelectorAll('[data-testid="toast"]');
+  let count = Array.from(nodes).filter(n => n.textContent && n.textContent.includes('X')).length;
+  expect(count).toBeLessThanOrEqual(1);
+
+  // 3.5초 이상 대기 후 토스트가 사라지는지 확인 (타이머 강제 실행)
+  await act(async () => {
+    jest.advanceTimersByTime(3600);
+    jest.runAllTimers();
+  });
+  nodes = document.querySelectorAll('[data-testid="toast"]');
+  count = Array.from(nodes).filter(n => n.textContent && n.textContent.includes('X')).length;
+  expect(count).toBe(0);
 
   // After 2s dispatch again
   await new Promise((r) => setTimeout(r, 1600));
+  await act(async () => {
     window.dispatchEvent(new window.CustomEvent('app:notification', { detail: { message: 'X', type: 'info' } }));
+  });
   await new Promise((r) => setTimeout(r, 200));
   const count2 = Array.from(document.querySelectorAll('div')).filter(n => n.textContent && n.textContent.includes('X')).length;
-  if (count2 < 1) {
-    console.error('Toast missing after spaced dispatch');
-    process.exit(4);
-  }
-
-  console.log('PASS: dedupe behavior OK');
-  process.exit(0);
-})();
+  expect(count2).toBeGreaterThanOrEqual(1);
+}, 15000);
