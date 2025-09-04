@@ -92,20 +92,37 @@ export function ToastProvider(props: ToastProviderProps) {
   useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent<any>).detail ?? {};
-      const type = typeof detail === 'object' && 'type' in detail ? (detail as any).type : 'info';
-      const msg =
-        typeof detail === 'object' && 'payload' in detail
-          ? JSON.stringify((detail as any).payload)
-          : String(detail ?? '');
+      const type = typeof detail === 'object' && detail && 'type' in detail ? (detail as any).type : 'info';
+      // 우선순위: detail.message(string | number) → detail.payload(JSON stringify) → 전체 detail toString
+      let msg: string;
+      if (typeof detail === 'object' && detail && 'message' in detail) {
+        const m = (detail as any).message;
+        msg = typeof m === 'string' ? m : String(m);
+      } else if (typeof detail === 'object' && detail && 'payload' in detail) {
+        try {
+          msg = JSON.stringify((detail as any).payload);
+        } catch {
+          msg = String((detail as any).payload);
+        }
+      } else {
+        msg = String(detail ?? '');
+      }
       push(msg, type);
     };
     window.addEventListener('app:notification', handler as EventListener);
     return () => window.removeEventListener('app:notification', handler as EventListener);
   }, [push]);
 
+  // children 안전 처리: React 요소/문자/숫자만 통과
+  const safeChildren = React.useMemo(() => {
+    return React.Children.toArray(children).filter((c: any) => {
+      return React.isValidElement(c) || typeof c === 'string' || typeof c === 'number';
+    });
+  }, [children]);
+
   return (
     <ToastContext.Provider value={{ push }}>
-      {children}
+      {safeChildren}
       {/* 컨테이너 */}
       <div className="fixed top-4 right-4 z-50 flex flex-col gap-2">
         {toasts.map((t: Toast) => (

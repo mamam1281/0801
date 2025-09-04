@@ -12,8 +12,14 @@ export const metadata = {
 export default function ShopPage() {
   const router = useRouter();
   useEffect(() => {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
-    if (!token) router.replace('/login');
+      // SSR/CSR 모두에서 쿠키 기반 인증 체크
+      let token = null;
+      if (typeof document !== 'undefined') {
+        // 클라이언트: document.cookie에서 직접 추출
+        const match = document.cookie.match(/(^|;)\s*auth_token=([^;]*)/);
+        token = match ? match[2] : null;
+      }
+      if (!token) router.replace('/login');
   }, []);
   return <App />;
 }

@@ -1,7 +1,8 @@
 const { JSDOM } = require('jsdom');
 const React = require('react');
 const { render, screen, waitFor } = require('@testing-library/react');
-const ToastProvider = require('../components/NotificationToast.tsx').ToastProvider;
+const moduleExport = require('../components/NotificationToast.tsx');
+const ToastProvider = moduleExport.default || moduleExport.ToastProvider;
 
 (async () => {
   // Setup JSDOM global
@@ -27,12 +28,12 @@ const ToastProvider = require('../components/NotificationToast.tsx').ToastProvid
     React.createElement(
       ToastProvider,
       null,
-      [React.createElement('div', { key: 'root' }, 'root')]
+      React.createElement('div', null, 'root')
     )
   );
 
-  // Dispatch event
-  window.dispatchEvent(new dom.window.CustomEvent('app:notification', { detail: { message: 'X', type: 'info' } }));
+    // Dispatch event
+    window.dispatchEvent(new window.CustomEvent('app:notification', { detail: { message: 'X', type: 'info' } }));
 
   // Wait for toast
   try {
@@ -43,8 +44,8 @@ const ToastProvider = require('../components/NotificationToast.tsx').ToastProvid
     process.exit(2);
   }
 
-  // Dispatch duplicate quickly
-  window.dispatchEvent(new dom.window.CustomEvent('app:notification', { detail: { message: 'X', type: 'info' } }));
+    // Dispatch duplicate quickly
+    window.dispatchEvent(new window.CustomEvent('app:notification', { detail: { message: 'X', type: 'info' } }));
   // Wait briefly and count elements
   await new Promise((r) => setTimeout(r, 500));
   const nodes = document.querySelectorAll('div');
@@ -57,7 +58,7 @@ const ToastProvider = require('../components/NotificationToast.tsx').ToastProvid
 
   // After 2s dispatch again
   await new Promise((r) => setTimeout(r, 1600));
-  window.dispatchEvent(new dom.window.CustomEvent('app:notification', { detail: { message: 'X', type: 'info' } }));
+    window.dispatchEvent(new window.CustomEvent('app:notification', { detail: { message: 'X', type: 'info' } }));
   await new Promise((r) => setTimeout(r, 200));
   const count2 = Array.from(document.querySelectorAll('div')).filter(n => n.textContent && n.textContent.includes('X')).length;
   if (count2 < 1) {

@@ -1,4 +1,34 @@
 ---
+### [실제 구현 예시] Next.js 쿠키 기반 인증 미들웨어
+
+```typescript
+// cc-webapp/frontend/middleware.ts
+import { NextRequest, NextResponse } from 'next/server';
+
+export default function middleware(req: NextRequest) {
+	const token = req.cookies.get('auth_token');
+	const protectedPaths = ['/', '/shop', '/games', '/dashboard', '/profile', '/admin'];
+	const { pathname } = req.nextUrl;
+
+	// 로그인/회원가입/공개페이지는 예외
+	if (protectedPaths.some(path => pathname.startsWith(path))) {
+		if (!token) {
+			const loginUrl = req.nextUrl.clone();
+			loginUrl.pathname = '/login';
+			return NextResponse.redirect(loginUrl);
+		}
+	}
+	return NextResponse.next();
+}
+
+export const config = {
+	matcher: ['/((?!_next/static|_next/image|favicon.ico|api|login|signup|public).*)'],
+};
+```
+
+---
+위 미들웨어는 SSR/클라이언트 모두에서 쿠키(`auth_token`) 기반으로 인증 체크하며, 토큰 없으면 `/login`으로 리다이렉트합니다. 실제 운영 환경에서는 httpOnly/secure 옵션, SameSite 정책도 함께 적용해야 보안이 강화됩니다.
+---
 ## [2025-09-05] 회원가입/로그인 콘솔로그 핵심 요약
 
 ### 핵심 콘솔로그 흐름
@@ -122,7 +152,44 @@ Next.js/React에서 useAuth 또는 withAuth HOC/미들웨어로 인증 체크.
 백엔드 API도 인증 미포함 요청은 401 반환 재확인.
 
 #### [게임 플레이]
-프론트(게임 컴포넌트: 슬롯, 가챠, 크래시, RPS) → API(/api/games/slot, /api/games/gacha, /api/games/crash, /api/games/rps) → 백엔드 → DB(game_sessions, user_actions) → 실시간/비동기 처리(카프카, Redis) → 프론트 결과/피드백 표시
+
+#### [게임 플레이: 상세 흐름]
+
+
+##### 1. 슬롯머신 (Slot)
+- 프론트: SlotMachineComponent에서 사용자가 스핀 버튼 클릭 → 애니메이션/사운드 실행
+- API: `/api/games/slot/spin` (POST)로 스핀 요청 전송 (JWT 쿠키 기반 인증)
+- 백엔드: 슬롯 확률/보상 로직 실행, 결과/보상 계산, user_actions/user_rewards DB 기록
+- DB: game_sessions(세션별 기록), user_actions(스핀 내역), user_rewards(보상 내역)
+- 실시간/비동기: Redis에 스핀 결과 캐시, Kafka로 이벤트 스트림 발행(통계/알림)
+- 프론트: API 응답 받아 당첨/실패 결과 표시, 피드백(애니메이션, 사운드, 토스트) 즉시 반영
+
+##### 2. 가챠(럭키박스)
+- 프론트: GachaSpinComponent에서 사용자가 뽑기 버튼 클릭 → 결과 애니메이션/소셜프루프 표시
+- API: `/api/games/gacha/pull` (POST)로 뽑기 요청 전송 (JWT 쿠키 기반 인증)
+- 백엔드: 가챠 확률/분포 기반 보상 추첨, user_actions/gacha_log/user_rewards DB 기록
+- DB: gacha_log(뽑기 내역), user_rewards(보상 내역), user_actions(뽑기 액션)
+- 실시간/비동기: Redis에 최근 뽑기 결과 캐시, Kafka로 뽑기 이벤트 발행(통계/알림)
+- 프론트: API 응답 받아 아이템/등급 결과 표시, 피드백(토스트, 소셜프루프) 즉시 반영
+
+##### 3. 크래시(Crash)
+- 프론트: CrashGameComponent에서 실시간 배당률 표시, 사용자가 멈춤 버튼 클릭
+- API: `/api/games/crash/play` (POST)로 플레이 요청 전송 (JWT 쿠키 기반 인증)
+- 백엔드: 실시간 배당률 계산, 세션 관리, user_actions/user_rewards DB 기록
+- DB: game_sessions(크래시 세션별 기록), user_actions(플레이 내역), user_rewards(보상 내역)
+- 실시간/비동기: Redis에 실시간 배당률/세션 상태 캐시, Kafka로 크래시 이벤트 발행
+- 프론트: API 응답 받아 배당률/성공/실패 결과 표시, 피드백(애니메이션, 사운드) 즉시 반영
+
+##### 4. RPS(가위바위보)
+- 프론트: RPSGameComponent에서 사용자가 선택 버튼 클릭 → 결과 애니메이션 표시
+- API: `/api/games/rps/play` (POST)로 플레이 요청 전송 (JWT 쿠키 기반 인증)
+- 백엔드: RPS 결과 계산, user_actions/user_rewards DB 기록
+- DB: game_sessions(RPS 세션별 기록), user_actions(플레이 내역), user_rewards(보상 내역)
+- 실시간/비동기: Redis에 최근 결과 캐시, Kafka로 RPS 이벤트 발행
+- 프론트: API 응답 받아 승/패/무 결과 표시, 피드백(애니메이션, 토스트) 즉시 반영
+
+---
+각 게임별 실제 구현 기준으로 프론트→API→백엔드→DB→실시간/비동기→피드백까지 단계별 동작/연계가 명확히 구분되도록 문서화 완료.
 
 #### [어드민 기능]
 프론트(AdminScreen) → API(/api/admin/*, /api/users/*, /api/shop/*, /api/events/* 등) → 백엔드 → DB(유저, 상점, 이벤트, 미션, 로그 등) → CRUD/조회/통계/권한 관리 → 프론트 결과/피드백 표시

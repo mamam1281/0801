@@ -5,11 +5,10 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
 
+
 export default function middleware(req: NextRequest) {
-	const token = req.cookies.get('auth_token')?.value || req.headers.get('Authorization');
-	const protectedPaths = [
-		'/', '/shop', '/games', '/dashboard', '/profile', '/admin'
-	];
+	const token = req.cookies.get('auth_token');
+	const protectedPaths = ['/', '/shop', '/games', '/dashboard', '/profile', '/admin'];
 	const { pathname } = req.nextUrl;
 
 	// 로그인/회원가입/공개페이지는 예외
@@ -24,7 +23,6 @@ export default function middleware(req: NextRequest) {
 }
 
 export const config = {
-	// 전역 적용은 유지하되, _next 내부 정적 자원과 API는 제외할 수 있음
-	matcher: ['/((?!_next/static|_next/image|favicon.ico|api).*)'],
+	matcher: ['/((?!_next/static|_next/image|favicon.ico|api|login|signup|public).*)'],
 };
 
