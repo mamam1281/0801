@@ -13,6 +13,7 @@ import { useGlobalSync } from '@/hooks/useGlobalSync';
 import { useWithReconcile } from '@/lib/sync';
 import { useGlobalStore, useGlobalProfile } from '@/store/globalStore';
 import { validateNickname } from '@/utils/securityUtils';
+import { calculateLevelProgress } from '@/utils/levelUtils';
 import { getTokens, setTokens } from '../utils/tokenStorage';
 import { useRealtimeProfile, useRealtimeStats } from '@/hooks/useRealtimeData';
 import ActionHistory from '@/components/profile/ActionHistory';
@@ -433,9 +434,15 @@ export function ProfileScreen({
     );
   }
 
-  // 안전한 계산을 위한 체크
-  const progressToNext =
-    user?.experience && user?.maxExperience ? (user.experience / user.maxExperience) * 100 : 0;
+  // 레벨 시스템 계산: 새로운 experience_points 기반
+  const experiencePoints = (globalProfile as any)?.experience_points ?? 0;
+  const levelProgress = calculateLevelProgress(experiencePoints);
+  
+  // 표시용 데이터
+  const displayLevel = levelProgress.currentLevel;
+  const displayXP = levelProgress.currentXP;
+  const displayMaxXP = levelProgress.nextLevelXP;
+  const progressToNext = levelProgress.progressPercent;
 
   // GOLD 표시값: Realtime 전역 상태(우선) → 공용 상태 → 로컬 balance 폴백
   const displayGold: number | string =
@@ -628,11 +635,15 @@ export function ProfileScreen({
                     </Button>
                   </div>
 
-                  {/* 🎯 연속출석일만 표시 */}
-                  <div className="flex justify-center">
+                  {/* 🎯 연속출석일과 레벨 표시 */}
+                  <div className="flex justify-center gap-4">
+                    <Badge className="bg-primary/20 text-primary border-primary/30 px-4 py-2 text-lg">
+                      <Trophy className="w-5 h-5 mr-2" />
+                      레벨 {displayLevel}
+                    </Badge>
                     <Badge className="bg-success/20 text-success border-success/30 px-4 py-2 text-lg">
                       <Flame className="w-5 h-5 mr-2" />
-                      {user?.dailyStreak || 0}일 연속 출석
+                      {(globalProfile as any)?.daily_streak || 0}일 연속 출석
                     </Badge>
                   </div>
                 </div>
@@ -642,8 +653,8 @@ export function ProfileScreen({
                   <div className="flex items-center justify-between text-lg">
                     <span className="font-medium">경험치 진행도</span>
                     <span className="font-bold">
-                      {user?.experience?.toLocaleString() || 0} /{' '}
-                      {user?.maxExperience?.toLocaleString() || 1000} XP
+                      {displayXP.toLocaleString()} /{' '}
+                      {displayMaxXP.toLocaleString()} XP
                     </span>
                   </div>
                   <div className="relative">
@@ -656,7 +667,7 @@ export function ProfileScreen({
                     />
                   </div>
                   <div className="text-center text-lg text-muted-foreground">
-                    다음 레벨까지 {progressToNext.toFixed(1)}%
+                    다음 레벨까지 {levelProgress.xpToNext.toLocaleString()} XP ({progressToNext.toFixed(1)}%)
                   </div>
                 </div>
 

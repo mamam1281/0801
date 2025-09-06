@@ -17,8 +17,8 @@ export function useUserGold() {
 
 export function useUserLevel() {
 	const p = useGlobalProfile();
-	// level이 없을 수 있으므로 0 기본값
-	return (p as any)?.level ?? 0;
+	// 새로운 레벨 시스템 필드 우선, 기존 필드 폴백
+	return (p as any)?.level ?? 1;
 }
 
 export function useIsAdmin() {
@@ -32,11 +32,11 @@ export function useUserSummary() {
 		() => ({
 			nickname: p?.nickname ?? "",
 			gold: p?.goldBalance ?? 0,
-			level: p?.level ?? 0,
-			dailyStreak: p?.dailyStreak ?? 0,
+			level: p?.level ?? 1,
+			dailyStreak: p?.daily_streak ?? 0,
 			isAdmin: !!(p?.isAdmin || p?.is_admin),
 		}),
-		[p?.nickname, p?.goldBalance, p?.level, p?.dailyStreak, p?.isAdmin, p?.is_admin]
+		[p?.nickname, p?.goldBalance, p?.level, p?.daily_streak, p?.isAdmin, p?.is_admin]
 	);
 }
 

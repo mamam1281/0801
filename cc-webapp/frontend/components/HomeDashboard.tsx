@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { User } from '../types';
 import { calculateExperiencePercentage, calculateWinRate, checkLevelUp } from '../utils/userUtils';
+import { calculateLevelProgress } from '../utils/levelUtils';
 import { QUICK_ACTIONS, ACHIEVEMENTS_DATA } from '../constants/dashboardData';
 import { Button } from './ui/button';
 import { useGameConfig } from '../hooks/useGameConfig';

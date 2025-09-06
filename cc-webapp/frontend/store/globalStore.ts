@@ -15,6 +15,12 @@ export type GlobalUserProfile = {
     gemsBalance?: number;
     level?: number;
     xp?: number;
+    // 🎯 새로운 레벨 시스템 필드들
+    experience_points?: number;
+    daily_streak?: number;
+    total_games_played?: number;
+    total_games_won?: number;
+    total_games_lost?: number;
     updatedAt?: string;
     [k: string]: unknown;
 };
