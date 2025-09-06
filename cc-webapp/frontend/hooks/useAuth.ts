@@ -125,7 +125,7 @@ export function useAuth() {
         setLoading(true);
         try {
             try {
-                const res = await api.post<any>('auth/login', { site_id: site_id.trim(), password }, { auth: false });
+                const res = await api.post<any>('auth/login', { site_id: site_id.trim(), password });
                 applyTokens(res);
                 if (res && res.user) {
                     const merged = await fetchAndMergeBalance(res.user as AuthUser);
@@ -156,7 +156,7 @@ export function useAuth() {
         setLoading(true);
         try {
             try {
-                const res = await api.post<any>('auth/admin/login', { site_id: site_id.trim(), password }, { auth: false });
+                const res = await api.post<any>('auth/admin/login', { site_id: site_id.trim(), password });
                 applyTokens(res);
                 if (res && res.user) {
                     const merged = await fetchAndMergeBalance(res.user as AuthUser);
@@ -186,22 +186,11 @@ export function useAuth() {
     const logout = useCallback(() => {
         if (refreshTimer.current) window.clearTimeout(refreshTimer.current);
         try {
-            // localStorage 토큰 삭제
             localStorage.removeItem(LEGACY_ACCESS_KEY);
             localStorage.removeItem(LEGACY_EXP_KEY);
             localStorage.removeItem(BUNDLE_KEY);
-            
-            // 쿠키 토큰도 삭제 (미들웨어용)
-            if (typeof document !== 'undefined') {
-                document.cookie = 'auth_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-            }
         } catch { }
         setUser(null);
-        
-        // 로그아웃 후 강제 리다이렉트
-        if (typeof window !== 'undefined') {
-            window.location.href = '/login';
-        }
     }, []);
 
     const refresh = useCallback(async () => {

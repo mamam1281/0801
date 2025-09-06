@@ -20,11 +20,9 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     """Upgrade schema."""
-    # Add cashout_multiplier column to crash_sessions table
-    op.add_column('crash_sessions', sa.Column('cashout_multiplier', sa.Numeric(10, 2), nullable=True))
+    pass
 
 
 def downgrade() -> None:
     """Downgrade schema."""
-    # Remove cashout_multiplier column from crash_sessions table
-    op.drop_column('crash_sessions', 'cashout_multiplier')
+    pass

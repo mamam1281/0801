@@ -54,6 +54,9 @@ export function GameDashboard({
   const [popularityIndex, setPopularityIndex] = useState(85);
   const [totalPlayTime] = useState(245);
   const totalGamesFromStore = useGlobalTotalGames();
+  
+  // 전역 스토어에서 실시간 골드 밸런스 가져오기
+  const { goldBalance } = useGlobalStore();
 
   // 로컬 게임 데이터 (API 호출 없이)
   const games: GameDashboardGame[] = [
@@ -119,7 +122,7 @@ export function GameDashboard({
   const leaderboardData = createLeaderboardData(user);
   
   // 게임 네비게이터
-  const navigateToGame = createGameNavigator(games, user.goldBalance, onAddNotification ?? (() => {}), {
+  const navigateToGame = createGameNavigator(games, goldBalance, onAddNotification ?? (() => {}), {
     onNavigateToSlot: onNavigateToSlot ?? (() => {}),
     onNavigateToRPS: onNavigateToRPS ?? (() => {}),
     onNavigateToGacha: onNavigateToGacha ?? (() => {}),
@@ -178,7 +181,7 @@ export function GameDashboard({
                 <div className="flex items-center gap-2 px-4 py-2 bg-black/50 backdrop-blur-sm rounded-full border border-yellow-500/50">
                   <Coins className="w-5 h-5 text-yellow-400" />
                   <span className="font-bold text-yellow-400">
-                    {user.goldBalance.toLocaleString()}
+                    {goldBalance.toLocaleString()}
                   </span>
                 </div>
 
@@ -268,7 +271,7 @@ export function GameDashboard({
                 <GameCard
                   game={game}
                   index={index}
-                  userGoldBalance={user.goldBalance}
+                  userGoldBalance={goldBalance}
                   onGameClick={navigateToGame}
                 />
               </div>

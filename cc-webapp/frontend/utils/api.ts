@@ -196,7 +196,7 @@ export const refreshAccessToken = async (): Promise<boolean> => {
 export const authApi = {
   // 로그인
   login: async (siteId: string, password: string, deviceInfo?: string) => {
-    return await apiRequest('/api/auth/login', {
+    return await apiRequest('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ site_id: siteId, password, device_info: deviceInfo })
     });
@@ -204,7 +204,7 @@ export const authApi = {
   
   // 회원가입
   register: async (inviteCode: string, nickname: string, siteId: string, phoneNumber: string, password: string) => {
-    return await apiRequest('/api/auth/register', {
+    return await apiRequest('/auth/register', {
       method: 'POST',
       body: JSON.stringify({ 
         invite_code: inviteCode,
@@ -223,22 +223,22 @@ export const authApi = {
 
   // 로그아웃
   logout: async () => {
-    return await apiRequest('/api/auth/logout', { method: 'POST' });
+    return await apiRequest('/auth/logout', { method: 'POST' });
   },
 
   // 모든 세션 로그아웃
   logoutAll: async () => {
-    return await apiRequest('/api/auth/logout-all', { method: 'POST' });
+    return await apiRequest('/auth/logout-all', { method: 'POST' });
   },
 
   // 초대코드 확인
   checkInviteCode: async (code: string) => {
-    return await apiRequest(`/api/auth/check-invite/${code}`);
+    return await apiRequest(`/auth/check-invite/${code}`);
   },
 
   // 초대코드 생성 (관리자 전용)
   createInviteCodes: async (count: number = 1) => {
-    return await apiRequest('/api/auth/admin/create-invite', {
+    return await apiRequest('/auth/admin/create-invite', {
       method: 'POST',
       body: JSON.stringify({ count })
     });
@@ -246,7 +246,7 @@ export const authApi = {
 
   // 인증 시스템 헬스 체크
   healthCheck: async () => {
-    return await apiRequest('/api/auth/health');
+    return await apiRequest('/auth/health');
   }
 };
 

@@ -26,10 +26,8 @@ import {
   Timer,
   TrendingUp,
   Eye,
-  Settings,
-  AlertCircle
+  Settings
 } from 'lucide-react';
-import { useGlobalStore } from '@/store/globalStore';
 import { User, Event, Mission } from '../types';
 import { EventBackend, MissionBackend, UserMissionBackend } from '../types/eventMission';
 import { eventMissionApi } from '../utils/eventMissionApi';
@@ -44,14 +42,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/Tabs';
 import { Progress } from './ui/progress';
 import { Badge } from './ui/badge';
 import { Switch } from './ui/switch';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from './ui/dialog';
 
 interface EventMissionPanelProps {
   user: User;
@@ -117,14 +107,6 @@ export function EventMissionPanel({
 
   const [authRequired, setAuthRequired] = useState(false);
   const [loadError, setLoadError] = useState(null as string | null);
-
-  // 중복 방지 모달 상태
-  const [duplicateModal, setDuplicateModal] = useState({
-    open: false,
-    type: 'event' as 'event' | 'mission',
-    title: '',
-    message: '',
-  });
 
   // Fetch API data
   const fetchData = async () => {
@@ -264,24 +246,11 @@ export function EventMissionPanel({
       t('mission_claim_skip', { missionId, reason: 'unauthenticated' });
       return;
     }
-
-    // 중복 수령 체크
-    const mission = missions.find((m: Mission) => m.id === missionId);
-    if (mission?.claimed) {
-      setDuplicateModal({
-        open: true,
-        type: 'mission',
-        title: '이미 수령한 보상입니다',
-        message: `${mission.title} 미션의 보상을 이미 수령하셨습니다.\n\n하루에 한 번만 수령 가능합니다.`,
-      });
-      return;
-    }
-
     try {
       // API를 통한 미션 보상 수령
       const response = await eventMissionApi.missions.claimRewards(parseInt(missionId));
 
-      if (response && response.success) {
+  if (response && response.success) {
         // 보상 내역 표시
         const rewardMessage = Object.entries(response.rewards)
           .map(([type, amount]) => `${type}: ${amount}`)
@@ -289,24 +258,13 @@ export function EventMissionPanel({
 
         onAddNotification(`보상 수령 완료: ${rewardMessage}`);
 
-        // 진행/목록은 서버가 권위: 새로고침으로 동기화
+  // 진행/목록은 서버가 권위: 새로고침으로 동기화
         fetchData();
         t('mission_claim_success', { missionId });
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error('미션 보상 수령 중 오류:', error);
-      
-      // API에서 중복 수령 오류 체크
-      if (error?.response?.status === 400 || error?.message?.includes('already claimed') || error?.message?.includes('이미')) {
-        setDuplicateModal({
-          open: true,
-          type: 'mission',
-          title: '중복 수령 불가',
-          message: '이 미션의 보상을 이미 수령하셨습니다.\n\n하루에 한 번만 수령 가능합니다.',
-        });
-      } else {
-        onAddNotification('미션 보상을 받는 중 문제가 발생했습니다.');
-      }
+      onAddNotification('미션 보상을 받는 중 문제가 발생했습니다.');
       t('mission_claim_error', { missionId });
     }
   };
@@ -342,23 +300,10 @@ export function EventMissionPanel({
       t('event_claim_skip', { eventId, reason: 'unauthenticated' });
       return;
     }
-
-    // 중복 수령 체크
-    const event = events.find((e: Event) => e.id === eventId);
-    if (event?.claimed) {
-      setDuplicateModal({
-        open: true,
-        type: 'event',
-        title: '이미 수령한 보상입니다',
-        message: `${event.title} 이벤트의 보상을 이미 수령하셨습니다.\n\n하루에 한 번만 수령 가능합니다.`,
-      });
-      return;
-    }
-
     try {
       const response = await claimEvent(parseInt(eventId));
 
-      if (response && response.success) {
+  if (response && response.success) {
         // 보상 내역 표시
         const rewardMessage = Object.entries(response.rewards)
           .map(([type, amount]) => `${type}: ${amount}`)
@@ -366,24 +311,13 @@ export function EventMissionPanel({
 
         onAddNotification(`이벤트 보상 수령 완료: ${rewardMessage}`);
 
-        // 권위 데이터 재조회
+  // 권위 데이터 재조회
         refreshEvents();
         t('event_claim_success', { eventId });
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error('이벤트 보상 수령 중 오류:', error);
-      
-      // API에서 중복 수령 오류 체크
-      if (error?.response?.status === 400 || error?.message?.includes('already claimed') || error?.message?.includes('이미')) {
-        setDuplicateModal({
-          open: true,
-          type: 'event',
-          title: '중복 수령 불가',
-          message: '이 이벤트의 보상을 이미 수령하셨습니다.\n\n하루에 한 번만 수령 가능합니다.',
-        });
-      } else {
-        onAddNotification('이벤트 보상을 받는 중 문제가 발생했습니다.');
-      }
+      onAddNotification('이벤트 보상을 받는 중 문제가 발생했습니다.');
       t('event_claim_error', { eventId });
     }
   };
@@ -910,33 +844,6 @@ export function EventMissionPanel({
           </TabsContent>
         </Tabs>
       </div>
-
-      {/* 중복 수령 방지 모달 */}
-      <Dialog open={duplicateModal.open} onOpenChange={(open: boolean) => setDuplicateModal((prev: any) => ({ ...prev, open }))}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-full bg-warning/20">
-                <AlertCircle className="w-5 h-5 text-warning" />
-              </div>
-              <DialogTitle className="text-lg font-bold">
-                {duplicateModal.title}
-              </DialogTitle>
-            </div>
-            <DialogDescription className="text-left whitespace-pre-line text-muted-foreground mt-3">
-              {duplicateModal.message}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              onClick={() => setDuplicateModal((prev: any) => ({ ...prev, open: false }))}
-              className="w-full"
-            >
-              확인
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

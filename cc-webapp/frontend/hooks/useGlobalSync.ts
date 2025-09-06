@@ -58,22 +58,19 @@ export function useGlobalSync() {
             const response = await api.get(AUTHORITY_ENDPOINTS.USER_PROFILE);
             const profile = response.data || response;
 
+            console.log('[GlobalSync] Profile data received:', profile);
+
             if (profile) {
-                console.log('[GlobalSync] Profile data received:', profile);
-                
                 dispatch({
                     type: 'SET_PROFILE',
                     profile: {
-                        id: profile.id,
-                        nickname: profile.nickname,
-                        goldBalance: profile.gold_balance || 0,
-                        level: profile.battlepass_level || 1,
-                        xp: profile.experience || 0,
-                        maxXp: profile.max_experience || 1000,
-                        vip_tier: profile.vip_tier || 'STANDARD',
-                        battlepass_level: profile.battlepass_level || 1,
-                        vip_points: profile.vip_points || 0,
-                        is_admin: profile.is_admin || false
+                        id: profile.id || profile.user_id,
+                        nickname: profile.nickname || profile.username,
+                        goldBalance: profile.cyber_token_balance || profile.gold_balance || profile.cyber_tokens || 0,
+                        level: profile.level || 1,
+                        xp: profile.experience || profile.xp || 0,
+                        vip_tier: profile.vip_tier,
+                        battlepass_level: profile.battlepass_level || 1
                     }
                 });
                 lastSyncTimes.current.profile = Date.now();
@@ -94,8 +91,10 @@ export function useGlobalSync() {
             const response = await api.get(AUTHORITY_ENDPOINTS.USER_BALANCE);
             const balanceData = response.data || response;
 
+            console.log('[GlobalSync] Balance data received:', balanceData);
+
             if (balanceData) {
-                const goldBalance = balanceData.gold_balance ?? balanceData.gold ?? 0;
+                const goldBalance = balanceData.cyber_token_balance ?? balanceData.gold ?? balanceData.cyber_tokens ?? 0;
 
                 // 현재 잔액과 비교
                 const currentGold = state.profile?.goldBalance ?? 0;
@@ -111,16 +110,6 @@ export function useGlobalSync() {
                     }
                 });
 
-                // 프로필의 goldBalance도 동시 업데이트
-                if (state.profile) {
-                    dispatch({
-                        type: 'MERGE_PROFILE',
-                        patch: {
-                            goldBalance: goldBalance
-                        }
-                    });
-                }
-
                 lastSyncTimes.current.balance = Date.now();
                 return true;
             }
@@ -129,7 +118,7 @@ export function useGlobalSync() {
             console.error('[GlobalSync] Balance sync failed:', error);
             return false;
         }
-    }, [dispatch, state.profile]);
+    }, [dispatch, state.profile?.goldBalance]);
 
     /**
      * 게임 통계 동기화

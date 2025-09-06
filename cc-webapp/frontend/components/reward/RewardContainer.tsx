@@ -190,7 +190,7 @@ export default function RewardContainer() {
     const rewardAmount = parseInt(reward.match(/\d+/)?.[0] || '0');
     try {
       if (dispatch && rewardAmount) {
-        applyReward(dispatch, { gold: rewardAmount });
+        applyReward(dispatch, { gold: rewardAmount, reason: 'daily_claim' });
       }
     } catch (e) {
       console.warn('applyReward 실패(일일 보상):', e);
@@ -218,7 +218,7 @@ export default function RewardContainer() {
     const rewardAmount = parseInt(reward.match(/\d+/)?.[0] || '0');
     try {
       if (dispatch && rewardAmount) {
-        applyReward(dispatch, { gold: rewardAmount });
+        applyReward(dispatch, { gold: rewardAmount, reason: 'achievement_claim' });
       }
     } catch (e) {
       console.warn('applyReward 실패(업적 보상):', e);
@@ -241,7 +241,7 @@ export default function RewardContainer() {
     const rewardAmount = parseInt(reward.match(/\d+/)?.[0] || '0');
     try {
       if (dispatch && rewardAmount) {
-        applyReward(dispatch, { gold: rewardAmount });
+        applyReward(dispatch, { gold: rewardAmount, reason: 'level_claim' });
       }
     } catch (e) {
       console.warn('applyReward 실패(레벨 보상):', e);
@@ -268,7 +268,7 @@ export default function RewardContainer() {
     const rewardAmount = parseInt(amount.match(/\d+/)?.[0] || '0');
     try {
       if (dispatch && rewardAmount) {
-        applyReward(dispatch, { gold: rewardAmount });
+        applyReward(dispatch, { gold: rewardAmount, reason: 'accumulated_claim' });
       }
     } catch (e) {
       console.warn('applyReward 실패(누적 보상):', e);
