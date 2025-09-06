@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { apiLogTry, apiLogSuccess, apiLogFail } from '../utils/apiLogger';
 import { 
@@ -80,28 +80,40 @@ export function LoginScreen({
     <div className="min-h-screen bg-gradient-to-br from-background via-black to-primary/10 flex items-center justify-center p-4 relative overflow-hidden">
       {/* Animated Background Elements */}
       <div className="absolute inset-0">
-        {[...Array(15)].map((_, i) => (
-          <motion.div
-            key={i}
-            initial={{
-              opacity: 0,
-              x: Math.random() * window.innerWidth,
-              y: Math.random() * window.innerHeight,
-            }}
-            animate={{
-              opacity: [0, 0.3, 0],
-              scale: [0, 1, 0],
-              rotate: 360,
-            }}
-            transition={{
-              duration: 8,
-              repeat: Infinity,
-              delay: i * 0.5,
-              ease: 'easeInOut',
-            }}
-            className="absolute w-1 h-1 bg-primary rounded-full"
-          />
-        ))}
+        {[...Array(15)].map((_, i) => {
+          // SSR에서는 고정값, CSR에서는 useEffect로 랜덤 위치 적용
+          const [pos, setPos] = useState({ x: 0, y: 0 });
+          useEffect(() => {
+            if (typeof window !== 'undefined') {
+              setPos({
+                x: Math.random() * window.innerWidth,
+                y: Math.random() * window.innerHeight,
+              });
+            }
+          }, []);
+          return (
+            <motion.div
+              key={i}
+              initial={{
+                opacity: 0,
+                x: pos.x,
+                y: pos.y,
+              }}
+              animate={{
+                opacity: [0, 0.3, 0],
+                scale: [0, 1, 0],
+                rotate: 360,
+              }}
+              transition={{
+                duration: 8,
+                repeat: Infinity,
+                delay: i * 0.5,
+                ease: 'easeInOut',
+              }}
+              className="absolute w-32 h-32 bg-primary/10 rounded-full blur-2xl"
+            />
+          );
+        })}
       </div>
 
       {/* Main Login Card */}

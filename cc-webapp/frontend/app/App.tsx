@@ -38,10 +38,20 @@ import { NOTIFICATION_STYLES } from '../constants/notificationConstants';
 
 type NotificationItem = { id: string | number; message: React.ReactNode };
 
-export default function App() {
+type AppProps = {
+  isAuthenticated?: boolean;
+};
+
+export default function App({ isAuthenticated }: AppProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [hasInitialized, setHasInitialized] = useState(false);
-  // 외부 네비게이션(__E2E_NAV 등) 사용 여부 플래그 – 초기 네비게이션 덮어쓰기 방지용
+  // externalNavRef는 한 번만 선언
+  // externalNavRef는 한 번만 선언
+
+  // SSR에서 인증되지 않은 경우 아무것도 렌더링하지 않음
+  if (isAuthenticated === false) {
+    return null;
+  }
   const externalNavRef = useRef(false);
 
   // 🎯 커스텀 훅으로 상태 관리 분리
@@ -572,6 +582,6 @@ export default function App() {
               onNavigateGame={handleNavigateToGamesFromDialog}
               onScheduleReminder={handleScheduleDailyRewardReminder}
             />
-  </div>
+    </div>
   );
 }
