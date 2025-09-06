@@ -1,5 +1,5 @@
 
-이import logging
+import logging
 """인증 관련 서비스"""
 import os
 from datetime import datetime, timedelta
