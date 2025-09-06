@@ -212,7 +212,7 @@ export default function App({ isAuthenticated }: AppProps) {
       console.log('[App] useAuth 사용자 변경 감지:', auth.user.nickname);
       
       // 현재 UI 사용자가 GUEST이고 백엔드에 인증된 사용자가 있다면 업데이트
-      if (user.nickname === 'GUEST' || user.nickname === 'E2E') {
+      if (user?.nickname === 'GUEST' || user?.nickname === 'E2E') {
         console.log('[App] GUEST → 인증된 사용자로 UI 상태 업데이트');
         const authUserData = createUserData(
           auth.user.nickname || 'USER',
@@ -225,7 +225,7 @@ export default function App({ isAuthenticated }: AppProps) {
         updateUser(authUserData);
       }
     }
-  }, [auth.user, auth.loading, user.nickname, createUserData, updateUser]);
+  }, [auth.user, auth.loading, user?.nickname, createUserData, updateUser]);
 
   // 🔄 앱 초기화 - 한 번만 실행되도록 개선
   useEffect(() => {

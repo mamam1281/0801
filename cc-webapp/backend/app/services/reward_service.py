@@ -10,19 +10,30 @@ from math import exp
 from datetime import datetime, timezone
 
 def calculate_streak_daily_reward(streak_count: int) -> tuple[int, int]:
-    """지민 감쇠(C안) 기반 골드/XP 산출.
+    """간단한 선형 증가 기반 골드/XP 산출.
 
-    Gold = 1000 + 800 * (1 - e^{-streak/6})  (≈ 1800 수렴)
-    XP   = 50   + 40  * (1 - e^{-streak/8})  (≈ 90 수렴)
+    Gold = 1000 + (streak_count * 200)  (0일차: 1000, 1일차: 1200, 2일차: 1400...)
+    XP   = 50   + (streak_count * 25)   (0일차: 50, 1일차: 75, 2일차: 100...)
 
     Args:
         streak_count: 현재 유지 중인 연속 출석 일수(>=0)
     Returns:
         (gold:int, xp:int)
     """
-    g = int(round(1000 + 800 * (1 - exp(-streak_count / 6))))
-    xp = int(round(50 + 40 * (1 - exp(-streak_count / 8))))
-    return g, xp
+    # 선형 증가 공식
+    base_gold = 1000
+    gold_per_day = 200
+    gold = base_gold + (streak_count * gold_per_day)
+    
+    base_xp = 50
+    xp_per_day = 25
+    xp = base_xp + (streak_count * xp_per_day)
+    
+    # 최대 보상 제한 (10일차까지)
+    max_gold = 3000
+    max_xp = 300
+    
+    return min(gold, max_gold), min(xp, max_xp)
 
 __all__ = ["calculate_streak_daily_reward"]
 from typing import Optional, Dict, Any
