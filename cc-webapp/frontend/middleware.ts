@@ -31,6 +31,7 @@ export default function middleware(req: NextRequest) {
   const allCookies = req.cookies.getAll();
   console.log(`[MIDDLEWARE] 토큰 상태: ${token ? '있음' : '없음'}`);
   console.log(`[MIDDLEWARE] 모든 쿠키:`, allCookies.map(c => `${c.name}=${c.value?.substring(0, 20)}...`));
+  console.log(`[MIDDLEWARE] 경로 ${pathname} 접근 시도`);
   
   if (!token) {
     console.log(`[MIDDLEWARE] 비인증 → /login 리다이렉트`);
