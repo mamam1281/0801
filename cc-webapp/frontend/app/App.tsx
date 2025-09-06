@@ -92,12 +92,24 @@ export default function App({ isAuthenticated }: AppProps) {
       setIsLoading(true);
       try {
         // backend login 은 site_id 를 요구 – 현재 UI 입력 nickname 을 site_id 로 간주
-        await auth.login(nickname, password); // 실패 시 throw
-        const userData = createUserData(nickname, password, false);
+        const authUser = await auth.login(nickname, password); // 실패 시 throw, 성공 시 AuthUser 반환
+        
+        // 백엔드에서 받은 실제 사용자 정보로 UI 상태 업데이트
+        const userData = createUserData(
+          authUser.nickname || nickname, // 백엔드에서 받은 nickname 사용, fallback으로 입력된 nickname
+          password, 
+          false
+        );
+        
+        // 백엔드에서 받은 골드 잔액 정보가 있다면 반영
+        if (authUser.goldBalance !== undefined) {
+          userData.goldBalance = authUser.goldBalance;
+        }
+        
         updateUser(userData);
         navigationHandlers.toHome();
         addNotification(
-          NOTIFICATION_MESSAGES.LOGIN_SUCCESS(nickname, isAdminAccount(nickname, password))
+          NOTIFICATION_MESSAGES.LOGIN_SUCCESS(authUser.nickname || nickname, isAdminAccount(nickname, password))
         );
         return true;
       } catch (e) {
@@ -191,17 +203,33 @@ export default function App({ isAuthenticated }: AppProps) {
         } catch {}
 
         const savedUser = restoreSavedUser();
-        if (savedUser) {
+        
+        // 백엔드 인증 상태 확인 - 이미 로그인된 상태라면 사용자 정보 복원
+        if (!savedUser && auth.user) {
+          // 백엔드에서 인증된 사용자가 있다면 UI 상태에 반영
+          const authUserData = createUserData(
+            auth.user.nickname || 'USER',
+            '',
+            false
+          );
+          if (auth.user.goldBalance !== undefined) {
+            authUserData.goldBalance = auth.user.goldBalance;
+          }
+          updateUser(authUserData);
+        } else if (savedUser) {
           updateUser(savedUser);
         } else {
           // production 환경에서는 절대 게스트 스텁 유저 생성 금지
+          // 그리고 이미 인증된 사용자가 있다면 스텁 생성하지 않음
           let allowStub = false;
+          const isAlreadyAuthenticated = !!auth.user;
+          
           try {
             const env = (process as any)?.env?.NODE_ENV;
             if (env && String(env) === 'production') {
               allowStub = false;
-            } else {
-              // 개발/테스트 환경에서만 허용
+            } else if (!isAlreadyAuthenticated) {
+              // 개발/테스트 환경에서만 허용하고, 인증되지 않은 경우에만
               const stubEnv = (process as any)?.env?.NEXT_PUBLIC_ALLOW_STUB_USER;
               if (stubEnv && (String(stubEnv) === '1' || String(stubEnv).toLowerCase() === 'true')) allowStub = true;
               if (!allowStub && typeof window !== 'undefined') {
@@ -210,7 +238,8 @@ export default function App({ isAuthenticated }: AppProps) {
               if (!allowStub) allowStub = true; // 개발 기본 허용
             }
           } catch {}
-          if ((forced || allowStub) && String((process as any)?.env?.NODE_ENV) !== 'production') {
+          
+          if ((forced || allowStub) && String((process as any)?.env?.NODE_ENV) !== 'production' && !isAlreadyAuthenticated) {
             const stub = createUserData(forced ? 'E2E' : 'GUEST', '', false);
             updateUser(stub);
           }
