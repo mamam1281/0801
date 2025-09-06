@@ -2,8 +2,9 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/unifiedApi';
-import { AdminPanel } from '@/components/AdminPanel';
+import { AdminDashboard } from '@/components/AdminDashboard';
 import { motion } from 'framer-motion';
+import { ArrowLeft, Settings, Users, ShoppingCart, BarChart3, Calendar } from 'lucide-react';
 
 interface ProfileMe {
   id: number;
@@ -86,23 +87,75 @@ export default function AdminPage() {
   return (
     <motion.div initial={{opacity:0}} animate={{opacity:1}} className="min-h-screen bg-gradient-to-b from-black via-neutral-950 to-black text-gray-100 p-4">
       <div className="max-w-7xl mx-auto">
-        <header className="flex items-center justify-between mb-6">
-          <h1 className="text-xl font-semibold tracking-tight bg-gradient-to-r from-purple-400 to-cyan-400 bg-clip-text text-transparent">Admin Dashboard</h1>
-          <div className="flex gap-2">
-            <button onClick={()=>router.push('/')} className="px-3 py-2 rounded bg-neutral-800 hover:bg-neutral-700 text-xs">홈으로</button>
-            <button onClick={load} className="px-3 py-2 rounded bg-neutral-800 hover:bg-neutral-700 text-xs">새로고침</button>
+        {/* 헤더 */}
+        <header className="flex items-center justify-between mb-8">
+          <div className="flex items-center space-x-4">
+            <button onClick={()=>router.push('/')} className="p-2 rounded-lg bg-neutral-800 hover:bg-neutral-700 transition-colors">
+              <ArrowLeft className="h-5 w-5" />
+            </button>
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight bg-gradient-to-r from-purple-400 to-cyan-400 bg-clip-text text-transparent">
+                Casino-Club 관리자 센터
+              </h1>
+              <p className="text-sm text-gray-400 mt-1">로그인: {me?.nickname} (관리자)</p>
+            </div>
+          </div>
+          <div className="flex items-center space-x-2">
+            <button onClick={load} className="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-sm transition-colors">
+              새로고침
+            </button>
           </div>
         </header>
-        <div className="mb-4 text-xs text-gray-500">로그인: {me.nickname} (관리자)</div>
-        <AdminPanel
-          user={{ id: me.id, nickname: me.nickname } as any}
-          onBack={()=>router.push('/')}
-          onUpdateUser={()=>{}}
-          onAddNotification={()=>{}}
-          navigate={(path)=>router.push(path)}
+
+        {/* 빠른 네비게이션 */}
+        <div className="mb-8 grid grid-cols-2 md:grid-cols-4 gap-4">
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => router.push('/admin/users')}
+            className="flex items-center space-x-3 p-4 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 transition-all"
+          >
+            <Users className="h-6 w-6" />
+            <span className="font-medium">사용자 관리</span>
+          </motion.button>
+
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => router.push('/admin/shop')}
+            className="flex items-center space-x-3 p-4 rounded-xl bg-gradient-to-r from-green-600 to-green-700 hover:from-green-500 hover:to-green-600 transition-all"
+          >
+            <ShoppingCart className="h-6 w-6" />
+            <span className="font-medium">상점 관리</span>
+          </motion.button>
+
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => router.push('/admin/stats')}
+            className="flex items-center space-x-3 p-4 rounded-xl bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-500 hover:to-purple-600 transition-all"
+          >
+            <BarChart3 className="h-6 w-6" />
+            <span className="font-medium">통계 분석</span>
+          </motion.button>
+
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => router.push('/admin/events')}
+            className="flex items-center space-x-3 p-4 rounded-xl bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-500 hover:to-orange-600 transition-all"
+          >
+            <Calendar className="h-6 w-6" />
+            <span className="font-medium">이벤트 관리</span>
+          </motion.button>
+        </div>
+
+        {/* 대시보드 */}
+        <AdminDashboard
           coreStats={coreStats || undefined}
           loadingStats={loading}
           statsError={error}
+          onRefresh={load}
         />
       </div>
     </motion.div>

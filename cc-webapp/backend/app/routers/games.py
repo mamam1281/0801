@@ -33,6 +33,7 @@ from ..schemas.game_schemas import (
     RPSPlayRequest, RPSPlayResponse,
     GachaPullRequest, GachaPullResponse,
     CrashBetRequest, CrashBetResponse,
+    CrashCashoutRequest, CrashCashoutResponse,
     GameStats, ProfileGameStats, Achievement, GameSession, GameLeaderboard
 )
 from app import models
@@ -1099,26 +1100,27 @@ async def place_crash_bet(
         import uuid, random as _r
         game_id = str(uuid.uuid4())
 
-        # 개선된 크래시 멀티플라이어 로직 - 더 실제적이고 예측 불가능한 시스템
-        import time, hashlib
+        # 정규화된 크래시 멀티플라이어 로직 - 지수 분포 사용
+        import time, hashlib, math
         seed = f"{current_user.id}:{int(time.time() * 1000)}:{game_id}"
         hash_val = int(hashlib.md5(seed.encode()).hexdigest()[:8], 16)
         
-        # 5단계 확률 시스템으로 더 현실적인 분포 구현
-        random_val = (hash_val % 10000) / 10000.0  # 0.0000 - 0.9999
+        # 0-1 사이의 균등 분포 난수 생성
+        random_val = (hash_val % 10000) / 10000.0
         
-        if random_val < 0.35:    # 35% - 1.0x ~ 1.5x (낮은 배수, 높은 확률)
-            multiplier = 1.0 + (random_val / 0.35) * 0.5
-        elif random_val < 0.60:  # 25% - 1.5x ~ 2.5x (중간 배수)  
-            multiplier = 1.5 + ((random_val - 0.35) / 0.25) * 1.0
-        elif random_val < 0.80:  # 20% - 2.5x ~ 5.0x (높은 배수)
-            multiplier = 2.5 + ((random_val - 0.60) / 0.20) * 2.5
-        elif random_val < 0.95:  # 15% - 5.0x ~ 10.0x (매우 높은 배수)
-            multiplier = 5.0 + ((random_val - 0.80) / 0.15) * 5.0
-        else:                   # 5% - 10.0x ~ 50.0x (잭팟 배수)
-            multiplier = 10.0 + ((random_val - 0.95) / 0.05) * 40.0
-            
-        # 하우스 엣지 적용 (약 5% 하우스 수수료)
+        # 지수 분포를 사용한 멀티플라이어 계산
+        # lambda = 0.693으로 설정하여 평균 크래시 포인트를 약 2.0x로 설정
+        # multiplier = 1.0 + (-ln(random) / lambda)
+        lambda_param = 0.693  # ln(2) ≈ 0.693
+        if random_val == 0.0:
+            random_val = 0.0001  # log(0) 방지
+        
+        multiplier = 1.0 + (-math.log(random_val) / lambda_param)
+        
+        # 최대값 제한 (극단적인 값 방지)
+        multiplier = min(multiplier, 100.0)
+        
+        # 하우스 엣지 적용 (5% 하우스 수수료)
         multiplier = max(1.01, multiplier * 0.95)
         
         # 소수점 둘째 자리로 반올림
@@ -1132,15 +1134,18 @@ async def place_crash_bet(
         win_amount = 0
         status = "placed"
         
-        # 자동 캐시아웃 로직 - 중복 당첨 방지
+        # 자동 캐시아웃 로직
         if auto_cashout_multiplier and multiplier >= auto_cashout_multiplier:
-            # 자동 캐시아웃 성공 - 한 번만 당첨 처리
+            # 자동 캐시아웃 성공
             net_win = int(bet_amount * (auto_cashout_multiplier - 1.0))  # 순이익만 계산
             win_amount = net_win
             user_row.gold_balance += net_win  # 순이익만 추가
             status = "auto_cashed"
+        elif auto_cashout_multiplier is None:
+            # 자동 캐시아웃이 설정되지 않은 경우 - 수동 캐시아웃 대기 상태
+            status = "active"
         else:
-            # 크래시 발생 - 손실
+            # 자동 캐시아웃이 설정되었지만 크래시 발생
             status = "crashed"
 
         new_balance = user_row.gold_balance
@@ -1165,22 +1170,25 @@ async def place_crash_bet(
         # crash_sessions / crash_bets upsert (동일 트랜잭션)
         db.execute(text(
             """
-            INSERT INTO crash_sessions (external_session_id, user_id, bet_amount, status, auto_cashout_multiplier, actual_multiplier, win_amount)
-            VALUES (:external_session_id, :user_id, :bet_amount, :status, :auto_cashout_multiplier, :actual_multiplier, :win_amount)
+            INSERT INTO crash_sessions (external_session_id, user_id, bet_amount, status, auto_cashout_multiplier, actual_multiplier, win_amount, game_id, max_multiplier)
+            VALUES (:external_session_id, :user_id, :bet_amount, :status, :auto_cashout_multiplier, :actual_multiplier, :win_amount, :game_id, :max_multiplier)
             ON CONFLICT (external_session_id) DO UPDATE SET
                 auto_cashout_multiplier = EXCLUDED.auto_cashout_multiplier,
                 actual_multiplier = EXCLUDED.actual_multiplier,
                 win_amount = EXCLUDED.win_amount,
-                status = CASE WHEN EXCLUDED.win_amount > 0 THEN 'cashed' ELSE crash_sessions.status END
+                status = EXCLUDED.status,
+                max_multiplier = EXCLUDED.max_multiplier
             """
         ), {
             "external_session_id": game_id,
             "user_id": current_user.id,
             "bet_amount": bet_amount,
-            "status": status if win_amount > 0 else "active",
+            "status": status,
             "auto_cashout_multiplier": auto_cashout_multiplier,
             "actual_multiplier": multiplier,
             "win_amount": win_amount,
+            "game_id": game_id,
+            "max_multiplier": multiplier,  # 크래시 포인트
         })
         db.execute(text(
             """
@@ -1328,7 +1336,141 @@ async def place_crash_bet(
         # 추가 노출(스키마에는 없지만 프론트 용 확장 - 추후 스키마 업데이트 필요 시 반영)
         'status': status,
         'simulated_max_win': simulated_max_win,
+        'win_amount': win_amount,
     }
+
+
+@router.post("/crash/cashout", response_model=CrashCashoutResponse)
+async def cashout_crash_bet(
+    request: CrashCashoutRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    크래시 게임 수동 캐시아웃
+    - 진행 중인 게임에서 사용자가 원하는 시점에 캐시아웃
+    - Redis 또는 DB에서 게임 세션 상태 확인
+    """
+    import logging
+    from ..core.logging import request_id_ctx
+
+    game_id = request.game_id
+    multiplier = request.multiplier
+    
+    _rid = request_id_ctx.get()
+    _logger = logging.getLogger("games.crash.cashout")
+    _logger.info(
+        "manual_cashout_request",
+        extra={
+            "request_id": _rid,
+            "user_id": current_user.id,
+            "game_id": game_id,
+            "cashout_multiplier": multiplier,
+        }
+    )
+
+    try:
+        from sqlalchemy.exc import SQLAlchemyError
+        
+        # 게임 세션 존재 여부 확인
+        game_session = db.execute(text(
+            "SELECT bet_amount, max_multiplier, status FROM crash_sessions WHERE game_id = :game_id AND user_id = :user_id"
+        ), {"game_id": game_id, "user_id": current_user.id}).fetchone()
+        
+        if not game_session:
+            raise HTTPException(status_code=404, detail="게임 세션을 찾을 수 없습니다")
+        
+        bet_amount, max_multiplier, status = game_session
+        
+        # 게임 상태 확인
+        if status != "active":
+            raise HTTPException(status_code=400, detail="진행 중인 게임이 아닙니다")
+        
+        # 캐시아웃 가능 여부 확인 (멀티플라이어가 크래시 포인트보다 낮아야 함)
+        if multiplier >= max_multiplier:
+            raise HTTPException(status_code=400, detail="이미 크래시가 발생했습니다")
+        
+        if multiplier < 1.01:
+            raise HTTPException(status_code=400, detail="캐시아웃 배수가 너무 낮습니다")
+        
+        # 사용자 정보 조회 및 잠금
+        user_row = db.execute(
+            text("SELECT id, gold_balance FROM users WHERE id = :user_id FOR UPDATE"),
+            {"user_id": current_user.id}
+        ).scalar_one_or_none()
+        
+        if not user_row:
+            raise HTTPException(status_code=404, detail="사용자 정보를 찾을 수 없습니다")
+        
+        # 승리 금액 계산
+        win_amount = int(bet_amount * multiplier)
+        net_profit = win_amount - bet_amount
+        
+        # 잔액 업데이트
+        new_balance = user_row.gold_balance + net_profit
+        db.execute(
+            text("UPDATE users SET gold_balance = :balance WHERE id = :user_id"),
+            {"balance": new_balance, "user_id": current_user.id}
+        )
+        
+        # 게임 세션 상태 업데이트
+        db.execute(text(
+            "UPDATE crash_sessions SET status = 'cashed_out', cashout_multiplier = :multiplier WHERE game_id = :game_id"
+        ), {"multiplier": multiplier, "game_id": game_id})
+        
+        # 로그 기록
+        action_data = {
+            "game_type": "crash",
+            "game_id": game_id,
+            "cashout_multiplier": multiplier,
+            "win_amount": net_profit,
+            "status": "manual_cashout"
+        }
+        _log_user_action(
+            db,
+            user_id=current_user.id,
+            action_type="CRASH_CASHOUT",
+            data=action_data
+        )
+        
+        db.commit()
+        
+        _logger.info(
+            "manual_cashout_success",
+            extra={
+                "request_id": _rid,
+                "user_id": current_user.id,
+                "game_id": game_id,
+                "win_amount": net_profit,
+                "new_balance": new_balance,
+            }
+        )
+        
+        return CrashCashoutResponse(
+            success=True,
+            game_id=game_id,
+            cashout_multiplier=multiplier,
+            win_amount=net_profit,
+            balance=new_balance,
+            message=f"{multiplier:.2f}x에서 캐시아웃! {net_profit} 골드 획득"
+        )
+        
+    except HTTPException:
+        db.rollback()
+        raise
+    except SQLAlchemyError as e:
+        db.rollback()
+        _logger.error(
+            "manual_cashout_failed",
+            extra={
+                "request_id": _rid,
+                "user_id": current_user.id,
+                "game_id": game_id,
+                "error": str(e),
+            }
+        )
+        raise HTTPException(status_code=500, detail="캐시아웃 처리 중 오류가 발생했습니다")
+
 
 # -------------------------------------------------------------------------
 # Server-authoritative per-user aggregated crash stats (user_game_stats)
