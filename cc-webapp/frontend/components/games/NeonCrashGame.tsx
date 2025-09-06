@@ -405,6 +405,12 @@ export function NeonCrashGame({
   const cashout = async () => {
     if (!isRunning || hasCashedOut) return;
 
+    // 최소 배수 검증 (서버와 동일한 조건)
+    if (multiplier < 1.01) {
+      onAddNotification('최소 1.01배 이상에서 캐시아웃할 수 있습니다.');
+      return;
+    }
+
     // 애니메이션 정지
     if (animationRef.current) {
       cancelAnimationFrame(animationRef.current);
@@ -427,7 +433,7 @@ export function NeonCrashGame({
           'games/crash/cashout',
           { 
             game_id: gameId,
-            multiplier 
+            multiplier: Math.max(1.01, multiplier) // 최소값 보장
           },
           { headers: { 'X-Idempotency-Key': idemKey } }
         )
