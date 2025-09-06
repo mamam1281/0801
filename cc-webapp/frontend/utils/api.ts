@@ -218,7 +218,7 @@ export const authApi = {
 
   // 현재 사용자 정보 조회
   getCurrentUser: async () => {
-    return await apiRequest('/api/auth/me');
+    return await apiRequest('/auth/me');
   },
 
   // 로그아웃

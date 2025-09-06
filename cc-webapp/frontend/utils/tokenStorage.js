@@ -75,16 +75,22 @@ export const getAccessToken = () => {
 };
 
 /**
- * 로컬 스토리지에 토큰 저장하기
+ * 로컬 스토리지와 쿠키에 토큰 저장하기
  * @param {Object} tokens - 저장할 토큰 객체 {access_token, refresh_token}
  */
 export const setTokens = (tokens) => {
   if (typeof window === 'undefined') return;
   try {
+    // 로컬 스토리지에 저장
     localStorage.setItem(TOKEN_KEY, JSON.stringify(tokens));
-    // 레거시 키 동기화 (점진적 제거 전까지 유지) - 2025-09-01 이후 제거 예정
+    
+    // 미들웨어 호환성을 위해 쿠키에도 액세스 토큰 저장
     if (tokens?.access_token) {
+      // 레거시 키 동기화 (점진적 제거 전까지 유지) - 2025-09-01 이후 제거 예정
       try { localStorage.setItem(LEGACY_ACCESS_KEY, tokens.access_token); } catch { }
+      
+      // 쿠키에 auth_token 저장 (미들웨어에서 사용)
+      document.cookie = `auth_token=${tokens.access_token}; path=/; max-age=86400; SameSite=Lax`;
     }
   } catch (error) {
     console.error('토큰 저장 오류:', error);
@@ -92,13 +98,18 @@ export const setTokens = (tokens) => {
 };
 
 /**
- * 로컬 스토리지에서 토큰 삭제하기
+ * 로컬 스토리지와 쿠키에서 토큰 삭제하기
  */
 export const clearTokens = () => {
   if (typeof window === 'undefined') return;
 
   try {
+    // 로컬 스토리지에서 삭제
     localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(LEGACY_ACCESS_KEY);
+    
+    // 쿠키에서도 삭제 (만료 시간을 과거로 설정)
+    document.cookie = 'auth_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
   } catch (error) {
     console.error('토큰 삭제 오류:', error);
   }
