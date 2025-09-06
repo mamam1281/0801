@@ -258,6 +258,12 @@ export async function hydrateFromServer(dispatch: DispatchFn) {
             gemsBalance: Number(me?.gems ?? me?.gems_balance ?? 0),
             level: me?.level ?? me?.battlepass_level ?? undefined,
             xp: me?.xp ?? undefined,
+            // 🎯 레벨 시스템 필드들 명시적 매핑
+            experience_points: me?.experience_points ?? 0,
+            daily_streak: me?.daily_streak ?? 0,
+            total_games_played: me?.total_games_played ?? 0,
+            total_games_won: me?.total_games_won ?? 0,
+            total_games_lost: me?.total_games_lost ?? 0,
             updatedAt: new Date().toISOString(),
             ...me,
         } as GlobalUserProfile as any;

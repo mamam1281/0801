@@ -27,6 +27,7 @@ import { createLeaderboardData } from '../constants/gameConstants';
 import { createGameNavigator, handleModelNavigation } from '../utils/gameUtils';
 import { useGlobalStore } from '@/store/globalStore';
 import { useGlobalTotalGames, useGameTileStats } from '@/hooks/useGameStats';
+import { useUserLevel } from '@/hooks/useSelectors';
 
 export interface GameDashboardProps {
   user: User;
@@ -54,6 +55,7 @@ export function GameDashboard({
   const [popularityIndex, setPopularityIndex] = useState(85);
   const [totalPlayTime] = useState(245);
   const totalGamesFromStore = useGlobalTotalGames();
+  const levelFromStore = useUserLevel();
   
   // 전역 스토어에서 실시간 골드 밸런스 가져오기 (안전한 접근)
   const globalStore = useGlobalStore();
@@ -188,7 +190,7 @@ export function GameDashboard({
 
                 <div className="flex items-center gap-2 px-4 py-2 bg-black/50 backdrop-blur-sm rounded-full border border-purple-500/50">
                   <Trophy className="w-5 h-5 text-purple-400" />
-                  <span className="font-semibold text-white">Lv.{user.level}</span>
+                  <span className="font-semibold text-white">Lv.{levelFromStore}</span>
                 </div>
               </div>
             </div>

@@ -1,3 +1,41 @@
+````markdown
+---
+## [2025-09-07] 레벨 시스템 전체 통합 완료
+
+### 📋 완료된 주요 작업
+1. **레벨 시스템 일관성 확보**: 사이드바/메인/게임페이지/프로필에서 모든 레벨 표시 통일
+2. **경험치 시스템 완전 적용**: experience_points, daily_streak, level 필드 기반 새로운 레벨 계산
+3. **프로필 진행도 바 정확성**: 레벨별 경험치 진행률 계산 (500 XP당 레벨업)
+4. **전역 상태 동기화**: 모든 컴포넌트가 globalStore를 단일 데이터 소스로 사용
+5. **백엔드 API 확인 완료**: UserResponse 스키마에 새 필드 모두 포함, 정상 동작
+
+### 🔧 핵심 기술 개선사항
+- **레벨 계산 공식**: `level = Math.floor(experience_points / 500) + 1`
+- **진행도 계산**: `progress = (experience_points % 500) / 500 * 100`
+- **일관된 데이터 접근**: useUserLevel, useUserSummary 훅 표준화
+- **타입 안전성**: GlobalUserProfile 타입에 새 필드 추가
+- **API 응답 매핑**: hydrateProfile 함수에서 새 필드 동기화
+
+### 📊 시드 계정 정보 (레벨 시스템)
+- **user001**: 레벨 2, 550 XP, 10일 연속 플레이 (진행률 10%)
+- **user002**: 레벨 1, 200 XP, 5일 연속 플레이 (진행률 40%)
+- **admin**: 관리자 계정 (레벨 시스템 동일 적용)
+
+### 🎯 사용자 가이드 (레벨 시스템 검증)
+1. http://localhost:3000 접속
+2. user001/123455로 로그인
+3. 모든 페이지(사이드바/메인/게임/프로필)에서 "레벨 2" 일관 표시 확인
+4. 프로필 페이지에서 550/1000 XP 진행도 바 확인
+
+### 🔧 레벨 시스템 주요 변경 파일
+- **globalStore.ts**: GlobalUserProfile 타입에 experience_points, daily_streak 필드 추가
+- **sync.ts**: hydrateProfile 함수에서 새 필드 API 응답 매핑
+- **useSelectors.ts**: useUserSummary, useUserLevel 훅 수정
+- **levelUtils.ts**: 새로운 레벨 계산 유틸리티 함수
+- **ProfileScreen.tsx**: 경험치 진행도 바 완전 재작성
+- **HomeDashboard.tsx**: 레벨 표시 통일
+- **GameDashboard.tsx**: useUserLevel 훅 적용
+
 ---
 ## [2025-09-06] 프론트엔드 전체 시스템 정비 완료
 
@@ -52,6 +90,7 @@ export const config = {
 
 ---
 위 미들웨어는 SSR/클라이언트 모두에서 쿠키(`auth_token`) 기반으로 인증 체크하며, 토큰 없으면 `/login`으로 리다이렉트합니다. 실제 운영 환경에서는 httpOnly/secure 옵션, SameSite 정책도 함께 적용해야 보안이 강화됩니다.
+
 ---
 ## [2025-09-05] 회원가입/로그인 콘솔로그 핵심 요약
 
@@ -71,6 +110,7 @@ export const config = {
 - 회원가입/로그인 성공 후 토큰 저장/동기화 확인
 - 인증 토큰 포함된 API 호출 로그 확인
 - 인증 실패/만료 시 UX 처리(리다이렉트/에러 안내)
+
 ---
 ## [2025-09-05] 인증/보호 강화 작업 내역
 
@@ -93,6 +133,7 @@ export const config = {
 - 신규/중요 페이지 추가 시 인증 가드/미들웨어 적용 필수
 - 백엔드 신규 엔드포인트에도 항상 Depends(get_current_user) 적용 여부 점검
 - 인증/보호 관련 변경은 개선안2.md에 즉시 기록 및 운영 매뉴얼 반영
+
 ### 트러블슈팅 표준 순서 (반드시 지킬 것)
 1. **1차 오류 수집**: 실제 프론트(웹앱)에서 모든 페이지/기능별로 발생하는 에러/경고/이슈를 빠짐없이 기록한다. (콘솔, 네트워크, UI, API 등)
 2. **상관관계/유기적 분석**: 수집된 오류/이슈를 기능/데이터/흐름/의존성/상태/동기화/보안 등 관점에서 유기적으로 연결해 원인/관계/패턴을 분석한다.
@@ -100,6 +141,7 @@ export const config = {
 4. **최종 검증/문서화**: 모든 수정 후 실제 동작/E2E/수동 테스트로 검증하고, 개선안2.md 또는 TROUBLESHOOTING.md에 진단→원인→해결→검증→예방책까지 기록한다.
 
 이 순서는 언제, 누가, 어떤 환경에서든 반드시 반복 적용해야 하며, 중간에 순서가 바뀌거나 생략되면 유기적 오류가 심화될 수 있으니 주의할 것.
+
 ## 7. 프론트엔드 에러 진단/트러블슈팅 계획
 
 아주 좋은 접근입니다!
@@ -128,6 +170,7 @@ export const config = {
 - 각 이슈별 원인/해결/검증을 문서화
 - 모든 과정을 개선안2.md 또는 TROUBLESHOOTING.md에 남김
 - 진단을 시작할 준비가 되었으며, 우선순위 페이지(홈, 로그인, 상점 등)부터 차근차근 진행
+
 ## 6. 데이터베이스-프론트/백엔드 플로우 도식화 및 현황 분석
 
 ### 6.1 주요 기능별 데이터 흐름 플로우차트 (텍스트 도식)
@@ -148,45 +191,27 @@ API ORIGIN 환경변수 누락 여부
 인증 토큰 포함된 API 호출 로그 확인
 인증 실패/만료 시 UX 처리(리다이렉트/에러 안내)
 
-
-, 상용 서비스 기준으로 "로그인하지 않은 사용자가 메인페이지(혹은 주요 기능 페이지)에 접근 가능한 것"은 명확한 보안/UX 결함입니다.
-
+상용 서비스 기준으로 "로그인하지 않은 사용자가 메인페이지(혹은 주요 기능 페이지)에 접근 가능한 것"은 명확한 보안/UX 결함입니다.
 
 Error: ./app/shop/page.tsx
-Error:   [31mx[0m You are attempting to export "metadata" from a component marked with "use client", which is disallowed. Either remove the export, or the "use client" directive. Read more: https://nextjs.org/docs/app/api-reference/directives/use-client
-  [31m|[0m
+Error:   [31mx[0m You are attempting to export "metadata" from a component marked with "use client", which is disallowed. Either remove the export, or the "use client" directive. Read more: https://nextjs.org/docs/app/api-reference/directives/use-client
+  [31m|[0m
 
-   ,-[[36;1;4m/app/app/shop/page.tsx[0m:7:1]
- [2m4[0m | import { useRouter } from 'next/navigation';
- [2m5[0m | import App from '../App';
- [2m6[0m | 
- [2m7[0m | export const metadata = {
-   : [35;1m             ^^^^^^^^[0m
- [2m8[0m |   title: 'Shop - Casino-Club F2P',
- [2m9[0m |   description: 'Browse and purchase in-game items in the Casino-Club F2P shop.',
- [2m9[0m | };
+   ,-[[36;1;4m/app/app/shop/page.tsx[0m:7:1]
+ [2m4[0m | import { useRouter } from 'next/navigation';
+ [2m5[0m | import App from '../App';
+ [2m6[0m | 
+ [2m7[0m | export const metadata = {
+   : [35;1m             ^^^^^^^^[0m
+ [2m8[0m |   title: 'Shop - Casino-Club F2P',
+ [2m9[0m |   description: 'Browse and purchase in-game items in the Casino-Club F2P shop.',
+ [2m9[0m | };
    `----
-
-Import trace for requested module:
-./app/shop/page.tsx
-    at tr (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/next-devtools/index.js:552:164429)
-    at o6 (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/next-devtools/index.js:541:62116)
-    at iP (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/next-devtools/index.js:541:81700)
-    at i$ (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/next-devtools/index.js:541:92800)
-    at sv (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/next-devtools/index.js:541:125399)
-    at eval (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/next-devtools/index.js:541:125244)
-    at sm (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/next-devtools/index.js:541:125252)
-    at sa (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/next-devtools/index.js:541:121554)
-    at sZ (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/next-devtools/index.js:541:143648)
-    at MessagePort._ (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/next-devtools/index.js:541:196942)
-
-
-
-
 
 상용앱 기준 정상 동작
 비로그인 상태: 메인페이지, 대시보드, 게임, 상점 등 핵심 기능 접근 불가. 로그인/회원가입 화면 또는 게스트용 제한 페이지로 리다이렉트.
 로그인 후: 정상적으로 메인/대시보드/게임 등 접근 가능.
+
 개선 방안
 라우팅 가드 적용
 
@@ -208,10 +233,7 @@ Next.js/React에서 useAuth 또는 withAuth HOC/미들웨어로 인증 체크.
 메인/대시보드/게임/상점 등 모든 주요 페이지에 인증 없으면 리다이렉트 로직 삽입.
 백엔드 API도 인증 미포함 요청은 401 반환 재확인.
 
-#### [게임 플레이]
-
 #### [게임 플레이: 상세 흐름]
-
 
 ##### 1. 슬롯머신 (Slot)
 - 프론트: SlotMachineComponent에서 사용자가 스핀 버튼 클릭 → 애니메이션/사운드 실행
@@ -254,42 +276,18 @@ Next.js/React에서 useAuth 또는 withAuth HOC/미들웨어로 인증 체크.
 #### [프로필 기능]
 프론트(ProfileScreen) → API(/api/users/me, /api/users/{id}/profile, /api/users/update 등) → 백엔드 → DB(users, game_sessions, rewards, missions 등) → CRUD/조회/수정/통계/알림 → 프론트 결과/피드백 표시
 
-
-
-
-
-
 #### [상점/구매]
 프론트(ShopScreen) → API(/api/shop/buy, /api/shop/history) → 백엔드 → DB(shop_transactions) → 결제/멱등성/보안 처리 → 프론트 잔액/구매내역 동기화
-
-
-
-
 
 #### [미션/이벤트]
 프론트(Mission/Event 컴포넌트) → API(/api/missions, /api/events) → 백엔드 → DB(missions, events, user_missions, event_participations) → 보상/진행도 동기화
 
-
-
-
 #### [잔액/통계/전역 동기화]
 프론트(useGlobalSync) → API(/api/users/me, /api/games/stats/me) → 백엔드 → DB → 프론트 전역 상태 갱신
-
-
-
 
 ---
 
 ### 6.2 기능별 구현 현황/문제점/배포 타임라인
-| 게임 4종(슬롯/가챠/크래시/RPS) | ✅ 완료           | 일부 확장(신규 게임)| 가능      | 즉시         |
-| 어드민 기능       | ✅ 완료           | 일부 통계/권한/로그 보강 필요| 가능      | 즉시         |
-| 프로필 기능       | ✅ 완료           | 일부 UI/통계/알림 보강 필요 | 가능      | 즉시         |
-
-### 게임/어드민/프로필 기능별 진단/트러블슈팅 항목화
-- [게임] 슬롯/가챠/크래시/RPS 4종 모두 실제 동작/API/DB/상태/피드백/보상/통계까지 진단
-- [어드민] 유저/상점/이벤트/미션/로그/권한/통계 등 CRUD/조회/통계/권한 관리 기능별 진단
-- [프로필] 유저 정보/게임 세션/보상/미션/알림/통계 등 CRUD/조회/수정/알림 기능별 진단
-- 각 기능별로 에러/이슈 발생 시 진단→원인→해결→검증→문서화 프로세스 적용
 
 | 기능            | 구현 현황         | 문제점/이슈         | 가능/불가 | 배포 타임라인 |
 |-----------------|------------------|---------------------|-----------|--------------|
@@ -298,6 +296,9 @@ Next.js/React에서 useAuth 또는 withAuth HOC/미들웨어로 인증 체크.
 | 상점/구매       | ✅ 완료           | 결제 Fraud/보안 강화| 가능      | 즉시         |
 | 미션/이벤트     | ✅ 완료           | 미션/이벤트 확장 필요| 가능      | 즉시         |
 | 잔액/통계 동기화| ✅ 완료           | 없음                | 가능      | 즉시         |
+| 게임 4종(슬롯/가챠/크래시/RPS) | ✅ 완료           | 일부 확장(신규 게임)| 가능      | 즉시         |
+| 어드민 기능     | ✅ 완료           | 일부 통계/권한/로그 보강 필요| 가능      | 즉시         |
+| 프로필 기능     | ✅ 완료           | 일부 UI/통계/알림 보강 필요 | 가능      | 즉시         |
 | 성인/VIP 컨텐츠 | ⏳ 일부 구현      | 연령/등급 검증 미완  | 일부 가능 | 9월 중       |
 | 추천/개인화     | ⏳ 일부 구현      | 추천 알고리즘 고도화| 일부 가능 | 9월 중       |
 | 실시간 알림     | ⏳ 일부 구현      | SSE/Push 안정화 필요| 일부 가능 | 9월 중       |
@@ -305,13 +306,18 @@ Next.js/React에서 useAuth 또는 withAuth HOC/미들웨어로 인증 체크.
 | 테스트 자동화   | ✅ 완료           | 일부 E2E/통합 보강  | 가능      | 즉시         |
 | 배포/운영       | ✅ 완료           | 일부 컨테이너 orphan| 가능      | 즉시         |
 
----
+### 게임/어드민/프로필 기능별 진단/트러블슈팅 항목화
+- [게임] 슬롯/가챠/크래시/RPS 4종 모두 실제 동작/API/DB/상태/피드백/보상/통계까지 진단
+- [어드민] 유저/상점/이벤트/미션/로그/권한/통계 등 CRUD/조회/통계/권한 관리 기능별 진단
+- [프로필] 유저 정보/게임 세션/보상/미션/알림/통계 등 CRUD/조회/수정/알림 기능별 진단
+- 각 기능별로 에러/이슈 발생 시 진단→원인→해결→검증→문서화 프로세스 적용
 
 ### 6.3 주요 문제점/가능점/배포 타임라인 요약
 - 회원가입/로그인/게임/상점/미션/이벤트/잔액/통계/테스트/배포는 즉시 가능, 상용 수준 구현 완료
 - 성인/VIP, 추천/개인화, 실시간 알림, OLAP/모니터링은 9~10월 중 고도화/배포 예정
 - 현재 장애/중단 이슈 없음, 일부 기능(알림/추천/성인/OLAP)은 추가 개발/테스트 필요
 - 배포는 컨테이너 재빌드 후 즉시 가능, 운영/모니터링/테스트 자동화도 완료
+
 ## 5. 세부 기능/흐름/테스트/보안/운영 포인트
 
 ### 5.1 데이터 전역 동기화 구조
@@ -345,7 +351,8 @@ Next.js/React에서 useAuth 또는 withAuth HOC/미들웨어로 인증 체크.
 - User를 중심으로 모든 주요 데이터가 외래키/관계형으로 연결되어 있어, 한 계정의 게임/상점/미션/이벤트/보상/액션/알림/세그먼트가 전역적으로 동기화됨
 - 프론트엔드 useGlobalSync, 백엔드 통합 라우터, 멱등성/트랜잭션/실시간/배치 연계로 실제 상용앱 수준의 데이터 일관성/유기성 확보
 - SSR/클라이언트/테스트/운영 모두 단일 정책/구조로 관리되어, 장애/오류/중복/보안 이슈 발생 시 빠른 진단/복구 가능
-# Casino-Club F2P 프로젝트 구조/기능 가이드 (2025-09-03 초안)
+
+# Casino-Club F2P 프로젝트 구조/기능 가이드 (2025-09-07 업데이트)
 
 ## 1. 루트 디렉터리
 - `docker-compose.yml`, `docker-manage.ps1`: 전체 서비스 오케스트레이션, 컨테이너 관리
@@ -365,6 +372,8 @@ Next.js/React에서 useAuth 또는 withAuth HOC/미들웨어로 인증 체크.
 	- `requirements.txt`, `Dockerfile`: 의존성, 컨테이너 빌드
 - `frontend/`
 	- `app/`, `components/`: Next.js 페이지, React 컴포넌트, SSR 미들웨어
+	- `lib/`: 전역 상태 관리 (globalStore.ts, sync.ts, levelUtils.ts 등)
+	- `hooks/`: React 훅 (useSelectors.ts, useUserLevel 등)
 	- `package.json`, `Dockerfile`: 프론트 의존성, 빌드
 
 ## 3. data/, logs/, scripts/
@@ -387,6 +396,9 @@ Next.js/React에서 useAuth 또는 withAuth HOC/미들웨어로 인증 체크.
 
 ---
 
-이 가이드 파일은 전체 구조/기능/연계성 파악을 위한 1차 초안입니다.
-추가 분석/세부 기능/테스트/보안/운영 포인트는 2~5회에 걸쳐 더 깊게 정리 가능합니다.
+이 가이드는 2025-09-07 기준 레벨 시스템 통합까지 반영된 최신 상태입니다.
+최근 완료된 레벨 시스템 통일화 작업으로 모든 UI 컴포넌트가 일관된 레벨/경험치 표시를 제공합니다.
+
+
+````
 

@@ -948,7 +948,7 @@ export function HomeDashboard({
               </motion.div>
 
               <h3 className="text-3xl font-bold text-gradient-primary mb-2">레벨업!</h3>
-              <p className="text-xl text-gold font-bold mb-4">레벨 {user.level}</p>
+              <p className="text-xl text-gold font-bold mb-4">레벨 {levelFromStore}</p>
               <p className="text-muted-foreground mb-6">축하합니다! 새로운 레벨에 도달했습니다!</p>
 
               <Button

@@ -47,9 +47,13 @@ export function ProfileScreen({
   // 초기 동기화
   useEffect(() => {
     if (!isHydrated) {
+      console.log('[ProfileScreen] 초기 동기화 실행');
       syncAll({ showToast: false });
+    } else {
+      console.log('[ProfileScreen] 이미 하이드레이트됨, 프로필 재동기화');
+      syncProfile();
     }
-  }, [isHydrated, syncAll]);
+  }, [isHydrated, syncAll, syncProfile]);
   // 쓰기 후 재동기화 유틸 (멱등 포함)
   const withReconcile = useWithReconcile();
   // Realtime 전역 상태 구독(골드 등 핵심 값은 전역 프로필 우선 사용)
@@ -437,6 +441,14 @@ export function ProfileScreen({
   // 레벨 시스템 계산: 새로운 experience_points 기반
   const experiencePoints = (globalProfile as any)?.experience_points ?? 0;
   const levelProgress = calculateLevelProgress(experiencePoints);
+  
+  // 디버깅: globalProfile 상태 확인
+  console.log('[ProfileScreen] 레벨 시스템 디버깅:', {
+    globalProfile: globalProfile,
+    experiencePoints: experiencePoints,
+    levelProgress: levelProgress,
+    isHydrated: isHydrated,
+  });
   
   // 표시용 데이터
   const displayLevel = levelProgress.currentLevel;
