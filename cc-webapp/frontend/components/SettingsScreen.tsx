@@ -253,7 +253,10 @@ export function SettingsScreen({
                 레벨 {actualLevel} • {actualGold.toLocaleString()}G
               </p>
               <p className="text-xs text-primary">
-                {actualGamesPlayed}게임 플레이 • {actualGamesWon}승
+                총 {userSummary.totalGamesPlayed}게임 • {userSummary.totalGamesWon}승 {userSummary.totalGamesLost}패
+              </p>
+              <p className="text-xs text-success">
+                승률 {userSummary.winRate}% • 연승 {userSummary.currentWinStreak}회
               </p>
               {/* 디버깅 정보 */}
               <p className="text-xs text-red-400">

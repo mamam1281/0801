@@ -44,7 +44,7 @@ export function useAppNavigation() {
     toInventory: () => navigate('inventory'),
     toProfile: () => navigate('profile'),
     toSettings: () => navigate('settings'),
-    toAdminPanel: () => navigate('admin-panel'),
+    toAdminPanel: () => navigate('admin'),
     toEventMissionPanel: () => navigate('event-mission-panel'),
     toStreaming: () => navigate('streaming'),
 

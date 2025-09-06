@@ -16,6 +16,7 @@ import { validateNickname } from '@/utils/securityUtils';
 import { calculateLevelProgress } from '@/utils/levelUtils';
 import { getTokens, setTokens } from '../utils/tokenStorage';
 import { useRealtimeProfile, useRealtimeStats } from '@/hooks/useRealtimeData';
+import { useUserSummary } from '@/hooks/useSelectors';
 import ActionHistory from '@/components/profile/ActionHistory';
 
 interface ProfileScreenProps {
@@ -43,6 +44,9 @@ export function ProfileScreen({
   const globalProfile = useGlobalProfile();
   const { state } = useGlobalStore();
   const storeGameStats = state.gameStats || {};
+  
+  // 전역 게임 통계 사용
+  const userSummary = useUserSummary();
 
   // 초기 동기화
   useEffect(() => {
@@ -804,7 +808,7 @@ export function ProfileScreen({
                         className="text-2xl font-bold text-primary"
                         data-testid="stats-total-games"
                       >
-                        {displayTotalGames}
+                        {userSummary.totalGamesPlayed}
                       </div>
                       <div className="text-sm text-muted-foreground">총 게임 수</div>
                     </div>
@@ -814,16 +818,30 @@ export function ProfileScreen({
                         className="text-2xl font-bold text-gradient-gold"
                         data-testid="stats-total-wins"
                       >
-                        {displayTotalWins} 승
+                        {userSummary.totalGamesWon} 승
                       </div>
-                      <div className="text-sm text-muted-foreground">총 수익</div>
+                      <div className="text-sm text-muted-foreground">총 승리</div>
+                    </div>
+
+                    <div className="text-center p-4 rounded-lg bg-error/5 border border-error/10">
+                      <div className="text-2xl font-bold text-error">
+                        {userSummary.totalGamesLost} 패
+                      </div>
+                      <div className="text-sm text-muted-foreground">총 패배</div>
                     </div>
 
                     <div className="text-center p-4 rounded-lg bg-success/5 border border-success/10">
                       <div className="text-2xl font-bold text-success">
-                        {user?.inventory?.length || 0}
+                        {userSummary.winRate}%
                       </div>
-                      <div className="text-sm text-muted-foreground">보유 아이템</div>
+                      <div className="text-sm text-muted-foreground">승률</div>
+                    </div>
+
+                    <div className="text-center p-4 rounded-lg bg-warning/5 border border-warning/10">
+                      <div className="text-2xl font-bold text-warning">
+                        {userSummary.currentWinStreak}
+                      </div>
+                      <div className="text-sm text-muted-foreground">연승 기록</div>
                     </div>
                   </div>
 

@@ -496,6 +496,17 @@ export default function App({ isAuthenticated }: AppProps) {
                 </React.Fragment>
               )}
 
+              {currentScreen === 'admin' && user && (
+                <React.Fragment key="admin">
+                  <AdminPanel
+                    user={user}
+                    onBack={navigationHandlers.toLogin}
+                    onUpdateUser={updateUser}
+                    onAddNotification={addNotification}
+                  />
+                </React.Fragment>
+              )}
+
               {currentScreen === 'home-dashboard' && user && (
                 <React.Fragment key="home-dashboard">
                   <HomeDashboard

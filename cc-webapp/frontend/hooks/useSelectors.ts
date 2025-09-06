@@ -34,9 +34,18 @@ export function useUserSummary() {
 			gold: p?.goldBalance ?? 0,
 			level: p?.level ?? 1,
 			dailyStreak: p?.daily_streak ?? 0,
+			// 게임 통계 필드 추가
+			totalGamesPlayed: p?.total_games_played ?? 0,
+			totalGamesWon: p?.total_games_won ?? 0,
+			totalGamesLost: p?.total_games_lost ?? 0,
+			winRate: (p?.total_games_played ?? 0) > 0 ? 
+				((p?.total_games_won ?? 0) / (p?.total_games_played ?? 0) * 100).toFixed(1) : "0.0",
+			currentWinStreak: p?.current_win_streak ?? 0,
 			isAdmin: !!(p?.isAdmin || p?.is_admin),
 		}),
-		[p?.nickname, p?.goldBalance, p?.level, p?.daily_streak, p?.isAdmin, p?.is_admin]
+		[p?.nickname, p?.goldBalance, p?.level, p?.daily_streak, 
+		 p?.total_games_played, p?.total_games_won, p?.total_games_lost, p?.current_win_streak,
+		 p?.isAdmin, p?.is_admin]
 	);
 }
 
