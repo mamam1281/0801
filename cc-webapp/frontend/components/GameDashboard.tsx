@@ -55,8 +55,9 @@ export function GameDashboard({
   const [totalPlayTime] = useState(245);
   const totalGamesFromStore = useGlobalTotalGames();
   
-  // 전역 스토어에서 실시간 골드 밸런스 가져오기
-  const { goldBalance } = useGlobalStore();
+  // 전역 스토어에서 실시간 골드 밸런스 가져오기 (안전한 접근)
+  const globalStore = useGlobalStore();
+  const goldBalance = globalStore?.state?.profile?.goldBalance ?? user.goldBalance ?? 0;
 
   // 로컬 게임 데이터 (API 호출 없이)
   const games: GameDashboardGame[] = [
@@ -181,7 +182,7 @@ export function GameDashboard({
                 <div className="flex items-center gap-2 px-4 py-2 bg-black/50 backdrop-blur-sm rounded-full border border-yellow-500/50">
                   <Coins className="w-5 h-5 text-yellow-400" />
                   <span className="font-bold text-yellow-400">
-                    {goldBalance.toLocaleString()}
+                    {(goldBalance ?? 0).toLocaleString()}
                   </span>
                 </div>
 
@@ -328,7 +329,7 @@ export function GameDashboard({
                   <div className="flex-1">
                     <div className="font-semibold text-white">{entry.name}</div>
                     <div className="text-sm text-gray-400">
-                      {entry.score.toLocaleString()} 포인트
+                      {(entry.score ?? 0).toLocaleString()} 포인트
                     </div>
                   </div>
                   {index < 3 && (

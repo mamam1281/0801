@@ -85,6 +85,10 @@ export const setTokens = (tokens) => {
     // 레거시 키 동기화 (점진적 제거 전까지 유지) - 2025-09-01 이후 제거 예정
     if (tokens?.access_token) {
       try { localStorage.setItem(LEGACY_ACCESS_KEY, tokens.access_token); } catch { }
+      // 미들웨어용 쿠키 설정
+      try { 
+        document.cookie = `auth_token=${tokens.access_token}; path=/; max-age=86400; SameSite=Lax`;
+      } catch { }
     }
   } catch (error) {
     console.error('토큰 저장 오류:', error);
@@ -99,6 +103,11 @@ export const clearTokens = () => {
 
   try {
     localStorage.removeItem(TOKEN_KEY);
+    // 레거시 키도 삭제
+    localStorage.removeItem(LEGACY_ACCESS_KEY);
+    localStorage.removeItem(LEGACY_ACCESS_EXP_KEY);
+    // 쿠키도 삭제
+    document.cookie = 'auth_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
   } catch (error) {
     console.error('토큰 삭제 오류:', error);
   }

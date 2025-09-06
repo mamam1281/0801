@@ -26,9 +26,24 @@ export default function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  // 인증 토큰 확인
+  // 인증 토큰 확인 - 더 상세한 디버깅
   const token = req.cookies.get('auth_token')?.value;
+  const allCookies = req.cookies.getAll();
+  
   console.log(`[MIDDLEWARE] 토큰 상태: ${token ? '있음' : '없음'}`);
+  console.log(`[MIDDLEWARE] 토큰 길이: ${token ? token.length : 0}`);
+  console.log(`[MIDDLEWARE] 전체 쿠키 개수: ${allCookies.length}`);
+  console.log(`[MIDDLEWARE] 쿠키 이름들: [${allCookies.map(c => c.name).join(', ')}]`);
+  
+  if (allCookies.length > 0) {
+    console.log('[MIDDLEWARE] 쿠키 상세:');
+    allCookies.forEach(cookie => {
+      const preview = cookie.value.length > 50 ? cookie.value.substring(0, 50) + '...' : cookie.value;
+      console.log(`  - ${cookie.name}: ${preview}`);
+    });
+  }
+  
+  console.log(`[MIDDLEWARE] 경로 ${pathname} 접근 시도`);
   
   if (!token) {
     console.log(`[MIDDLEWARE] 비인증 → /login 리다이렉트`);
