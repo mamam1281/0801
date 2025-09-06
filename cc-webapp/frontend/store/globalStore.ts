@@ -21,6 +21,9 @@ export type GlobalUserProfile = {
     total_games_played?: number;
     total_games_won?: number;
     total_games_lost?: number;
+    // 🔑 관리자 정보 필드들
+    isAdmin?: boolean;
+    is_admin?: boolean;
     updatedAt?: string;
     [k: string]: unknown;
 };

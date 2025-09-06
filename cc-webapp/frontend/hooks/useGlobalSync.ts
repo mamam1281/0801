@@ -56,6 +56,13 @@ export function useGlobalSync() {
     const syncProfile = useCallback(async (): Promise<boolean> => {
         try {
             const response = await api.get(AUTHORITY_ENDPOINTS.USER_PROFILE);
+            
+            // 🔧 null 체크 강화
+            if (!response) {
+                console.warn('[GlobalSync] API 응답이 null입니다');
+                return false;
+            }
+            
             const profile = response.data || response;
 
             console.log('[GlobalSync] Profile data received:', profile);

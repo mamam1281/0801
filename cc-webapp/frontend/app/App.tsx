@@ -28,6 +28,7 @@ import { useAppNavigation } from '../hooks/useAppNavigation';
 // NOTE: Deprecated useAuthHandlers (local simulation) removed – now using real backend auth via useAuth
 import { useAuth } from '../hooks/useAuth';
 // 전역 Provider는 app/layout.tsx의 <Providers>에서 래핑됨
+import { useGlobalStore, setProfile } from '../store/globalStore';
 import DailyRewardClaimedDialog from '../components/rewards/DailyRewardClaimedDialog';
 import {
   APP_CONFIG,
@@ -76,6 +77,9 @@ export default function App({ isAuthenticated }: AppProps) {
 
   // 📱 알림 시스템
   const { notifications, addNotification } = useNotificationSystem();
+
+  // 🌐 전역 스토어
+  const { dispatch } = useGlobalStore();
 
   // 🔐 실제 백엔드 인증 훅 (JWT 토큰 저장 & 프로필 fetch)
   const auth = useAuth();
@@ -180,17 +184,50 @@ export default function App({ isAuthenticated }: AppProps) {
         // 백엔드 관리자 로그인 수행 - AuthUser 객체 반환
         const authUser = await auth.adminLogin(adminId, password);
         
-        // 백엔드에서 받은 실제 관리자 정보로 UI 상태 업데이트
+        // 🎯 백엔드에서 받은 실제 관리자 정보로 UI 상태 업데이트
         const adminUser = createUserData(
           authUser.nickname || adminId, // 백엔드에서 받은 nickname 사용, fallback으로 입력된 adminId
           password, 
           false
         );
         
-        // 백엔드에서 받은 골드 잔액 정보가 있다면 반영
+        // 🔑 백엔드에서 받은 관리자 정보를 직접 반영
+        adminUser.isAdmin = true; // 관리자 상태 강제 설정
+        
+        // 백엔드에서 받은 데이터 반영
+        if (authUser.gold_balance !== undefined) {
+          adminUser.goldBalance = authUser.gold_balance;
+        }
         if (authUser.goldBalance !== undefined) {
           adminUser.goldBalance = authUser.goldBalance;
         }
+        if (authUser.level !== undefined) {
+          adminUser.level = authUser.level;
+        }
+        if (authUser.experience !== undefined) {
+          adminUser.experience = authUser.experience;
+        }
+        
+        console.log('[App] 관리자 로그인 성공, 사용자 정보:', adminUser);
+        
+        // 🌐 전역 상태에도 관리자 정보 설정
+        const globalProfile = {
+          id: authUser.id || adminUser.id,
+          nickname: authUser.nickname || adminUser.nickname,
+          goldBalance: authUser.gold_balance || authUser.goldBalance || adminUser.goldBalance,
+          level: authUser.level || adminUser.level,
+          experience_points: authUser.experience_points || authUser.experience || adminUser.experience,
+          total_games_played: authUser.total_games_played || 0,
+          total_games_won: authUser.total_games_won || 0,
+          total_games_lost: authUser.total_games_lost || 0,
+          daily_streak: authUser.daily_streak || adminUser.dailyStreak,
+          isAdmin: true, // 🔑 전역 상태에도 관리자 정보 설정
+          is_admin: true, // 백엔드 필드명도 설정
+          updatedAt: new Date().toISOString()
+        };
+        
+        setProfile(dispatch, globalProfile);
+        console.log('[App] 전역 상태에 관리자 프로필 설정:', globalProfile);
         
         updateUser(adminUser);
         addNotification(NOTIFICATION_MESSAGES.ADMIN_LOGIN_SUCCESS);
@@ -203,7 +240,7 @@ export default function App({ isAuthenticated }: AppProps) {
         setIsLoading(false);
       }
     },
-    [auth, setIsLoading, createUserData, updateUser, navigationHandlers, addNotification]
+    [auth, setIsLoading, createUserData, updateUser, navigationHandlers, addNotification, dispatch]
   );
 
   const handleLogout = React.useCallback(() => {
