@@ -452,6 +452,15 @@ export function ProfileScreen({
     console.log('[ProfileScreen] Raw experience_points:', globalProfile.experience_points);
     console.log('[ProfileScreen] Raw xp:', (globalProfile as any).xp);
   }
+  console.log('[ProfileScreen] Final Experience Points:', experiencePoints);
+  console.log('[ProfileScreen] Level Progress:', levelProgress);
+  console.log('[ProfileScreen] GlobalProfile Keys:', globalProfile ? Object.keys(globalProfile) : 'null');
+  
+  // 실제 값 확인
+  if (globalProfile) {
+    console.log('[ProfileScreen] Raw experience_points:', globalProfile.experience_points);
+    console.log('[ProfileScreen] Raw xp:', (globalProfile as any).xp);
+  }
   
   // 표시용 데이터
   const displayLevel = levelProgress.currentLevel;

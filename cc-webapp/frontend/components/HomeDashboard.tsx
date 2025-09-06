@@ -70,6 +70,16 @@ export function HomeDashboard({
   const levelFromStore = useUserLevel();
   const router = useRouter();
 
+  // 연속일 동기화: globalProfile.daily_streak를 우선 사용
+  useEffect(() => {
+    if (globalProfile?.daily_streak !== undefined) {
+      setStreak((prev: StreakState) => ({
+        ...prev,
+        count: globalProfile.daily_streak ?? 0
+      }));
+    }
+  }, [globalProfile?.daily_streak]);
+
   // 초기 동기화
   useEffect(() => {
     if (!isHydrated) {
@@ -99,7 +109,7 @@ export function HomeDashboard({
   );
   const [isAchievementsExpanded, setIsAchievementsExpanded] = useState(false);
   const [streak, setStreak] = useState({
-    count: user?.dailyStreak ?? 0,
+    count: globalProfile?.daily_streak ?? user?.dailyStreak ?? 0,
     ttl_seconds: null as number | null,
     next_reward: null as string | null,
   });
@@ -321,7 +331,7 @@ export function HomeDashboard({
         rewardMessages.success(
           data.awarded_gold || 0,
           data.awarded_xp || 0,
-          (streak.count || user.dailyStreak || 0) + 0
+          (globalProfile?.daily_streak ?? streak.count ?? 0) + 0
         )
       );
       setShowDailyReward(false);
@@ -420,7 +430,7 @@ export function HomeDashboard({
         case 'gold_100k':
           return user.goldBalance >= 100000;
         case 'daily_7':
-          return (streak.count ?? user.dailyStreak) >= 7;
+          return (globalProfile?.daily_streak ?? streak.count ?? 0) >= 7;
         default:
           return false;
       }
@@ -699,7 +709,7 @@ export function HomeDashboard({
               </div>
               <div className="grid grid-cols-3 gap-3 text-center">
                 <div className="bg-secondary/40 rounded-lg p-3">
-                  <div className="text-2xl font-bold text-primary">{streak.count}</div>
+                  <div className="text-2xl font-bold text-primary">{globalProfile?.daily_streak ?? streak.count ?? 0}</div>
                   <div className="text-xs text-muted-foreground">연속일</div>
                 </div>
                 <div className="bg-secondary/40 rounded-lg p-3">
@@ -891,7 +901,7 @@ export function HomeDashboard({
 
               <h3 className="text-2xl font-bold text-gold mb-2">일일 보상!</h3>
               <p className="text-muted-foreground mb-6">
-                연속 {streak.count ?? user.dailyStreak}일 접속 보너스를 받으세요!
+                연속 {globalProfile?.daily_streak ?? streak.count ?? 0}일 접속 보너스를 받으세요!
               </p>
 
               <div className="bg-gold-soft rounded-lg p-4 mb-6">
@@ -899,14 +909,14 @@ export function HomeDashboard({
                   {/* 서버 설정 기반 일일 보너스 계산 */}
                   {(
                     gameConfig.dailyBonusBase +
-                    (streak.count ?? user.dailyStreak) * gameConfig.dailyBonusPerStreak
+                    (globalProfile?.daily_streak ?? streak.count ?? 0) * gameConfig.dailyBonusPerStreak
                   ).toLocaleString()}
                   G
                 </div>
                 <div className="text-sm text-muted-foreground">
                   {/* 서버 설정 기반 XP 계산 */}+{' '}
                   {Math.floor(gameConfig.dailyBonusBase / 20) +
-                    (streak.count ?? user.dailyStreak) *
+                    (globalProfile?.daily_streak ?? streak.count ?? 0) *
                       Math.floor(gameConfig.dailyBonusPerStreak / 8)}{' '}
                   XP
                 </div>
