@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { apiLogTry, apiLogSuccess, apiLogFail } from '../utils/apiLogger';
 import { 
@@ -81,17 +81,23 @@ export function LoginScreen({
       {/* Animated Background Elements */}
       <div className="absolute inset-0">
         {[...Array(15)].map((_, i) => {
-          // SSR 환경에서는 window가 없으므로 기본값 사용
-          const isClient = typeof window !== 'undefined';
-          const x = isClient ? Math.random() * window.innerWidth : Math.random() * 1280;
-          const y = isClient ? Math.random() * window.innerHeight : Math.random() * 720;
+          // SSR에서는 고정값, CSR에서는 useEffect로 랜덤 위치 적용
+          const [pos, setPos] = useState({ x: 0, y: 0 });
+          useEffect(() => {
+            if (typeof window !== 'undefined') {
+              setPos({
+                x: Math.random() * window.innerWidth,
+                y: Math.random() * window.innerHeight,
+              });
+            }
+          }, []);
           return (
             <motion.div
               key={i}
               initial={{
                 opacity: 0,
-                x,
-                y,
+                x: pos.x,
+                y: pos.y,
               }}
               animate={{
                 opacity: [0, 0.3, 0],

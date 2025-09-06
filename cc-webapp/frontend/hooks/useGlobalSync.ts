@@ -21,9 +21,9 @@ interface SyncResult {
 
 // 권위 소스 엔드포인트 정의
 const AUTHORITY_ENDPOINTS = {
-    USER_PROFILE: 'auth/me',           // 사용자 전체 정보
-    USER_BALANCE: 'users/balance',     // 잔액 권위
-    GAME_STATS: 'games/stats/me'       // 게임 통계
+    USER_PROFILE: 'api/auth/me',           // 사용자 전체 정보
+    USER_BALANCE: 'api/users/balance',     // 잔액 권위
+    GAME_STATS: 'api/games/stats/me'       // 게임 통계
 } as const;
 
 // 동기화 간격 (밀리초)
