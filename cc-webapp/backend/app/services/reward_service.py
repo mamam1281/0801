@@ -35,7 +35,64 @@ def calculate_streak_daily_reward(streak_count: int) -> tuple[int, int]:
     
     return min(gold, max_gold), min(xp, max_xp)
 
-__all__ = ["calculate_streak_daily_reward"]
+
+def update_user_level_and_streak(db: Session, user_id: int, streak_increment: int = 1) -> tuple[int, int, int]:
+    """사용자 레벨과 연속출석 업데이트
+    
+    Args:
+        db: 데이터베이스 세션
+        user_id: 사용자 ID  
+        streak_increment: 연속출석 증가값 (기본 1)
+    
+    Returns:
+        tuple[int, int, int]: (새로운 레벨, 새로운 연속출석, 추가된 경험치)
+    """
+    try:
+        from app.models.auth_models import User
+        
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            return 0, 0, 0
+        
+        # 연속출석 업데이트
+        user.daily_streak += streak_increment
+        
+        # 연속출석에 따른 경험치 계산 (연속출석 1일당 50 XP)
+        bonus_xp = streak_increment * 50
+        user.experience_points += bonus_xp
+        
+        # 레벨 계산 (500 XP마다 레벨업)
+        new_level = (user.experience_points // 500) + 1
+        old_level = user.level
+        user.level = new_level
+        
+        db.commit()
+        
+        return new_level, user.daily_streak, bonus_xp
+        
+    except Exception as e:
+        import logging
+        logging.error(f"레벨/연속출석 업데이트 실패: {e}")
+        db.rollback()
+        return 0, 0, 0
+
+
+def calculate_level_from_streak(daily_streak: int) -> int:
+    """연속출석 일수를 기반으로 레벨 계산
+    
+    레벨 공식: Level = 1 + (daily_streak // 7)
+    - 7일 연속출석마다 레벨업
+    - 최대 레벨 10 (70일차)
+    
+    Args:
+        daily_streak: 연속 출석 일수
+    Returns:
+        int: 계산된 레벨 (1-10)
+    """
+    level = 1 + (daily_streak // 7)
+    return min(level, 10)  # 최대 레벨 10
+
+__all__ = ["calculate_streak_daily_reward", "update_user_level_and_streak"]
 from typing import Optional, Dict, Any
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError

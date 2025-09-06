@@ -18,6 +18,8 @@ from ..schemas.auth import TokenData, UserCreate, UserLogin, AdminLogin
 
 from ..models.auth_models import InviteCode
 
+logger = logging.getLogger(__name__)
+
 # 보안 설정
 SECRET_KEY = os.getenv("JWT_SECRET_KEY", "your-secret-key-here")
 ALGORITHM = "HS256"
@@ -305,14 +307,14 @@ class AuthService:
         return user
     
     @staticmethod
-    def create_user(db: Session, user_create: UserCreate) -> User:
+    def create_user(db: Session, user_create: dict) -> User:
         """사용자 생성 - 회원가입 필수 입력사항"""
         # --- Invite Code 검증 전략 ---
         # 기본 정책: UNLIMITED_INVITE_CODE(기본 5858) 는 항상 허용.
         # Grace 모드: NEW 코드(예: DB 활성 invite_codes.is_active=1) + OLD(UNLIMITED) 모두 허용.
         # Cutover 모드(ENFORCE_DB_INVITE_CODES=1): DB is_active=1 인 코드 목록 OR UNLIMITED(명시적으로 계속 허용 정책일 경우)만 허용.
         from ..core.config import settings
-        supplied_code = getattr(user_create, 'invite_code', None)
+        supplied_code = user_create.get('invite_code', None)
         unlimited = settings.UNLIMITED_INVITE_CODE
         enforce_db = settings.ENFORCE_DB_INVITE_CODES
         if not supplied_code:
@@ -362,7 +364,7 @@ class AuthService:
         
         # 사이트 아이디 중복 검사
         try:
-            if db.query(User).filter(User.site_id == user_create.site_id).first():
+            if db.query(User).filter(User.site_id == user_create['site_id']).first():
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="이미 존재하는 사이트 아이디입니다"
@@ -375,7 +377,7 @@ class AuthService:
         
         # 닉네임 중복 검사
         try:
-            if db.query(User).filter(User.nickname == user_create.nickname).first():
+            if db.query(User).filter(User.nickname == user_create['nickname']).first():
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="이미 존재하는 닉네임입니다"
@@ -386,9 +388,9 @@ class AuthService:
             db.rollback()
         
         # 전화번호 필드가 있는 경우에만 중복 검사
-        if hasattr(user_create, 'phone_number') and user_create.phone_number:
+        if 'phone_number' in user_create and user_create['phone_number']:
             try:
-                if db.query(User).filter(User.phone_number == user_create.phone_number).first():
+                if db.query(User).filter(User.phone_number == user_create['phone_number']).first():
                     raise HTTPException(
                         status_code=status.HTTP_400_BAD_REQUEST,
                         detail="이미 등록된 전화번호입니다"
@@ -399,18 +401,18 @@ class AuthService:
                 db.rollback()
         
         # 비밀번호 길이 검증 (4글자 이상)
-        if len(user_create.password) < 4:
+        if len(user_create['password']) < 4:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="비밀번호는 4글자 이상이어야 합니다"
             )
         
         # 사용자 생성 (site_id는 user_id와 동일한 개념으로 사용)
-        hashed_password = AuthService.get_password_hash(user_create.password)
+        hashed_password = AuthService.get_password_hash(user_create['password'])
         db_user = User(
-            site_id=user_create.site_id,  # site_id는 user_id와 동일한 개념
-            nickname=user_create.nickname,
-            phone_number=getattr(user_create, 'phone_number', None),  # 선택적 필드로 처리
+            site_id=user_create['site_id'],  # site_id는 user_id와 동일한 개념
+            nickname=user_create['nickname'],
+            phone_number=user_create.get('phone_number', None),  # 선택적 필드로 처리
             password_hash=hashed_password,
             invite_code=supplied_code,
             is_admin=False
