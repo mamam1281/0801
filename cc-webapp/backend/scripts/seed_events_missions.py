@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 from app.database import SessionLocal
-from app.models.event_models import Event, Mission
+from app.models.event_models import Event
+from app.models.mission_models import Mission
 
 def seed_events_and_missions():
     db = SessionLocal()

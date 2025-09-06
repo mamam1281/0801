@@ -19,6 +19,9 @@ class Mission(Base):
     is_active = Column(Boolean, default=True)
     start_date = Column(DateTime, default=datetime.utcnow)
     end_date = Column(DateTime, nullable=True)
+    
+    # Relationships
+    user_missions = relationship("UserMission", back_populates="mission")
 
 class UserMissionProgress(Base):
     __tablename__ = "user_mission_progress"
