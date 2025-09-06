@@ -18,16 +18,26 @@ export function useAppNavigation() {
 
   // 🎯 네비게이션 핸들러
   const navigate = useCallback((screen: AppScreen) => {
+    console.log('[useAppNavigation] navigate 호출됨:', { from: currentScreen, to: screen });
     setCurrentScreen(screen);
     setIsSideMenuOpen(false);
-  }, []);
+  }, [currentScreen]);
 
   const navigationHandlers = {
     // 기본 네비게이션
     navigate,
-    toLogin: () => navigate('login'),
-    toSignup: () => navigate('signup'),
-    toAdminLogin: () => navigate('admin-login'),
+    toLogin: () => {
+      console.log('[useAppNavigation] toLogin 호출됨');
+      navigate('login');
+    },
+    toSignup: () => {
+      console.log('[useAppNavigation] toSignup 호출됨');
+      navigate('signup');
+    },
+    toAdminLogin: () => {
+      console.log('[useAppNavigation] toAdminLogin 호출됨');
+      navigate('admin-login');
+    },
     toHome: () => navigate('home-dashboard'),
     toGames: () => navigate('game-dashboard'),
     toShop: () => navigate('shop'),

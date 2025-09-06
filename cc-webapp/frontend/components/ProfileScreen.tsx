@@ -442,13 +442,16 @@ export function ProfileScreen({
   const experiencePoints = (globalProfile as any)?.experience_points ?? 0;
   const levelProgress = calculateLevelProgress(experiencePoints);
   
-  // 디버깅: globalProfile 상태 확인
-  console.log('[ProfileScreen] 레벨 시스템 디버깅:', {
-    globalProfile: globalProfile,
-    experiencePoints: experiencePoints,
-    levelProgress: levelProgress,
-    isHydrated: isHydrated,
-  });
+  // 간소화된 디버깅
+  console.log('[ProfileScreen] Experience Points:', experiencePoints);
+  console.log('[ProfileScreen] Level Progress:', levelProgress);
+  console.log('[ProfileScreen] GlobalProfile Keys:', globalProfile ? Object.keys(globalProfile) : 'null');
+  
+  // 실제 값 확인
+  if (globalProfile) {
+    console.log('[ProfileScreen] Raw experience_points:', globalProfile.experience_points);
+    console.log('[ProfileScreen] Raw xp:', (globalProfile as any).xp);
+  }
   
   // 표시용 데이터
   const displayLevel = levelProgress.currentLevel;

@@ -40,6 +40,17 @@ export function LoginScreen({
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // 🎯 디버깅용 로그
+  React.useEffect(() => {
+    console.log('[LoginScreen] 상태 업데이트:', {
+      isLoading,
+      isSubmitting,
+      hasOnSwitchToSignup: !!onSwitchToSignup,
+      hasOnAdminAccess: !!onAdminAccess,
+      disabled: isSubmitting || isLoading
+    });
+  }, [isLoading, isSubmitting, onSwitchToSignup, onAdminAccess]);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -271,7 +282,10 @@ export function LoginScreen({
             <Button
               type="button"
               variant="outline"
-              onClick={onSwitchToSignup}
+              onClick={() => {
+                console.log('[LoginScreen] 회원가입 버튼 클릭됨, onSwitchToSignup 함수:', !!onSwitchToSignup);
+                onSwitchToSignup?.();
+              }}
               className="w-full border-border-secondary hover:border-primary hover:bg-primary/10 text-foreground flex items-center justify-center gap-2"
               disabled={isSubmitting || isLoading}
             >
@@ -282,7 +296,10 @@ export function LoginScreen({
             {/* Admin Access Button */}
             <button
               type="button"
-              onClick={onAdminAccess}
+              onClick={() => {
+                console.log('[LoginScreen] 관리자 로그인 버튼 클릭됨, onAdminAccess 함수:', !!onAdminAccess);
+                onAdminAccess?.();
+              }}
               className="w-full p-2 text-xs text-muted-foreground hover:text-primary transition-colors flex items-center justify-center gap-1"
               disabled={isSubmitting || isLoading}
             >

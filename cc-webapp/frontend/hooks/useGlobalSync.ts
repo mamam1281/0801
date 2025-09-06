@@ -60,6 +60,13 @@ export function useGlobalSync() {
 
             console.log('[GlobalSync] Profile data received:', profile);
 
+            // 🎯 디버깅을 위한 로그 추가
+            console.log('[GlobalSync] Experience fields check:', {
+                experience: profile.experience,
+                experience_points: profile.experience_points,
+                level: profile.level
+            });
+
             if (profile) {
                 dispatch({
                     type: 'SET_PROFILE',
@@ -68,10 +75,21 @@ export function useGlobalSync() {
                         nickname: profile.nickname || profile.username,
                         goldBalance: profile.cyber_token_balance || profile.gold_balance || profile.cyber_tokens || 0,
                         level: profile.level || 1,
-                        xp: profile.experience || profile.xp || 0,
+                        // 🎯 experience_points를 우선으로 사용
+                        xp: profile.experience_points ?? profile.experience ?? profile.xp ?? 0,
+                        // 🎯 experience_points 필드도 명시적으로 추가
+                        experience_points: profile.experience_points ?? profile.experience ?? 0,
+                        daily_streak: profile.daily_streak ?? 0,
                         vip_tier: profile.vip_tier,
                         battlepass_level: profile.battlepass_level || 1
                     }
+                });
+                
+                // 🎯 매핑 후 결과 확인
+                console.log('[GlobalSync] Mapped profile:', {
+                    xp: profile.experience_points ?? profile.experience ?? profile.xp ?? 0,
+                    experience_points: profile.experience_points ?? profile.experience ?? 0,
+                    level: profile.level || 1
                 });
                 lastSyncTimes.current.profile = Date.now();
                 return true;

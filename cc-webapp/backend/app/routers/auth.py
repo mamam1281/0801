@@ -377,6 +377,25 @@ async def login(data: UserLogin, request: Request, db: Session = Depends(get_db)
                     "message": "아이디 또는 비밀번호가 올바르지 않습니다.",
                 },
             )
+        
+        # 🚫 관리자 계정은 일반 로그인 차단
+        if user.is_admin:
+            # Record failure for admin trying to use regular login
+            AuthService.record_login_attempt(
+                db,
+                site_id=data.site_id,
+                success=False,
+                ip_address=request.client.host if request and request.client else None,
+                user_agent=request.headers.get("User-Agent") if request else None,
+                failure_reason="admin_restricted",
+            )
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={
+                    "error": "admin_restricted",
+                    "message": "관리자 계정은 관리자 전용 로그인 페이지를 사용해주세요.",
+                },
+            )
         AuthService.update_last_login(db, user)
         # Record success
         AuthService.record_login_attempt(
