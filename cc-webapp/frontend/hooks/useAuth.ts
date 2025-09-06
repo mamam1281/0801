@@ -13,6 +13,14 @@ interface AuthUser {
     battlepass_level?: number; // level
     experience?: number; // current exp
     max_experience?: number; // cap
+    
+    // 🎯 새로운 게임 통계 필드들
+    level?: number;
+    experience_points?: number;
+    total_games_played?: number;
+    total_games_won?: number;
+    total_games_lost?: number;
+    daily_streak?: number;
 }
 
 interface SignupPayload {

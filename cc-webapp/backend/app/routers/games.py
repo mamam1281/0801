@@ -16,6 +16,7 @@ from ..services.simple_user_service import SimpleUserService
 from ..services.game_service import GameService
 from ..services.history_service import log_game_history
 from ..services.achievement_service import AchievementService
+from ..services.auth_service import AuthService
 from pydantic import BaseModel, ConfigDict
 
 def _lazy_broadcast_game_session_event():
@@ -804,6 +805,9 @@ async def play_rps(
     
     # 잔액 업데이트
     new_balance = SimpleUserService.update_user_tokens(db, current_user.id, -bet_amount + win_amount)
+    
+    # 🎯 게임 통계 업데이트 추가
+    AuthService.update_game_stats(db, current_user.id, result)
     
     # 플레이 기록 저장
     action_data = {

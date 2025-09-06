@@ -91,6 +91,18 @@ export default function App({ isAuthenticated }: AppProps) {
     async (nickname: string, password: string): Promise<boolean> => {
       setIsLoading(true);
       try {
+        // 🚫 관리자 계정은 일반 로그인 차단
+        if (isAdminAccount(nickname, password)) {
+          console.log('[App] 관리자 계정 일반 로그인 차단:', nickname);
+          addNotification({
+            id: Date.now().toString(),
+            message: '관리자 계정은 관리자 로그인을 사용해주세요.',
+            type: 'error',
+            duration: 5000
+          });
+          return false;
+        }
+
         // backend login 은 site_id 를 요구 – 현재 UI 입력 nickname 을 site_id 로 간주
         const authUser = await auth.login(nickname, password); // 실패 시 throw, 성공 시 AuthUser 반환
         
@@ -113,7 +125,7 @@ export default function App({ isAuthenticated }: AppProps) {
         updateUser(userData);
         navigationHandlers.toHome();
         addNotification(
-          NOTIFICATION_MESSAGES.LOGIN_SUCCESS(authUser.nickname || nickname, isAdminAccount(nickname, password))
+          NOTIFICATION_MESSAGES.LOGIN_SUCCESS(authUser.nickname || nickname, false) // 관리자가 아니므로 false
         );
         return true;
       } catch (e) {

@@ -214,22 +214,10 @@ class AuthService:
     
     @staticmethod
     def authenticate_user(db: Session, site_id: str, password: str) -> Optional[User]:
-        """사용자 인증"""
+        """사용자 인증 - site_id만 사용 (보안 강화)"""
+        # site_id로만 사용자 검색 (nickname 검색 제거)
         user = db.query(User).filter(User.site_id == site_id).first()
-        # 1차: site_id 일치
-        if not user:
-            # 2차: site_id 로 못 찾으면 nickname 매칭 (대소문자 관용) 지원 – 프론트 라벨이 '닉네임' 인 혼동 완화
-            try:
-                # PostgreSQL ILIKE 사용 가능(다른 DB에서는 fallback 소문자 비교)
-                from sqlalchemy import func
-                user = (
-                    db.query(User)
-                    .filter(func.lower(User.nickname) == site_id.lower())
-                    .first()
-                )
-            except Exception:
-                # DB 백엔드 차이/호환 문제 시 단순 반복 필터
-                user = db.query(User).filter(User.nickname == site_id).first()
+        
         if not user or not AuthService.verify_password(password, user.password_hash):
             return None
         return user
@@ -562,3 +550,45 @@ class AuthService:
             password=password,
         )
         return AuthService.create_user(db, uc)
+    
+    @staticmethod
+    def update_game_stats(db: Session, user_id: int, game_result: str) -> bool:
+        """게임 결과에 따라 사용자 통계 업데이트
+        
+        Args:
+            user_id: 사용자 ID
+            game_result: 'win', 'lose', 또는 'draw'
+        
+        Returns:
+            bool: 업데이트 성공 여부
+        """
+        try:
+            user = db.query(User).filter(User.id == user_id).first()
+            if not user:
+                return False
+            
+            # 총 게임 참여 횟수 증가
+            user.total_games_played += 1
+            
+            # 결과에 따른 승리/패배 횟수 업데이트
+            if game_result == 'win':
+                user.total_games_won += 1
+                # 승리 시 경험치 추가 (승리당 10 XP)
+                user.experience_points += 10
+            elif game_result == 'lose':
+                user.total_games_lost += 1
+                # 패배 시에도 참여 경험치 (패배당 5 XP)
+                user.experience_points += 5
+            # draw는 별도 카운트 없이 게임 참여만 카운트
+            
+            # 레벨업 체크 (1000 XP마다 레벨업)
+            new_level = (user.experience_points // 1000) + 1
+            if new_level > user.level:
+                user.level = new_level
+            
+            db.commit()
+            return True
+        except Exception as e:
+            logger.error(f"게임 통계 업데이트 실패: {e}")
+            db.rollback()
+            return False

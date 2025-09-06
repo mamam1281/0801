@@ -75,10 +75,17 @@ def _build_user_response(user: User) -> UserResponse:
         is_admin=getattr(user, "is_admin", False),
         is_active=getattr(user, "is_active", True),
         gold_balance=getattr(user, "gold_balance", 0),
-    vip_points=getattr(user, "vip_points", 0),
+        vip_points=getattr(user, "vip_points", 0),
         battlepass_level=level,
         experience=int(total_exp) if isinstance(total_exp, (int, float)) else 0,
         max_experience=int(max_exp),
+        # 🎯 새로운 게임 통계 필드들 추가
+        level=getattr(user, "level", 1),
+        experience_points=getattr(user, "experience_points", 0),
+        total_games_played=getattr(user, "total_games_played", 0),
+        total_games_won=getattr(user, "total_games_won", 0),
+        total_games_lost=getattr(user, "total_games_lost", 0),
+        daily_streak=getattr(user, "daily_streak", 0),
     )
 
 """NOTE: 2025-08 Consolidation
