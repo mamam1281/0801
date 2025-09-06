@@ -85,8 +85,13 @@ from .chat_models import (
 from .event_models import (
     Event,
     EventParticipation,
-    Mission,
     UserMission,
+)
+
+# Mission models
+from .mission_models import (
+    Mission,
+    UserMissionProgress,
 )
 
 # New admin persistence models (events / missions templates / reward catalog / audit)

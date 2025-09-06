@@ -249,6 +249,78 @@ export function AdminDashboard({ coreStats, loadingStats, statsError, onRefresh 
         />
       </div>
 
+      {/* 🎯 관리자 CRUD 기능 섹션 추가 */}
+      <div className="rounded-xl border border-neutral-800 bg-neutral-900/50 p-6">
+        <h3 className="mb-4 text-lg font-semibold text-white">⚙️ 관리 기능</h3>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <button
+            onClick={() => window.location.href = '/admin/users'}
+            className="flex items-center space-x-3 rounded-lg border border-neutral-700 bg-neutral-800 p-4 text-left transition-colors hover:bg-neutral-700"
+          >
+            <Users className="h-5 w-5 text-blue-400" />
+            <div>
+              <div className="font-medium text-white">사용자 관리</div>
+              <div className="text-xs text-gray-400">사용자 조회, 권한 관리</div>
+            </div>
+          </button>
+
+          <button
+            onClick={() => window.location.href = '/admin/shop'}
+            className="flex items-center space-x-3 rounded-lg border border-neutral-700 bg-neutral-800 p-4 text-left transition-colors hover:bg-neutral-700"
+          >
+            <DollarSign className="h-5 w-5 text-green-400" />
+            <div>
+              <div className="font-medium text-white">상점 관리</div>
+              <div className="text-xs text-gray-400">상품 CRUD, 가격 설정</div>
+            </div>
+          </button>
+
+          <button
+            onClick={() => window.location.href = '/admin/events'}
+            className="flex items-center space-x-3 rounded-lg border border-neutral-700 bg-neutral-800 p-4 text-left transition-colors hover:bg-neutral-700"
+          >
+            <Activity className="h-5 w-5 text-purple-400" />
+            <div>
+              <div className="font-medium text-white">이벤트 관리</div>
+              <div className="text-xs text-gray-400">이벤트 생성, 참여자 관리</div>
+            </div>
+          </button>
+
+          <button
+            onClick={() => window.location.href = '/admin/points'}
+            className="flex items-center space-x-3 rounded-lg border border-neutral-700 bg-neutral-800 p-4 text-left transition-colors hover:bg-neutral-700"
+          >
+            <TrendingUp className="h-5 w-5 text-yellow-400" />
+            <div>
+              <div className="font-medium text-white">포인트 관리</div>
+              <div className="text-xs text-gray-400">포인트 지급, 차감</div>
+            </div>
+          </button>
+
+          <button
+            onClick={() => window.location.href = '/admin/campaigns'}
+            className="flex items-center space-x-3 rounded-lg border border-neutral-700 bg-neutral-800 p-4 text-left transition-colors hover:bg-neutral-700"
+          >
+            <Bell className="h-5 w-5 text-orange-400" />
+            <div>
+              <div className="font-medium text-white">캠페인 관리</div>
+              <div className="text-xs text-gray-400">캠페인 생성, 성과 분석</div>
+            </div>
+          </button>
+
+          <button
+            onClick={() => window.location.href = '/admin/stats'}
+            className="flex items-center space-x-3 rounded-lg border border-neutral-700 bg-neutral-800 p-4 text-left transition-colors hover:bg-neutral-700"
+          >
+            <CheckCircle className="h-5 w-5 text-cyan-400" />
+            <div>
+              <div className="font-medium text-white">통계 분석</div>
+              <div className="text-xs text-gray-400">상세 통계, 리포트</div>
+            </div>
+          </button>
+        </div>
+      </div>
+
       {/* 추가 정보 섹션 */}
       <div className="rounded-xl border border-neutral-800 bg-neutral-900/50 p-6">
         <h3 className="mb-4 text-lg font-semibold text-white">시스템 개요</h3>
