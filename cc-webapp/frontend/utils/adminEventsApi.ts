@@ -1,4 +1,4 @@
-import { api } from '@/lib/unifiedApi';
+import { api } from '../lib/unifiedApi';
 
 // 관리자 이벤트 관리 API 클라이언트
 export const adminEventsApi = {

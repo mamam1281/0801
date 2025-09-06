@@ -48,10 +48,14 @@ function resolveOrigin(): string {
     return 'http://backend:8000';
   }
 
-  if (envOrigin && /^https?:\/\//.test(envOrigin)) return envOrigin.replace(/\/$/, '');
-  const fallback = (window.location.port === '3000' || window.location.port === '3001') ? 'http://localhost:8000' : `${window.location.origin}`;
-  if (!envOrigin) console.warn('[unifiedApi] NEXT_PUBLIC_API_ORIGIN 미설정 → fallback:', fallback);
-  return fallback.replace(/\/$/, '');
+  // 클라이언트 사이드에서는 무조건 localhost:8000 사용 (임시 하드코딩)
+  console.log('[unifiedApi] 클라이언트 사이드 → localhost:8000 강제 설정');
+  return 'http://localhost:8000';
+  
+  // if (envOrigin && /^https?:\/\//.test(envOrigin)) return envOrigin.replace(/\/$/, '');
+  // const fallback = (window.location.port === '3000' || window.location.port === '3001') ? 'http://localhost:8000' : `${window.location.origin}`;
+  // if (!envOrigin) console.warn('[unifiedApi] NEXT_PUBLIC_API_ORIGIN 미설정 → fallback:', fallback);
+  // return fallback.replace(/\/$/, '');
 }
 
 const ORIGIN = resolveOrigin();

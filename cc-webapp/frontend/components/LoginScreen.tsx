@@ -43,9 +43,11 @@ export function LoginScreen({
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    console.log('[LoginScreen] handleLogin 시작, onLogin 함수:', !!onLogin);
     apiLogTry('POST /api/auth/login');
 
     const { nickname, password } = formData;
+    console.log('[LoginScreen] 입력값:', { nickname, password: '***' });
 
     if (!nickname || !password) {
       setError('모든 필드를 입력해주세요.');
@@ -55,7 +57,9 @@ export function LoginScreen({
 
     setIsSubmitting(true);
     try {
+      console.log('[LoginScreen] onLogin 호출 직전');
       const success = onLogin ? await onLogin(nickname, password) : false;
+      console.log('[LoginScreen] onLogin 결과:', success);
       if (success) {
         apiLogSuccess('POST /api/auth/login');
       } else {

@@ -1,10 +1,10 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, Page, APIRequestContext } from '@playwright/test';
 
 // 회원가입 → 토큰 주입 → /api/users/balance 확인 → UI와 일치 확인(스모크)
 // 안정성 우선: 최소 단언만 수행
 
 test.describe('Signup → Balance smoke', () => {
-  test('register and verify balance matches /users/balance', async ({ page, request }) => {
+  test('register and verify balance matches /users/balance', async ({ page, request }: { page: Page; request: APIRequestContext }) => {
     const BASE = process.env.BASE_URL || 'http://frontend:3000';
     const API = process.env.API_BASE_URL || 'http://localhost:8000';
 
@@ -15,7 +15,7 @@ test.describe('Signup → Balance smoke', () => {
     expect(reg.ok()).toBeTruthy();
     const { access_token, refresh_token } = await reg.json();
 
-    await page.addInitScript(([a, r, nick]) => {
+    await page.addInitScript(([a, r, nick]: [string, string, string]) => {
       try {
         localStorage.setItem('cc_auth_tokens', JSON.stringify({ access_token: a, refresh_token: r || undefined }));
         localStorage.setItem('game-user', JSON.stringify({ id: 'e2e', nickname: nick, goldBalance: 0, level: 1 }));
