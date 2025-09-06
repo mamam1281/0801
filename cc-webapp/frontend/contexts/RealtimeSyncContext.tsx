@@ -392,7 +392,7 @@ export function RealtimeSyncProvider({ children, apiBaseUrl }: RealtimeSyncProvi
       case 'profile_update':
   dispatch({ type: 'UPDATE_PROFILE', payload: message.data });
   // 프로필 갱신 토스트(ToastProvider의 1.5s 중복 억제 적용)
-  try { push('프로필이 갱신되었습니다.', 'system'); } catch {}
+  // try { push('프로필이 갱신되었습니다.', 'system'); } catch {} // TODO: 토스트 알림 구현 필요
         break;
 
       case 'purchase_update': {
@@ -465,7 +465,7 @@ export function RealtimeSyncProvider({ children, apiBaseUrl }: RealtimeSyncProvi
           const rd: any = d.reward_data || d;
           const g = Number(rd?.awarded_gold ?? rd?.gold ?? rd?.amount ?? 0);
           const text = Number.isFinite(g) && g !== 0 ? `보상 지급: ${g > 0 ? '+' : ''}${g}G` : '보상 지급';
-          push(text, 'reward');
+          // push(text, 'reward'); // TODO: 토스트 알림 구현 필요
         } catch {}
         break;
       }
