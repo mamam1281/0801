@@ -28,6 +28,7 @@ import {
   Eye,
   Settings
 } from 'lucide-react';
+import { useGlobalStore } from '@/store/globalStore';
 import { User, Event, Mission } from '../types';
 import { EventBackend, MissionBackend, UserMissionBackend } from '../types/eventMission';
 import { eventMissionApi } from '../utils/eventMissionApi';

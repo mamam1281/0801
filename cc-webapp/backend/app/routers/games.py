@@ -1397,7 +1397,7 @@ async def cashout_crash_bet(
         user_row = db.execute(
             text("SELECT id, gold_balance FROM users WHERE id = :user_id FOR UPDATE"),
             {"user_id": current_user.id}
-        ).scalar_one_or_none()
+        ).fetchone()
         
         if not user_row:
             raise HTTPException(status_code=404, detail="사용자 정보를 찾을 수 없습니다")

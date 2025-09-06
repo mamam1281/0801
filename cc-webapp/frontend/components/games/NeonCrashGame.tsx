@@ -57,6 +57,7 @@ export function NeonCrashGame({
   const [multiplier, setMultiplier] = useState(1.0);
   const [isRunning, setIsRunning] = useState(false);
   const [hasCashedOut, setHasCashedOut] = useState(false);
+  const [currentGameId, setCurrentGameId] = useState(null as string | null);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [autoCashout, setAutoCashout] = useState(0);
   const [gameHistory, setGameHistory] = useState(
@@ -142,6 +143,11 @@ export function NeonCrashGame({
       // 서버에서 받은 게임 결과로 애니메이션 시작
       const finalMultiplier = gameResult.max_multiplier || 1.01;
       const winAmount = gameResult.win_amount || 0;
+      const gameId = gameResult.game_id;
+      
+      // 현재 게임 ID 저장
+      setCurrentGameId(gameId);
+      
       const newBalance = gameResult?.balance ?? gameResult?.gold ?? gameResult?.gold_balance;
       if (typeof newBalance === 'number' && Number.isFinite(newBalance)) {
         mergeProfile(dispatch, { goldBalance: Number(newBalance) });
@@ -199,6 +205,7 @@ export function NeonCrashGame({
       // 부분적으로 증가한 로컬 상태가 있으면 되돌림(실행 플래그 등)
       setIsRunning(false);
       setHasCashedOut(false);
+      setCurrentGameId(null);
     }
   };
 
@@ -396,7 +403,7 @@ export function NeonCrashGame({
 
   // 게임 캐시아웃 (서버 권위; withReconcile로 재동기화)
   const cashout = async () => {
-    if (!isRunning || hasCashedOut) return;
+    if (!isRunning || hasCashedOut || !currentGameId) return;
 
     // 애니메이션 정지
     if (animationRef.current) {
@@ -413,7 +420,10 @@ export function NeonCrashGame({
       await withReconcile(async (idemKey: string) =>
         api.post<any>(
           'games/crash/cashout',
-          { multiplier },
+          { 
+            game_id: currentGameId,
+            multiplier 
+          },
           { headers: { 'X-Idempotency-Key': idemKey } }
         )
       );
@@ -428,6 +438,7 @@ export function NeonCrashGame({
     // 게임 상태 업데이트
     setHasCashedOut(true);
     setIsRunning(false);
+    setCurrentGameId(null);
 
     // 게임 기록 업데이트
     setGameHistory((prev: Array<{ multiplier: number; win: boolean; amount: number }>) => [
@@ -505,6 +516,7 @@ export function NeonCrashGame({
 
     // 게임 종료
     setIsRunning(false);
+    setCurrentGameId(null);
 
     // 전역 변수 정리
     delete (window as any)._crashGameTarget;
