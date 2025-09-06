@@ -167,7 +167,7 @@ export function ShopManager({ onAddNotification }: ShopManagerProps) {
       });
       await load();
       onAddNotification('🗑️ 아이템이 삭제되었습니다.');
-      emitEvent('shopCatalogUpdated', { source: 'admin' });
+      // emitEvent('shopCatalogUpdated', { source: 'admin' }); // TODO: 이벤트 시스템 구현 시 활성화
     } catch (error) {
       onAddNotification('❌ 아이템 삭제에 실패했습니다.');
     } finally {
