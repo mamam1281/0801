@@ -94,12 +94,16 @@ export default function App({ isAuthenticated }: AppProps) {
         // backend login 은 site_id 를 요구 – 현재 UI 입력 nickname 을 site_id 로 간주
         const authUser = await auth.login(nickname, password); // 실패 시 throw, 성공 시 AuthUser 반환
         
+        console.log('[App] 로그인 성공, 백엔드 사용자 정보:', authUser);
+        
         // 백엔드에서 받은 실제 사용자 정보로 UI 상태 업데이트
         const userData = createUserData(
           authUser.nickname || nickname, // 백엔드에서 받은 nickname 사용, fallback으로 입력된 nickname
           password, 
           false
         );
+        
+        console.log('[App] 생성된 UI 사용자 데이터:', userData);
         
         // 백엔드에서 받은 골드 잔액 정보가 있다면 반영
         if (authUser.goldBalance !== undefined) {
@@ -161,9 +165,21 @@ export default function App({ isAuthenticated }: AppProps) {
     async (adminId: string, password: string): Promise<boolean> => {
       setIsLoading(true);
       try {
-        await auth.adminLogin(adminId, password);
-        // 백엔드에서 관리자 검증을 처리하므로 프론트엔드 검증 불필요
-        const adminUser = createUserData(adminId, password, false);
+        // 백엔드 관리자 로그인 수행 - AuthUser 객체 반환
+        const authUser = await auth.adminLogin(adminId, password);
+        
+        // 백엔드에서 받은 실제 관리자 정보로 UI 상태 업데이트
+        const adminUser = createUserData(
+          authUser.nickname || adminId, // 백엔드에서 받은 nickname 사용, fallback으로 입력된 adminId
+          password, 
+          false
+        );
+        
+        // 백엔드에서 받은 골드 잔액 정보가 있다면 반영
+        if (authUser.goldBalance !== undefined) {
+          adminUser.goldBalance = authUser.goldBalance;
+        }
+        
         updateUser(adminUser);
         addNotification(NOTIFICATION_MESSAGES.ADMIN_LOGIN_SUCCESS);
         navigationHandlers.toAdminPanel();
@@ -190,6 +206,27 @@ export default function App({ isAuthenticated }: AppProps) {
     addNotification(NOTIFICATION_MESSAGES.LOGOUT_SUCCESS);
   }, [auth, logout, closeSideMenu, navigationHandlers, addNotification]);
 
+  // 🔄 useAuth 사용자 변경 감지 - 백엔드 인증 상태가 변경되면 UI 상태 동기화
+  useEffect(() => {
+    if (auth.user && !auth.loading) {
+      console.log('[App] useAuth 사용자 변경 감지:', auth.user.nickname);
+      
+      // 현재 UI 사용자가 GUEST이고 백엔드에 인증된 사용자가 있다면 업데이트
+      if (user.nickname === 'GUEST' || user.nickname === 'E2E') {
+        console.log('[App] GUEST → 인증된 사용자로 UI 상태 업데이트');
+        const authUserData = createUserData(
+          auth.user.nickname || 'USER',
+          '',
+          false
+        );
+        if (auth.user.goldBalance !== undefined) {
+          authUserData.goldBalance = auth.user.goldBalance;
+        }
+        updateUser(authUserData);
+      }
+    }
+  }, [auth.user, auth.loading, user.nickname, createUserData, updateUser]);
+
   // 🔄 앱 초기화 - 한 번만 실행되도록 개선
   useEffect(() => {
     if (hasInitialized) return;
@@ -204,8 +241,15 @@ export default function App({ isAuthenticated }: AppProps) {
 
         const savedUser = restoreSavedUser();
         
+        console.log('[App] 초기화 상태:', {
+          savedUser: savedUser?.nickname,
+          authUser: auth.user?.nickname,
+          hasAuthUser: !!auth.user
+        });
+        
         // 백엔드 인증 상태 확인 - 이미 로그인된 상태라면 사용자 정보 복원
         if (!savedUser && auth.user) {
+          console.log('[App] 백엔드 인증 사용자로 UI 상태 업데이트:', auth.user.nickname);
           // 백엔드에서 인증된 사용자가 있다면 UI 상태에 반영
           const authUserData = createUserData(
             auth.user.nickname || 'USER',
@@ -217,6 +261,7 @@ export default function App({ isAuthenticated }: AppProps) {
           }
           updateUser(authUserData);
         } else if (savedUser) {
+          console.log('[App] 저장된 사용자 복원:', savedUser.nickname);
           updateUser(savedUser);
         } else {
           // production 환경에서는 절대 게스트 스텁 유저 생성 금지

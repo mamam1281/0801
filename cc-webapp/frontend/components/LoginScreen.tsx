@@ -175,7 +175,7 @@ export function LoginScreen({
             {/* Nickname Field */}
             <div className="space-y-2">
               <Label htmlFor="nickname" className="text-foreground">
-                닉네임
+                사용자 ID
               </Label>
               <div className="relative">
                 <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
@@ -184,11 +184,14 @@ export function LoginScreen({
                   type="text"
                   value={formData.nickname}
                   onChange={handleInputChange('nickname')}
-                  placeholder="닉네임을 입력하세요"
+                  placeholder="user001, admin 등 사용자 ID를 입력하세요"
                   className="pl-10 bg-input-background border-input-border focus:border-primary focus:ring-primary/20 text-foreground"
                   disabled={isSubmitting || isLoading}
                 />
               </div>
+              <p className="text-xs text-muted-foreground">
+                💡 테스트 계정: admin/123456, user001-004/123455
+              </p>
             </div>
 
             {/* Password Field */}
