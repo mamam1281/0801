@@ -146,3 +146,30 @@ To check for known vulnerabilities in Python dependencies, you can use tools lik
     *   `safety` uses its own vulnerability database (requires a free or commercial license for the latest data, otherwise uses a freely available but potentially delayed database).
 
 Regularly review the output from these tools and update your dependencies in `requirements.txt` as needed, testing thoroughly for compatibility.
+
+---
+## 🧩 최근 백엔드 파일 실전 적용/정리 가이드 (누적학습 기준)
+
+### 1. 데이터베이스 초기화/시드/초대코드
+- reset_database.py: 전체 테이블 삭제/재생성 + 고정 초대코드(5882, 6969, 6974) 자동 등록. 운영/테스트 환경에서 초기화 필요 시만 사용, 실전 배포 전에는 백업 필수.
+- seed_realistic_data.py, seed_and_explain.py: 시드계정만 남기고 가짜 데이터 정리 및 시드계정 상태/쿼리/EXPLAIN 자동화. 운영/테스트 환경에서만 사용, 실전 배포 전에는 백업/정리 권장.
+
+### 2. 토큰/인증 테스트
+- token_generator.py, token_test.py, working_token.json, simple_jwt_test.py: JWT 토큰 생성/검증/테스트 자동화 스크립트. 운영에는 미사용, 토큰 구조/테스트 참고만 가능. 실제 인증/테스트는 pytest/conftest.py 기반 자동화만 유지.
+
+### 3. 임시/간이 서버/스키마/유틸
+- simple_server.py, simple_schema.py: FastAPI 기반 간이 서버/초기 스키마 생성. 실전 운영에는 미사용, 구조/테스트 참고만 가능. 표준 모델/마이그레이션/엔트리포인트만 유지.
+- tmp_inspect_db.py: DB 테이블/버전/구조 확인 유틸. 운영에는 미사용, DB 구조/마이그레이션 참고만 가능.
+
+### 4. 모델/필드/테이블 업데이트
+- update_auth_models.py, update_game_fields.py: 인증/게임 모델 필드/테이블 업데이트 스크립트. Alembic 마이그레이션이 표준이므로, 참고/삭제/통합 대상. 실제 운영은 Alembic revision으로만 관리.
+
+### 5. 기타/정리 지침
+- 최근 생성/수정된 파일 중, 누적학습 기준과 반대되거나 중복/레거시/테스트/임시/유틸 성격의 파일은 운영/배포 전 반드시 백업/삭제/통합 필요.
+- 실전 운영/테스트/배포 시, 표준화된 모델/마이그레이션/테스트/유틸/엔트리포인트만 유지, 나머지는 참고/삭제.
+- 신규 멤버/운영자는 conftest.py 기반 자동화 테스트, Alembic 마이그레이션, 표준 모델/엔트리포인트/유틸만 따라도 실전 환경 재현 가능.
+
+---
+변경 요약: 최근 백엔드 파일 중 실전 적용/누적학습 기준에 부합하는 내용만 README에 반영, 나머지는 참고/삭제/통합 권장
+검증 결과: 최신 기준의 실전 적용/정리/운영/테스트/배포 기준 반영
+다음 단계: 불필요/중복/테스트/임시 파일 백업/삭제, 실전 적용 파일만 유지, 신규 구조/테스트/운영 변경 시 본 섹션에 누적 업데이트
