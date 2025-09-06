@@ -112,8 +112,8 @@ export function HomeDashboard({
       return [] as { id: number; x: number; y: number; delay: number }[];
     return Array.from({ length: 20 }).map((_, i) => ({
       id: i,
-      x: Math.random() * window.innerWidth,
-      y: Math.random() * window.innerHeight,
+      x: Math.random() * (typeof window !== 'undefined' ? window.innerWidth : 1920),
+      y: Math.random() * (typeof window !== 'undefined' ? window.innerHeight : 1080),
       delay: i * 0.3,
     }));
   });
