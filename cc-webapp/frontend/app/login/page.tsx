@@ -1,5 +1,5 @@
 import React from 'react';
-import App from '../App';
+import { LoginScreen } from '../../components/LoginScreen';
 
 export const metadata = {
   title: 'Login - Casino-Club F2P',
@@ -7,5 +7,5 @@ export const metadata = {
 };
 
 export default function LoginPage() {
-  return <App />;
+  return <LoginScreen />;
 }

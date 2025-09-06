@@ -11,11 +11,9 @@ export default async function ShopPage() {
         <noscript>
           <meta httpEquiv="refresh" content="0;url=/login" />
         </noscript>
-        <script
-          dangerouslySetInnerHTML={{ __html: "location.replace('/login');" }}
-        />
+        <script dangerouslySetInnerHTML={{ __html: "location.replace('/login');" }} />
       </>
     );
   }
-  return <App />;
+  return <App isAuthenticated={true} />;
 }
