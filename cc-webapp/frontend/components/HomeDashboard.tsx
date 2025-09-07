@@ -111,7 +111,7 @@ export function HomeDashboard({
   const [streak, setStreak] = useState({
     count: globalProfile?.daily_streak ?? user?.dailyStreak ?? 0,
     ttl_seconds: null as number | null,
-    next_reward: null as string | null,
+    // next_reward 필드 제거 (2025-01-09)
   });
   // streakProtection 토글 기능 제거(요구사항: 보호 토글/표시 제거) → 관련 상태/호출 삭제
   // const [streakProtection, setStreakProtection] = useState(null as boolean | null);
@@ -133,13 +133,12 @@ export function HomeDashboard({
   interface StreakState {
     count: number;
     ttl_seconds: number | null;
-    next_reward: string | null;
+    // next_reward 필드 제거 (2025-01-09)
   }
   const safeSetStreak = (next: StreakState) => {
     setStreak((prev: StreakState) =>
       prev.count === next.count &&
-      prev.ttl_seconds === next.ttl_seconds &&
-      prev.next_reward === next.next_reward
+      prev.ttl_seconds === next.ttl_seconds
         ? prev
         : next
     );
@@ -191,7 +190,7 @@ export function HomeDashboard({
         safeSetStreak({
           count: s?.count ?? 0,
           ttl_seconds: s?.ttl_seconds ?? null,
-          next_reward: s?.next_reward ?? null,
+          // next_reward 필드 제거 (2025-01-09)
         });
         if (typeof s?.claimed_today !== 'undefined') setDailyClaimed(!!s.claimed_today);
       } catch {}
@@ -342,7 +341,7 @@ export function HomeDashboard({
         safeSetStreak({
           count: s?.count ?? 0,
           ttl_seconds: s?.ttl_seconds ?? null,
-          next_reward: s?.next_reward ?? null,
+          // next_reward 필드 제거 (2025-01-09)
         });
         if (typeof s?.claimed_today !== 'undefined') setDailyClaimed(!!s.claimed_today);
       } catch {}
@@ -712,12 +711,7 @@ export function HomeDashboard({
                   <div className="text-2xl font-bold text-primary">{globalProfile?.daily_streak ?? streak.count ?? 0}</div>
                   <div className="text-xs text-muted-foreground">연속일</div>
                 </div>
-                <div className="bg-secondary/40 rounded-lg p-3">
-                  <div className="text-sm font-bold text-gold">
-                    {streak.next_reward || 'Coins + XP'}
-                  </div>
-                  <div className="text-xs text-muted-foreground">다음 보상</div>
-                </div>
+                {/* 다음 보상 타입 표시 제거 (2025-01-09) */}
                 <div className="bg-secondary/40 rounded-lg p-3">
                   <Button size="sm" className="w-full" onClick={() => setShowDailyReward(true)}>
                     보상 보기

@@ -10,28 +10,28 @@ from math import exp
 from datetime import datetime, timezone
 
 def calculate_streak_daily_reward(streak_count: int) -> tuple[int, int]:
-    """간단한 선형 증가 기반 골드/XP 산출.
+    """1일차부터 시작하는 선형 증가 기반 골드/XP 산출.
 
-    Gold = 1000 + (streak_count * 200)  (0일차: 1000, 1일차: 1200, 2일차: 1400...)
-    XP   = 50   + (streak_count * 25)   (0일차: 50, 1일차: 75, 2일차: 100...)
+    Gold = 800 + (streak_count * 200)  (1일차: 1000, 2일차: 1200, 3일차: 1400...)
+    XP   = 25  + (streak_count * 25)   (1일차: 50, 2일차: 75, 3일차: 100...)
 
     Args:
-        streak_count: 현재 유지 중인 연속 출석 일수(>=0)
+        streak_count: 현재 유지 중인 연속 출석 일수(>=1, 1일차부터 시작)
     Returns:
         (gold:int, xp:int)
     """
-    # 선형 증가 공식
-    base_gold = 1000
+    # 1일차부터 시작하는 선형 증가 공식
+    base_gold = 800  # 1일차에 1000골드가 되도록 조정
     gold_per_day = 200
     gold = base_gold + (streak_count * gold_per_day)
     
-    base_xp = 50
+    base_xp = 25   # 1일차에 50XP가 되도록 조정
     xp_per_day = 25
     xp = base_xp + (streak_count * xp_per_day)
     
-    # 최대 보상 제한 (10일차까지)
-    max_gold = 3000
-    max_xp = 300
+    # 최대 보상 제한 (10일차까지: 2800골드, 275XP)
+    max_gold = 2800  # 10일차 = 800 + (10 * 200) = 2800
+    max_xp = 275     # 10일차 = 25 + (10 * 25) = 275
     
     return min(gold, max_gold), min(xp, max_xp)
 

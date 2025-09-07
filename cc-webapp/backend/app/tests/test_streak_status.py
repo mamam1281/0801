@@ -9,4 +9,4 @@ def test_streak_status_basic(client: TestClient):
     assert data["action_type"] == "DAILY_LOGIN"
     assert "count" in data
     assert "ttl_seconds" in data
-    assert "next_reward" in data
+    # next_reward 필드 제거됨 (2025-01-09)
