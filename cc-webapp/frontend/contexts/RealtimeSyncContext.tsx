@@ -479,7 +479,7 @@ export function RealtimeSyncProvider({ children, apiBaseUrl }: RealtimeSyncProvi
         console.log('[RealtimeSync] Game event received:', data);
         
         // 게임 이벤트 처리 (슬롯, RPS 등)
-        if (data.subtype === 'slot_spin') {
+        if (data && data.subtype === 'slot_spin') {
           // 슬롯 스핀 결과에 대한 실시간 피드백
           console.log('[RealtimeSync] Slot spin result:', {
             win: data.win,

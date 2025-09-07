@@ -1480,23 +1480,92 @@ async def cashout_crash_bet(
 # Server-authoritative per-user aggregated crash stats (user_game_stats)
 @router.get("/stats/me")
 def get_my_authoritative_game_stats(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    """현재 로그인 사용자에 대한 서버 권위 Crash GameStats.
+    """현재 로그인 사용자에 대한 서버 권위 게임 통계 (Crash + 슬롯 + 가챠 + RPS 통합).
 
-    user_game_stats 테이블 row 없으면 생성 후 반환. (MVP: crash 전용)
-    TODO: 멀티 게임 타입 확장 시 game_type 파라미터 도입.
+    user_game_stats 테이블 (Crash 전용) + user_actions 테이블 (슬롯/가챠/RPS 등) 통합 조회.
     """
     try:
         from ..services.game_stats_service import GameStatsService as _GSS
+        from ..models.game_models import UserAction
+        from sqlalchemy import func, case
+        
+        # Crash 게임 통계 (기존 로직)
         svc = _GSS(db)
-        stats = svc.get_or_create(current_user.id)
+        crash_stats = svc.get_or_create(current_user.id)
+        
+        # 슬롯 게임 통계 (user_actions 테이블에서 집계) - 간단한 카운트부터
+        slot_query = db.query(
+            func.count(UserAction.id).label('slot_spins')
+        ).filter(
+            UserAction.user_id == current_user.id,
+            UserAction.action_type == 'SLOT_SPIN'
+        ).first()
+        
+        # 가챠 게임 통계 (GACHA_SPIN)
+        gacha_query = db.query(
+            func.count(UserAction.id).label('gacha_spins')
+        ).filter(
+            UserAction.user_id == current_user.id,
+            UserAction.action_type == 'GACHA_SPIN'
+        ).first()
+        
+        # RPS 게임 통계 (RPS_PLAY)
+        rps_query = db.query(
+            func.count(UserAction.id).label('rps_plays')
+        ).filter(
+            UserAction.user_id == current_user.id,
+            UserAction.action_type == 'RPS_PLAY'
+        ).first()
+        
+        # 집계 계산 (기본값 설정)
+        slot_spins = int(slot_query.slot_spins or 0)
+        slot_wins = 0  # JSON 파싱 로직 추후 추가
+        slot_losses = 0
+        
+        gacha_spins = int(gacha_query.gacha_spins or 0)
+        gacha_wins = 0
+        
+        rps_plays = int(rps_query.rps_plays or 0)
+        rps_wins = 0
+        rps_losses = 0
+        rps_ties = 0
+        
+        # 전체 게임 통계 통합
+        total_games_played = slot_spins + gacha_spins + rps_plays
+        total_games_won = slot_wins + gacha_wins + rps_wins
+        total_games_lost = slot_losses + rps_losses  # 가챠는 승/패 개념이 아니므로 제외
+        
+        # 통합 통계 반환
         return {"success": True, "stats": {
-            "user_id": stats.user_id,
-            "total_bets": int(stats.total_bets or 0),
-            "total_wins": int(stats.total_wins or 0),
-            "total_losses": int(stats.total_losses or 0),
-            "total_profit": float(stats.total_profit or 0),
-            "highest_multiplier": float(stats.highest_multiplier) if stats.highest_multiplier is not None else None,
-            "updated_at": stats.updated_at.isoformat() if stats.updated_at else None,
+            "user_id": current_user.id,
+            "total_bets": int(crash_stats.total_bets or 0) + total_games_played,  # Crash 베팅 + 전체 게임 플레이
+            "total_wins": int(crash_stats.total_wins or 0) + total_games_won,     # Crash 승리 + 전체 게임 승리  
+            "total_losses": int(crash_stats.total_losses or 0) + total_games_lost, # Crash 패배 + 전체 게임 패배
+            "total_profit": float(crash_stats.total_profit or 0),  # Crash 수익 (다른 게임 수익은 별도 계산 필요)
+            "highest_multiplier": float(crash_stats.highest_multiplier) if crash_stats.highest_multiplier is not None else None,
+            "updated_at": crash_stats.updated_at.isoformat() if crash_stats.updated_at else None,
+            "game_breakdown": {
+                "crash": {
+                    "bets": int(crash_stats.total_bets or 0),
+                    "wins": int(crash_stats.total_wins or 0),
+                    "losses": int(crash_stats.total_losses or 0)
+                },
+                "slot": {
+                    "spins": slot_spins,
+                    "wins": slot_wins,
+                    "losses": slot_losses
+                },
+                "gacha": {
+                    "spins": gacha_spins,
+                    "rare_wins": gacha_wins
+                },
+                "rps": {
+                    "plays": rps_plays,
+                    "wins": rps_wins,
+                    "losses": rps_losses,
+                    "ties": rps_ties
+                }
+            }
         }}
     except Exception as e:  # pragma: no cover
         logger.error("get_my_authoritative_game_stats failed user=%s err=%s", current_user.id, e)

@@ -227,8 +227,8 @@ export function SettingsScreen({
           </div>
 
           <div className="text-right">
-            <div className="text-sm text-muted-foreground">{user.nickname}</div>
-            <div className="text-lg font-bold text-gold">레벨 {user.level}</div>
+            <div className="text-sm text-muted-foreground">{summary.nickname || user.nickname}</div>
+            <div className="text-lg font-bold text-gold">레벨 {summary.level}</div>
           </div>
         </div>
       </motion.div>
@@ -258,14 +258,14 @@ export function SettingsScreen({
                 </Button>
               </div>
               <p className="text-sm text-muted-foreground">
-                레벨 {user.level} • {user.goldBalance.toLocaleString()}G
+                레벨 {summary.level} • {summary.gold.toLocaleString()}G
               </p>
               <p className="text-xs text-primary">
                 {summary.totalGamesPlayed}게임 플레이 • {summary.totalGamesWon}승
               </p>
             </div>
             <div className="text-right">
-              <div className="text-2xl font-bold text-gold">{user.dailyStreak}</div>
+              <div className="text-2xl font-bold text-gold">{summary.dailyStreak}</div>
               <div className="text-xs text-muted-foreground">연속 접속일</div>
             </div>
           </div>
