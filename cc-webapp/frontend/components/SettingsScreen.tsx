@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { api as unifiedApi } from '@/lib/unifiedApi';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft,
@@ -21,9 +22,8 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { User as UserType } from '../types';
-import { useGlobalStore, useGlobalProfile, hydrateFromServer } from '@/store/globalStore';
-import { useUserLevel, useUserSummary } from '@/hooks/useSelectors';
-import { calculateLevelProgress } from '@/utils/levelUtils';
+import { useGlobalStore, setProfile } from '@/store/globalStore';
+import api from '../utils/api';
 import { Button } from './ui/button';
 import { Switch } from './ui/switch';
 import { Slider } from './ui/slider';
@@ -38,39 +38,10 @@ interface SettingsScreenProps {
 export function SettingsScreen({
   user,
   onBack,
-  onUpdateUser: _, // 더 이상 사용하지 않음
+  onUpdateUser,
   onAddNotification,
 }: SettingsScreenProps) {
   const { dispatch } = useGlobalStore();
-  const globalProfile = useGlobalProfile();
-  const userLevel = useUserLevel();
-  const userSummary = useUserSummary();
-  
-  // 실제 데이터 사용
-  const experiencePoints = globalProfile?.experience_points ?? 0;
-  const levelProgress = calculateLevelProgress(experiencePoints);
-  const actualLevel = levelProgress.currentLevel;
-  const actualGold = globalProfile?.goldBalance ?? 0;
-  const actualDailyStreak = globalProfile?.daily_streak ?? 0;
-  const actualGamesPlayed = globalProfile?.total_games_played ?? 0;
-  const actualGamesWon = globalProfile?.total_games_won ?? 0;
-  
-  // 설정 페이지 로드 시 프로필 강제 동기화
-  useEffect(() => {
-    console.log('SettingsScreen: 프로필 동기화 시작', {
-      globalProfile,
-      actualLevel,
-      actualGold,
-      actualDailyStreak,
-      actualGamesPlayed,
-      actualGamesWon
-    });
-    
-    // 항상 서버에서 최신 데이터 가져오기
-    console.log('SettingsScreen: 강제 프로필 재동기화 실행');
-    hydrateFromServer(dispatch);
-  }, []); // 의존성 배열 비움으로 한 번만 실행
-  
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [soundVolume, setSoundVolume] = useState([80]);
   const [musicEnabled, setMusicEnabled] = useState(true);
@@ -78,6 +49,8 @@ export function SettingsScreen({
   const [vibrationEnabled, setVibrationEnabled] = useState(true);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [showBalance, setShowBalance] = useState(true);
+  const [editingNickname, setEditingNickname] = useState(user.nickname ?? '');
+  const [saving, setSaving] = useState(false);
 
   const handleSoundToggle = (enabled: boolean) => {
     setSoundEnabled(enabled);
@@ -92,6 +65,34 @@ export function SettingsScreen({
   const handleNotificationToggle = (enabled: boolean) => {
     setNotificationsEnabled(enabled);
     onAddNotification(enabled ? '🔔 알림이 활성화되었습니다' : '🔕 알림이 비활성화되었습니다');
+  };
+
+  // 프로필 닉네임 저장 처리
+  const handleSaveProfile = async () => {
+    if (!editingNickname || editingNickname.trim().length < 2) {
+      onAddNotification('닉네임은 최소 2자 이상이어야 합니다.');
+      return;
+    }
+    try {
+      setSaving(true);
+      // Use unifiedApi per project convention: auth/me is the canonical profile endpoint
+      // PUT via unifiedApi will include standard headers (X-Idempotency-Key, auth handling)
+      const serverProfile = await unifiedApi.put('auth/me', { nickname: editingNickname.trim() });
+      if (serverProfile) {
+        // 덮어쓰기: 전역 스토어를 서버 응답으로 업데이트
+        setProfile(dispatch, serverProfile as any);
+        onAddNotification('프로필이 성공적으로 저장되었습니다.');
+        // 로컬 UI 업데이트
+        onUpdateUser(serverProfile as any);
+      } else {
+        onAddNotification('서버 응답이 없습니다. 다시 시도해주세요.');
+      }
+    } catch (err) {
+      console.error('Failed to save profile', err);
+      onAddNotification('프로필 저장 중 오류가 발생했습니다.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   // 🗑️ 자동플레이 기능 완전 제거 + 간소화
@@ -224,8 +225,8 @@ export function SettingsScreen({
           </div>
 
           <div className="text-right">
-            <div className="text-sm text-muted-foreground">{globalProfile?.nickname || user.nickname}</div>
-            <div className="text-lg font-bold text-gold">레벨 {actualLevel}</div>
+            <div className="text-sm text-muted-foreground">{user.nickname}</div>
+            <div className="text-lg font-bold text-gold">레벨 {user.level}</div>
           </div>
         </div>
       </motion.div>
@@ -245,29 +246,24 @@ export function SettingsScreen({
             </div>
             <div className="flex-1">
               <div className="flex items-center gap-2">
-                <h3 className="text-lg font-bold text-foreground">
-                  {globalProfile?.nickname || user.nickname || '사용자'}
-                </h3>
+                <input
+                  className="bg-transparent border-b border-border-secondary px-2 py-1 text-lg font-bold text-foreground focus:outline-none"
+                  value={editingNickname}
+                  onChange={(e: any) => setEditingNickname((e.target as HTMLInputElement).value)}
+                />
+                <Button size="sm" onClick={handleSaveProfile} disabled={saving}>
+                  {saving ? '저장 중...' : '저장'}
+                </Button>
               </div>
               <p className="text-sm text-muted-foreground">
-                레벨 {actualLevel} • {actualGold.toLocaleString()}G
+                레벨 {user.level} • {user.goldBalance.toLocaleString()}G
               </p>
               <p className="text-xs text-primary">
-                총 {userSummary.totalGamesPlayed}게임 • {userSummary.totalGamesWon}승 {userSummary.totalGamesLost}패
-              </p>
-              <p className="text-xs text-success">
-                승률 {userSummary.winRate}% • 연승 {userSummary.currentWinStreak}회
-              </p>
-              {/* 디버깅 정보 */}
-              <p className="text-xs text-red-400">
-                Debug: Gold={globalProfile?.goldBalance || 'null'}, 
-                Level={actualLevel}, 
-                XP={globalProfile?.experience_points || 'null'},
-                Streak={globalProfile?.daily_streak || 'null'}
+                {user.stats.gamesPlayed}게임 플레이 • {user.stats.gamesWon}승
               </p>
             </div>
             <div className="text-right">
-              <div className="text-2xl font-bold text-gold">{actualDailyStreak}</div>
+              <div className="text-2xl font-bold text-gold">{user.dailyStreak}</div>
               <div className="text-xs text-muted-foreground">연속 접속일</div>
             </div>
           </div>

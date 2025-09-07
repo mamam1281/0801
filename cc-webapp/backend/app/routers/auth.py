@@ -75,17 +75,10 @@ def _build_user_response(user: User) -> UserResponse:
         is_admin=getattr(user, "is_admin", False),
         is_active=getattr(user, "is_active", True),
         gold_balance=getattr(user, "gold_balance", 0),
-        vip_points=getattr(user, "vip_points", 0),
+    vip_points=getattr(user, "vip_points", 0),
         battlepass_level=level,
         experience=int(total_exp) if isinstance(total_exp, (int, float)) else 0,
         max_experience=int(max_exp),
-        # 🎯 새로운 게임 통계 필드들 추가
-        level=getattr(user, "level", 1),
-        experience_points=getattr(user, "experience_points", 0),
-        total_games_played=getattr(user, "total_games_played", 0),
-        total_games_won=getattr(user, "total_games_won", 0),
-        total_games_lost=getattr(user, "total_games_lost", 0),
-        daily_streak=getattr(user, "daily_streak", 0),
     )
 
 """NOTE: 2025-08 Consolidation
@@ -375,25 +368,6 @@ async def login(data: UserLogin, request: Request, db: Session = Depends(get_db)
                 detail={
                     "error": "invalid_credentials",
                     "message": "아이디 또는 비밀번호가 올바르지 않습니다.",
-                },
-            )
-        
-        # 🚫 관리자 계정은 일반 로그인 차단
-        if user.is_admin:
-            # Record failure for admin trying to use regular login
-            AuthService.record_login_attempt(
-                db,
-                site_id=data.site_id,
-                success=False,
-                ip_address=request.client.host if request and request.client else None,
-                user_agent=request.headers.get("User-Agent") if request else None,
-                failure_reason="admin_restricted",
-            )
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail={
-                    "error": "admin_restricted",
-                    "message": "관리자 계정은 관리자 전용 로그인 페이지를 사용해주세요.",
                 },
             )
         AuthService.update_last_login(db, user)

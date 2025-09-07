@@ -24,15 +24,13 @@ export function NotificationSystem({ children }: NotificationSystemProps) {
 
   // 📱 🎯 VIP 알림만 (중요한 것만)
   const addNotification = useCallback((message: string) => {
-    // 타입 안전성 확보
-    const safeMessage = typeof message === 'string' ? message : String(message || '');
     // 특정 키워드가 포함된 중요한 알림만 표시
-    const shouldShow = VIP_NOTIFICATION_KEYWORDS.some(keyword => safeMessage.includes(keyword));
+    const shouldShow = VIP_NOTIFICATION_KEYWORDS.some(keyword => message.includes(keyword));
     
     if (shouldShow) {
       const newNotification: Notification = {
         id: generateNotificationId(),
-        message: safeMessage,
+        message,
         timestamp: Date.now()
       };
       
@@ -89,14 +87,12 @@ export function useNotificationSystem() {
   }, []);
 
   const addNotification = useCallback((message: string) => {
-    // 타입 안전성 확보
-    const safeMessage = typeof message === 'string' ? message : String(message || '');
-    const shouldShow = VIP_NOTIFICATION_KEYWORDS.some(keyword => safeMessage.includes(keyword));
+    const shouldShow = VIP_NOTIFICATION_KEYWORDS.some(keyword => message.includes(keyword));
     
     if (shouldShow) {
       const newNotification: Notification = {
         id: generateNotificationId(),
-        message: safeMessage,
+        message,
         timestamp: Date.now()
       };
       

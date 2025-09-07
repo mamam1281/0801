@@ -21,7 +21,7 @@ from ..utils.redis import (
     set_streak_protection,
 )
 from app.utils.redis import get_redis  # 일일 중복 가드용 직접 Redis 접근
-# calc_next_streak_reward 함수 제거 (2025-01-09)
+from app.utils.streak_utils import calc_next_streak_reward
 
 router = APIRouter(prefix="/api/streak", tags=["Streaks"])
 
@@ -32,7 +32,7 @@ class StreakStatus(BaseModel):
     action_type: str
     count: int
     ttl_seconds: Optional[int] = None
-    # next_reward 필드 제거 (2025-01-09)
+    next_reward: Optional[str] = None
 
 
 class StreakClaimResponse(BaseModel):
@@ -51,8 +51,8 @@ async def status(
 ):
     cnt = get_streak_counter(str(current_user.id), action_type)
     ttl = get_streak_ttl(str(current_user.id), action_type)
-    # next_reward 계산 제거 (2025-01-09)
-    return StreakStatus(action_type=action_type, count=cnt, ttl_seconds=ttl)
+    next_reward = calc_next_streak_reward(cnt + 1)
+    return StreakStatus(action_type=action_type, count=cnt, ttl_seconds=ttl, next_reward=next_reward)
 
 
 class TickRequest(BaseModel):
@@ -63,7 +63,6 @@ class TickRequest(BaseModel):
 async def tick(
     body: TickRequest,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
 ):
     action_type = body.action_type or DEFAULT_ACTION
 
@@ -89,32 +88,11 @@ async def tick(
 
     if allow_increment:
         cnt = update_streak_counter(str(current_user.id), action_type, increment=True)
-        
-        # 🎯 레벨과 daily_streak 업데이트 (일일 출석 시에만)
-        if action_type == "DAILY_LOGIN":
-            from ..services.reward_service import update_user_level_and_streak
-            new_level, new_streak, bonus_xp = update_user_level_and_streak(db, current_user.id, 1)
-            
-            # 레벨업 알림을 위한 브로드캐스트 (나중에 구현 가능)
-            if new_level > current_user.level:
-                try:
-                    from ..routers.realtime import broadcast_level_up
-                    import asyncio
-                    loop = asyncio.get_event_loop()
-                    if loop.is_running():
-                        loop.create_task(broadcast_level_up(
-                            user_id=current_user.id,
-                            old_level=current_user.level,
-                            new_level=new_level,
-                            bonus_xp=bonus_xp
-                        ))
-                except Exception:
-                    pass
     else:
         cnt = get_streak_counter(str(current_user.id), action_type)
 
     ttl = get_streak_ttl(str(current_user.id), action_type)
-    # next_reward 계산 제거 (2025-01-09)
+    next_reward = calc_next_streak_reward(cnt + 1)
 
     # 출석 기록 (증가 여부와 무관하게 하루 한 번 기록 시도 – SADD idempotent)
     try:
@@ -137,7 +115,7 @@ async def tick(
         except Exception:
             pass
 
-    return StreakStatus(action_type=action_type, count=cnt, ttl_seconds=ttl)
+    return StreakStatus(action_type=action_type, count=cnt, ttl_seconds=ttl, next_reward=next_reward)
 
 
 class ResetRequest(BaseModel):
@@ -155,7 +133,16 @@ async def reset(
     return {"ok": True}
 
 
-# /next-reward 엔드포인트 제거 (2025-01-09)
+@router.get("/next-reward")
+async def next_reward(
+    action_type: str = Query(DEFAULT_ACTION),
+    current_user: User = Depends(get_current_user),
+):
+    cnt = get_streak_counter(str(current_user.id), action_type)
+    return {"next_reward": calc_next_streak_reward(cnt + 1)}
+
+
+# _calc_next_reward: calc_next_streak_reward (공통 util) 사용으로 제거
 
 
 # -----------------
@@ -202,7 +189,7 @@ async def protection_status(
 class ClaimRequest(BaseModel):
     action_type: Optional[str] = None
 
-from app.services.reward_service import calculate_streak_daily_reward, calculate_level_from_streak
+from app.services.reward_service import calculate_streak_daily_reward
 
 
 # ----------------------
@@ -359,32 +346,12 @@ async def claim(
         from app.models.auth_models import User as ORMUser  # 지연 import
         orm_user = db.query(ORMUser).filter(ORMUser.id == current_user.id).first()
         if orm_user:
-            # 골드 잔액 업데이트
             orm_user.gold_balance = (getattr(orm_user, 'gold_balance', 0) or 0) + gold
-            
-            # 경험치 업데이트
             if hasattr(orm_user, 'experience'):
                 try:
                     orm_user.experience = (orm_user.experience or 0) + xp
                 except Exception:
                     pass
-            
-            # 🎯 새로운 레벨 및 연속출석 시스템
-            # 연속출석 일수 업데이트
-            orm_user.daily_streak = streak_count
-            
-            # 경험치 포인트 업데이트 (기존 experience와 별개)
-            if hasattr(orm_user, 'experience_points'):
-                orm_user.experience_points = (orm_user.experience_points or 0) + xp
-            
-            # 레벨 계산 및 업데이트 (연속출석 기반)
-            if hasattr(orm_user, 'level'):
-                new_level = calculate_level_from_streak(streak_count)
-                if new_level > orm_user.level:
-                    # 레벨업 발생!
-                    old_level = orm_user.level
-                    orm_user.level = new_level
-                    # TODO: 레벨업 알림 추가 가능
         # reward row 생성
         reward = UserReward(
             user_id=current_user.id,

@@ -13,14 +13,6 @@ interface AuthUser {
     battlepass_level?: number; // level
     experience?: number; // current exp
     max_experience?: number; // cap
-    
-    // 🎯 새로운 게임 통계 필드들
-    level?: number;
-    experience_points?: number;
-    total_games_played?: number;
-    total_games_won?: number;
-    total_games_lost?: number;
-    daily_streak?: number;
 }
 
 interface SignupPayload {
@@ -115,7 +107,7 @@ export function useAuth() {
     const signup = useCallback(async (data: SignupPayload) => {
         setLoading(true);
         try {
-        const res = await api.post<SignupResponse>('auth/signup', data, { auth: false });
+        const res = await api.post<SignupResponse>('auth/signup', data);
             // Backend returns flat structure: { access_token, token_type, user, refresh_token }
             applyTokens(res);
             // 잔액 병합
@@ -133,7 +125,7 @@ export function useAuth() {
         setLoading(true);
         try {
             try {
-                const res = await api.post<any>('auth/login', { site_id: site_id.trim(), password }, { auth: false });
+                const res = await api.post<any>('auth/login', { site_id: site_id.trim(), password });
                 applyTokens(res);
                 if (res && res.user) {
                     const merged = await fetchAndMergeBalance(res.user as AuthUser);
@@ -164,7 +156,7 @@ export function useAuth() {
         setLoading(true);
         try {
             try {
-                const res = await api.post<any>('auth/admin/login', { site_id: site_id.trim(), password }, { auth: false });
+                const res = await api.post<any>('auth/admin/login', { site_id: site_id.trim(), password });
                 applyTokens(res);
                 if (res && res.user) {
                     const merged = await fetchAndMergeBalance(res.user as AuthUser);

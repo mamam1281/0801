@@ -3,11 +3,6 @@ from sqlalchemy.orm import relationship
 from datetime import datetime
 from ..database import Base
 
-# Mission 클래스는 mission_models.py에서 정의됨
-# UserMission 클래스도 mission_models.py에서 정의됨
-
-__all__ = ['Event', 'EventParticipation']
-
 class Event(Base):
     __tablename__ = "events"
     
@@ -48,5 +43,44 @@ class EventParticipation(Base):
     user = relationship("User", back_populates="event_participations")
     event = relationship("Event", back_populates="participations")
 
-# Mission 클래스는 mission_models.py에서 import하여 사용
-# UserMission 클래스도 mission_models.py에서 정의됨
+class Mission(Base):
+    __tablename__ = "missions"
+    __table_args__ = {'extend_existing': True}
+    
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String, nullable=False)
+    description = Column(Text)
+    mission_type = Column(String, nullable=False)  # 'daily', 'weekly', 'achievement'
+    category = Column(String)  # 'game', 'social', 'collection', 'spending'
+    target_value = Column(Integer, nullable=False)  # 목표값
+    target_type = Column(String, nullable=False)  # 'play_count', 'win_count', 'spend_gold'
+    rewards = Column(JSON)  # {gold: 500, exp: 100}
+    requirements = Column(JSON)  # {min_level: 1}
+    reset_period = Column(String)  # 'daily', 'weekly', 'never'
+    icon = Column(String)
+    is_active = Column(Boolean, default=True)
+    sort_order = Column(Integer, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    user_missions = relationship("UserMission", back_populates="mission")
+
+class UserMission(Base):
+    __tablename__ = "user_missions"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    mission_id = Column(Integer, ForeignKey("missions.id"), index=True)
+    current_progress = Column(Integer, default=0)
+    completed = Column(Boolean, default=False)
+    claimed = Column(Boolean, default=False)
+    started_at = Column(DateTime, default=datetime.utcnow)
+    completed_at = Column(DateTime)
+    claimed_at = Column(DateTime)
+    reset_at = Column(DateTime)  # 리셋 예정 시간
+    progress_version = Column(Integer, default=0)
+    last_progress_at = Column(DateTime)
+    
+    # Relationships
+    user = relationship("User", back_populates="missions")
+    mission = relationship("Mission", back_populates="user_missions")

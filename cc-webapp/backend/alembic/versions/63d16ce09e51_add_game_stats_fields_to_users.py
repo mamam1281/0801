@@ -19,35 +19,10 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    """Add game statistics fields to users table."""
-    # Add daily_streak field
-    op.add_column('users', sa.Column('daily_streak', sa.Integer(), nullable=False, server_default='0'))
-    
-    # Add experience_points field
-    op.add_column('users', sa.Column('experience_points', sa.Integer(), nullable=False, server_default='0'))
-    
-    # Add total_games_played field
-    op.add_column('users', sa.Column('total_games_played', sa.Integer(), nullable=False, server_default='0'))
-    
-    # Add total_wins field
-    op.add_column('users', sa.Column('total_wins', sa.Integer(), nullable=False, server_default='0'))
-    
-    # Add total_losses field
-    op.add_column('users', sa.Column('total_losses', sa.Integer(), nullable=False, server_default='0'))
-    
-    # Add win_rate field (calculated field, stored for performance)
-    op.add_column('users', sa.Column('win_rate', sa.Numeric(5, 4), nullable=False, server_default='0.0000'))
-    
-    # Add updated_at field if not exists
-    op.add_column('users', sa.Column('updated_at', sa.TIMESTAMP(), nullable=False, server_default=sa.text('now()')))
+    """Upgrade schema."""
+    pass
 
 
 def downgrade() -> None:
-    """Remove game statistics fields from users table."""
-    op.drop_column('users', 'updated_at')
-    op.drop_column('users', 'win_rate')
-    op.drop_column('users', 'total_losses')
-    op.drop_column('users', 'total_wins')
-    op.drop_column('users', 'total_games_played')
-    op.drop_column('users', 'experience_points')
-    op.drop_column('users', 'daily_streak')
+    """Downgrade schema."""
+    pass

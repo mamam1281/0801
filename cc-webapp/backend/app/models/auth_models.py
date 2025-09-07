@@ -19,18 +19,6 @@ class User(Base):
     gold_balance = Column(Integer, default=1000, nullable=False)  # 신규 가입 시 1000 골드 지급
     # VIP 포인트 (일일 VIP 보상 전용 포인트)
     vip_points = Column(Integer, default=0, nullable=False)
-    
-    # 🎯 레벨 및 게임 통계 시스템
-    level = Column(Integer, default=1, nullable=False)  # 사용자 레벨
-    experience_points = Column(Integer, default=0, nullable=False)  # 경험치
-    
-    # 게임 참여/승리/패배 통계
-    total_games_played = Column(Integer, default=0, nullable=False)  # 총 게임 참여 횟수
-    total_games_won = Column(Integer, default=0, nullable=False)     # 총 게임 승리 횟수
-    total_games_lost = Column(Integer, default=0, nullable=False)    # 총 게임 패배 횟수
-    
-    # 일일 출석 연속 일수
-    daily_streak = Column(Integer, default=0, nullable=False)  # 연속 출석 일수
     is_active = Column(Boolean, default=True)
     is_admin = Column(Boolean, default=False)  # 관리자 여부
     # DB의 컬럼명은 'vip_tier' 이므로 name='vip_tier'로 매핑 (기존 'rank' 예약어 사용 회피)

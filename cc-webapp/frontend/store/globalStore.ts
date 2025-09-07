@@ -15,15 +15,6 @@ export type GlobalUserProfile = {
     gemsBalance?: number;
     level?: number;
     xp?: number;
-    // 🎯 새로운 레벨 시스템 필드들
-    experience_points?: number;
-    daily_streak?: number;
-    total_games_played?: number;
-    total_games_won?: number;
-    total_games_lost?: number;
-    // 🔑 관리자 정보 필드들
-    isAdmin?: boolean;
-    is_admin?: boolean;
     updatedAt?: string;
     [k: string]: unknown;
 };
@@ -254,44 +245,16 @@ export async function hydrateFromServer(dispatch: DispatchFn) {
             api.get("games/stats/me").catch(() => null),
         ]);
         const goldFromBalanceRaw = (bal as any)?.gold ?? (bal as any)?.gold_balance ?? (bal as any)?.cyber_token_balance ?? (bal as any)?.balance;
-        
-        // 🎯 디버깅을 위한 로그 추가
-        console.log("[hydrateFromServer] me 원본 데이터:", {
-            experience: me?.experience,
-            experience_points: me?.experience_points,
-            level: me?.level
-        });
-        
         const mapped = {
-            // 🎯 experience와 experience_points를 제외하고 spread
-            ...(()=>{
-                const {experience, experience_points, ...rest} = me || {};
-                return rest;
-            })(),
-            // 그 다음 명시적으로 필요한 필드들을 재정의
             id: me?.id ?? me?.user_id ?? "unknown",
             nickname: me?.nickname ?? me?.name ?? "",
             goldBalance: Number.isFinite(Number(goldFromBalanceRaw)) ? Number(goldFromBalanceRaw) : Number(me?.gold ?? me?.gold_balance ?? 0),
             gemsBalance: Number(me?.gems ?? me?.gems_balance ?? 0),
             level: me?.level ?? me?.battlepass_level ?? undefined,
-            // 🎯 레벨 시스템 필드들 명시적 매핑 (experience_points 우선)
-            experience_points: me?.experience_points ?? me?.experience ?? 0,
-            daily_streak: me?.daily_streak ?? 0,
-            total_games_played: me?.total_games_played ?? 0,
-            total_games_won: me?.total_games_won ?? 0,
-            total_games_lost: me?.total_games_lost ?? 0,
-            // xp는 experience_points를 우선으로 사용
-            xp: me?.experience_points ?? me?.experience ?? 0,
+            xp: me?.xp ?? undefined,
             updatedAt: new Date().toISOString(),
+            ...me,
         } as GlobalUserProfile as any;
-        
-        // 🎯 매핑 후 결과 확인
-        console.log("[hydrateFromServer] 매핑 후 결과:", {
-            experience: mapped.experience,
-            experience_points: mapped.experience_points,
-            xp: mapped.xp,
-            level: mapped.level
-        });
         const balances = { gold: mapped.goldBalance ?? 0, gems: (mapped as any).gemsBalance ?? 0 };
         setProfile(dispatch, mapped);
         dispatch({ type: "SET_BALANCES", balances });

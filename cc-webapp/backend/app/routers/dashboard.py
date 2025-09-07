@@ -10,7 +10,7 @@ from ..utils.redis import (
     get_streak_ttl,
     get_attendance_month,
 )
-# calc_next_streak_reward import 제거 (2025-01-09)
+from ..utils.streak_utils import calc_next_streak_reward
 
 from ..services.dashboard_service import DashboardService
 from sqlalchemy.orm import Session
@@ -89,7 +89,8 @@ def get_unified_dashboard(
             action_type = "DAILY_LOGIN"  # 프론트에서 사용하는 streak 기본 action
             streak_count = get_streak_counter(str(current_user.id), action_type)
             ttl_seconds = get_streak_ttl(str(current_user.id), action_type)
-            # next_reward 기능 제거 (2025-01-09)
+            # 공통 util 사용
+            next_reward = calc_next_streak_reward(streak_count + 1)
 
             # 주간 attendance (현재 UTC 주간)
             today_utc = datetime.utcnow().date()
@@ -112,7 +113,7 @@ def get_unified_dashboard(
             payload["streak"] = {
                 "count": streak_count,
                 "ttl_seconds": ttl_seconds,
-                # next_reward 필드 제거 (2025-01-09)
+                "next_reward": next_reward,
                 "attendance_week": sorted(attendance_week),
             }
         except Exception:

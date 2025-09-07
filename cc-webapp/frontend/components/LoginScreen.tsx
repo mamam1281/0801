@@ -42,6 +42,12 @@ export function LoginScreen({
 
   // 🎯 디버깅용 로그
   React.useEffect(() => {
+    console.log('[LoginScreen] 🔧 DEBUG - props 타입 확인:', {
+      onSwitchToSignup: typeof onSwitchToSignup,
+      onAdminAccess: typeof onAdminAccess,
+      isOnSwitchToSignupFunction: typeof onSwitchToSignup === 'function',
+      isOnAdminAccessFunction: typeof onAdminAccess === 'function'
+    });
     console.log('[LoginScreen] 상태 업데이트:', {
       isLoading,
       isSubmitting,

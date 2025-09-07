@@ -18,8 +18,6 @@ from ..schemas.auth import TokenData, UserCreate, UserLogin, AdminLogin
 
 from ..models.auth_models import InviteCode
 
-logger = logging.getLogger(__name__)
-
 # 보안 설정
 SECRET_KEY = os.getenv("JWT_SECRET_KEY", "your-secret-key-here")
 ALGORITHM = "HS256"
@@ -216,10 +214,22 @@ class AuthService:
     
     @staticmethod
     def authenticate_user(db: Session, site_id: str, password: str) -> Optional[User]:
-        """사용자 인증 - site_id만 사용 (보안 강화)"""
-        # site_id로만 사용자 검색 (nickname 검색 제거)
+        """사용자 인증"""
         user = db.query(User).filter(User.site_id == site_id).first()
-        
+        # 1차: site_id 일치
+        if not user:
+            # 2차: site_id 로 못 찾으면 nickname 매칭 (대소문자 관용) 지원 – 프론트 라벨이 '닉네임' 인 혼동 완화
+            try:
+                # PostgreSQL ILIKE 사용 가능(다른 DB에서는 fallback 소문자 비교)
+                from sqlalchemy import func
+                user = (
+                    db.query(User)
+                    .filter(func.lower(User.nickname) == site_id.lower())
+                    .first()
+                )
+            except Exception:
+                # DB 백엔드 차이/호환 문제 시 단순 반복 필터
+                user = db.query(User).filter(User.nickname == site_id).first()
         if not user or not AuthService.verify_password(password, user.password_hash):
             return None
         return user
@@ -307,14 +317,14 @@ class AuthService:
         return user
     
     @staticmethod
-    def create_user(db: Session, user_create: dict) -> User:
+    def create_user(db: Session, user_create: UserCreate) -> User:
         """사용자 생성 - 회원가입 필수 입력사항"""
         # --- Invite Code 검증 전략 ---
         # 기본 정책: UNLIMITED_INVITE_CODE(기본 5858) 는 항상 허용.
         # Grace 모드: NEW 코드(예: DB 활성 invite_codes.is_active=1) + OLD(UNLIMITED) 모두 허용.
         # Cutover 모드(ENFORCE_DB_INVITE_CODES=1): DB is_active=1 인 코드 목록 OR UNLIMITED(명시적으로 계속 허용 정책일 경우)만 허용.
         from ..core.config import settings
-        supplied_code = user_create.get('invite_code', None)
+        supplied_code = getattr(user_create, 'invite_code', None)
         unlimited = settings.UNLIMITED_INVITE_CODE
         enforce_db = settings.ENFORCE_DB_INVITE_CODES
         if not supplied_code:
@@ -364,7 +374,7 @@ class AuthService:
         
         # 사이트 아이디 중복 검사
         try:
-            if db.query(User).filter(User.site_id == user_create['site_id']).first():
+            if db.query(User).filter(User.site_id == user_create.site_id).first():
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="이미 존재하는 사이트 아이디입니다"
@@ -377,7 +387,7 @@ class AuthService:
         
         # 닉네임 중복 검사
         try:
-            if db.query(User).filter(User.nickname == user_create['nickname']).first():
+            if db.query(User).filter(User.nickname == user_create.nickname).first():
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="이미 존재하는 닉네임입니다"
@@ -388,9 +398,9 @@ class AuthService:
             db.rollback()
         
         # 전화번호 필드가 있는 경우에만 중복 검사
-        if 'phone_number' in user_create and user_create['phone_number']:
+        if hasattr(user_create, 'phone_number') and user_create.phone_number:
             try:
-                if db.query(User).filter(User.phone_number == user_create['phone_number']).first():
+                if db.query(User).filter(User.phone_number == user_create.phone_number).first():
                     raise HTTPException(
                         status_code=status.HTTP_400_BAD_REQUEST,
                         detail="이미 등록된 전화번호입니다"
@@ -401,18 +411,18 @@ class AuthService:
                 db.rollback()
         
         # 비밀번호 길이 검증 (4글자 이상)
-        if len(user_create['password']) < 4:
+        if len(user_create.password) < 4:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="비밀번호는 4글자 이상이어야 합니다"
             )
         
         # 사용자 생성 (site_id는 user_id와 동일한 개념으로 사용)
-        hashed_password = AuthService.get_password_hash(user_create['password'])
+        hashed_password = AuthService.get_password_hash(user_create.password)
         db_user = User(
-            site_id=user_create['site_id'],  # site_id는 user_id와 동일한 개념
-            nickname=user_create['nickname'],
-            phone_number=user_create.get('phone_number', None),  # 선택적 필드로 처리
+            site_id=user_create.site_id,  # site_id는 user_id와 동일한 개념
+            nickname=user_create.nickname,
+            phone_number=getattr(user_create, 'phone_number', None),  # 선택적 필드로 처리
             password_hash=hashed_password,
             invite_code=supplied_code,
             is_admin=False
@@ -552,45 +562,3 @@ class AuthService:
             password=password,
         )
         return AuthService.create_user(db, uc)
-    
-    @staticmethod
-    def update_game_stats(db: Session, user_id: int, game_result: str) -> bool:
-        """게임 결과에 따라 사용자 통계 업데이트
-        
-        Args:
-            user_id: 사용자 ID
-            game_result: 'win', 'lose', 또는 'draw'
-        
-        Returns:
-            bool: 업데이트 성공 여부
-        """
-        try:
-            user = db.query(User).filter(User.id == user_id).first()
-            if not user:
-                return False
-            
-            # 총 게임 참여 횟수 증가
-            user.total_games_played += 1
-            
-            # 결과에 따른 승리/패배 횟수 업데이트
-            if game_result == 'win':
-                user.total_games_won += 1
-                # 승리 시 경험치 추가 (승리당 10 XP)
-                user.experience_points += 10
-            elif game_result == 'lose':
-                user.total_games_lost += 1
-                # 패배 시에도 참여 경험치 (패배당 5 XP)
-                user.experience_points += 5
-            # draw는 별도 카운트 없이 게임 참여만 카운트
-            
-            # 레벨업 체크 (1000 XP마다 레벨업)
-            new_level = (user.experience_points // 1000) + 1
-            if new_level > user.level:
-                user.level = new_level
-            
-            db.commit()
-            return True
-        except Exception as e:
-            logger.error(f"게임 통계 업데이트 실패: {e}")
-            db.rollback()
-            return False

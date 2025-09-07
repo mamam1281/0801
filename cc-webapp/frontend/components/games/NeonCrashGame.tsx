@@ -57,7 +57,6 @@ export function NeonCrashGame({
   const [multiplier, setMultiplier] = useState(1.0);
   const [isRunning, setIsRunning] = useState(false);
   const [hasCashedOut, setHasCashedOut] = useState(false);
-  const [gameId, setGameId] = useState(null as string | null); // 현재 게임 세션 ID
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [autoCashout, setAutoCashout] = useState(0);
   const [gameHistory, setGameHistory] = useState(
@@ -144,12 +143,6 @@ export function NeonCrashGame({
       const finalMultiplier = gameResult.max_multiplier || 1.01;
       const winAmount = gameResult.win_amount || 0;
       const newBalance = gameResult?.balance ?? gameResult?.gold ?? gameResult?.gold_balance;
-      
-      // 게임 ID 저장 (캐시아웃 시 필요)
-      if (gameResult.game_id) {
-        setGameId(gameResult.game_id);
-      }
-      
       if (typeof newBalance === 'number' && Number.isFinite(newBalance)) {
         mergeProfile(dispatch, { goldBalance: Number(newBalance) });
       }
@@ -405,12 +398,6 @@ export function NeonCrashGame({
   const cashout = async () => {
     if (!isRunning || hasCashedOut) return;
 
-    // 최소 배수 검증 (서버와 동일한 조건)
-    if (multiplier < 1.01) {
-      onAddNotification('최소 1.01배 이상에서 캐시아웃할 수 있습니다.');
-      return;
-    }
-
     // 애니메이션 정지
     if (animationRef.current) {
       cancelAnimationFrame(animationRef.current);
@@ -422,19 +409,11 @@ export function NeonCrashGame({
 
     // 서버에 캐시아웃 요청(필요 시). 현재 백엔드에 별도 캐시아웃 엔드포인트가 존재하면 사용
     try {
-      // game_id가 없으면 캐시아웃 불가
-      if (!gameId) {
-        throw new Error('게임 세션이 올바르지 않습니다. 게임을 다시 시작해주세요.');
-      }
-      
       // 우선 멱등+재동기화만 수행하여 최종 잔액 일치 보장
       await withReconcile(async (idemKey: string) =>
         api.post<any>(
           'games/crash/cashout',
-          { 
-            game_id: gameId,
-            multiplier: Math.max(1.01, multiplier) // 최소값 보장
-          },
+          { multiplier },
           { headers: { 'X-Idempotency-Key': idemKey } }
         )
       );
@@ -449,7 +428,6 @@ export function NeonCrashGame({
     // 게임 상태 업데이트
     setHasCashedOut(true);
     setIsRunning(false);
-    setGameId(null); // 게임 세션 ID 초기화
 
     // 게임 기록 업데이트
     setGameHistory((prev: Array<{ multiplier: number; win: boolean; amount: number }>) => [
@@ -527,7 +505,6 @@ export function NeonCrashGame({
 
     // 게임 종료
     setIsRunning(false);
-    setGameId(null); // 게임 세션 ID 초기화
 
     // 전역 변수 정리
     delete (window as any)._crashGameTarget;

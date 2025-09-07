@@ -13,10 +13,8 @@ import { useGlobalSync } from '@/hooks/useGlobalSync';
 import { useWithReconcile } from '@/lib/sync';
 import { useGlobalStore, useGlobalProfile } from '@/store/globalStore';
 import { validateNickname } from '@/utils/securityUtils';
-import { calculateLevelProgress } from '@/utils/levelUtils';
 import { getTokens, setTokens } from '../utils/tokenStorage';
 import { useRealtimeProfile, useRealtimeStats } from '@/hooks/useRealtimeData';
-import { useUserSummary } from '@/hooks/useSelectors';
 import ActionHistory from '@/components/profile/ActionHistory';
 
 interface ProfileScreenProps {
@@ -44,20 +42,13 @@ export function ProfileScreen({
   const globalProfile = useGlobalProfile();
   const { state } = useGlobalStore();
   const storeGameStats = state.gameStats || {};
-  
-  // 전역 게임 통계 사용
-  const userSummary = useUserSummary();
 
   // 초기 동기화
   useEffect(() => {
     if (!isHydrated) {
-      console.log('[ProfileScreen] 초기 동기화 실행');
       syncAll({ showToast: false });
-    } else {
-      console.log('[ProfileScreen] 이미 하이드레이트됨, 프로필 재동기화');
-      syncProfile();
     }
-  }, [isHydrated, syncAll, syncProfile]);
+  }, [isHydrated, syncAll]);
   // 쓰기 후 재동기화 유틸 (멱등 포함)
   const withReconcile = useWithReconcile();
   // Realtime 전역 상태 구독(골드 등 핵심 값은 전역 프로필 우선 사용)
@@ -442,35 +433,9 @@ export function ProfileScreen({
     );
   }
 
-  // 레벨 시스템 계산: 새로운 experience_points 기반
-  const experiencePoints = (globalProfile as any)?.experience_points ?? 0;
-  const levelProgress = calculateLevelProgress(experiencePoints);
-  
-  // 간소화된 디버깅
-  console.log('[ProfileScreen] Experience Points:', experiencePoints);
-  console.log('[ProfileScreen] Level Progress:', levelProgress);
-  console.log('[ProfileScreen] GlobalProfile Keys:', globalProfile ? Object.keys(globalProfile) : 'null');
-  
-  // 실제 값 확인
-  if (globalProfile) {
-    console.log('[ProfileScreen] Raw experience_points:', globalProfile.experience_points);
-    console.log('[ProfileScreen] Raw xp:', (globalProfile as any).xp);
-  }
-  console.log('[ProfileScreen] Final Experience Points:', experiencePoints);
-  console.log('[ProfileScreen] Level Progress:', levelProgress);
-  console.log('[ProfileScreen] GlobalProfile Keys:', globalProfile ? Object.keys(globalProfile) : 'null');
-  
-  // 실제 값 확인
-  if (globalProfile) {
-    console.log('[ProfileScreen] Raw experience_points:', globalProfile.experience_points);
-    console.log('[ProfileScreen] Raw xp:', (globalProfile as any).xp);
-  }
-  
-  // 표시용 데이터
-  const displayLevel = levelProgress.currentLevel;
-  const displayXP = levelProgress.currentXP;
-  const displayMaxXP = levelProgress.nextLevelXP;
-  const progressToNext = levelProgress.progressPercent;
+  // 안전한 계산을 위한 체크
+  const progressToNext =
+    user?.experience && user?.maxExperience ? (user.experience / user.maxExperience) * 100 : 0;
 
   // GOLD 표시값: Realtime 전역 상태(우선) → 공용 상태 → 로컬 balance 폴백
   const displayGold: number | string =
@@ -663,15 +628,11 @@ export function ProfileScreen({
                     </Button>
                   </div>
 
-                  {/* 🎯 연속출석일과 레벨 표시 */}
-                  <div className="flex justify-center gap-4">
-                    <Badge className="bg-primary/20 text-primary border-primary/30 px-4 py-2 text-lg">
-                      <Trophy className="w-5 h-5 mr-2" />
-                      레벨 {displayLevel}
-                    </Badge>
+                  {/* 🎯 연속출석일만 표시 */}
+                  <div className="flex justify-center">
                     <Badge className="bg-success/20 text-success border-success/30 px-4 py-2 text-lg">
                       <Flame className="w-5 h-5 mr-2" />
-                      {(globalProfile as any)?.daily_streak || 0}일 연속 출석
+                      {user?.dailyStreak || 0}일 연속 출석
                     </Badge>
                   </div>
                 </div>
@@ -681,8 +642,8 @@ export function ProfileScreen({
                   <div className="flex items-center justify-between text-lg">
                     <span className="font-medium">경험치 진행도</span>
                     <span className="font-bold">
-                      {displayXP.toLocaleString()} /{' '}
-                      {displayMaxXP.toLocaleString()} XP
+                      {user?.experience?.toLocaleString() || 0} /{' '}
+                      {user?.maxExperience?.toLocaleString() || 1000} XP
                     </span>
                   </div>
                   <div className="relative">
@@ -695,7 +656,7 @@ export function ProfileScreen({
                     />
                   </div>
                   <div className="text-center text-lg text-muted-foreground">
-                    다음 레벨까지 {levelProgress.xpToNext.toLocaleString()} XP ({progressToNext.toFixed(1)}%)
+                    다음 레벨까지 {progressToNext.toFixed(1)}%
                   </div>
                 </div>
 
@@ -808,7 +769,7 @@ export function ProfileScreen({
                         className="text-2xl font-bold text-primary"
                         data-testid="stats-total-games"
                       >
-                        {userSummary.totalGamesPlayed}
+                        {displayTotalGames}
                       </div>
                       <div className="text-sm text-muted-foreground">총 게임 수</div>
                     </div>
@@ -818,30 +779,16 @@ export function ProfileScreen({
                         className="text-2xl font-bold text-gradient-gold"
                         data-testid="stats-total-wins"
                       >
-                        {userSummary.totalGamesWon} 승
+                        {displayTotalWins} 승
                       </div>
-                      <div className="text-sm text-muted-foreground">총 승리</div>
-                    </div>
-
-                    <div className="text-center p-4 rounded-lg bg-error/5 border border-error/10">
-                      <div className="text-2xl font-bold text-error">
-                        {userSummary.totalGamesLost} 패
-                      </div>
-                      <div className="text-sm text-muted-foreground">총 패배</div>
+                      <div className="text-sm text-muted-foreground">총 수익</div>
                     </div>
 
                     <div className="text-center p-4 rounded-lg bg-success/5 border border-success/10">
                       <div className="text-2xl font-bold text-success">
-                        {userSummary.winRate}%
+                        {user?.inventory?.length || 0}
                       </div>
-                      <div className="text-sm text-muted-foreground">승률</div>
-                    </div>
-
-                    <div className="text-center p-4 rounded-lg bg-warning/5 border border-warning/10">
-                      <div className="text-2xl font-bold text-warning">
-                        {userSummary.currentWinStreak}
-                      </div>
-                      <div className="text-sm text-muted-foreground">연승 기록</div>
+                      <div className="text-sm text-muted-foreground">보유 아이템</div>
                     </div>
                   </div>
 

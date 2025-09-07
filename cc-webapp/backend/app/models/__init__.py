@@ -85,10 +85,6 @@ from .chat_models import (
 from .event_models import (
     Event,
     EventParticipation,
-)
-
-# Mission models
-from .mission_models import (
     Mission,
     UserMission,
 )
@@ -182,8 +178,7 @@ __all__ = [
     "SupportedEmotion",
 
     # Mission Models
-    "Mission",
-    "UserMission",
+    "UserMissionProgress",
     "PageView",
     "ConversionEvent",
     "ABTestParticipant",
@@ -191,7 +186,8 @@ __all__ = [
 
     # Event Models
     "Event",
-    "EventParticipation",
+    "EventParticipation", 
+    "UserMission",
 
     # History
     "GameHistory",

@@ -75,7 +75,15 @@ export default function App({ isAuthenticated }: AppProps) {
     handleBottomNavigation,
   } = useAppNavigation();
 
-  // 📱 알림 시스템
+  // � navigationHandlers 진단
+  console.log('[App] useAppNavigation 반환값:', {
+    currentScreen,
+    navigationHandlers: !!navigationHandlers,
+    toSignup: typeof navigationHandlers?.toSignup,
+    toAdminLogin: typeof navigationHandlers?.toAdminLogin
+  });
+
+  // �📱 알림 시스템
   const { notifications, addNotification } = useNotificationSystem();
 
   // 🌐 전역 스토어
@@ -504,12 +512,19 @@ export default function App({ isAuthenticated }: AppProps) {
 
               {currentScreen === 'login' && (
                 <React.Fragment key="login">
+                  {/* 🔧 navigationHandlers 최종 진단 */}
+                  {console.log('[App] LoginScreen 렌더링 직전 navigationHandlers:', navigationHandlers)}
                   <LoginScreen
                     onLogin={handleLogin}
-                    onSwitchToSignup={navigationHandlers.toSignup}
-                    onAdminAccess={navigationHandlers.toAdminLogin}
+                    onSwitchToSignup={navigationHandlers?.toSignup || (() => console.warn('[App] toSignup 핸들러 없음'))}
+                    onAdminAccess={navigationHandlers?.toAdminLogin || (() => console.warn('[App] toAdminLogin 핸들러 없음'))}
                     isLoading={isLoading}
                   />
+                  {!navigationHandlers && (
+                    <div style={{color:'red', position:'fixed', top:'10px', left:'10px', zIndex:9999}}>
+                      [App] 경고: navigationHandlers가 undefined입니다!
+                    </div>
+                  )}
                 </React.Fragment>
               )}
 
