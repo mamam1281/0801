@@ -49,12 +49,24 @@ export function ProfileScreen({
       syncAll({ showToast: false });
     }
   }, [isHydrated, syncAll]);
+
+  // 전역 프로필과 로컬 user 상태 동기화
+  useEffect(() => {
+    if (globalProfile) {
+      setUser(globalProfile);
+      setLoading(false);
+      setAuthChecked(true);
+    }
+  }, [globalProfile]);
+  
   // 쓰기 후 재동기화 유틸 (멱등 포함)
   const withReconcile = useWithReconcile();
   // Realtime 전역 상태 구독(골드 등 핵심 값은 전역 프로필 우선 사용)
   const { profile: rtProfile, refresh: refreshRtProfile } = useRealtimeProfile();
   const { allStats: rtAllStats } = useRealtimeStats();
-  const [user, setUser] = useState(null);
+  
+  // 로컬 상태 - 전역 프로필과 동기화
+  const [user, setUser] = useState(globalProfile);
   const [stats, setStats] = useState(null);
   const [balance, setBalance] = useState(null);
   const [loading, setLoading] = useState(true);

@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { User as UserType } from '../types';
 import { useGlobalStore, setProfile } from '@/store/globalStore';
+import { useUserSummary } from '@/hooks/useSelectors';
 import api from '../utils/api';
 import { Button } from './ui/button';
 import { Switch } from './ui/switch';
@@ -42,6 +43,7 @@ export function SettingsScreen({
   onAddNotification,
 }: SettingsScreenProps) {
   const { dispatch } = useGlobalStore();
+  const summary = useUserSummary();
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [soundVolume, setSoundVolume] = useState([80]);
   const [musicEnabled, setMusicEnabled] = useState(true);
@@ -259,7 +261,7 @@ export function SettingsScreen({
                 레벨 {user.level} • {user.goldBalance.toLocaleString()}G
               </p>
               <p className="text-xs text-primary">
-                {user.stats.gamesPlayed}게임 플레이 • {user.stats.gamesWon}승
+                {summary.totalGamesPlayed}게임 플레이 • {summary.totalGamesWon}승
               </p>
             </div>
             <div className="text-right">
