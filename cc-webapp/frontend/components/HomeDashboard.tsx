@@ -708,8 +708,19 @@ export function HomeDashboard({
               </div>
               <div className="grid grid-cols-3 gap-3 text-center">
                 <div className="bg-secondary/40 rounded-lg p-3">
-                  <div className="text-2xl font-bold text-primary">{globalProfile?.daily_streak ?? streak.count ?? 0}</div>
-                  <div className="text-xs text-muted-foreground">연속일</div>
+                  <div className="text-2xl font-bold text-primary">
+                    {(() => {
+                      const streakCount = globalProfile?.daily_streak ?? streak.count ?? 0;
+                      // 0일차 개념 제거: 0이면 "시작 전", 1 이상이면 그대로 표시
+                      return streakCount === 0 ? "시작 전" : streakCount;
+                    })()}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {(() => {
+                      const streakCount = globalProfile?.daily_streak ?? streak.count ?? 0;
+                      return streakCount === 0 ? "연속 보상" : "연속일";
+                    })()}
+                  </div>
                 </div>
                 {/* 다음 보상 타입 표시 제거 (2025-01-09) */}
                 <div className="bg-secondary/40 rounded-lg p-3">
@@ -895,7 +906,14 @@ export function HomeDashboard({
 
               <h3 className="text-2xl font-bold text-gold mb-2">일일 보상!</h3>
               <p className="text-muted-foreground mb-6">
-                연속 {globalProfile?.daily_streak ?? streak.count ?? 0}일 접속 보너스를 받으세요!
+                {(() => {
+                  const streakCount = globalProfile?.daily_streak ?? streak.count ?? 0;
+                  if (streakCount === 0) {
+                    return "첫 일일 보상을 받으세요!";
+                  } else {
+                    return `연속 ${streakCount}일 접속 보너스를 받으세요!`;
+                  }
+                })()}
               </p>
 
               <div className="bg-gold-soft rounded-lg p-4 mb-6">
