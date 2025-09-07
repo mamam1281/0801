@@ -150,7 +150,8 @@ export function useGlobalSync() {
      */
     const syncGameStats = useCallback(async (): Promise<boolean> => {
         try {
-            console.log('[GlobalSync] syncGameStats 호출됨');
+            console.log('[GlobalSync] syncGameStats 호출됨 - 엔드포인트:', AUTHORITY_ENDPOINTS.GAME_STATS);
+            console.log('[GlobalSync] API 인스턴스:', api);
             const response = await api.get(AUTHORITY_ENDPOINTS.GAME_STATS);
             console.log('[GlobalSync] Game stats API 응답:', response);
             
@@ -282,12 +283,15 @@ export function useGlobalSync() {
             console.log('[GlobalSync] Starting full sync...');
 
             // 병렬로 모든 데이터 동기화
+            console.log('[GlobalSync] syncAll - 개별 sync 함수 호출 시작');
+            console.log('[GlobalSync] syncProfile, syncBalance, syncGameStats 병렬 실행...');
             const results = await Promise.allSettled([
                 syncProfile(),
                 syncBalance(),
                 syncGameStats()
             ]);
 
+            console.log('[GlobalSync] syncAll - Promise.allSettled 결과:', results);
             const successes = results.filter(r => r.status === 'fulfilled' && r.value).length;
             const success = successes >= 2; // 최소 2개 이상 성공하면 OK
 

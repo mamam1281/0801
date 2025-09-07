@@ -260,9 +260,6 @@ export function SettingsScreen({
               <p className="text-sm text-muted-foreground">
                 레벨 {summary.level} • {summary.gold.toLocaleString()}G
               </p>
-              <p className="text-xs text-primary">
-                {summary.totalGamesPlayed}게임 플레이 • {summary.totalGamesWon}승
-              </p>
             </div>
             <div className="text-right">
               <div className="text-2xl font-bold text-gold">{summary.dailyStreak}</div>

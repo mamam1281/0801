@@ -1,14 +1,12 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import {
   ArrowLeft,
   Sparkles,
   Crown,
-  TrendingUp,
   Trophy,
-  Heart,
   ExternalLink,
   Menu,
   Dice1,
@@ -52,8 +50,6 @@ export function GameDashboard({
   onAddNotification,
   onToggleSideMenu,
 }: GameDashboardProps) {
-  const [popularityIndex, setPopularityIndex] = useState(85);
-  const [totalPlayTime] = useState(245);
   const totalGamesFromStore = useGlobalTotalGames();
   const levelFromStore = useUserLevel();
   
@@ -132,17 +128,6 @@ export function GameDashboard({
     onNavigateToCrash: onNavigateToCrash ?? (() => {}),
   });
 
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setPopularityIndex((prev: number) => {
-        const change = Math.random() * 6 - 3;
-        return Math.max(70, Math.min(100, prev + change));
-      });
-    }, 2000);
-
-    return () => clearInterval(timer);
-  }, []);
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#0e0a17] via-black to-[#1a0f1f] relative" data-testid="game-dashboard">
       <GameBackground />
@@ -204,48 +189,10 @@ export function GameDashboard({
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8"
+            className="grid grid-cols-1 md:grid-cols-1 gap-6 mb-8"
           >
-            {/* Popularity Index */}
-            <div className="bg-[#14121a]/70 backdrop-blur-sm rounded-2xl p-6 border border-purple-500/20">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold bg-gradient-to-r from-purple-300 to-pink-300 bg-clip-text text-transparent">
-                  인기도 지민
-                </h3>
-                <TrendingUp className="w-5 h-5 text-purple-400" />
-              </div>
-              <div className="space-y-3">
-                <div className="text-3xl font-bold text-yellow-400">
-                  {popularityIndex.toFixed(1)}%
-                </div>
-                <Progress value={popularityIndex} className="h-2 bg-purple-900/50" />
-                <p className="text-sm text-gray-400">현재 서버 활성도</p>
-                {/* 전역 게임 합계(서버 권위 동기화 기준). 디자인 영향 최소화 표시 */}
-                <div className="text-sm text-gray-300">
-                  총 플레이 <span data-testid="games-stats-total">{totalGamesFromStore}</span>회
-                </div>
-              </div>
-            </div>
-
-            {/* Total Play Time */}
-            <div className="bg-[#14121a]/70 backdrop-blur-sm rounded-2xl p-6 border border-purple-500/20">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold bg-gradient-to-r from-purple-300 to-pink-300 bg-clip-text text-transparent">
-                  오늘 플레이
-                </h3>
-                <Heart className="w-5 h-5 text-pink-400" />
-              </div>
-              <div className="space-y-3">
-                <div className="text-3xl font-bold text-yellow-400">
-                  {Math.floor(totalPlayTime / 60)}시간 {totalPlayTime % 60}분
-                </div>
-                <Progress value={(totalPlayTime / 480) * 100} className="h-2 bg-purple-900/50" />
-                <p className="text-sm text-gray-400">일일 목표: 8시간</p>
-              </div>
-            </div>
-
             {/* VIP Status */}
-            <div className="bg-[#14121a]/70 backdrop-blur-sm rounded-2xl p-6 border border-purple-500/20">
+            <div className="bg-[#14121a]/70 backdrop-blur-sm rounded-2xl p-6 border border-purple-500/20 max-w-md mx-auto">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold bg-gradient-to-r from-purple-300 to-pink-300 bg-clip-text text-transparent">
                   VIP 등급
