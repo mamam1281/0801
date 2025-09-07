@@ -7,6 +7,7 @@
 
 import React, { createContext, useContext, useMemo, useReducer } from "react";
 import { api } from "@/lib/unifiedApi";
+import { normalizeGameStatsResponse } from "@/utils/gameStatsNormalizer";
 
 export type GlobalUserProfile = {
     id: string | number;
@@ -269,7 +270,13 @@ export async function hydrateFromServer(dispatch: DispatchFn) {
         setProfile(dispatch, mapped);
         dispatch({ type: "SET_BALANCES", balances });
         if (stats && typeof stats === 'object') {
-            try { dispatch({ type: "MERGE_GAME_STATS", game: "_me", delta: stats as any }); } catch { /* noop */ }
+            try { 
+                // 백엔드 응답을 프론트엔드 형식으로 변환
+                const normalizedStats = normalizeGameStatsResponse(stats);
+                dispatch({ type: "MERGE_GAME_STATS", game: "_me", delta: normalizedStats }); 
+            } catch (e) { 
+                console.warn('게임 통계 처리 실패:', e);
+            }
         }
     } catch (e:any) {
         dispatch({ type: "SET_ERROR", error: { message: e?.message || "hydrateFromServer failed", at: Date.now() } });

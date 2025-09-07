@@ -44,18 +44,13 @@ type AppProps = {
 };
 
 export default function App({ isAuthenticated }: AppProps) {
+  // 모든 hooks는 최상단에서 항상 호출되어야 함 - 조건부 return 전에 모두 선언
   const [isLoading, setIsLoading] = useState(false);
   const [hasInitialized, setHasInitialized] = useState(false);
-  // externalNavRef는 한 번만 선언
-  // externalNavRef는 한 번만 선언
-
-  // SSR에서 인증되지 않은 경우 아무것도 렌더링하지 않음
-  if (isAuthenticated === false) {
-    return null;
-  }
+  const [isClient, setIsClient] = useState(false);
   const externalNavRef = useRef(false);
 
-  // 🎯 커스텀 훅으로 상태 관리 분리
+  // 🎯 커스텀 훅으로 상태 관리 분리 - 항상 호출
   const {
     user,
     updateUser,
@@ -75,15 +70,7 @@ export default function App({ isAuthenticated }: AppProps) {
     handleBottomNavigation,
   } = useAppNavigation();
 
-  // � navigationHandlers 진단
-  console.log('[App] useAppNavigation 반환값:', {
-    currentScreen,
-    navigationHandlers: !!navigationHandlers,
-    toSignup: typeof navigationHandlers?.toSignup,
-    toAdminLogin: typeof navigationHandlers?.toAdminLogin
-  });
-
-  // �📱 알림 시스템
+  // 📱 알림 시스템
   const { notifications, addNotification } = useNotificationSystem();
 
   // 🌐 전역 스토어
@@ -91,6 +78,16 @@ export default function App({ isAuthenticated }: AppProps) {
 
   // 🔐 실제 백엔드 인증 훅 (JWT 토큰 저장 & 프로필 fetch)
   const auth = useAuth();
+  
+  // 클라이언트 렌더링 확인
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  // SSR에서 인증되지 않은 경우 또는 클라이언트 렌더링 전에는 로딩 화면 표시
+  if (isAuthenticated === false || !isClient) {
+    return <LoadingScreen />;
+  }
 
   // ---------------------------------------------------------------------------
   // Backend 연동 어댑터 함수들
