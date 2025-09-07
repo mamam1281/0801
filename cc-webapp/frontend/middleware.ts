@@ -13,7 +13,8 @@ export default function middleware(req: NextRequest) {
     '/login',
     '/signup',
     '/favicon.ico',
-    '/public'
+    '/public',
+    '/healthz'
   ];
   
   // 허용 경로인지 확인
