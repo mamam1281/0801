@@ -107,7 +107,7 @@ export function useAuth() {
     const signup = useCallback(async (data: SignupPayload) => {
         setLoading(true);
         try {
-        const res = await api.post<SignupResponse>('auth/signup', data);
+        const res = await api.post<SignupResponse>('auth/signup', data, { auth: false });
             // Backend returns flat structure: { access_token, token_type, user, refresh_token }
             applyTokens(res);
             // 잔액 병합
@@ -125,7 +125,7 @@ export function useAuth() {
         setLoading(true);
         try {
             try {
-                const res = await api.post<any>('auth/login', { site_id: site_id.trim(), password });
+                const res = await api.post<any>('auth/login', { site_id: site_id.trim(), password }, { auth: false });
                 applyTokens(res);
                 if (res && res.user) {
                     const merged = await fetchAndMergeBalance(res.user as AuthUser);
@@ -156,7 +156,7 @@ export function useAuth() {
         setLoading(true);
         try {
             try {
-                const res = await api.post<any>('auth/admin/login', { site_id: site_id.trim(), password });
+                const res = await api.post<any>('auth/admin/login', { site_id: site_id.trim(), password }, { auth: false });
                 applyTokens(res);
                 if (res && res.user) {
                     const merged = await fetchAndMergeBalance(res.user as AuthUser);

@@ -21,7 +21,7 @@ from ..utils.redis import (
     set_streak_protection,
 )
 from app.utils.redis import get_redis  # 일일 중복 가드용 직접 Redis 접근
-from app.utils.streak_utils import calc_next_streak_reward
+from app.utils.streak_utils import calculate_streak_reward
 
 router = APIRouter(prefix="/api/streak", tags=["Streaks"])
 
@@ -32,7 +32,7 @@ class StreakStatus(BaseModel):
     action_type: str
     count: int
     ttl_seconds: Optional[int] = None
-    next_reward: Optional[str] = None
+    # next_reward 필드 제거 - 간소화된 시스템
 
 
 class StreakClaimResponse(BaseModel):
@@ -51,8 +51,7 @@ async def status(
 ):
     cnt = get_streak_counter(str(current_user.id), action_type)
     ttl = get_streak_ttl(str(current_user.id), action_type)
-    next_reward = calc_next_streak_reward(cnt + 1)
-    return StreakStatus(action_type=action_type, count=cnt, ttl_seconds=ttl, next_reward=next_reward)
+    return StreakStatus(action_type=action_type, count=cnt, ttl_seconds=ttl)
 
 
 class TickRequest(BaseModel):
@@ -92,7 +91,6 @@ async def tick(
         cnt = get_streak_counter(str(current_user.id), action_type)
 
     ttl = get_streak_ttl(str(current_user.id), action_type)
-    next_reward = calc_next_streak_reward(cnt + 1)
 
     # 출석 기록 (증가 여부와 무관하게 하루 한 번 기록 시도 – SADD idempotent)
     try:
@@ -115,7 +113,7 @@ async def tick(
         except Exception:
             pass
 
-    return StreakStatus(action_type=action_type, count=cnt, ttl_seconds=ttl, next_reward=next_reward)
+    return StreakStatus(action_type=action_type, count=cnt, ttl_seconds=ttl)
 
 
 class ResetRequest(BaseModel):
@@ -133,16 +131,7 @@ async def reset(
     return {"ok": True}
 
 
-@router.get("/next-reward")
-async def next_reward(
-    action_type: str = Query(DEFAULT_ACTION),
-    current_user: User = Depends(get_current_user),
-):
-    cnt = get_streak_counter(str(current_user.id), action_type)
-    return {"next_reward": calc_next_streak_reward(cnt + 1)}
-
-
-# _calc_next_reward: calc_next_streak_reward (공통 util) 사용으로 제거
+# /api/streak/next-reward 엔드포인트 제거 - 간소화된 시스템에서는 불필요
 
 
 # -----------------
@@ -190,6 +179,7 @@ class ClaimRequest(BaseModel):
     action_type: Optional[str] = None
 
 from app.services.reward_service import calculate_streak_daily_reward
+from app.utils.streak_utils import calculate_streak_reward
 
 
 # ----------------------
@@ -233,8 +223,17 @@ async def preview(
         .first()
     )
     claimed_today = existing is not None
-    today_gold, today_xp = calculate_streak_daily_reward(streak_count) if streak_count > 0 else (0, 0)
-    next_gold, next_xp = calculate_streak_daily_reward(streak_count + 1)
+    
+    # 새로운 선형 보상 시스템 사용
+    if streak_count > 0:
+        reward_info = calculate_streak_reward(streak_count)
+        today_gold, today_xp = reward_info['gold'], reward_info['xp']
+    else:
+        today_gold, today_xp = 0, 0
+    
+    next_reward_info = calculate_streak_reward(streak_count + 1)
+    next_gold, next_xp = next_reward_info['gold'], next_reward_info['xp']
+    
     return StreakPreviewResponse(
         action_type=action_type,
         streak_count=streak_count,
@@ -338,7 +337,9 @@ async def claim(
             claimed_at=existing.claimed_at,
         )
 
-    gold, xp = calculate_streak_daily_reward(streak_count)
+    # 새로운 선형 보상 시스템으로 보상 계산
+    reward_info = calculate_streak_reward(streak_count)
+    gold, xp = reward_info['gold'], reward_info['xp']
 
     # 트랜잭션 처리
     try:

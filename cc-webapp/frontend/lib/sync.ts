@@ -40,6 +40,16 @@ export async function hydrateProfile(dispatch: ReturnType<typeof useGlobalStore>
       gemsBalance: Number(data?.gems ?? data?.gems_balance ?? 0),
       level: data?.level ?? data?.battlepass_level ?? undefined,
       xp: data?.xp ?? undefined,
+      // 게임 통계 필드들 추가
+      experience_points: data?.experience_points ?? data?.experience ?? data?.xp ?? 0,
+      daily_streak: data?.daily_streak ?? data?.streak ?? 0,
+      total_games_played: data?.total_games_played ?? 0,
+      total_games_won: data?.total_games_won ?? data?.total_wins ?? 0,
+      total_games_lost: data?.total_games_lost ?? data?.total_losses ?? 0,
+      win_rate: data?.win_rate ?? 0,
+      // 관리자 여부
+      isAdmin: data?.is_admin ?? data?.isAdmin ?? false,
+      is_admin: data?.is_admin ?? data?.isAdmin ?? false,
       updatedAt: new Date().toISOString(),
       ...data,
     } as any;

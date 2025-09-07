@@ -3,7 +3,7 @@ from sqlalchemy import func
 from datetime import datetime, timedelta
 from typing import List, Optional, Dict, Any
 from ..models.event_models import Event, EventParticipation
-from ..models.mission_models import Mission, UserMission
+from ..models.mission_models import Mission, UserMissionProgress
 from ..models.auth_models import User
 from ..schemas.event_schemas import *
 import logging
@@ -228,9 +228,9 @@ class MissionService:
         db: Session, 
         user_id: int, 
         mission_type: Optional[str] = None
-    ) -> List[UserMission]:
+    ) -> List[UserMissionProgress]:
         """사용자 미션 목록 조회"""
-        query = db.query(UserMission).filter(UserMission.user_id == user_id)
+        query = db.query(UserMissionProgress).filter(UserMissionProgress.user_id == user_id)
         
         if mission_type:
             query = query.join(Mission).filter(Mission.mission_type == mission_type)
@@ -241,9 +241,9 @@ class MissionService:
     def initialize_daily_missions(db: Session, user_id: int):
         """일일 미션 초기화"""
         # 기존 일일 미션 리셋
-        db.query(UserMission).filter(
-            UserMission.user_id == user_id,
-            UserMission.reset_at <= datetime.utcnow()
+        db.query(UserMissionProgress).filter(
+            UserMissionProgress.user_id == user_id,
+            UserMissionProgress.reset_at <= datetime.utcnow()
         ).delete()
         
         # 새로운 일일 미션 할당
@@ -253,7 +253,7 @@ class MissionService:
         ).all()
         
         for mission in daily_missions:
-            user_mission = UserMission(
+            user_mission = UserMissionProgress(
                 user_id=user_id,
                 mission_id=mission.id,
                 current_progress=0,
@@ -273,10 +273,10 @@ class MissionService:
     ):
         """미션 진행 상황 업데이트"""
         # 해당 타입의 모든 미션 조회
-        user_missions = db.query(UserMission).join(Mission).filter(
-            UserMission.user_id == user_id,
+        user_missions = db.query(UserMissionProgress).join(Mission).filter(
+            UserMissionProgress.user_id == user_id,
             Mission.target_type == target_type,
-            UserMission.completed == False
+            UserMissionProgress.completed == False
         ).all()
         
         completed_missions = []
@@ -311,11 +311,11 @@ class MissionService:
         mission_id: int
     ) -> Dict[str, Any]:
         """미션 보상 수령"""
-        user_mission = db.query(UserMission).filter(
-            UserMission.user_id == user_id,
-            UserMission.mission_id == mission_id,
-            UserMission.completed == True,
-            UserMission.claimed == False
+        user_mission = db.query(UserMissionProgress).filter(
+            UserMissionProgress.user_id == user_id,
+            UserMissionProgress.mission_id == mission_id,
+            UserMissionProgress.completed == True,
+            UserMissionProgress.claimed == False
         ).first()
         
         if not user_mission:

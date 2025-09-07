@@ -17,8 +17,8 @@ export function useUserGold() {
 
 export function useUserLevel() {
 	const p = useGlobalProfile();
-	// level이 없을 수 있으므로 0 기본값
-	return (p as any)?.level ?? 0;
+	// level 또는 experience_points 기반 레벨 계산
+	return (p as any)?.level ?? Math.floor(((p as any)?.experience_points ?? 0) / 500) + 1;
 }
 
 export function useIsAdmin() {
@@ -32,11 +32,32 @@ export function useUserSummary() {
 		() => ({
 			nickname: p?.nickname ?? "",
 			gold: p?.goldBalance ?? 0,
-			level: p?.level ?? 0,
-			dailyStreak: p?.dailyStreak ?? 0,
+			level: p?.level ?? Math.floor(((p?.experience_points ?? 0) / 500) + 1),
+			dailyStreak: p?.daily_streak ?? p?.dailyStreak ?? 0,
+			experiencePoints: p?.experience_points ?? p?.xp ?? 0,
+			totalGamesPlayed: p?.total_games_played ?? 0,
+			totalGamesWon: p?.total_games_won ?? 0,
+			totalGamesLost: p?.total_games_lost ?? 0,
+			winRate: p?.win_rate ?? 0,
+			currentWinStreak: p?.current_win_streak ?? 0,
 			isAdmin: !!(p?.isAdmin || p?.is_admin),
 		}),
-		[p?.nickname, p?.goldBalance, p?.level, p?.dailyStreak, p?.isAdmin, p?.is_admin]
+		[
+			p?.nickname, 
+			p?.goldBalance, 
+			p?.level, 
+			p?.daily_streak, 
+			p?.dailyStreak,
+			p?.experience_points,
+			p?.xp,
+			p?.total_games_played,
+			p?.total_games_won,
+			p?.total_games_lost,
+			p?.win_rate,
+			p?.current_win_streak,
+			p?.isAdmin, 
+			p?.is_admin
+		]
 	);
 }
 

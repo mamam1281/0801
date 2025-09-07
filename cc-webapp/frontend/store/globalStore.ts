@@ -15,6 +15,16 @@ export type GlobalUserProfile = {
     gemsBalance?: number;
     level?: number;
     xp?: number;
+    // 게임 통계 필드들 추가
+    experience_points?: number;
+    daily_streak?: number;
+    total_games_played?: number;
+    total_games_won?: number;
+    total_games_lost?: number;
+    win_rate?: number;
+    // 관리자 여부
+    isAdmin?: boolean;
+    is_admin?: boolean;
     updatedAt?: string;
     [k: string]: unknown;
 };

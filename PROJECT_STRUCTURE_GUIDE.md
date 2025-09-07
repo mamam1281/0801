@@ -1,4 +1,31 @@
+`````markdown
 ````markdown
+---
+## [2025-09-07 22:35] ✅ 관리자 로그인 UNAUTHENTICATED_NO_TOKEN 오류 해결 완료
+
+### ✅ 인증 API 호출 문제 진단 및 해결
+**문제**: 관리자 로그인 버튼 클릭 시 `Error: UNAUTHENTICATED_NO_TOKEN` 오류 발생
+**원인 분석**:
+1. unifiedApi.ts에서 `auth=true`이고 토큰이 없으면 POST 요청 시 에러 발생
+2. useAuth.ts의 adminLogin 함수에서 기본값 `auth=true`로 API 호출
+3. 로그인 API는 당연히 토큰 없이 호출되어야 하는 엔드포인트
+
+### 🔧 해결 방법
+**useAuth.ts 수정**:
+- `adminLogin`: `api.post('auth/admin/login', data, { auth: false })`
+- `login`: `api.post('auth/login', data, { auth: false })`  
+- `signup`: `api.post('auth/signup', data, { auth: false })`
+
+### ✅ 결과 검증
+- 관리자 로그인 UNAUTHENTICATED_NO_TOKEN 오류 완전 해결
+- 일반 사용자 로그인/회원가입도 동일한 방식으로 안정화
+- 모든 인증 전 API 호출이 토큰 없이 정상 동작
+
+### 🎯 운영 지침
+- 로그인/회원가입/토큰 갱신 등 인증 전 API는 반드시 `{ auth: false }` 사용
+- 새로운 공개 API 엔드포인트 추가 시 토큰 요구 여부 명확히 구분
+- unifiedApi.ts의 인증 검증 로직과 일치하도록 구현
+
 ---
 ## [2025-09-07 22:10] ✅ 시드 계정 초기화 및 게임 통계 시스템 완성
 
