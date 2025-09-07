@@ -341,21 +341,23 @@ export default function App({ isAuthenticated }: AppProps) {
             }
           } catch {}
           
-          if ((forced || allowStub) && String((process as any)?.env?.NODE_ENV) !== 'production' && !isAlreadyAuthenticated) {
+          if ((forced || allowStub) && String((process as any)?.env?.NODE_ENV) !== 'production' && !isAlreadyAuthenticated && forced) {
+            // 강제로 요청된 경우에만 스텁 유저 생성 (일반적인 경우에는 생성하지 않음)
             const stub = createUserData(forced ? 'E2E' : 'GUEST', '', false);
             updateUser(stub);
           }
         }
 
-        // 네비게이션 결정: 강제 화면 우선 → 기본 홈 (단, 외부 네비게이션이 이미 개입했으면 건드리지 않음)
+        // 네비게이션 결정: 강제 화면 우선 → 인증 상태에 따른 화면 결정 (단, 외부 네비게이션이 이미 개입했으면 건드리지 않음)
         if (!externalNavRef.current) {
           if (forced && typeof forced === 'string') {
             navigationHandlers.navigate(forced as any);
-          } else if (savedUser) {
+          } else if (savedUser || auth.user) {
+            // 인증된 사용자만 홈으로 이동
             navigationHandlers.toHome();
           } else {
-            // 스텁 유저가 생성되었을 수 있으니 홈으로 기본 이동
-            navigationHandlers.toHome();
+            // 비인증 사용자는 로그인 화면으로 이동
+            navigationHandlers.toLogin();
           }
         }
 
