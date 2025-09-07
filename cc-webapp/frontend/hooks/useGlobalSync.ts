@@ -150,17 +150,46 @@ export function useGlobalSync() {
      */
     const syncGameStats = useCallback(async (): Promise<boolean> => {
         try {
+            console.log('[GlobalSync] syncGameStats 호출됨');
             const response = await api.get(AUTHORITY_ENDPOINTS.GAME_STATS);
+            console.log('[GlobalSync] Game stats API 응답:', response);
+            
             // 단일 포맷: { success: boolean, stats: {...} }
             const raw = (response as any)?.data ?? response;
-            if (!raw || typeof raw !== 'object' || !('stats' in (raw as any))) {
-                console.warn('[GlobalSync] Unexpected stats format; expected {success, stats}. Got:', raw);
+            console.log('[GlobalSync] Game stats raw response:', raw);
+            
+            if (!raw || typeof raw !== 'object') {
+                console.warn('[GlobalSync] 잘못된 응답 형식:', raw);
                 return false;
             }
-            const statsRoot = (raw as any).stats;
+            
+            // 우리 백엔드 응답 형식에 맞게 처리
+            if (raw.success && raw.stats) {
+                console.log('[GlobalSync] 백엔드 응답 처리 중...');
+                // normalizeGameStatsResponse 함수 사용하여 변환
+                const { normalizeGameStatsResponse } = await import('@/utils/gameStatsNormalizer');
+                const normalizedStats = normalizeGameStatsResponse(raw);
+                console.log('[GlobalSync] Normalized stats:', normalizedStats);
+                
+                if (Object.keys(normalizedStats).length > 0) {
+                    // MERGE_GAME_STATS 액션 사용 (globalStore.ts와 일치)
+                    dispatch({ type: 'MERGE_GAME_STATS', game: '_me', delta: normalizedStats });
+                    lastSyncTimes.current.stats = Date.now();
+                    console.log('[GlobalSync] Game stats synced successfully');
+                    return true;
+                } else {
+                    console.warn('[GlobalSync] 정규화된 통계가 비어있음');
+                    return false;
+                }
+            } else {
+                console.warn('[GlobalSync] 응답에 success 또는 stats가 없음:', raw);
+                return false;
+            }
 
+            const statsRoot = (raw as any).stats;
             const gameStats: Record<string, any> = {};
 
+            // 기존 로직 유지 (다른 형식 지원)
             // 1) 배열 형태 (예: { game_stats: [...] } 또는 바로 [...])
             const arr = Array.isArray((statsRoot as any)?.game_stats)
                 ? (statsRoot as any).game_stats

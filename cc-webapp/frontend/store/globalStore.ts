@@ -271,12 +271,17 @@ export async function hydrateFromServer(dispatch: DispatchFn) {
         dispatch({ type: "SET_BALANCES", balances });
         if (stats && typeof stats === 'object') {
             try { 
+                console.log('[hydrateFromServer] 원본 게임 통계:', stats);
                 // 백엔드 응답을 프론트엔드 형식으로 변환
                 const normalizedStats = normalizeGameStatsResponse(stats);
+                console.log('[hydrateFromServer] 정규화된 게임 통계:', normalizedStats);
                 dispatch({ type: "MERGE_GAME_STATS", game: "_me", delta: normalizedStats }); 
+                console.log('[hydrateFromServer] 게임 통계 스토어에 저장 완료');
             } catch (e) { 
                 console.warn('게임 통계 처리 실패:', e);
             }
+        } else {
+            console.warn('[hydrateFromServer] 게임 통계 데이터 없음:', stats);
         }
     } catch (e:any) {
         dispatch({ type: "SET_ERROR", error: { message: e?.message || "hydrateFromServer failed", at: Date.now() } });

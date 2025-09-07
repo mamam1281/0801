@@ -84,18 +84,198 @@ export default function App({ isAuthenticated }: AppProps) {
     setIsClient(true);
   }, []);
 
-  // SSR에서 인증되지 않은 경우 또는 클라이언트 렌더링 전에는 로딩 화면 표시
-  if (isAuthenticated === false || !isClient) {
-    return <LoadingScreen />;
-  }
+  //  useAuth 사용자 변경 감지 - 백엔드 인증 상태가 변경되면 UI 상태 동기화
+  useEffect(() => {
+    if (auth.user && !auth.loading) {
+      console.log('[App] useAuth 사용자 변경 감지:', auth.user.nickname);
+      
+      // 현재 UI 사용자가 GUEST이고 백엔드에 인증된 사용자가 있다면 업데이트
+      if (user?.nickname === 'GUEST' || user?.nickname === 'E2E') {
+        console.log('[App] GUEST → 인증된 사용자로 UI 상태 업데이트');
+        const authUserData = createUserData(
+          auth.user.nickname || 'USER',
+          '',
+          false
+        );
+        if (auth.user.goldBalance !== undefined) {
+          authUserData.goldBalance = auth.user.goldBalance;
+        }
+        updateUser(authUserData);
+      }
+    }
+  }, [auth.user, auth.loading, user?.nickname, createUserData, updateUser]);
+
+  // 🔄 앱 초기화 - 한 번만 실행되도록 개선
+  useEffect(() => {
+    if (hasInitialized) return;
+
+    const initializeApp = async () => {
+      try {
+        // 테스트 전용 강제 화면 플래그 우선 확인
+        let forced: string | null = null;
+        try {
+          forced = localStorage.getItem('E2E_FORCE_SCREEN');
+        } catch {}
+
+        const savedUser = restoreSavedUser();
+        
+        console.log('[App] 초기화 상태:', {
+          savedUser: savedUser?.nickname,
+          authUser: auth.user?.nickname,
+          hasAuthUser: !!auth.user
+        });
+        
+        // 백엔드 인증 상태 확인 - 이미 로그인된 상태라면 사용자 정보 복원
+        if (!savedUser && auth.user) {
+          console.log('[App] 백엔드 인증 사용자로 UI 상태 업데이트:', auth.user.nickname);
+          // 백엔드에서 인증된 사용자가 있다면 UI 상태에 반영
+          const authUserData = createUserData(
+            auth.user.nickname || 'USER',
+            '',
+            false
+          );
+          if (auth.user.goldBalance !== undefined) {
+            authUserData.goldBalance = auth.user.goldBalance;
+          }
+          updateUser(authUserData);
+        } else if (savedUser) {
+          console.log('[App] 저장된 사용자 복원:', savedUser.nickname);
+          updateUser(savedUser);
+        } else {
+          // production 환경에서는 절대 게스트 스텁 유저 생성 금지
+          // 그리고 이미 인증된 사용자가 있다면 스텁 생성하지 않음
+          let allowStub = false;
+          const isAlreadyAuthenticated = !!auth.user;
+          
+          try {
+            const env = (process as any)?.env?.NODE_ENV;
+            if (env && String(env) === 'production') {
+              allowStub = false;
+            } else if (!isAlreadyAuthenticated) {
+              // 개발/테스트 환경에서만 허용하고, 인증되지 않은 경우에만
+              const stubEnv = (process as any)?.env?.NEXT_PUBLIC_ALLOW_STUB_USER;
+              if (stubEnv && (String(stubEnv) === '1' || String(stubEnv).toLowerCase() === 'true')) allowStub = true;
+              if (!allowStub && typeof window !== 'undefined') {
+                allowStub = window.localStorage.getItem('E2E_ALLOW_STUB') === '1';
+              }
+              if (!allowStub) allowStub = true; // 개발 기본 허용
+            }
+          } catch {}
+          
+          if ((forced || allowStub) && String((process as any)?.env?.NODE_ENV) !== 'production' && !isAlreadyAuthenticated && forced) {
+            // 강제로 요청된 경우에만 스텁 유저 생성 (일반적인 경우에는 생성하지 않음)
+            const stub = createUserData(forced ? 'E2E' : 'GUEST', '', false);
+            updateUser(stub);
+          }
+        }
+
+        // 네비게이션 결정: 강제 화면 우선 → 인증 상태에 따른 화면 결정 (단, 외부 네비게이션이 이미 개입했으면 건드리지 않음)
+        if (!externalNavRef.current) {
+          if (forced && typeof forced === 'string') {
+            navigationHandlers.navigate(forced as any);
+          } else if (savedUser || auth.user) {
+            // 인증된 사용자만 홈으로 이동
+            navigationHandlers.toHome();
+          } else {
+            // 비인증 사용자는 로그인 화면으로 이동
+            navigationHandlers.toLogin();
+          }
+        }
+
+        // 저장 유저가 있는 경우에만 일일 보너스 체크 수행
+        if (savedUser) {
+          const lastLogin = new Date(savedUser.lastLogin);
+          const today = new Date();
+          const timeDiff = today.getTime() - lastLogin.getTime();
+          const daysDiff = Math.floor(timeDiff / (1000 * 3600 * 24));
+
+          if (daysDiff >= 1) {
+            const { updatedUser, bonusGold } = processDailyBonus(savedUser);
+            updateUser(updatedUser);
+            addNotification(NOTIFICATION_MESSAGES.DAILY_BONUS(bonusGold, updatedUser.dailyStreak));
+          }
+        }
+
+        setHasInitialized(true);
+      } catch (error) {
+        console.error('App initialization failed:', error);
+        setHasInitialized(true);
+      }
+    };
+
+    initializeApp();
+  }, [
+    hasInitialized,
+    restoreSavedUser,
+    updateUser,
+    navigationHandlers,
+    processDailyBonus,
+    addNotification,
+    auth.user,
+    createUserData
+  ]);
+
+  // E2E 전용 전역 헬퍼 노출: 테스트에서 직접 화면 전환/유저 시드 가능
+  useEffect(() => {
+    try {
+      // 화면 전환
+      (window as any).__E2E_NAV = (screen: string) => {
+        try { externalNavRef.current = true; } catch {}
+        navigationHandlers.navigate(screen as any);
+      };
+      // 유저 주입 (미지정 시 기본 스텁)
+      (window as any).__E2E_SET_USER = (stub?: any) => {
+        const u = stub || createUserData('E2E', '', false);
+        updateUser(u as any);
+      };
+    } catch {
+      // noop
+    }
+  }, [navigationHandlers, updateUser, createUserData]);
+
+  // 개발/테스트 편의: 게임 화면 진입 시 유저가 없으면 안전 스텁 자동 주입
+  useEffect(() => {
+    const isGameScreen = (
+      currentScreen === 'game-dashboard' ||
+      currentScreen === 'neon-slot' ||
+      currentScreen === 'rock-paper-scissors' ||
+      currentScreen === 'gacha-system' ||
+      currentScreen === 'neon-crash'
+    );
+    if (!isGameScreen || user) return;
+    // production 환경에서는 절대 게스트 스텁 유저 생성 금지
+    let allow = false;
+    try {
+      const env = (process as any)?.env?.NODE_ENV;
+      if (env && String(env) === 'production') {
+        allow = false;
+      } else {
+        // 개발/테스트 환경에서만 허용
+        const stubEnv = (process as any)?.env?.NEXT_PUBLIC_ALLOW_STUB_USER;
+        if (stubEnv && (String(stubEnv) === '1' || String(stubEnv).toLowerCase() === 'true')) allow = true;
+        if (!allow && typeof window !== 'undefined') {
+          allow = window.localStorage.getItem('E2E_ALLOW_STUB') === '1';
+        }
+        if (!allow) allow = true; // 개발 기본 허용
+      }
+    } catch {/* ignore */}
+    if (allow && String((process as any)?.env?.NODE_ENV) !== 'production') {
+      const stub = createUserData('GUEST', '', false);
+      updateUser(stub);
+    }
+  }, [currentScreen, user, createUserData, updateUser]);
+
+  // 🏠 하단 네비게이션 표시 여부 결정 (메모이제이션)
+  const showBottomNavigation = useMemo(() => {
+    return SCREENS_WITH_BOTTOM_NAV.includes(currentScreen as any) && user;
+  }, [currentScreen, user]);
 
   // ---------------------------------------------------------------------------
-  // Backend 연동 어댑터 함수들
-  // 기존 컴포넌트들은 nickname 기반 User (game-user) 객체를 기대하므로
-  // 서버 인증 성공 후 기존 createUserData 로 UI용 사용자 상태를 구성 (임시)
-  // 향후: 서버 프로필 스키마와 UI User 타입 통합 예정.
+  // Daily Reward Claimed Dialog 상태 
   // ---------------------------------------------------------------------------
+  const [isDailyRewardClaimedOpen, setDailyRewardClaimedOpen] = useState(false);
 
+  // 모든 콜백 함수들 정의
   const handleLogin = React.useCallback(
     async (nickname: string, password: string): Promise<boolean> => {
       setIsLoading(true);
@@ -260,213 +440,25 @@ export default function App({ isAuthenticated }: AppProps) {
     addNotification(NOTIFICATION_MESSAGES.LOGOUT_SUCCESS);
   }, [auth, logout, closeSideMenu, navigationHandlers, addNotification]);
 
-  // 🔄 useAuth 사용자 변경 감지 - 백엔드 인증 상태가 변경되면 UI 상태 동기화
-  useEffect(() => {
-    if (auth.user && !auth.loading) {
-      console.log('[App] useAuth 사용자 변경 감지:', auth.user.nickname);
-      
-      // 현재 UI 사용자가 GUEST이고 백엔드에 인증된 사용자가 있다면 업데이트
-      if (user?.nickname === 'GUEST' || user?.nickname === 'E2E') {
-        console.log('[App] GUEST → 인증된 사용자로 UI 상태 업데이트');
-        const authUserData = createUserData(
-          auth.user.nickname || 'USER',
-          '',
-          false
-        );
-        if (auth.user.goldBalance !== undefined) {
-          authUserData.goldBalance = auth.user.goldBalance;
-        }
-        updateUser(authUserData);
-      }
-    }
-  }, [auth.user, auth.loading, user?.nickname, createUserData, updateUser]);
-
-  // 🔄 앱 초기화 - 한 번만 실행되도록 개선
-  useEffect(() => {
-    if (hasInitialized) return;
-
-    const initializeApp = async () => {
-      try {
-        // 테스트 전용 강제 화면 플래그 우선 확인
-        let forced: string | null = null;
-        try {
-          forced = localStorage.getItem('E2E_FORCE_SCREEN');
-        } catch {}
-
-        const savedUser = restoreSavedUser();
-        
-        console.log('[App] 초기화 상태:', {
-          savedUser: savedUser?.nickname,
-          authUser: auth.user?.nickname,
-          hasAuthUser: !!auth.user
-        });
-        
-        // 백엔드 인증 상태 확인 - 이미 로그인된 상태라면 사용자 정보 복원
-        if (!savedUser && auth.user) {
-          console.log('[App] 백엔드 인증 사용자로 UI 상태 업데이트:', auth.user.nickname);
-          // 백엔드에서 인증된 사용자가 있다면 UI 상태에 반영
-          const authUserData = createUserData(
-            auth.user.nickname || 'USER',
-            '',
-            false
-          );
-          if (auth.user.goldBalance !== undefined) {
-            authUserData.goldBalance = auth.user.goldBalance;
-          }
-          updateUser(authUserData);
-        } else if (savedUser) {
-          console.log('[App] 저장된 사용자 복원:', savedUser.nickname);
-          updateUser(savedUser);
-        } else {
-          // production 환경에서는 절대 게스트 스텁 유저 생성 금지
-          // 그리고 이미 인증된 사용자가 있다면 스텁 생성하지 않음
-          let allowStub = false;
-          const isAlreadyAuthenticated = !!auth.user;
-          
-          try {
-            const env = (process as any)?.env?.NODE_ENV;
-            if (env && String(env) === 'production') {
-              allowStub = false;
-            } else if (!isAlreadyAuthenticated) {
-              // 개발/테스트 환경에서만 허용하고, 인증되지 않은 경우에만
-              const stubEnv = (process as any)?.env?.NEXT_PUBLIC_ALLOW_STUB_USER;
-              if (stubEnv && (String(stubEnv) === '1' || String(stubEnv).toLowerCase() === 'true')) allowStub = true;
-              if (!allowStub && typeof window !== 'undefined') {
-                allowStub = window.localStorage.getItem('E2E_ALLOW_STUB') === '1';
-              }
-              if (!allowStub) allowStub = true; // 개발 기본 허용
-            }
-          } catch {}
-          
-          if ((forced || allowStub) && String((process as any)?.env?.NODE_ENV) !== 'production' && !isAlreadyAuthenticated && forced) {
-            // 강제로 요청된 경우에만 스텁 유저 생성 (일반적인 경우에는 생성하지 않음)
-            const stub = createUserData(forced ? 'E2E' : 'GUEST', '', false);
-            updateUser(stub);
-          }
-        }
-
-        // 네비게이션 결정: 강제 화면 우선 → 인증 상태에 따른 화면 결정 (단, 외부 네비게이션이 이미 개입했으면 건드리지 않음)
-        if (!externalNavRef.current) {
-          if (forced && typeof forced === 'string') {
-            navigationHandlers.navigate(forced as any);
-          } else if (savedUser || auth.user) {
-            // 인증된 사용자만 홈으로 이동
-            navigationHandlers.toHome();
-          } else {
-            // 비인증 사용자는 로그인 화면으로 이동
-            navigationHandlers.toLogin();
-          }
-        }
-
-        // 저장 유저가 있는 경우에만 일일 보너스 체크 수행
-        if (savedUser) {
-          const lastLogin = new Date(savedUser.lastLogin);
-          const today = new Date();
-          const timeDiff = today.getTime() - lastLogin.getTime();
-          const daysDiff = Math.floor(timeDiff / (1000 * 3600 * 24));
-
-          if (daysDiff >= 1) {
-            const { updatedUser, bonusGold } = processDailyBonus(savedUser);
-            updateUser(updatedUser);
-            addNotification(NOTIFICATION_MESSAGES.DAILY_BONUS(bonusGold, updatedUser.dailyStreak));
-          }
-        }
-
-  setHasInitialized(true);
-      } catch (error) {
-        console.error('App initialization failed:', error);
-        setHasInitialized(true);
-      }
-    };
-
-    initializeApp();
-  }, [
-    hasInitialized,
-    restoreSavedUser,
-    updateUser,
-    navigationHandlers,
-    processDailyBonus,
-    addNotification,
-  ]);
-
-  // 🏠 하단 네비게이션 표시 여부 결정 (메모이제이션)
-  const showBottomNavigation = useMemo(() => {
-    return SCREENS_WITH_BOTTOM_NAV.includes(currentScreen as any) && user;
-  }, [currentScreen, user]);
-
-  // E2E 전용 전역 헬퍼 노출: 테스트에서 직접 화면 전환/유저 시드 가능
-  useEffect(() => {
-    try {
-      // 화면 전환
-      (window as any).__E2E_NAV = (screen: string) => {
-        try { externalNavRef.current = true; } catch {}
-        navigationHandlers.navigate(screen as any);
-      };
-      // 유저 주입 (미지정 시 기본 스텁)
-      (window as any).__E2E_SET_USER = (stub?: any) => {
-        const u = stub || createUserData('E2E', '', false);
-        updateUser(u as any);
-      };
-    } catch {
-      // noop
-    }
-  }, [navigationHandlers, updateUser, createUserData]);
-
-  // 개발/테스트 편의: 게임 화면 진입 시 유저가 없으면 안전 스텁 자동 주입
-  // 활성 조건: 
-  //  - NEXT_PUBLIC_ALLOW_STUB_USER=1 또는 true
-  //  - 로컬스토리지 E2E_ALLOW_STUB=1
-  //  - NODE_ENV !== 'production' (개발 기본 허용)
-  useEffect(() => {
-    const isGameScreen = (
-      currentScreen === 'game-dashboard' ||
-      currentScreen === 'neon-slot' ||
-      currentScreen === 'rock-paper-scissors' ||
-      currentScreen === 'gacha-system' ||
-      currentScreen === 'neon-crash'
-    );
-    if (!isGameScreen || user) return;
-    // production 환경에서는 절대 게스트 스텁 유저 생성 금지
-    let allow = false;
-    try {
-      const env = (process as any)?.env?.NODE_ENV;
-      if (env && String(env) === 'production') {
-        allow = false;
-      } else {
-        // 개발/테스트 환경에서만 허용
-        const stubEnv = (process as any)?.env?.NEXT_PUBLIC_ALLOW_STUB_USER;
-        if (stubEnv && (String(stubEnv) === '1' || String(stubEnv).toLowerCase() === 'true')) allow = true;
-        if (!allow && typeof window !== 'undefined') {
-          allow = window.localStorage.getItem('E2E_ALLOW_STUB') === '1';
-        }
-        if (!allow) allow = true; // 개발 기본 허용
-      }
-    } catch {/* ignore */}
-    if (allow && String((process as any)?.env?.NODE_ENV) !== 'production') {
-      const stub = createUserData('GUEST', '', false);
-      updateUser(stub);
-    }
-  }, [currentScreen, user, createUserData, updateUser]);
-
-  // ---------------------------------------------------------------------------
-  // Daily Reward Claimed Dialog 상태 (이미 수령한 경우 노출)
-  // 실제 트리거 지점은 Daily Reward 버튼 클릭 시 백엔드 응답이 'already claimed' 일 때 set true
-  // ---------------------------------------------------------------------------
-  const [isDailyRewardClaimedOpen, setDailyRewardClaimedOpen] = useState(false);
-  const openDailyRewardClaimed = () => setDailyRewardClaimedOpen(true);
-  const closeDailyRewardClaimed = () => setDailyRewardClaimedOpen(false);
+  const openDailyRewardClaimed = useCallback(() => setDailyRewardClaimedOpen(true), []);
+  const closeDailyRewardClaimed = useCallback(() => setDailyRewardClaimedOpen(false), []);
 
   // 내일 알림 받기 (추후 서비스 워커/푸시 연동 예정) - 현재는 토스트로 스텁
-  const handleScheduleDailyRewardReminder = () => {
+  const handleScheduleDailyRewardReminder = useCallback(() => {
     addNotification(
       <span className="text-amber-300">내일 00:00 리셋 알림이 예약(가상)되었습니다.</span>
     );
-  };
+  }, [addNotification]);
 
   // 다른 게임 하기 버튼 -> 게임 대시보드 이동
-  const handleNavigateToGamesFromDialog = () => {
+  const handleNavigateToGamesFromDialog = useCallback(() => {
     navigationHandlers.toGames();
-  };
+  }, [navigationHandlers]);
+
+  // SSR에서 인증되지 않은 경우 또는 클라이언트 렌더링 전에는 로딩 화면 표시
+  if (isAuthenticated === false || !isClient) {
+    return <LoadingScreen />;
+  }
 
   return (
     <div className="dark">
