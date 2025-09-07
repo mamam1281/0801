@@ -50,6 +50,17 @@ export interface SyncEventData {
     reward_data: Record<string, any>;
     source: string;
   };
+  game_event?: {
+    subtype: string;
+    user_id: number;
+    game_type: string;
+    bet?: number;
+    win?: number;
+    reels?: string[];
+    jackpot?: boolean;
+    streak?: number;
+    [key: string]: any;
+  };
   stats_update?: {
     user_id: number;
     game_type?: string;

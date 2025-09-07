@@ -85,13 +85,12 @@ from .chat_models import (
 from .event_models import (
     Event,
     EventParticipation,
-    UserMission,
 )
 
 # Mission models
 from .mission_models import (
     Mission,
-    UserMissionProgress,
+    UserMission,
 )
 
 # New admin persistence models (events / missions templates / reward catalog / audit)
@@ -183,7 +182,8 @@ __all__ = [
     "SupportedEmotion",
 
     # Mission Models
-    "UserMissionProgress",
+    "Mission",
+    "UserMission",
     "PageView",
     "ConversionEvent",
     "ABTestParticipant",
@@ -191,8 +191,7 @@ __all__ = [
 
     # Event Models
     "Event",
-    "EventParticipation", 
-    "UserMission",
+    "EventParticipation",
 
     # History
     "GameHistory",

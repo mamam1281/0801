@@ -5,6 +5,8 @@
  * 백엔드와의 통신을 처리하는 함수들
  */
 
+import { getTokens, setTokens, clearTokens } from './tokenStorage.js';
+
 // 개발 기본값: IPv4 루프백을 사용하여 호스트의 IPv6 문제 회피
 const API_BASE_URL = 'http://127.0.0.1:8000'; // 백엔드 API 주소 (필요에 따라 수정)
 
@@ -81,22 +83,8 @@ export const apiLogger = {
   }
 };
 
-// 토큰 관리
-export const getTokens = () => {
-  const accessToken = localStorage.getItem('access_token');
-  const refreshToken = localStorage.getItem('refresh_token');
-  return { accessToken, refreshToken };
-};
-
-export const setTokens = (accessToken: string, refreshToken: string) => {
-  localStorage.setItem('access_token', accessToken);
-  localStorage.setItem('refresh_token', refreshToken);
-};
-
-export const clearTokens = () => {
-  localStorage.removeItem('access_token');
-  localStorage.removeItem('refresh_token');
-};
+// 토큰 관리는 tokenStorage.js로 통합됨 - 중복 제거
+// export const getTokens, setTokens, clearTokens는 ../utils/tokenStorage.js 사용
 
 // 기본 API 요청 함수
 const apiRequest = async (endpoint: string, options: RequestInit = {}) => {
@@ -108,7 +96,8 @@ const apiRequest = async (endpoint: string, options: RequestInit = {}) => {
     // 요청 로깅
     apiLogger.request(method, endpoint, requestData);
     
-    const { accessToken } = getTokens();
+    const tokens = getTokens();
+    const accessToken = tokens?.access_token;
     
     const headers = {
       'Content-Type': 'application/json',
@@ -162,7 +151,8 @@ export const refreshAccessToken = async (): Promise<boolean> => {
   try {
     apiLogger.request(method, endpoint, { message: '토큰 갱신 시도 중...' });
     
-    const { refreshToken } = getTokens();
+    const tokens = getTokens();
+    const refreshToken = tokens?.refresh_token;
     if (!refreshToken) {
       apiLogger.error(method, endpoint, '리프레시 토큰이 없습니다.');
       return false;
@@ -184,7 +174,7 @@ export const refreshAccessToken = async (): Promise<boolean> => {
 
     apiLogger.response(method, endpoint, response.status, { message: '토큰 갱신 성공' }, duration);
     
-    setTokens(data.access_token, refreshToken); // 리프레시 토큰은 유지
+    setTokens({ access_token: data.access_token, refresh_token: refreshToken }); // 리프레시 토큰은 유지
     return true;
   } catch (error) {
     apiLogger.error(method, endpoint, error);

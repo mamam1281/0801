@@ -2,7 +2,8 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from datetime import datetime, timedelta
 from typing import List, Optional, Dict, Any
-from ..models.event_models import Event, EventParticipation, Mission, UserMission
+from ..models.event_models import Event, EventParticipation
+from ..models.mission_models import Mission, UserMission
 from ..models.auth_models import User
 from ..schemas.event_schemas import *
 import logging

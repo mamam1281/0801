@@ -474,6 +474,33 @@ export function RealtimeSyncProvider({ children, apiBaseUrl }: RealtimeSyncProvi
         dispatch({ type: 'UPDATE_STATS', payload: message.data });
         break;
 
+      case 'game_event': {
+        const data = message.data as any;
+        console.log('[RealtimeSync] Game event received:', data);
+        
+        // 게임 이벤트 처리 (슬롯, RPS 등)
+        if (data.subtype === 'slot_spin') {
+          // 슬롯 스핀 결과에 대한 실시간 피드백
+          console.log('[RealtimeSync] Slot spin result:', {
+            win: data.win,
+            jackpot: data.jackpot,
+            reels: data.reels
+          });
+          
+          // 잭팟이나 큰 승리시 토스트 표시
+          if (data.jackpot) {
+            try { 
+              console.log('[Toast] 🎰 JACKPOT! 잭팟을 터뜨렸습니다!'); 
+            } catch {}
+          } else if (data.win > data.bet * 5) {
+            try { 
+              console.log(`[Toast] 🎉 대박! ${data.win}G 획득!`); 
+            } catch {}
+          }
+        }
+        break;
+      }
+
       case 'pong':
         // 하트비트 응답 - 특별한 처리 불요
         break;

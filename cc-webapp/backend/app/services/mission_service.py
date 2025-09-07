@@ -1,5 +1,6 @@
 from sqlalchemy.orm import Session
 from typing import List
+from datetime import datetime
 
 from .. import models
 from .reward_service import RewardService
@@ -13,22 +14,25 @@ class MissionService:
         Lists all active missions and the user's progress for each.
         """
         active_missions = self.db.query(models.Mission).filter(models.Mission.is_active == True).all()
-        user_progress = self.db.query(models.UserMissionProgress).filter(models.UserMissionProgress.user_id == user_id).all()
+        user_progress = self.db.query(models.UserMission).filter(models.UserMission.user_id == user_id).all()
 
         progress_map = {p.mission_id: p for p in user_progress}
 
         missions_with_progress = []
         for mission in active_missions:
             progress = progress_map.get(mission.id)
+            # rewards JSON에서 정보 추출
+            reward_info = mission.rewards if mission.rewards else {}
             missions_with_progress.append({
                 "mission_id": mission.id,
                 "title": mission.title,
                 "description": mission.description,
-                "target_count": mission.target_count,
-                "reward_amount": mission.reward_amount,
-                "current_count": progress.current_count if progress else 0,
-                "is_completed": progress.is_completed if progress else False,
-                "is_claimed": progress.is_claimed if progress else False,
+                "target_value": mission.target_value,
+                "target_type": mission.target_type,
+                "rewards": mission.rewards,
+                "current_progress": progress.current_progress if progress else 0,
+                "completed": progress.completed if progress else False,
+                "claimed": progress.claimed if progress else False,
             })
         return missions_with_progress
 
@@ -39,19 +43,19 @@ class MissionService:
         # Find all active missions related to this action
         relevant_missions = self.db.query(models.Mission).filter(
             models.Mission.is_active == True,
-            models.Mission.target_action == action_type
+            models.Mission.target_type == action_type
         ).all()
 
         for mission in relevant_missions:
-            progress = self.db.query(models.UserMissionProgress).filter_by(user_id=user_id, mission_id=mission.id).first()
+            progress = self.db.query(models.UserMission).filter_by(user_id=user_id, mission_id=mission.id).first()
             if not progress:
-                progress = models.UserMissionProgress(user_id=user_id, mission_id=mission.id)
+                progress = models.UserMission(user_id=user_id, mission_id=mission.id)
                 self.db.add(progress)
 
-            if not progress.is_completed:
-                progress.current_count += 1
-                if progress.current_count >= mission.target_count:
-                    progress.is_completed = True
+            if not progress.completed:
+                progress.current_progress += 1
+                if progress.current_progress >= mission.target_value:
+                    progress.completed = True
                     progress.completed_at = datetime.utcnow()
 
         self.db.commit()
@@ -60,25 +64,30 @@ class MissionService:
         """
         Allows a user to claim the reward for a completed, unclaimed mission.
         """
-        progress = self.db.query(models.UserMissionProgress).filter_by(user_id=user_id, mission_id=mission_id).first()
+        progress = self.db.query(models.UserMission).filter_by(user_id=user_id, mission_id=mission_id).first()
 
-        if not progress or not progress.is_completed:
+        if not progress or not progress.completed:
             raise ValueError("Mission not completed.")
 
-        if progress.is_claimed:
+        if progress.claimed:
             raise ValueError("Reward already claimed.")
 
         mission = self.db.query(models.Mission).filter_by(id=mission_id).one()
 
+        # rewards는 JSON 필드이므로 파싱 필요
+        reward_info = mission.rewards if mission.rewards else {}
+        reward_type = reward_info.get('type', 'cyber_token')
+        reward_amount = reward_info.get('amount', 100)
+
         reward_service = RewardService(self.db)
         user_reward = reward_service.distribute_reward(
             user_id=user_id,
-            reward_type=mission.reward_type,
-            amount=mission.reward_amount,
+            reward_type=reward_type,
+            amount=reward_amount,
             source_description=f"Mission Complete: {mission.title}"
         )
 
-        progress.is_claimed = True
+        progress.claimed = True
         progress.claimed_at = datetime.utcnow()
         self.db.commit()
 
