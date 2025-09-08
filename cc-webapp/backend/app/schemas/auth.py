@@ -71,6 +71,8 @@ class UserResponse(BaseModel):
     # Progress / level (추가: 프론트 경험치/레벨 표시 정합성 확보)
     battlepass_level: int = 1
     experience: int = 0  # total_experience (없으면 0)
+    experience_points: int = 0  # 프론트 경험치 필드 (동일값)
+    level: int = 1  # 프론트 레벨 필드 (battlepass_level과 동일)
     max_experience: int = 1000  # UI에서 maxExperience fallback 사용
     
     model_config = ConfigDict(from_attributes=True)

@@ -5,6 +5,7 @@ Delegates business logic to services.auth_service.AuthService.
 """
 
 import logging
+from sqlalchemy import func
 import os
 from fastapi import APIRouter, Depends, HTTPException, status, Body, Request
 from pydantic import BaseModel, Field
@@ -65,6 +66,32 @@ def _build_user_response(user: User) -> UserResponse:
     level = getattr(user, "battlepass_level", 1) or 1
     max_exp = 1000 + (level - 1) * 100  # keep existing simple progression
 
+    # streak 보상 경험치 합산
+    from sqlalchemy.orm import Session
+    from app.models.game_models import UserReward
+    db = None
+    try:
+        import inspect
+        frame = inspect.currentframe()
+        while frame:
+            if "db" in frame.f_locals:
+                db = frame.f_locals["db"]
+                break
+            frame = frame.f_back
+    except Exception:
+        db = None
+    streak_xp = 0
+    if db:
+        from datetime import datetime
+        today = datetime.utcnow().date()
+        rewards = db.query(UserReward).filter(
+            UserReward.user_id == user.id,
+            UserReward.reward_type == "STREAK_DAILY",
+            func.date(UserReward.claimed_at) == today
+        ).all()
+        streak_xp = sum([r.xp_amount or 0 for r in rewards])
+    total_xp = int(total_exp) if isinstance(total_exp, (int, float)) else 0
+    total_xp += streak_xp
     return UserResponse(
         id=user.id,
         site_id=user.site_id,
@@ -75,9 +102,11 @@ def _build_user_response(user: User) -> UserResponse:
         is_admin=getattr(user, "is_admin", False),
         is_active=getattr(user, "is_active", True),
         gold_balance=getattr(user, "gold_balance", 0),
-    vip_points=getattr(user, "vip_points", 0),
+        vip_points=getattr(user, "vip_points", 0),
         battlepass_level=level,
-        experience=int(total_exp) if isinstance(total_exp, (int, float)) else 0,
+        experience=total_xp,
+        experience_points=total_xp,
+        level=level,
         max_experience=int(max_exp),
     )
 

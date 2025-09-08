@@ -4,6 +4,7 @@ import * as React from "react";
 import { Slot } from "@radix-ui/react-slot";
 import { VariantProps, cva } from "class-variance-authority";
 import { PanelLeftIcon } from "lucide-react";
+import { useGlobalProfile } from '@/store/globalStore';
 
 import { useIsMobile } from "./use-mobile";
 import { cn } from "../utils";
@@ -502,9 +503,11 @@ function SidebarMenuButton({
   tooltip,
   className,
   ...props
-}: any) {
-  const Comp = asChild ? Slot : "button";
-  const { isMobile, state } = useSidebar();
+  }: any) {
+    const Comp = asChild ? Slot : "button";
+    const { isMobile, state } = useSidebar();
+    // 전역 프로필에서 streak 표시 (존재 시)
+    const globalProfile = useGlobalProfile();
 
   const button = (
     <Comp
@@ -600,6 +603,7 @@ function SidebarMenuSkeleton({
   const width = React.useMemo(() => {
     return `${Math.floor(Math.random() * 40) + 50}%`;
   }, []);
+  const globalProfile = useGlobalProfile();
 
   return (
     <div
@@ -615,14 +619,16 @@ function SidebarMenuSkeleton({
         />
       )}
       <Skeleton
-        className="h-4 max-w-(--skeleton-width) flex-1"
+        className="h-4 flex-1"
         data-sidebar="menu-skeleton-text"
-        style={
-          {
-            "--skeleton-width": width,
-          } as any
-        }
+        style={{ width }}
       />
+      {/* 연속출석일 표시 (globalProfile.daily_streak) */}
+      {typeof globalProfile?.daily_streak === 'number' && (
+        <div className="px-4 py-2 text-xs text-primary font-bold">
+          🔥 {Math.max(1, globalProfile.daily_streak)}일 연속 출석
+        </div>
+      )}
     </div>
   );
 }

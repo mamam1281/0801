@@ -46,7 +46,7 @@ export function useUserSummary() {
 			return total + (typeof wins === 'number' && !Number.isNaN(wins) ? wins : 0);
 		}, 0);
 	}, [allStatsEntries]);
-	
+
 	// 현재 연승수 계산 (가장 높은 값 사용)
 	const currentWinStreak = useMemo(() => {
 		const streaks = allStatsEntries.map((entry: any) => {
@@ -57,14 +57,28 @@ export function useUserSummary() {
 		});
 		return Math.max(0, ...streaks);
 	}, [allStatsEntries]);
-	
+
+	// 연속보상 경험치 반영: streak에서 받은 포인트를 경험치에 합산
+	const streakRewardXp = (() => {
+		const streak = state?.streak || {};
+		// streak.reward_points 또는 streak.xp_reward 등 다양한 필드 지원
+		const xp = streak.reward_points ?? streak.xp_reward ?? streak.xp ?? 0;
+		return typeof xp === 'number' && xp > 0 ? xp : 0;
+	})();
+
+	// dailyStreak: 0일차는 1일차로 보정
+	const dailyStreak = Math.max(1, p?.daily_streak ?? p?.dailyStreak ?? 1);
+
+	// 경험치: 프로필 경험치 + streak 보상 경험치
+	const experiencePoints = (p?.experience_points ?? p?.xp ?? 0) + streakRewardXp;
+
 	return useMemo(
 		() => ({
 			nickname: p?.nickname ?? "",
 			gold: p?.goldBalance ?? 0,
-			level: p?.level ?? Math.floor(((p?.experience_points ?? 0) / 500) + 1),
-			dailyStreak: p?.daily_streak ?? p?.dailyStreak ?? 0,
-			experiencePoints: p?.experience_points ?? p?.xp ?? 0,
+			level: p?.level ?? Math.floor((experiencePoints / 500) + 1),
+			dailyStreak,
+			experiencePoints,
 			totalGamesPlayed: globalTotalGames,
 			totalGamesWon: totalWins,
 			totalGamesLost: Math.max(0, globalTotalGames - totalWins),
@@ -76,10 +90,8 @@ export function useUserSummary() {
 			p?.nickname, 
 			p?.goldBalance, 
 			p?.level, 
-			p?.daily_streak, 
-			p?.dailyStreak,
-			p?.experience_points,
-			p?.xp,
+			dailyStreak,
+			experiencePoints,
 			globalTotalGames,
 			totalWins,
 			currentWinStreak,

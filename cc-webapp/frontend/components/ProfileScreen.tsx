@@ -42,6 +42,8 @@ export function ProfileScreen({
   const globalProfile = useGlobalProfile();
   const { state } = useGlobalStore();
   const storeGameStats = state.gameStats || {};
+  // 경험치/레벨 전역 셀렉터 사용
+  const userSummary = require('@/hooks/useSelectors').useUserSummary();
 
   // 초기 동기화
   useEffect(() => {
@@ -446,11 +448,11 @@ export function ProfileScreen({
   }
 
   // 전역 프로필에서 XP, maxExperience, daily_streak, level을 직접 읽어 UI에 반영
-  const authoritativeXp = (globalProfile?.xp ?? globalProfile?.experience_points ?? 0) as number;
+  const authoritativeXp = userSummary.experiencePoints;
   const authoritativeMaxXp = (globalProfile as any)?.maxExperience ?? (globalProfile as any)?.max_experience ?? 1000;
   const progressToNext = authoritativeMaxXp ? (authoritativeXp / authoritativeMaxXp) * 100 : 0;
-  const authoritativeLevel = (globalProfile?.level ?? 1) as number;
-  const authoritativeDailyStreak = (globalProfile as any)?.daily_streak ?? (globalProfile as any)?.dailyStreak ?? 0;
+  const authoritativeLevel = userSummary.level;
+  const authoritativeDailyStreak = Math.max(1, userSummary.dailyStreak ?? 1);
 
   // GOLD 표시값: 전역 프로필 우선
   const displayGold: number | string = (globalProfile?.goldBalance as any) ?? 0;
@@ -604,48 +606,13 @@ export function ProfileScreen({
                     <h2 className="text-4xl font-black text-gradient-primary">
                       {globalProfile?.nickname || user?.nickname || '사용자'}
                     </h2>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="glass-effect hover:bg-primary/10"
-                      onClick={async () => {
-                        try {
-                          const current = (
-                            globalProfile?.nickname ||
-                            user?.nickname ||
-                            ''
-                          ).toString();
-                          const next = window.prompt('새 닉네임을 입력하세요', current)?.trim();
-                          if (!next || next === current) return;
-                          const { isValid, error } = validateNickname(next);
-                          if (!isValid) {
-                            onAddNotification(error || '닉네임 형식이 올바르지 않습니다.');
-                            return;
-                          }
-                          // 금지 리터럴('users/profile')을 코드에 직접 쓰지 않기 위해 조합
-                          const PROFILE_UPDATE = ['users', 'profile'].join('/');
-                          await withReconcile(async () => {
-                            await unifiedApi.put(PROFILE_UPDATE, { nickname: next });
-                            return { ok: true } as any;
-                          });
-                          onAddNotification('닉네임이 변경되었습니다.');
-                          // 하이드레이트로 덮어쓰기를 기다리되, 즉시성 확보를 위해 로컬 표시값 폴백 최소화
-                        } catch (e) {
-                          // eslint-disable-next-line no-console
-                          console.error('[ProfileScreen] 닉네임 변경 실패', e);
-                          onAddNotification('닉네임 변경 중 오류가 발생했습니다.');
-                        }
-                      }}
-                    >
-                      닉네임 수정
-                    </Button>
                   </div>
 
                   {/* 🎯 연속출석일만 표시 */}
                   <div className="flex justify-center">
                     <Badge className="bg-success/20 text-success border-success/30 px-4 py-2 text-lg">
                       <Flame className="w-5 h-5 mr-2" />
-                      {user?.dailyStreak || 0}일 연속 출석
+                      {Math.max(1, globalProfile?.daily_streak ?? 1)}일 연속 출석
                     </Badge>
                   </div>
                 </div>
@@ -655,21 +622,20 @@ export function ProfileScreen({
                   <div className="flex items-center justify-between text-lg">
                     <span className="font-medium">경험치 진행도</span>
                     <span className="font-bold">
-                      {user?.experience?.toLocaleString() || 0} /{' '}
-                      {user?.maxExperience?.toLocaleString() || 1000} XP
+                      {userSummary.experiencePoints.toLocaleString()} / {(globalProfile?.maxExperience ?? globalProfile?.max_experience ?? 1000).toLocaleString()} XP
                     </span>
                   </div>
                   <div className="relative">
-                    <Progress value={progressToNext} className="h-4 bg-secondary/50" />
+                    <Progress value={(userSummary.experiencePoints / (globalProfile?.maxExperience ?? globalProfile?.max_experience ?? 1000)) * 100} className="h-4 bg-secondary/50" />
                     <motion.div
                       initial={{ width: 0 }}
-                      animate={{ width: `${progressToNext}%` }}
+                      animate={{ width: `${(userSummary.experiencePoints / (globalProfile?.maxExperience ?? globalProfile?.max_experience ?? 1000)) * 100}%` }}
                       transition={{ duration: 1.5, delay: 0.5 }}
                       className="absolute top-0 left-0 h-full bg-gradient-to-r from-primary to-gold rounded-full"
                     />
                   </div>
                   <div className="text-center text-lg text-muted-foreground">
-                    다음 레벨까지 {progressToNext.toFixed(1)}%
+                    다음 레벨까지 {(userSummary.experiencePoints / (globalProfile?.maxExperience ?? globalProfile?.max_experience ?? 1000) * 100).toFixed(1)}%
                   </div>
                 </div>
 
@@ -829,7 +795,7 @@ export function ProfileScreen({
                           <div className="text-xs text-muted-foreground">레벨 10 달성하기</div>
                         </div>
                         <Badge className="bg-muted/20 text-muted-foreground border-muted/30 text-xs">
-                          {user?.level || 0}/10
+                          {userSummary.level || 0}/10
                         </Badge>
                       </div>
 
