@@ -225,12 +225,13 @@ async def preview(
     claimed_today = existing is not None
     
     # 새로운 선형 보상 시스템 사용
-    if streak_count > 0:
-        reward_info = calculate_streak_reward(streak_count)
-        today_gold, today_xp = reward_info['gold'], reward_info['xp']
-    else:
-        today_gold, today_xp = 0, 0
-    
+    # 프론트와 일관성 유지: preview에서는 raw 0을 사용자에게 보이는 "1일차"로 처리
+    # 단, claimable/claimed_today 판정은 기존 로직(실제 streak_count 기반)을 유지
+    display_count = streak_count if streak_count > 0 else 1
+    reward_info = calculate_streak_reward(display_count)
+    today_gold, today_xp = reward_info['gold'], reward_info['xp']
+
+    # next day reward 계산은 실제 다음 증가값(streak_count + 1)을 사용 (기존과 동일)
     next_reward_info = calculate_streak_reward(streak_count + 1)
     next_gold, next_xp = next_reward_info['gold'], next_reward_info['xp']
     
