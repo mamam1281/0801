@@ -35,6 +35,7 @@ import { useWithReconcile } from '@/lib/sync';
 import { useUserGold } from '@/hooks/useSelectors';
 import { useGlobalStore, mergeProfile, mergeGameStats } from '@/store/globalStore';
 import { useGlobalSync } from '@/hooks/useGlobalSync';
+import { useGameTileStats } from '@/hooks/useGameStats';
 
 interface NeonCrashGameProps {
   user: User;
@@ -49,6 +50,7 @@ export function NeonCrashGame({
   onUpdateUser,
   onAddNotification,
 }: NeonCrashGameProps) {
+  const crashStats = useGameTileStats('crash');
   const withReconcile = useWithReconcile();
   const gold = useUserGold();
   const { dispatch } = useGlobalStore();

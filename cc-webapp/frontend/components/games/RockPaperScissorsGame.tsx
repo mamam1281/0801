@@ -21,6 +21,7 @@ import { useWithReconcile } from '@/lib/sync';
 import { useGlobalSync } from '@/hooks/useGlobalSync';
 import { useGlobalStore, useGlobalProfile } from '@/store/globalStore';
 import { mergeGameStats } from '@/store/globalStore';
+import { useGameTileStats } from '@/hooks/useGameStats';
 
 interface RockPaperScissorsGameProps {
   user: User;
@@ -70,6 +71,7 @@ export function RockPaperScissorsGame({
   onUpdateUser,
   onAddNotification,
 }: RockPaperScissorsGameProps) {
+  const rpsStats = useGameTileStats('rps');
   const [playerChoice, setPlayerChoice] = useState(null as Choice | null);
   const [aiChoice, setAiChoice] = useState(null as Choice | null);
   const [gameResult, setGameResult] = useState(null as GameResult | null);
@@ -404,6 +406,25 @@ export function RockPaperScissorsGame({
           </div>
 
           <div className="flex items-center gap-4">
+            <div className="hidden sm:flex items-center gap-4">
+              <div className="glass-effect rounded-xl p-3 border border-primary/20">
+                <div className="text-center">
+                  <div className="text-xs text-muted-foreground">총 플레이</div>
+                  <div className="text-lg font-bold text-primary">
+                    {rpsStats.playCount.toLocaleString()}
+                  </div>
+                </div>
+              </div>
+              <div className="glass-effect rounded-xl p-3 border border-gold/20">
+                <div className="text-center">
+                  <div className="text-xs text-muted-foreground">최대 승리</div>
+                  <div className="text-lg font-bold text-gradient-gold">
+                    {rpsStats.bestScore.toLocaleString()}G
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <Button
               variant="outline"
               size="icon"

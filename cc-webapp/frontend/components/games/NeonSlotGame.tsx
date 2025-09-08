@@ -114,6 +114,9 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
   // 전역 스토어 훅은 컴포넌트 최상단에서만 호출 (rules-of-hooks 준수)
   const { state, dispatch } = useGlobalStore();
 
+  // 🎯 슬롯 게임 통계 가져오기
+  const slotStats = useGameTileStats('slot', user.gameStats?.slot);
+
   // unifiedApi: call games endpoints with relative paths
   const [reels, setReels] = useState([
     SLOT_SYMBOLS[0],
@@ -594,6 +597,25 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
           </div>
 
           <div className="flex items-center gap-4">
+            {/* 🎯 슬롯 게임 통계 표시 */}
+            <div className="glass-effect rounded-xl p-3 border border-purple-500/20">
+              <div className="text-center">
+                <div className="text-xs text-muted-foreground">총 참여</div>
+                <div className="text-sm font-bold text-purple-400">
+                  {slotStats.playCount}회
+                </div>
+              </div>
+            </div>
+
+            <div className="glass-effect rounded-xl p-3 border border-pink-500/20">
+              <div className="text-center">
+                <div className="text-xs text-muted-foreground">최대 승리</div>
+                <div className="text-sm font-bold text-pink-400">
+                  {slotStats.bestScore.toLocaleString()}G
+                </div>
+              </div>
+            </div>
+
             <Button
               variant="outline"
               size="icon"
