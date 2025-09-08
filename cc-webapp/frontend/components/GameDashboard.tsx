@@ -52,12 +52,14 @@ export function GameDashboard({
 }: GameDashboardProps) {
   const totalGamesFromStore = useGlobalTotalGames();
   const levelFromStore = useUserLevel();
-  
-  // 전역 스토어에서 실시간 골드 밸런스 가져오기 (안전한 접근)
   const globalStore = useGlobalStore();
   const goldBalance = globalStore?.state?.profile?.goldBalance ?? user.goldBalance ?? 0;
 
-  // 로컬 게임 데이터 (API 호출 없이)
+  // 모든 게임별 통계 추출 (전역 store 기반)
+  const slotStats = useGameTileStats('slot', user.gameStats?.slot);
+  const rpsStats = useGameTileStats('rps', user.gameStats?.rps);
+  const gachaStats = useGameTileStats('gacha', user.gameStats?.gacha);
+  const crashStats = useGameTileStats('crash', user.gameStats?.crash);
   const games: GameDashboardGame[] = [
     {
       id: 'slot',
@@ -189,27 +191,39 @@ export function GameDashboard({
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="grid grid-cols-1 md:grid-cols-1 gap-6 mb-8"
+            className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8"
           >
-            {/* VIP Status */}
+            {/* 전체 게임 총 참여횟수 */}
             <div className="bg-[#14121a]/70 backdrop-blur-sm rounded-2xl p-6 border border-purple-500/20 max-w-md mx-auto">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold bg-gradient-to-r from-purple-300 to-pink-300 bg-clip-text text-transparent">
-                  VIP 등급
+                  전체 게임 총 참여횟수
                 </h3>
                 <Crown className="w-5 h-5 text-yellow-400" />
               </div>
               <div className="space-y-3">
                 <div className="text-3xl font-bold text-yellow-400">
-                  {(user.vipTier ?? 0) > 0 ? `VIP ${user.vipTier}` : 'Standard'}
+                  {totalGamesFromStore}
                 </div>
-                <Progress
-                  value={(user.vipTier ?? 0) > 0 ? ((user.vipTier ?? 0) / 5) * 100 : 10}
-                  className="h-2 bg-purple-900/50"
-                />
                 <p className="text-sm text-gray-400">
-                  {(user.vipTier ?? 0) > 0 ? '프리미엄 혜택 활성화' : '더 많은 혜택을 누리세요'}
+                  모든 게임의 실제 플레이 합산값 (전역 store 기준)
                 </p>
+              </div>
+            </div>
+
+            {/* 게임별 참여횟수/최대 수익 */}
+            <div className="bg-[#14121a]/70 backdrop-blur-sm rounded-2xl p-6 border border-pink-500/20 max-w-md mx-auto">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold bg-gradient-to-r from-pink-300 to-yellow-300 bg-clip-text text-transparent">
+                  게임별 참여횟수 / 최대 수익
+                </h3>
+                <Trophy className="w-5 h-5 text-pink-400" />
+              </div>
+              <div className="space-y-2">
+                <div className="text-base font-bold text-purple-300">슬롯: {slotStats.playCount}회 / 최대 {slotStats.bestScore.toLocaleString()}G</div>
+                <div className="text-base font-bold text-blue-300">가위바위보: {rpsStats.playCount}회 / 최대 {rpsStats.bestScore.toLocaleString()}G</div>
+                <div className="text-base font-bold text-pink-300">가챠: {gachaStats.playCount}회 / 최대 {gachaStats.bestScore.toLocaleString()}G</div>
+                <div className="text-base font-bold text-red-300">크래시: {crashStats.playCount}회 / 최대 {crashStats.bestScore.toLocaleString()}G</div>
               </div>
             </div>
           </motion.div>
