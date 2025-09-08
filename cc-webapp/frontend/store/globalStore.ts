@@ -262,7 +262,13 @@ export async function hydrateFromServer(dispatch: DispatchFn) {
             goldBalance: Number.isFinite(Number(goldFromBalanceRaw)) ? Number(goldFromBalanceRaw) : Number(me?.gold ?? me?.gold_balance ?? 0),
             gemsBalance: Number(me?.gems ?? me?.gems_balance ?? 0),
             level: me?.level ?? me?.battlepass_level ?? undefined,
-            xp: me?.xp ?? undefined,
+            // XP/experience normalization
+            xp: me?.experience_points ?? me?.experience ?? me?.xp ?? 0,
+            experience_points: me?.experience_points ?? me?.experience ?? me?.xp ?? 0,
+            maxExperience: me?.max_experience ?? me?.maxExperience ?? 1000,
+            // daily streak normalization (server may use snake_case or camelCase)
+            daily_streak: me?.daily_streak ?? me?.dailyStreak ?? me?.streak ?? 0,
+            dailyStreak: me?.daily_streak ?? me?.dailyStreak ?? me?.streak ?? 0,
             updatedAt: new Date().toISOString(),
             ...me,
         } as GlobalUserProfile as any;

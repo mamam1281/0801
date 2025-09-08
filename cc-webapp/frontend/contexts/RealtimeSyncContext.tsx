@@ -395,13 +395,13 @@ export function RealtimeSyncProvider({ children, apiBaseUrl }: RealtimeSyncProvi
     console.log('[RealtimeSync] Received message:', message.type, message.data);
 
     switch (message.type) {
-      case 'profile_update':
+  case 'profile_update':
   dispatch({ type: 'UPDATE_PROFILE', payload: message.data });
   // 프로필 갱신 토스트(ToastProvider의 1.5s 중복 억제 적용)
   try { console.log('[Toast] 프로필이 갱신되었습니다.'); } catch {}
         break;
 
-      case 'purchase_update': {
+  case 'purchase_update': {
         const data = message.data as SyncEventData['purchase_update'];
         // 사용자 토스트 알림
         const status = data?.status ?? 'pending';
@@ -448,6 +448,21 @@ export function RealtimeSyncProvider({ children, apiBaseUrl }: RealtimeSyncProvi
         }
         // 전역 상태 업데이트(배지/요약용)
         dispatch({ type: 'UPDATE_PURCHASE', payload: data });
+        break;
+      }
+
+      case 'sync_connected': {
+        // 서버가 연결 성공을 알리는 간단한 핑/상태 메시지
+        // 목적: Unknown message type 경고 제거 및 필요시 초기 동기화 트리거
+        try {
+          console.log('[RealtimeSync] Server signalled sync_connected');
+          // 연결 직후 서버 권위 초기화가 별도로 없다면 보완적으로 프로필/스트릭 리프레시
+          (async () => {
+            try {
+              await Promise.allSettled([refreshProfile(), refreshStreaks()]);
+            } catch {}
+          })();
+        } catch (e) {}
         break;
       }
 
@@ -503,6 +518,42 @@ export function RealtimeSyncProvider({ children, apiBaseUrl }: RealtimeSyncProvi
               console.log(`[Toast] 🎉 대박! ${data.win}G 획득!`); 
             } catch {}
           }
+        }
+        break;
+      }
+
+      case 'initial_state': {
+        // 서버가 연결 직후 전송하는 전체 초기 상태 페이로드 처리
+        // 목적: 클라이언트 전역 상태를 서버 권위값으로 초기화하여 UI 불일치 방지
+        try {
+          const data = message.data as Partial<RealtimeSyncState> | null;
+          if (data) {
+            // 부분적으로 들어오는 필드들을 안전하게 매핑
+            const payload: Partial<RealtimeSyncState> = {};
+            if (data.profile) payload.profile = {
+              gold: data.profile.gold ?? state.profile.gold,
+              exp: data.profile.exp ?? state.profile.exp,
+              tier: data.profile.tier ?? state.profile.tier,
+              total_spent: data.profile.total_spent ?? state.profile.total_spent,
+              last_updated: data.profile.last_updated,
+            } as any;
+            if (data.streaks) payload.streaks = data.streaks as any;
+            if (data.recent_rewards) payload.recent_rewards = data.recent_rewards as any;
+            if (data.stats) payload.stats = data.stats as any;
+
+            dispatch({ type: 'INITIALIZE_STATE', payload });
+
+            // 초기 상태 수신시 추가 동기화가 필요하면 폴백 API 호출로 보완
+            // 예: 일부 클라이언트에서 누락된 리소스(이벤트 등)를 보완
+            // 비동기로 프로필/스트릭 재동기화 시도
+            (async () => {
+              try {
+                await Promise.allSettled([refreshProfile(), refreshStreaks()]);
+              } catch {}
+            })();
+          }
+        } catch (e) {
+          console.error('[RealtimeSync] Failed to apply initial_state payload:', e);
         }
         break;
       }

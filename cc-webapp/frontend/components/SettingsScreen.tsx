@@ -22,7 +22,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { User as UserType } from '../types';
-import { useGlobalStore } from '@/store/globalStore';
+import { useGlobalStore, useGlobalProfile } from '@/store/globalStore';
 // profile writeback disabled — global store updates via canonical sync flows
 import { useUserSummary } from '@/hooks/useSelectors';
 import api from '../utils/api';
@@ -44,7 +44,7 @@ export function SettingsScreen({
   onAddNotification,
 }: SettingsScreenProps) {
   const { dispatch } = useGlobalStore();
-  const summary = useUserSummary();
+  const globalProfile = useGlobalProfile();
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [soundVolume, setSoundVolume] = useState([80]);
   const [musicEnabled, setMusicEnabled] = useState(true);
@@ -201,8 +201,8 @@ export function SettingsScreen({
           </div>
 
           <div className="text-right">
-            <div className="text-sm text-muted-foreground">{summary.nickname || user.nickname}</div>
-            <div className="text-lg font-bold text-gold">레벨 {summary.level}</div>
+            <div className="text-sm text-muted-foreground">{globalProfile?.nickname ?? user.nickname}</div>
+            <div className="text-lg font-bold text-gold">레벨 {globalProfile?.level ?? 1}</div>
           </div>
         </div>
       </motion.div>
@@ -225,11 +225,14 @@ export function SettingsScreen({
                 <div className="text-lg font-bold text-foreground">{user.nickname}</div>
               </div>
               <p className="text-sm text-muted-foreground">
-                레벨 {summary.level} • {summary.gold.toLocaleString()}G
+                레벨 {globalProfile?.level ?? 1} • {(globalProfile?.goldBalance ?? 0).toLocaleString()}G
               </p>
             </div>
             <div className="text-right">
-              <div className="text-2xl font-bold text-gold">{(() => { const raw = summary.dailyStreak ?? 0; return raw === 0 ? 1 : raw; })()}</div>
+              <div className="text-2xl font-bold text-gold">{(() => {
+                  const raw = (globalProfile as any)?.daily_streak ?? (globalProfile as any)?.dailyStreak ?? 0;
+                  return raw === 0 ? 1 : raw;
+                })()}</div>
               <div className="text-xs text-muted-foreground">연속일</div>
             </div>
           </div>

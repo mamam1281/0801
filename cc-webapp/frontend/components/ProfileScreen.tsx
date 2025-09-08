@@ -445,17 +445,15 @@ export function ProfileScreen({
     );
   }
 
-  // 안전한 계산을 위한 체크
-  const progressToNext =
-    user?.experience && user?.maxExperience ? (user.experience / user.maxExperience) * 100 : 0;
+  // 전역 프로필에서 XP, maxExperience, daily_streak, level을 직접 읽어 UI에 반영
+  const authoritativeXp = (globalProfile?.xp ?? globalProfile?.experience_points ?? 0) as number;
+  const authoritativeMaxXp = (globalProfile as any)?.maxExperience ?? (globalProfile as any)?.max_experience ?? 1000;
+  const progressToNext = authoritativeMaxXp ? (authoritativeXp / authoritativeMaxXp) * 100 : 0;
+  const authoritativeLevel = (globalProfile?.level ?? 1) as number;
+  const authoritativeDailyStreak = (globalProfile as any)?.daily_streak ?? (globalProfile as any)?.dailyStreak ?? 0;
 
-  // GOLD 표시값: Realtime 전역 상태(우선) → 공용 상태 → 로컬 balance 폴백
-  const displayGold: number | string =
-    (globalProfile?.goldBalance as any) ??
-    (rtProfile?.gold as any) ??
-    (sharedUser?.goldBalance as any) ??
-    (balance?.cyber_token_balance as any) ??
-    0;
+  // GOLD 표시값: 전역 프로필 우선
+  const displayGold: number | string = (globalProfile?.goldBalance as any) ?? 0;
 
   // 실시간 통계 파생값: 전역 stats 우선, 없으면 기존 로컬 stats 사용
   const pickNumber = (obj: Record<string, any> | undefined, keys: string[]): number => {
@@ -495,6 +493,9 @@ export function ProfileScreen({
   const rtTotals = computeRtTotals();
   const displayTotalGames = (rtTotals.totalGames ?? 0) || (stats?.total_games_played ?? 0) || 0;
   const displayTotalWins = (rtTotals.totalWins ?? 0) || (stats?.total_wins ?? 0) || 0;
+
+  // 연속일(스트릭) 권위값 우선: globalProfile.daily_streak
+  // 이미 위에서 선언됨
 
   // 게임별 요약: 전역 store.gameStats 우선, legacy user.gameStats 폴백
   const pickFromEntry = (entry: any, keys: string[]) => {
