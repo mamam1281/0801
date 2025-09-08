@@ -180,7 +180,7 @@ export function RockPaperScissorsGame({
         // 백엔드 스키마 준수: choice + bet_amount 필수
         const res = await api.post<any>(
           'games/rps/play',
-          { choice, bet_amount: betAmount },
+          { choice, bet_amount: betAmount, game_id: 'rps' },
           { headers: { 'X-Idempotency-Key': idemKey } }
         );
         // 서버 결과를 화면 연출에 사용하되, 잔액은 재동기화에 위임

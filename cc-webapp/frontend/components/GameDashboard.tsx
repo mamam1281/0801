@@ -149,6 +149,7 @@ export function GameDashboard({
                   size="icon"
                   onClick={onToggleSideMenu}
                   className="lg:hidden hover:bg-purple-500/20"
+                  aria-label="사이드바 열기"
                 >
                   <Menu className="w-5 h-5" />
                 </Button>

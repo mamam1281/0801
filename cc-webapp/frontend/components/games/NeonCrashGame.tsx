@@ -413,7 +413,7 @@ export function NeonCrashGame({
       await withReconcile(async (idemKey: string) =>
         api.post<any>(
           'games/crash/cashout',
-          { multiplier },
+          { multiplier, game_id: 'crash' },
           { headers: { 'X-Idempotency-Key': idemKey } }
         )
       );
@@ -551,14 +551,14 @@ export function NeonCrashGame({
         className="p-4 flex items-center justify-between"
       >
         <div className="flex items-center space-x-2">
-          <Button variant="ghost" size="icon" onClick={onBack} className="rounded-full">
+          <Button variant="ghost" size="icon" onClick={onBack} className="rounded-full" aria-label="뒤로가기">
             <ArrowLeft className="h-6 w-6" />
           </Button>
           <h1 className="text-2xl font-bold text-gradient-primary">네온 크래시</h1>
         </div>
 
         <div className="flex items-center space-x-4">
-          <Button variant="ghost" size="icon" onClick={toggleSound} className="rounded-full">
+          <Button variant="ghost" size="icon" onClick={toggleSound} className="rounded-full" aria-label="사운드 토글">
             {soundEnabled ? <Volume2 className="h-6 w-6" /> : <VolumeX className="h-6 w-6" />}
           </Button>
           <Button
@@ -566,6 +566,7 @@ export function NeonCrashGame({
             size="icon"
             onClick={() => setShowGraph(!showGraph)}
             className="rounded-full"
+            aria-label="그래프 표시 토글"
           >
             <BarChart2
               className={`h-6 w-6 ${showGraph ? 'text-primary' : 'text-muted-foreground'}`}
@@ -576,6 +577,7 @@ export function NeonCrashGame({
             size="icon"
             onClick={() => setShowAdvancedSettings(!showAdvancedSettings)}
             className="rounded-full"
+            aria-label="고급 설정 열기"
           >
             <Settings
               className={`h-6 w-6 ${
