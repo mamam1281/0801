@@ -293,6 +293,8 @@ export function AdminLoginScreen({
                 />
                 <button
                   aria-label={showPassword ? '비밀번호 숨기기' : '비밀번호 보이기'}
+                  title={showPassword ? '비밀번호 숨기기' : '비밀번호 보이기'}
+                  aria-pressed={showPassword}
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-error transition-colors"

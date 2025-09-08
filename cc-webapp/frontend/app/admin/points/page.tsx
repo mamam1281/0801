@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { api as unifiedApi } from "@/lib/unifiedApi";
 import { useWithReconcile } from "@/lib/sync";
 import { Input } from "../../../components/ui/input";
@@ -15,6 +15,25 @@ type ResultState =
 	| { status: "error"; message: string };
 
 export default function AdminPointsPage() {
+	const [me, setMe] = useState(null as any);
+	const [authChecked, setAuthChecked] = useState(false);
+
+	useEffect(() => {
+		let cancelled = false;
+		(async () => {
+			try {
+				// 서버 권위 프로필 조회
+				const prof = await unifiedApi.get<any>('auth/me');
+				if (!cancelled) setMe(prof || {});
+			} catch {
+				if (!cancelled) setMe(null);
+			} finally {
+				if (!cancelled) setAuthChecked(true);
+			}
+		})();
+		return () => { cancelled = true; };
+	}, []);
+
 	const [userId, setUserId] = useState("");
 	const [amount, setAmount] = useState("");
 	const [memo, setMemo] = useState("");
@@ -64,6 +83,15 @@ export default function AdminPointsPage() {
 	return (
 		<div className="min-h-[calc(100vh-4rem)] w-full px-4 py-6 md:px-8 lg:px-12">
 			<div className="mx-auto w-full max-w-3xl">
+				{/* 비관리자 가드 배너 */}
+		{authChecked && !me?.is_admin && (
+					<div
+						data-testid="admin-guard-banner"
+						className="mb-4 rounded-md border border-red-700/50 bg-red-900/20 p-3 text-sm text-red-300"
+					>
+			관리자 전용 페이지입니다. 접근 권한이 없습니다.
+					</div>
+				)}
 				<h1 className="mb-2 bg-gradient-to-r from-pink-500 to-cyan-400 bg-clip-text text-2xl font-bold text-transparent md:text-3xl">
 					관리자: 포인트/토큰 지급
 				</h1>

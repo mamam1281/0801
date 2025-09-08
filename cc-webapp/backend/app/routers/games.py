@@ -1493,77 +1493,74 @@ def get_my_authoritative_game_stats(current_user: models.User = Depends(get_curr
         svc = _GSS(db)
         crash_stats = svc.get_or_create(current_user.id)
         
-        # 슬롯 게임 통계 (user_actions 테이블에서 집계) - 간단한 카운트부터
-        slot_query = db.query(
-            func.count(UserAction.id).label('slot_spins')
-        ).filter(
-            UserAction.user_id == current_user.id,
-            UserAction.action_type == 'SLOT_SPIN'
-        ).first()
-        
-        # 가챠 게임 통계 (GACHA_SPIN)
-        gacha_query = db.query(
-            func.count(UserAction.id).label('gacha_spins')
-        ).filter(
-            UserAction.user_id == current_user.id,
-            UserAction.action_type == 'GACHA_SPIN'
-        ).first()
-        
-        # RPS 게임 통계 (RPS_PLAY)
-        rps_query = db.query(
-            func.count(UserAction.id).label('rps_plays')
-        ).filter(
-            UserAction.user_id == current_user.id,
-            UserAction.action_type == 'RPS_PLAY'
-        ).first()
-        
-        # 집계 계산 (기본값 설정)
-        slot_spins = int(slot_query.slot_spins or 0)
-        slot_wins = 0  # JSON 파싱 로직 추후 추가
-        slot_losses = 0
-        
-        gacha_spins = int(gacha_query.gacha_spins or 0)
-        gacha_wins = 0
-        
-        rps_plays = int(rps_query.rps_plays or 0)
-        rps_wins = 0
-        rps_losses = 0
-        rps_ties = 0
-        
+        # 슬롯 게임 통계 (spins, max_win, wins, losses)
+        slot_stats = db.query(
+            func.count(UserAction.id).label('spins'),
+            func.max(case([(UserAction.action_type == 'SLOT_WIN', func.cast(UserAction.action_data, Integer))], else_=0)).label('max_win'),
+            func.count(case([(UserAction.action_type == 'SLOT_WIN', 1)], else_=None)).label('wins'),
+            func.count(case([(UserAction.action_type == 'SLOT_LOSE', 1)], else_=None)).label('losses')
+        ).filter(UserAction.user_id == current_user.id, UserAction.action_type.in_(['SLOT_SPIN', 'SLOT_WIN', 'SLOT_LOSE'])).first()
+
+        # 가챠 게임 통계 (spins, rare_wins, ultra_rare_wins, max_win)
+        gacha_stats = db.query(
+            func.count(UserAction.id).label('spins'),
+            func.count(case([(UserAction.action_type == 'GACHA_RARE_WIN', 1)], else_=None)).label('rare_wins'),
+            func.count(case([(UserAction.action_type == 'GACHA_ULTRA_RARE_WIN', 1)], else_=None)).label('ultra_rare_wins'),
+            func.max(case([(UserAction.action_type.in_(['GACHA_RARE_WIN', 'GACHA_ULTRA_RARE_WIN']), func.cast(UserAction.action_data, Integer))], else_=0)).label('max_win')
+        ).filter(UserAction.user_id == current_user.id, UserAction.action_type.in_(['GACHA_SPIN', 'GACHA_RARE_WIN', 'GACHA_ULTRA_RARE_WIN'])).first()
+
+        # RPS 게임 통계 (plays, wins, losses, ties)
+        rps_stats = db.query(
+            func.count(UserAction.id).label('plays'),
+            func.count(case([(UserAction.action_type == 'RPS_WIN', 1)], else_=None)).label('wins'),
+            func.count(case([(UserAction.action_type == 'RPS_LOSE', 1)], else_=None)).label('losses'),
+            func.count(case([(UserAction.action_type == 'RPS_TIE', 1)], else_=None)).label('ties')
+        ).filter(UserAction.user_id == current_user.id, UserAction.action_type.in_(['RPS_PLAY', 'RPS_WIN', 'RPS_LOSE', 'RPS_TIE'])).first()
+
+        # Crash 게임 통계 (bets, max_multiplier, max_win, wins, losses)
+        crash_max_win = db.query(func.max(case([(UserAction.action_type == 'CRASH_WIN', func.cast(UserAction.action_data, Integer))], else_=0))).filter(UserAction.user_id == current_user.id).scalar() or 0
+        crash_max_multiplier = float(crash_stats.highest_multiplier) if crash_stats.highest_multiplier is not None else None
+
         # 전체 게임 통계 통합
-        total_games_played = slot_spins + gacha_spins + rps_plays
-        total_games_won = slot_wins + gacha_wins + rps_wins
-        total_games_lost = slot_losses + rps_losses  # 가챠는 승/패 개념이 아니므로 제외
-        
+        total_games_played = (slot_stats.spins or 0) + (gacha_stats.spins or 0) + (rps_stats.plays or 0) + int(crash_stats.total_bets or 0)
+        total_games_won = (slot_stats.wins or 0) + (gacha_stats.rare_wins or 0) + (gacha_stats.ultra_rare_wins or 0) + (rps_stats.wins or 0) + int(crash_stats.total_wins or 0)
+        total_games_lost = (slot_stats.losses or 0) + (rps_stats.losses or 0) + int(crash_stats.total_losses or 0)
+
         # 통합 통계 반환
         return {"success": True, "stats": {
             "user_id": current_user.id,
-            "total_bets": int(crash_stats.total_bets or 0) + total_games_played,  # Crash 베팅 + 전체 게임 플레이
-            "total_wins": int(crash_stats.total_wins or 0) + total_games_won,     # Crash 승리 + 전체 게임 승리  
-            "total_losses": int(crash_stats.total_losses or 0) + total_games_lost, # Crash 패배 + 전체 게임 패배
-            "total_profit": float(crash_stats.total_profit or 0),  # Crash 수익 (다른 게임 수익은 별도 계산 필요)
-            "highest_multiplier": float(crash_stats.highest_multiplier) if crash_stats.highest_multiplier is not None else None,
+            "total_bets": int(crash_stats.total_bets or 0),
+            "total_games_played": total_games_played,
+            "total_wins": total_games_won,
+            "total_losses": total_games_lost,
+            "total_profit": float(crash_stats.total_profit or 0),
+            "highest_multiplier": crash_max_multiplier,
             "updated_at": crash_stats.updated_at.isoformat() if crash_stats.updated_at else None,
             "game_breakdown": {
                 "crash": {
                     "bets": int(crash_stats.total_bets or 0),
+                    "max_win": crash_max_win,
+                    "max_multiplier": crash_max_multiplier,
                     "wins": int(crash_stats.total_wins or 0),
                     "losses": int(crash_stats.total_losses or 0)
                 },
                 "slot": {
-                    "spins": slot_spins,
-                    "wins": slot_wins,
-                    "losses": slot_losses
+                    "spins": int(slot_stats.spins or 0),
+                    "max_win": int(slot_stats.max_win or 0),
+                    "wins": int(slot_stats.wins or 0),
+                    "losses": int(slot_stats.losses or 0)
                 },
                 "gacha": {
-                    "spins": gacha_spins,
-                    "rare_wins": gacha_wins
+                    "spins": int(gacha_stats.spins or 0),
+                    "rare_wins": int(gacha_stats.rare_wins or 0),
+                    "ultra_rare_wins": int(gacha_stats.ultra_rare_wins or 0),
+                    "max_win": int(gacha_stats.max_win or 0)
                 },
                 "rps": {
-                    "plays": rps_plays,
-                    "wins": rps_wins,
-                    "losses": rps_losses,
-                    "ties": rps_ties
+                    "plays": int(rps_stats.plays or 0),
+                    "wins": int(rps_stats.wins or 0),
+                    "losses": int(rps_stats.losses or 0),
+                    "ties": int(rps_stats.ties or 0)
                 }
             }
         }}

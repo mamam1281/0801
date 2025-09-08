@@ -720,7 +720,12 @@ export function HomeDashboard({
                 </div>
                 {/* 다음 보상 타입 표시 제거 (2025-01-09) */}
                 <div className="bg-secondary/40 rounded-lg p-3">
-                  <Button size="sm" className="w-full" onClick={() => setShowDailyReward(true)}>
+                  <Button
+                    size="sm"
+                    className="w-full"
+                    data-testid="open-daily-reward"
+                    onClick={() => setShowDailyReward(true)}
+                  >
                     보상 보기
                   </Button>
                 </div>
