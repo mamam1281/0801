@@ -96,6 +96,7 @@ def _ensure_schema():
 
 	try:
 		_dialect = engine.url.get_backend_name()
+<<<<<<< HEAD
 		# Postgres: entrypoint에서 이미 alembic upgrade head 수행 → 테스트에서는 기본 skip
 		# 필요 시 TEST_FORCE_ALEMBIC=1 로 강제 실행
 		if _dialect == "postgresql":
@@ -106,6 +107,17 @@ def _ensure_schema():
 				command.upgrade(cfg, "head")
 		else:
 			# SQLite 등에서는 간단히 head까지 올려 테스트 스키마 보장
+=======
+
+		# Postgres에서는 컨테이너 entrypoint에서 이미 upgrade head가 수행됨.
+		# 테스트 중에는 잠재적 락/경합을 피하기 위해 기본적으로 Alembic upgrade를 건너뜀.
+		# 강제 필요 시 TEST_FORCE_ALEMBIC=1로 재활성화.
+		do_upgrade = True
+		if _dialect == "postgresql":
+			do_upgrade = os.getenv("TEST_FORCE_ALEMBIC", "0") == "1"
+
+		if do_upgrade:
+>>>>>>> copilot/vscode1756626445491
 			from alembic.config import Config
 			from alembic import command
 			cfg = Config("alembic.ini")
