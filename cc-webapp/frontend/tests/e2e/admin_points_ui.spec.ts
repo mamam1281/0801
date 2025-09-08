@@ -14,9 +14,9 @@ test.describe('Admin Points UI smoke', () => {
 
     const formVisible = await userInput.first().isVisible().catch(() => false);
     if (!formVisible) {
-      // 권한 가드 메시지 또는 인증 요구 UI 존재 여부 확인(페이지 구조에 맞는 텍스트 중 하나)
-      const guardMsg = page.getByText(/관리자|권한|로그인|접근 제한/i);
-      await expect(guardMsg).toBeVisible();
+      // 비관리자 guard 배너 data-testid 명시적 확인
+      const guardBanner = page.getByTestId('admin-guard-banner');
+      await expect(guardBanner).toBeVisible();
       test.fixme(true, 'Admin Points page guarded; skipping UI form assertions in non-admin context');
       return;
     }

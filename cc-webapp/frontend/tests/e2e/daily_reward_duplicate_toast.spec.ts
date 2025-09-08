@@ -26,9 +26,16 @@ test.describe('[DailyReward] duplicate claim toast', () => {
       // 2) 홈 진입 후 일일 보상 모달 열기
       await page.goto(BASE + '/');
       // 메인 페이지의 연속 보상 카드에서 '보상 보기' 버튼 클릭 → 모달 오픈
-      const openReward = page.getByRole('button', { name: '보상 보기' });
-      await openReward.waitFor({ state: 'visible' });
-      await openReward.click();
+        // data-testid 우선, fallback: role/name
+        let openReward;
+        try {
+          openReward = page.getByTestId('open-daily-reward');
+          await openReward.waitFor({ state: 'visible', timeout: 2000 });
+        } catch {
+          openReward = page.getByRole('button', { name: '보상 보기' });
+          await openReward.waitFor({ state: 'visible', timeout: 2000 });
+        }
+        await openReward.click();
 
     // 3) 첫 수령(성공 경로)
       const claimOrState = page.getByRole('button', { name: /보상 받기!|이미 수령됨/ });
