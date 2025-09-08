@@ -28,22 +28,23 @@ function normalizeEntry(e: any): Record<string, any> | undefined {
 export function useGlobalTotalGames(): number {
   const { state } = useGlobalStore();
   return useMemo(() => {
-    const stats = state?.gameStats || {};
-    const entries = Object.values(stats);
-    console.log('[useGlobalTotalGames] 전역 스토어 게임 통계:', stats);
-    console.log('[useGlobalTotalGames] 엔트리들:', entries);
-    if (!entries.length) {
-      console.log('[useGlobalTotalGames] 게임 통계 엔트리 없음');
-      return 0;
-    }
-    const total = entries.reduce((acc: number, e: any) => {
-      const normalized = normalizeEntry(e);
-      const count = firstNumber(normalized, [...TOTAL_KEYS_GLOBAL]);
-      console.log('[useGlobalTotalGames] 엔트리:', e, '정규화:', normalized, '카운트:', count);
-      return acc + count;
-    }, 0 as number);
-    console.log('[useGlobalTotalGames] 최종 총합:', total);
-    return total;
+      const stats = state?.gameStats || {};
+      // undefined/빈 오브젝트 제외
+      const entries = Object.values(stats).filter(entry => entry && Object.keys(entry).length > 0);
+      console.log('[useGlobalTotalGames] 전역 스토어 게임 통계:', stats);
+      console.log('[useGlobalTotalGames] 엔트리들:', entries);
+      if (!entries.length) {
+        console.log('[useGlobalTotalGames] 게임 통계 엔트리 없음');
+        return 0;
+      }
+      const total = entries.reduce((acc: number, e: any) => {
+        const normalized = normalizeEntry(e);
+        const count = firstNumber(normalized, [...TOTAL_KEYS_GLOBAL]);
+        console.log('[useGlobalTotalGames] 엔트리:', e, '정규화:', normalized, '카운트:', count);
+        return acc + count;
+      }, 0 as number);
+      console.log('[useGlobalTotalGames] 최종 총합:', total);
+      return total;
   }, [state?.gameStats]);
 }
 
