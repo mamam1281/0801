@@ -379,10 +379,16 @@ export function RealtimeSyncProvider({ children, apiBaseUrl }: RealtimeSyncProvi
   const lastPurchaseByReceiptRef = useRef(new Map<string, { status: string; at: number }>());
 
   // Prefer the same origin resolution as unifiedApi to avoid cross-origin/SSR mismatches
-  const baseUrl =
-    apiBaseUrl ||
-    API_ORIGIN ||
-    (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8000');
+  // If API_ORIGIN is an empty string (client-relative), fall back to window.location.origin.
+  const resolvedApiOrigin = (() => {
+    if (apiBaseUrl && apiBaseUrl.length > 0) return apiBaseUrl;
+    if (API_ORIGIN && API_ORIGIN.length > 0) return API_ORIGIN;
+    if (typeof window !== 'undefined') return window.location.origin;
+    return 'http://localhost:8000';
+  })();
+
+  // Ensure no trailing slash for consistent URL joins
+  const baseUrl = resolvedApiOrigin.replace(/\/$/, '');
 
   // WebSocket 메시지 핸들러
   const handleWebSocketMessage = useCallback((message: WebSocketMessage) => {

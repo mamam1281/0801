@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { api as unifiedApi } from '@/lib/unifiedApi';
+// unifiedApi/profile edit removed — nickname editing disabled
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft,
@@ -22,7 +22,8 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { User as UserType } from '../types';
-import { useGlobalStore, setProfile } from '@/store/globalStore';
+import { useGlobalStore } from '@/store/globalStore';
+// profile writeback disabled — global store updates via canonical sync flows
 import { useUserSummary } from '@/hooks/useSelectors';
 import api from '../utils/api';
 import { Button } from './ui/button';
@@ -51,8 +52,7 @@ export function SettingsScreen({
   const [vibrationEnabled, setVibrationEnabled] = useState(true);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [showBalance, setShowBalance] = useState(true);
-  const [editingNickname, setEditingNickname] = useState(user.nickname ?? '');
-  const [saving, setSaving] = useState(false);
+  // 닉네임 편집 기능 비활성화: display-only
 
   const handleSoundToggle = (enabled: boolean) => {
     setSoundEnabled(enabled);
@@ -69,33 +69,7 @@ export function SettingsScreen({
     onAddNotification(enabled ? '🔔 알림이 활성화되었습니다' : '🔕 알림이 비활성화되었습니다');
   };
 
-  // 프로필 닉네임 저장 처리
-  const handleSaveProfile = async () => {
-    if (!editingNickname || editingNickname.trim().length < 2) {
-      onAddNotification('닉네임은 최소 2자 이상이어야 합니다.');
-      return;
-    }
-    try {
-      setSaving(true);
-      // Use unifiedApi per project convention: auth/me is the canonical profile endpoint
-      // PUT via unifiedApi will include standard headers (X-Idempotency-Key, auth handling)
-      const serverProfile = await unifiedApi.put('auth/me', { nickname: editingNickname.trim() });
-      if (serverProfile) {
-        // 덮어쓰기: 전역 스토어를 서버 응답으로 업데이트
-        setProfile(dispatch, serverProfile as any);
-        onAddNotification('프로필이 성공적으로 저장되었습니다.');
-        // 로컬 UI 업데이트
-        onUpdateUser(serverProfile as any);
-      } else {
-        onAddNotification('서버 응답이 없습니다. 다시 시도해주세요.');
-      }
-    } catch (err) {
-      console.error('Failed to save profile', err);
-      onAddNotification('프로필 저장 중 오류가 발생했습니다.');
-    } finally {
-      setSaving(false);
-    }
-  };
+  // 닉네임 수정/저장 기능은 정책상 제거되었습니다. 프로필 변경은 서버 측 계정 설정을 통해 처리하세요.
 
   // 🗑️ 자동플레이 기능 완전 제거 + 간소화
   const settingsSections = [
@@ -248,22 +222,15 @@ export function SettingsScreen({
             </div>
             <div className="flex-1">
               <div className="flex items-center gap-2">
-                <input
-                  className="bg-transparent border-b border-border-secondary px-2 py-1 text-lg font-bold text-foreground focus:outline-none"
-                  value={editingNickname}
-                  onChange={(e: any) => setEditingNickname((e.target as HTMLInputElement).value)}
-                />
-                <Button size="sm" onClick={handleSaveProfile} disabled={saving}>
-                  {saving ? '저장 중...' : '저장'}
-                </Button>
+                <div className="text-lg font-bold text-foreground">{user.nickname}</div>
               </div>
               <p className="text-sm text-muted-foreground">
                 레벨 {summary.level} • {summary.gold.toLocaleString()}G
               </p>
             </div>
             <div className="text-right">
-              <div className="text-2xl font-bold text-gold">{summary.dailyStreak}</div>
-              <div className="text-xs text-muted-foreground">연속 접속일</div>
+              <div className="text-2xl font-bold text-gold">{(() => { const raw = summary.dailyStreak ?? 0; return raw === 0 ? 1 : raw; })()}</div>
+              <div className="text-xs text-muted-foreground">연속일</div>
             </div>
           </div>
         </motion.div>

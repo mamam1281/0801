@@ -195,13 +195,29 @@ export class WSClient {
 
   private buildWebSocketUrl(): string {
     const { url, token } = this.options;
-    const wsUrl = url.replace(/^http/, 'ws');
-    
+
+    // If url is relative (starts with '/'), build absolute URL from window.location
+    let absoluteUrl = url;
+    try {
+      if (typeof window !== 'undefined' && url && url.startsWith('/')) {
+        absoluteUrl = `${window.location.protocol}//${window.location.host}${url}`;
+      } else if (!/^https?:\/\//.test(url) && typeof window !== 'undefined') {
+        // If url is not absolute and not starting with '/', fallback to location origin
+        absoluteUrl = `${window.location.protocol}//${window.location.host}${url.startsWith('/') ? url : '/' + url}`;
+      }
+    } catch (e) {
+      // In non-browser environments, fall back to provided url as-is
+      absoluteUrl = url;
+    }
+
+    // Convert http(s) to ws(s)
+    const wsUrl = absoluteUrl.replace(/^http:/, 'ws:').replace(/^https:/, 'wss:');
+
     if (token) {
       const separator = wsUrl.includes('?') ? '&' : '?';
       return `${wsUrl}${separator}token=${encodeURIComponent(token)}`;
     }
-    
+
     return wsUrl;
   }
 

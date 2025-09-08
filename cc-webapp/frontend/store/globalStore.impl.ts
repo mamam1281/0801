@@ -80,6 +80,13 @@ const initialState: GlobalState = {
 function reducer(state: GlobalState, action: Actions): GlobalState {
     switch (action.type) {
         case "SET_PROFILE":
+            // Ensure level/xp normalized to numbers to avoid undefined usage in UI
+            if (action.profile) {
+                const lp = action.profile as GlobalUserProfile & any;
+                const coercedLevel = lp.level !== undefined ? Number(lp.level) : (lp.battlepass_level !== undefined ? Number(lp.battlepass_level) : undefined);
+                const coercedXP = lp.experience_points ?? lp.xp ?? lp.experience ?? undefined;
+                action.profile = { ...action.profile, level: coercedLevel === undefined ? undefined : (Number.isFinite(coercedLevel) ? coercedLevel : undefined), xp: coercedXP === undefined ? undefined : Number(coercedXP) } as GlobalUserProfile;
+            }
             return { ...state, profile: action.profile, hydrated: true, lastHydratedAt: Date.now() };
         case "SET_HYDRATED":
             return { ...state, hydrated: action.value, lastHydratedAt: action.value ? Date.now() : state.lastHydratedAt };
@@ -115,10 +122,21 @@ function reducer(state: GlobalState, action: Actions): GlobalState {
         }
         case "MERGE_PROFILE": {
             if (!state.profile) {
-                // If profile isn't set yet, create one from patch minimally
-                return { ...state, profile: { goldBalance: 0, nickname: "", id: "unknown", ...(action.patch as any) } };
+                // If profile isn't set yet, create one from patch minimally and normalize level/xp
+                const base = { goldBalance: 0, nickname: "", id: "unknown", ...(action.patch as any) } as any;
+                const levelVal = base.level ?? base.battlepass_level ?? undefined;
+                base.level = levelVal !== undefined ? (Number.isFinite(Number(levelVal)) ? Number(levelVal) : undefined) : undefined;
+                base.xp = base.experience_points ?? base.xp ?? base.experience ?? undefined;
+                if (base.xp !== undefined) base.xp = Number(base.xp);
+                return { ...state, profile: base };
             }
-            return { ...state, profile: { ...state.profile, ...(action.patch as any) } as GlobalUserProfile };
+            const patched = { ...state.profile, ...(action.patch as any) } as any;
+            // normalize level/xp
+            const lvl = patched.level ?? patched.battlepass_level ?? undefined;
+            patched.level = lvl !== undefined ? (Number.isFinite(Number(lvl)) ? Number(lvl) : undefined) : undefined;
+            patched.xp = patched.experience_points ?? patched.xp ?? patched.experience ?? undefined;
+            if (patched.xp !== undefined) patched.xp = Number(patched.xp);
+            return { ...state, profile: patched as GlobalUserProfile };
         }
         case "MERGE_GAME_STATS": {
             const current = state.gameStats || {};
@@ -242,13 +260,15 @@ export async function hydrateFromServer(dispatch: DispatchFn) {
             api.get("games/stats/me").catch(() => null),
         ]);
         const goldFromBalanceRaw = (bal as any)?.gold ?? (bal as any)?.gold_balance ?? (bal as any)?.cyber_token_balance ?? (bal as any)?.balance;
+        const rawLevel = me?.level ?? me?.battlepass_level ?? undefined;
+        const rawXp = me?.experience_points ?? me?.xp ?? me?.experience ?? undefined;
         const mapped = {
             id: me?.id ?? me?.user_id ?? "unknown",
             nickname: me?.nickname ?? me?.name ?? "",
             goldBalance: Number.isFinite(Number(goldFromBalanceRaw)) ? Number(goldFromBalanceRaw) : Number(me?.gold ?? me?.gold_balance ?? 0),
             gemsBalance: Number(me?.gems ?? me?.gems_balance ?? 0),
-            level: me?.level ?? me?.battlepass_level ?? undefined,
-            xp: me?.xp ?? undefined,
+            level: rawLevel !== undefined ? (Number.isFinite(Number(rawLevel)) ? Number(rawLevel) : undefined) : undefined,
+            xp: rawXp !== undefined ? Number(rawXp) : undefined,
             updatedAt: new Date().toISOString(),
             ...me,
         } as GlobalUserProfile as any;

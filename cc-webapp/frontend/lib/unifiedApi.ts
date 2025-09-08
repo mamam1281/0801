@@ -47,10 +47,21 @@ function resolveOrigin(): string {
     if (envOrigin && /^https?:\/\//.test(envOrigin)) return envOrigin.replace(/\/$/, '');
     return 'http://backend:8000';
   }
-
-  // 클라이언트 사이드에서는 무조건 localhost:8000 사용 (임시 하드코딩)
-  console.log('[unifiedApi] 클라이언트 사이드 → localhost:8000 강제 설정');
-  return 'http://localhost:8000';
+  // 클라이언트 사이드: 가능한 경우 환경변수 사용, 아니면 상대경로(/api) 사용하여
+  // CORS 문제와 로컬/컨테이너 네트워크 혼선 가능성을 줄인다.
+  // - NEXT_PUBLIC_API_ORIGIN이 설정되어 있으면 그것을 사용
+  // - 아니면 빈 문자열을 반환하여 apiCall에서 상대경로(`/api/...`)을 사용하게 함
+  if (envOrigin && /^https?:\/\//.test(envOrigin)) {
+    if (envOrigin) console.log('[unifiedApi] 클라이언트 사이드 → using NEXT_PUBLIC_API_ORIGIN', envOrigin);
+    return envOrigin.replace(/\/$/, '');
+  }
+  if (typeof window !== 'undefined') {
+    // 상대경로 사용 안내 로그(로그 게이트에 따름)
+    try { if (__logGateEnabled()) console.log('[unifiedApi] 클라이언트 사이드 → using relative /api path'); } catch {}
+    return '';
+  }
+  // Fallback (방어적): 상대경로 사용
+  return '';
   
   // if (envOrigin && /^https?:\/\//.test(envOrigin)) return envOrigin.replace(/\/$/, '');
   // const fallback = (window.location.port === '3000' || window.location.port === '3001') ? 'http://localhost:8000' : `${window.location.origin}`;
@@ -222,12 +233,19 @@ export async function apiCall<T=any>(path: string, opts: UnifiedRequestOptions<T
         credentials: 'include',
       });
     } catch (networkErr:any) {
+      // 네트워크 레벨 예외(예: CORS, DNS, 연결 끊김)인 경우 재시도 로직 적용 후
+      // 마지막 실패 시 사용자 친화적이고 디버깅 가능한 Error 객체를 던진다.
       if (attempt < retry) {
         const delay = backoffBaseMs * Math.pow(2, attempt);
         await new Promise(r=>setTimeout(r, delay));
         attempt++; continue;
       }
-      throw networkErr;
+      const enhanced = new Error('[unifiedApi] NetworkError: Failed to fetch or connect to API');
+      // 포함: 원본 메시지와 호출 URL, 시도 횟수
+      try { (enhanced as any).original = networkErr?.message || String(networkErr); } catch {}
+      (enhanced as any).url = url;
+      (enhanced as any).attempts = attempt + 1;
+      throw enhanced;
     }
 
     if (response.status === 401 && auth && !didRefresh) {

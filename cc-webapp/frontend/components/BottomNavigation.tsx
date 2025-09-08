@@ -24,7 +24,8 @@ import { useUserGold, useUserLevel } from '@/hooks/useSelectors';
 export function BottomNavigation({ currentScreen, onNavigate }: BottomNavigationProps) {
   const { pendingCount } = useRealtimePurchaseBadge();
   const gold = useUserGold();
-  const level = useUserLevel();
+  // null-safe numeric level 보장
+  const level = Number(useUserLevel() ?? 1);
   const handleModelNavigation = () => {
     // 본사 사이트로 리다이렉트
     window.open('https://md-01.com', '_blank');
@@ -191,7 +192,7 @@ export function BottomNavigation({ currentScreen, onNavigate }: BottomNavigation
       )}
       
       {/* Level indicator */}
-    {level > 0 && (
+  {level > 0 && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}

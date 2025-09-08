@@ -124,6 +124,13 @@ export function ensureUserCompatibility(userData: any): User {
     userData.lastActivity = new Date(userData.lastActivity);
   }
 
+  // 레벨과 경험치 보정: 오래된 데이터나 잘못된 타입을 안전하게 숫자로 변환
+  const parsedLevel = Number(userData.level);
+  userData.level = Number.isFinite(parsedLevel) && parsedLevel >= 1 ? Math.floor(parsedLevel) : 1;
+
+  const parsedExp = Number(userData.experience ?? userData.experiencePoints ?? 0);
+  userData.experience = Number.isFinite(parsedExp) && parsedExp >= 0 ? Math.floor(parsedExp) : 0;
+
   return userData as User;
 }
 
@@ -167,13 +174,16 @@ export function calculateDailyBonus(
   dailyBonusPerStreak = 200
 ): { updatedUser: User; bonusGold: number } {
   const baseBonus = dailyBonusBase;
-  const streakBonus = user.dailyStreak * dailyBonusPerStreak;
+  // 시작일 규칙: 저장된 raw 값이 0이면 UI/계산 상에서는 시작일(1)로 취급
+  const displayStreak = (user.dailyStreak === 0 ? 1 : user.dailyStreak);
+  const streakBonus = displayStreak * dailyBonusPerStreak;
   const bonusGold = baseBonus + streakBonus;
   
   const updatedUser = {
     ...user,
     goldBalance: user.goldBalance + bonusGold,
-    dailyStreak: user.dailyStreak + 1,
+    // 실제 저장되는 streak는 기존 값에 +1 (0 -> 1), 일관된 서버 동기화 전까지 이 값을 사용
+    dailyStreak: (user.dailyStreak ?? 0) + 1,
     lastLogin: new Date()
   };
   

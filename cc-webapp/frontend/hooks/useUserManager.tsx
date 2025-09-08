@@ -32,7 +32,12 @@ export function useUserManager() {
     inviteCode?: string
   ): User => {
     const isAdmin = isAdminAccount(nickname, password);
-    
+    // 레벨을 안전하게 보장: 숫자가 아니거나 1 미만일 경우 기본값 1 사용
+    const rawLevel = isAdmin
+      ? GAME_DEFAULTS.ADMIN_LEVEL
+      : Math.floor(Math.random() * GAME_DEFAULTS.RANDOM_LEVEL_RANGE) + 1;
+    const safeLevel = Number.isFinite(rawLevel) && rawLevel >= 1 ? rawLevel : 1;
+
     return {
       id: Date.now().toString(),
       nickname,
@@ -41,7 +46,7 @@ export function useUserManager() {
         : isSignup 
           ? (inviteCode ? GAME_DEFAULTS.INVITE_BONUS : GAME_DEFAULTS.SIGNUP_BONUS)
           : GAME_DEFAULTS.BASIC_GOLD + Math.floor(Math.random() * GAME_DEFAULTS.RANDOM_GOLD_RANGE),
-      level: isAdmin ? GAME_DEFAULTS.ADMIN_LEVEL : Math.floor(Math.random() * GAME_DEFAULTS.RANDOM_LEVEL_RANGE) + 1,
+      level: safeLevel,
       experience: Math.floor(Math.random() * GAME_DEFAULTS.RANDOM_EXP_RANGE),
       maxExperience: GAME_DEFAULTS.BASE_MAX_EXP,
       dailyStreak: isSignup ? 1 : Math.floor(Math.random() * GAME_DEFAULTS.RANDOM_STREAK_RANGE),
