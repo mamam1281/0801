@@ -23,6 +23,8 @@ import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { Badge } from './ui/badge';
 import { User, GameItem } from '../types';
+import { normalizeCatalog, FALLBACK_SHOP_ITEMS, calcFinalPrice, calcEffectiveGold, isOneTimePurchased } from '@/utils/shop';
+import { NormalizedShopItem } from '@/types/shop';
 import { useGlobalSync } from '@/hooks/useGlobalSync';
 import { api } from '@/lib/unifiedApi';
 import { useWithReconcile } from '@/lib/sync';
@@ -39,143 +41,7 @@ interface ShopScreenProps {
   onAddNotification: (message: string) => void;
 }
 
-// 🏪 상점 아이템 데이터 (서버 장애/초기 구동 시 폴백)
-// 사용자 요청에 따라 MODEL 포인트 / MODEL 아이템 구성으로 전면 교체
-// price: 소비 골드(구매비용), value: 획득 골드(통화형 상품인 경우). 주어진 표에 가격 정보가 명시되지 않아
-// "포인트 > GOLD" 매핑을 그대로 (price == value) 로 가정 (서버 카탈로그 도입 시 서버 값이 우선).
-// TODO: 서버 카탈로그 활성 시 해당 값은 /api/shop/catalog 응답으로 대체됨.
-const SHOP_ITEMS = [
-  // MODEL 포인트 (골드 충전 상품)
-  {
-    id: 'model_points_30000',
-    name: '모델 30,000 포인트',
-    type: 'currency' as const,
-    rarity: 'common' as const,
-    price: 30000,
-    description: '30,000 GOLD 충전',
-    value: 30000,
-    icon: '�',
-    category: 'currency',
-    isLimited: false,
-    discount: 0,
-    popular: false
-  },
-  {
-    id: 'model_points_105000',
-    name: '모델 105,000 포인트',
-    type: 'currency' as const,
-    rarity: 'rare' as const,
-    price: 100000, // 표: 105,000 포인트 → 100,000 GOLD
-    description: '105,000 포인트 교환 (100,000 GOLD 지급)',
-    value: 100000,
-   icon: '�',
-    category: 'currency',
-    isLimited: false,
-    discount: 0,
-    popular: true
-  },
-  {
-    id: 'model_points_330000',
-    name: '모델 330,000 포인트',
-    type: 'currency' as const,
-    rarity: 'epic' as const,
-    price: 300000,
-    description: '330,000 포인트 교환 (300,000 GOLD 지급)',
-    value: 300000,
-    icon: '�',
-    category: 'currency',
-    isLimited: false,
-    discount: 0,
-    popular: false
-  },
-  {
-    id: 'model_points_1150000',
-    name: '모델 1,150,000 포인트',
-    type: 'currency' as const,
-    rarity: 'legendary' as const,
-    price: 1000000,
-    description: '1,150,000 포인트 교환 (1,000,000 GOLD + 보너스 20,000 GOLD)',
-    value: 1000000,
-    bonusGold: 20000, // 100만 충전 시 20,000 GOLD 지급 (표기용 메타)
-    icon: '�',
-    category: 'currency',
-    isLimited: false,
-    discount: 0,
-    popular: true
-  },
-  // MODEL 아이템 (일반/버프/특수)
-  {
-    id: 'anti_single_loss',
-    name: '한폴방지',
-    type: 'powerup' as const,
-    rarity: 'rare' as const,
-    price: 30000,
-    description: '낙첨 1회 무효 (세션/기간 정책은 서버 적용 대상)',
-    value: 0,
-    icon: '🛡️',
-    category: 'powerup',
-    isLimited: false,
-    discount: 0,
-    popular: false
-  },
-  {
-    id: 'charge_plus_30',
-    name: '충전 30%',
-    type: 'powerup' as const,
-    rarity: 'epic' as const,
-    price: 50000,
-    description: '충전/획득 골드 보너스 +30% (지속조건 서버 구현 예정)',
-    value: 0,
-    icon: '⚡',
-    category: 'powerup',
-    isLimited: false,
-    discount: 0,
-    popular: true
-  },
-  {
-    id: 'early_rank_up',
-    name: '조기등업',
-    type: 'special' as const,
-    rarity: 'legendary' as const,
-    price: 500000,
-    description: '즉시 한 단계 등급 상승 (1회만 구매 가능)',
-    value: 0,
-    icon: '🚀',
-    category: 'special',
-    oneTime: true,
-    isLimited: true,
-    discount: 0,
-    popular: false
-  },
-  {
-    id: 'attendance_link',
-    name: '출석연결',
-    type: 'utility' as const,
-    rarity: 'common' as const,
-    price: 20000,
-    description: '출석 보상 누락/이월 기능 (정책 서버 적용 예정)',
-    value: 0,
-    icon: '📅',
-    category: 'utility',
-    isLimited: false,
-    discount: 0,
-    popular: false
-  },
-  {
-    id: 'comp_double_day',
-    name: '하루동안 콤프 2배',
-    type: 'powerup' as const,
-    rarity: 'epic' as const,
-    price: 50000,
-    description: '24시간 동안 컴프(Comp) 보상 2배',
-    value: 0,
-    icon: '🔥',
-    category: 'powerup',
-    isLimited: false,
-    discount: 0,
-    popular: true
-  }
-];
+// 내부 상수 삭제됨: utils/shop.ts 의 FALLBACK_SHOP_ITEMS 사용
 
 export function ShopScreen({
   user,
@@ -187,7 +53,10 @@ export function ShopScreen({
 }: ShopScreenProps) {
   const [showPurchaseModal, setShowPurchaseModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null as import('../types').GameItem | null);
-  const [catalog, setCatalog] = useState(null as any[] | null);
+  const [catalog, setCatalog] = useState<NormalizedShopItem[] | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const [purchasedOneTimeIds, setPurchasedOneTimeIds] = useState<Set<string>>(new Set());
   const { syncBalance } = useGlobalSync();
   const withReconcile = useWithReconcile();
   const gold = useUserGold();
@@ -203,21 +72,26 @@ export function ShopScreen({
   useEffect(() => {
     let cancelled = false;
     async function load() {
+      setLoading(true); setError(null);
       try {
         const res1: any = await api.get('shop/catalog');
         if (!cancelled && Array.isArray(res1)) {
-          setCatalog(res1);
-          return;
+          const norm = normalizeCatalog(res1, { dedupeById: true, preferServerFields: true });
+          setCatalog(norm.items); setLoading(false); return;
         }
       } catch {}
       try {
         const res2: any = await api.get('shop/items');
         if (!cancelled && Array.isArray(res2)) {
-          setCatalog(res2);
-          return;
+          const norm2 = normalizeCatalog(res2, { dedupeById: true, preferServerFields: true });
+          setCatalog(norm2.items); setLoading(false); return;
         }
       } catch {}
-      if (!cancelled) setCatalog([]); // 빈 배열이면 아래에서 폴백 사용
+      if (!cancelled) {
+        const fallback = normalizeCatalog([], { dedupeById: true });
+        setCatalog(fallback.items); setLoading(false);
+      }
+      if (!cancelled) setLoading(false);
     }
     load();
     // 간단한 캐시 무효화 훅: 어드민 업서트 이후 window 이벤트로 무효화
@@ -236,22 +110,7 @@ export function ShopScreen({
   }, []);
 
   // 서버 → UI 매핑 (널 안전)
-  const itemsToRender = useMemo(() => {
-    const source = (catalog && catalog.length > 0) ? catalog : SHOP_ITEMS;
-    return source.map((it: any) => ({
-      id: String(it.id ?? it.item_id ?? it.slug ?? it.code ?? Math.random().toString(36).slice(2)),
-      name: String(it.name ?? '아이템'),
-      type: String(it.type ?? 'item'),
-      rarity: String(it.rarity ?? 'common'),
-      price: Number(it.price ?? it.cost ?? 0),
-      discount: Number(it.discount ?? it.sale_pct ?? 0),
-      description: String(it.description ?? it.desc ?? ''),
-      value: Number(it.value ?? it.amount ?? 0),
-      icon: String(it.icon ?? '🎁'),
-      isLimited: Boolean(it.isLimited ?? it.limited ?? false),
-      popular: Boolean(it.popular ?? it.isPopular ?? false),
-    }));
-  }, [catalog]);
+  const itemsToRender = useMemo(() => (catalog ?? FALLBACK_SHOP_ITEMS), [catalog]);
 
   // 🎨 등급별 스타일링 (글래스메탈 버전)
   const getRarityStyles = (rarity: string) => {
@@ -296,7 +155,7 @@ export function ShopScreen({
 
   // 💰 아이템 구매 처리
   const handlePurchase = async (item: any) => {
-    const finalPrice = Math.floor(item.price * (1 - item.discount / 100));
+    const finalPrice = calcFinalPrice(item);
 
     if (gold < finalPrice) {
       onAddNotification('❌ 골드가 부족합니다!');
@@ -348,8 +207,12 @@ export function ShopScreen({
       // 실패 시에도 최종적으로 권위 잔액과 동기화 시도
       onAddNotification('구매 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
     }
-  // 구매 후 권위 잔액 재조회로 최종 정합 유지(권위 동기화 훅 사용)
-  try { await syncBalance(); } catch {}
+    // oneTime 구매 성공 시 로컬 비활성
+    if (item.oneTime) {
+      setPurchasedOneTimeIds(prev => new Set(prev).add(item.id));
+    }
+    // 구매 후 권위 잔액 재조회로 최종 정합 유지(권위 동기화 훅 사용)
+    try { await syncBalance(); } catch {}
     setShowPurchaseModal(false);
   };
 
@@ -542,11 +405,28 @@ export function ShopScreen({
         </motion.div>
 
         {/* 🛍️ 상점 아이템 그리드 (글래스메탈) */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+        {/* 로딩 / 오류 / 빈 상태 처리 */}
+        {loading && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="glass-metal p-8 rounded-2xl border border-border/30 animate-pulse h-80" />
+            ))}
+          </div>
+        )}
+        {!loading && error && (
+          <div className="text-center py-20 text-error font-semibold">상점 데이터를 불러오지 못했습니다. (fallback 표시 중)</div>
+        )}
+        {!loading && !error && itemsToRender.length === 0 && (
+          <div className="text-center py-20 text-muted-foreground">표시할 아이템이 없습니다.</div>
+        )}
+        {!loading && itemsToRender.length > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
           {itemsToRender.map((item: any, index: number) => {
             const styles = getRarityStyles(item.rarity);
-            const finalPrice = Math.floor(item.price * (1 - item.discount / 100));
+            const finalPrice = calcFinalPrice(item);
             const canAfford = gold >= finalPrice;
+            const effectiveGold = calcEffectiveGold(item);
+            const purchasedOneTime = item.oneTime && isOneTimePurchased(item.id, purchasedOneTimeIds);
             
             return (
               <motion.div
@@ -568,6 +448,16 @@ export function ShopScreen({
                       <Badge className="glass-metal bg-gold text-white font-bold text-xs px-3 py-2 rounded-full">
                         <Timer className="w-3 h-3 mr-1" />
                         한정
+                      </Badge>
+                    )}
+                    {item.oneTime && (
+                      <Badge className="glass-metal bg-warning text-black font-bold text-xs px-3 py-2 rounded-full">
+                        1회
+                      </Badge>
+                    )}
+                    {item.bonusGold && item.bonusGold > 0 && (
+                      <Badge className="glass-metal bg-success text-white font-bold text-xs px-3 py-2 rounded-full">
+                        +{item.bonusGold.toLocaleString()}G
                       </Badge>
                     )}
                   </div>
@@ -619,6 +509,9 @@ export function ShopScreen({
                           {item.price.toLocaleString()}G
                         </div>
                       )}
+                      {effectiveGold > 0 && (
+                        <div className="text-xs mt-1 text-success font-semibold">실수령 {effectiveGold.toLocaleString()}G</div>
+                      )}
                     </div>
 
                     <Button
@@ -626,7 +519,7 @@ export function ShopScreen({
                         setSelectedItem(item);
                         setShowPurchaseModal(true);
                       }}
-                      disabled={!canAfford}
+                      disabled={!canAfford || purchasedOneTime}
                       className={`w-full glass-metal-hover ${
                         item.rarity === 'legendary' ? 'bg-gradient-to-r from-gold to-gold-light' :
                         item.rarity === 'epic' ? 'bg-gradient-to-r from-primary to-primary-light' :
@@ -635,14 +528,15 @@ export function ShopScreen({
                       } hover:opacity-90 text-white font-bold py-3 disabled:opacity-50 disabled:cursor-not-allowed metal-shine`}
                     >
                       <ShoppingCart className="w-5 h-5 mr-2" />
-                      {canAfford ? '구매하기' : '골드 부족'}
+                      {purchasedOneTime ? '구매완료' : (canAfford ? '구매하기' : '골드 부족')}
                     </Button>
                   </div>
                 </Card>
               </motion.div>
             );
           })}
-  </div>
+          </div>
+        )}
 
   {/* 🧾 최근 거래 히스토리 */}
   <ShopPurchaseHistory />
