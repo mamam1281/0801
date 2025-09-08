@@ -95,15 +95,13 @@ export function ProfileScreen({
 
       const profileData: any = {
         ...rawProfile,
-        experience: (rawProfile as any).experience ?? (rawProfile as any).xp ?? 0,
+        experience: (rawProfile as any).experience ?? (rawProfile as any).experience_points ?? (rawProfile as any).xp ?? 0,
+        experience_points: (rawProfile as any).experience_points ?? (rawProfile as any).experience ?? (rawProfile as any).xp ?? 0,
         maxExperience:
           (rawProfile as any).maxExperience ?? (rawProfile as any).max_experience ?? 1000,
         dailyStreak:
-          (rawProfile as any).dailyStreak ||
-          (rawProfile as any).daily_streak ||
-          (rawProfile as any).streak ||
-          0,
-        level: (rawProfile as any).level ?? (rawProfile as any).lvl ?? 1,
+          (rawProfile as any).dailyStreak ?? (rawProfile as any).daily_streak ?? (rawProfile as any).streak ?? 1,
+        level: (rawProfile as any).level ?? (rawProfile as any).battlepass_level ?? (rawProfile as any).lvl ?? 1,
         gameStats: (rawProfile as any).gameStats || (rawProfile as any).game_stats || {},
       };
       const statsData: any = {
