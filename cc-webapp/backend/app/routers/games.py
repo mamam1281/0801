@@ -1517,9 +1517,9 @@ def get_my_authoritative_game_stats(current_user: models.User = Depends(get_curr
         # 슬롯 통계 조회
         slot_stats = db.query(
             func.count(UserAction.id).label('spins'),
-            func.max(case([(UserAction.action_type == 'SLOT_WIN', func.cast(UserAction.action_data, Integer))], else_=0)).label('max_win'),
-            func.count(case([(UserAction.action_type == 'SLOT_WIN', 1)], else_=None)).label('wins'),
-            func.count(case([(UserAction.action_type == 'SLOT_LOSE', 1)], else_=None)).label('losses')
+            func.max(case((UserAction.action_type == 'SLOT_WIN', func.cast(UserAction.action_data, Integer)), else_=0)).label('max_win'),
+            func.count(case((UserAction.action_type == 'SLOT_WIN', 1), else_=None)).label('wins'),
+            func.count(case((UserAction.action_type == 'SLOT_LOSE', 1), else_=None)).label('losses')
         ).filter(UserAction.user_id == current_user.id, UserAction.action_type.in_(['SLOT_SPIN', 'SLOT_WIN', 'SLOT_LOSE'])).first()
         
         slot_stats_dict = {
@@ -1532,9 +1532,9 @@ def get_my_authoritative_game_stats(current_user: models.User = Depends(get_curr
         # 가챠 통계 조회
         gacha_stats = db.query(
             func.count(UserAction.id).label('spins'),
-            func.count(case([(UserAction.action_type == 'GACHA_RARE_WIN', 1)], else_=None)).label('rare_wins'),
-            func.count(case([(UserAction.action_type == 'GACHA_ULTRA_RARE_WIN', 1)], else_=None)).label('ultra_rare_wins'),
-            func.max(case([(UserAction.action_type.in_(['GACHA_RARE_WIN', 'GACHA_ULTRA_RARE_WIN']), func.cast(UserAction.action_data, Integer))], else_=0)).label('max_win')
+            func.count(case((UserAction.action_type == 'GACHA_RARE_WIN', 1), else_=None)).label('rare_wins'),
+            func.count(case((UserAction.action_type == 'GACHA_ULTRA_RARE_WIN', 1), else_=None)).label('ultra_rare_wins'),
+            func.max(case((UserAction.action_type.in_(['GACHA_RARE_WIN', 'GACHA_ULTRA_RARE_WIN']), func.cast(UserAction.action_data, Integer)), else_=0)).label('max_win')
         ).filter(UserAction.user_id == current_user.id, UserAction.action_type.in_(['GACHA_SPIN', 'GACHA_RARE_WIN', 'GACHA_ULTRA_RARE_WIN'])).first()
         
         gacha_stats_dict = {
@@ -1547,9 +1547,9 @@ def get_my_authoritative_game_stats(current_user: models.User = Depends(get_curr
         # RPS 통계 조회
         rps_stats = db.query(
             func.count(UserAction.id).label('plays'),
-            func.count(case([(UserAction.action_type == 'RPS_WIN', 1)], else_=None)).label('wins'),
-            func.count(case([(UserAction.action_type == 'RPS_LOSE', 1)], else_=None)).label('losses'),
-            func.count(case([(UserAction.action_type == 'RPS_TIE', 1)], else_=None)).label('ties')
+            func.count(case((UserAction.action_type == 'RPS_WIN', 1), else_=None)).label('wins'),
+            func.count(case((UserAction.action_type == 'RPS_LOSE', 1), else_=None)).label('losses'),
+            func.count(case((UserAction.action_type == 'RPS_TIE', 1), else_=None)).label('ties')
         ).filter(UserAction.user_id == current_user.id, UserAction.action_type.in_(['RPS_PLAY', 'RPS_WIN', 'RPS_LOSE', 'RPS_TIE'])).first()
         
         rps_stats_dict = {
@@ -1560,8 +1560,8 @@ def get_my_authoritative_game_stats(current_user: models.User = Depends(get_curr
         }
 
         # 최대 승리 금액 계산
-        crash_max_win = db.query(func.max(case([(UserAction.action_type == 'CRASH_WIN', func.cast(UserAction.action_data, Integer))], else_=0))).filter(UserAction.user_id == current_user.id).scalar() or 0
-        rps_max_win = db.query(func.max(case([(UserAction.action_type == 'RPS_WIN', func.cast(UserAction.action_data, Integer))], else_=0))).filter(UserAction.user_id == current_user.id).scalar() or 0
+        crash_max_win = db.query(func.max(case((UserAction.action_type == 'CRASH_WIN', func.cast(UserAction.action_data, Integer)), else_=0))).filter(UserAction.user_id == current_user.id).scalar() or 0
+        rps_max_win = db.query(func.max(case((UserAction.action_type == 'RPS_WIN', func.cast(UserAction.action_data, Integer)), else_=0))).filter(UserAction.user_id == current_user.id).scalar() or 0
         
         crash_max_multiplier = float(crash_stats_dict['highest_multiplier']) if crash_stats_dict['highest_multiplier'] is not None else None
 
