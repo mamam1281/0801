@@ -262,25 +262,8 @@ async def claim(
         logger.info("[streak.claim] start", extra={"user_id": current_user.id, "action_type": action_type})
     except Exception:
         logger = None
-    # 현재 streak 읽기 (증가 없이)
-    streak_count = get_streak_counter(str(current_user.id), action_type)
-    if streak_count <= 0:
-        # 최초 claim 시 자동 seed (tick 1회와 동일 효과) -> 사용자 UX 개선
-        try:
-            seeded = update_streak_counter(str(current_user.id), action_type, increment=True)
-            streak_count = seeded
-            if logger:
-                logger.info("[streak.claim] auto_seed_applied", extra={"user_id": current_user.id, "action_type": action_type, "seeded": seeded})
-        except Exception:
-            # Redis/seed 실패 시 이전 로직과 동일하게 400 반환 (fallback)
-            if logger:
-                logger.info("[streak.claim] auto_seed_failed", extra={"user_id": current_user.id, "action_type": action_type})
-            raise HTTPException(status_code=400, detail="No active streak to claim")
-        
-    # 오늘 이미 보상을 받았는지 확인
-    claim_day = datetime.utcnow().date().isoformat()
-    # 기존 코드에서 UserReward.created_at 필드를 참조했으나 모델에는 claimed_at 만 존재
-    # streak 일일 보상은 claimed_at 기준으로 '오늘' 수령 여부 확인
+    # 매일 보상 claim 시 streak 증가 (연속보상의 핵심 로직)
+    # 오늘 이미 보상을 받았는지 먼저 확인
     existing_today = (
         db.query(UserReward)
         .filter(
@@ -291,10 +274,22 @@ async def claim(
         .first()
     )
     if existing_today:
+        # 이미 오늘 보상을 받았으면 streak는 증가시키지 않고 기존 값 반환
+        streak_count = get_streak_counter(str(current_user.id), action_type)
         if logger:
             logger.info("[streak.claim] already_claimed_today", extra={"user_id": current_user.id, "reward_id": existing_today.id})
         raise HTTPException(status_code=400, detail="한 회원당 하루에 1번만 연속 보상을 받을 수 있습니다")
-
+    
+    # 아직 오늘 보상을 받지 않았다면 streak 증가
+    try:
+        streak_count = update_streak_counter(str(current_user.id), action_type, increment=True)
+        if logger:
+            logger.info("[streak.claim] streak_incremented", extra={"user_id": current_user.id, "action_type": action_type, "new_streak": streak_count})
+    except Exception:
+        # Redis 실패 시 fallback
+        if logger:
+            logger.info("[streak.claim] streak_increment_failed", extra={"user_id": current_user.id, "action_type": action_type})
+        raise HTTPException(status_code=500, detail="Streak 업데이트 실패")
     # 멱등키: user_id + action_type + UTC date
     claim_day = datetime.utcnow().date().isoformat()
     idempotency_key = f"streak:{current_user.id}:{action_type}:{claim_day}"
