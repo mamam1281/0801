@@ -20,7 +20,6 @@ import { Button } from '../ui/button';
 import { useWithReconcile } from '@/lib/sync';
 import { useGlobalSync } from '@/hooks/useGlobalSync';
 import { useGlobalStore, useGlobalProfile } from '@/store/globalStore';
-import { mergeGameStats } from '@/store/globalStore';
 import { useGameTileStats } from '@/hooks/useGameStats';
 
 interface RockPaperScissorsGameProps {
@@ -208,7 +207,8 @@ export function RockPaperScissorsGame({
           totalBet: betAmount || 0,
           totalPayout: winnings || 0,
         };
-        mergeGameStats(dispatch, 'rps', statsDelta);
+        // 🎯 중요: mergeGameStats 제거 - 누적 버그 방지, 서버 권위 동기화만 사용
+        // mergeGameStats(dispatch, 'rps', statsDelta); // 제거됨
         // 게임 후 전역 동기화 (권위 반영)
         await syncAfterGame();
         return res;

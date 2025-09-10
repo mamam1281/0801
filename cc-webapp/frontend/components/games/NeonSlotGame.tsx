@@ -5,7 +5,7 @@ import useFeedback from '../../hooks/useFeedback';
 import { api } from '@/lib/unifiedApi';
 import { useWithReconcile } from '@/lib/sync';
 import { useUserGold } from '@/hooks/useSelectors';
-import { useGlobalStore, mergeProfile, mergeGameStats } from '@/store/globalStore';
+import { useGlobalStore, mergeProfile } from '@/store/globalStore';
 import { useGameTileStats } from '@/hooks/useGameStats';
 import {
   PLAY_COUNT_KEYS_BY_GAME,
@@ -441,14 +441,8 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
 
         // 전역 게임 통계 누적(표시용 캐시). 서버 실패(로컬 시뮬레이션) 시에는 증가하지 않음
         if (authoritativeUsed) {
-          mergeGameStats(dispatch, 'slot', {
-            total_games: 1,
-            spins: 1,
-            totalBet: costAmount,
-            totalPayout: result.winAmount,
-            totalWins: 1,
-            jackpots: result.isJackpot ? 1 : 0,
-          });
+          // 🎯 중요: mergeGameStats 제거 - 누적 버그 방지, 서버 권위 동기화만 사용
+          // mergeGameStats(dispatch, 'slot', { ... }); // 제거됨
         }
         // 로컬 user.gameStats 직접 증분 제거 (서버 권위 동기화 사용)
 
@@ -469,14 +463,8 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
 
         // 전역 게임 통계 누적(표시용 캐시). 서버 실패(로컬 시뮬레이션) 시에는 증가하지 않음
         if (authoritativeUsed) {
-          mergeGameStats(dispatch, 'slot', {
-            total_games: 1,
-            spins: 1,
-            totalBet: costAmount,
-            totalPayout: 0,
-            totalWins: 0,
-            jackpots: 0,
-          });
+          // 🎯 중요: mergeGameStats 제거 - 누적 버그 방지, 서버 권위 동기화만 사용
+          // mergeGameStats(dispatch, 'slot', { ... }); // 제거됨
         }
         // 로컬 user.gameStats 직접 증분 제거 (서버 권위 동기화 사용)
         // 실패 스핀도 서버 feedback이 push 되었을 수 있음 (serverResult)
