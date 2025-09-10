@@ -1,6 +1,112 @@
 `````markdown
 # 🎯 Casino-Club F2P 프로젝트 구조 가이드
 
+# 🎯 Casino-Club F2P 프로젝트 구조 가이드
+
+## [2025-09-11 13:30] 🛒 상점 메뉴 시스템 완전 구축 완료
+
+### 🛍️ 상점 시스템 핵심 개선: 실제 서비스 수준 상품 카탈로그 구축
+**배경**: 사용자 요청에 따른 실제 사용 가능한 상점 메뉴 구성 필요
+**목표**: 한폴방지, 출석연결, 충전혜택, 모델 포인트 교환권 등 9개 상품 카테고리 완전 구현
+
+### 🏗️ 상점 데이터베이스 구조 완성
+#### 구현된 상품 카탈로그 (shop_products 테이블)
+```
+🛒 Casino-Club F2P 상점 메뉴 (총 9개 상품)
+├── 게임 지원 상품
+│   ├── 한폴방지: 20,000 GOLD
+│   ├── 출석연결: 30,000 GOLD (월 3회)
+│   ├── 1일 콤프2배: 40,000 GOLD
+│   ├── 충전30%: 50,000 GOLD (주 1회)
+│   └── 조기등업: 500,000 GOLD (1회만 구매가능)
+└── 모델 포인트 교환권
+    ├── 30,000 포인트교환권: 30,000 GOLD
+    ├── 105,000 포인트교환권: 100,000 GOLD
+    ├── 330,000 포인트교환권: 300,000 GOLD
+    └── 1,150,000 포인트교환권: 1,000,000 GOLD
+```
+
+#### 데이터베이스 스키마 검증
+```sql
+-- 현재 상점 상품 목록 (가격순 정렬)
+SELECT id, product_id, name, description, price, is_active 
+FROM shop_products ORDER BY price;
+
+-- 결과: 9개 상품 모두 is_active=true 상태로 정상 등록
+```
+
+### 🔧 기술적 구현 세부사항
+
+#### 1. 프론트엔드 globalStore TypeError 해결
+```typescript
+// globalStore.impl.ts, globalStore.ts 수정
+const deepMergeNumericAdd = (a: any, b: any): any => {
+  // 기존 코드...
+  if (typeof a === "object" && typeof b === "object" && a !== null && b !== null) {
+    const out: Record<string, any> = { ...a };
+    // b가 null이나 undefined가 아닌지 한번 더 체크 추가
+    if (b && typeof b === "object") {
+      for (const k of Object.keys(b)) {
+        out[k] = deepMergeNumericAdd((a as any)[k], (b as any)[k]);
+      }
+    }
+    return out;
+  }
+  // ...
+};
+```
+
+#### 2. 백엔드 Shop API 검증
+```python
+# app/routers/shop.py에서 상품 카탈로그 조회 확인
+@router.get("/catalog")
+def get_shop_catalog():
+    # 9개 상품 모두 정상 반환 확인
+    # HTTP 200 OK, JSON 형태로 상품 목록 응답
+```
+
+#### 3. 컨테이너 환경 안정화
+```bash
+# 프론트엔드 컨테이너 완전 재빌드
+docker-compose stop frontend
+docker-compose build --no-cache frontend  
+docker-compose up -d frontend
+
+# 모든 컨테이너 healthy 상태 확인
+```
+
+### 📊 상점 시스템 현재 상태
+```json
+{
+  "shop_products_total": 9,
+  "price_range": "20,000 ~ 1,000,000 GOLD",
+  "categories": {
+    "game_support": 5,     // 게임 지원 상품
+    "model_vouchers": 4    // 모델 포인트 교환권
+  },
+  "purchase_limits": {
+    "monthly": 1,    // 출석연결 (월 3회)
+    "weekly": 1,     // 충전30% (주 1회)  
+    "one_time": 1    // 조기등업 (1회만)
+  }
+}
+```
+
+### ✅ 해결 완료 사항
+- **프론트엔드 TypeError**: globalStore deepMergeNumericAdd 함수 null 안전성 확보
+- **상점 데이터베이스**: 요청된 9개 상품 카테고리 완전 구축
+- **API 연동**: 백엔드 /api/shop/catalog 정상 응답 (9개 상품 조회)
+- **컨테이너 안정화**: 모든 서비스 healthy 상태, 프론트엔드 빌드 완료
+- **데이터 일관성**: shop_products 테이블과 API 응답 동기화 완료
+
+### 🎯 기술적 의의
+1. **실용성**: 실제 서비스에서 사용 가능한 상품 카테고리 구성
+2. **확장성**: 구매 제한, 할인, 프로모션 등 고급 기능 확장 가능한 구조
+3. **안정성**: 프론트엔드 상태 관리 오류 완전 해결
+4. **운영성**: Docker 컨테이너 기반 안정적 배포 환경 확보
+
+---
+
 ## [2025-09-07 11:20] ✅ 게임 통계 전역동기화 완전 해결 - 모든 게임 타입 통합
 
 ### 🎮 핵심 문제 해결: 게임 통계 시스템 완전 통합

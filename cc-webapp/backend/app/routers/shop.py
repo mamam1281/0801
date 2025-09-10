@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field, field_validator
 from typing import Optional, Literal, List
 from datetime import datetime
+from sqlalchemy.orm import Session
 import time
 import json
 import logging
@@ -125,6 +126,13 @@ class CatalogItem(BaseModel):
     discount_ends_at: Optional[datetime] = None
     min_rank: Optional[str] = None
 
+class ShopProductOut(BaseModel):
+    id: int
+    product_id: str
+    name: str
+    description: Optional[str]
+    price: int
+    is_active: bool
 
 @router.get("/catalog", response_model=list[CatalogItem], summary="List shop catalog (gold)")
 def list_catalog():
@@ -142,6 +150,22 @@ def list_catalog():
             min_rank=p.min_rank,
         ))
     return items
+
+@router.get("/products", response_model=List[ShopProductOut], summary="List shop products from database")
+def list_shop_products(db: Session = Depends(get_db)):
+    """List active shop products from shop_products table"""
+    from sqlalchemy.orm import Session
+    from ..models.shop_models import ShopProduct
+    
+    products = db.query(ShopProduct).filter(ShopProduct.is_active == True).order_by(ShopProduct.price).all()
+    return [ShopProductOut(
+        id=p.id,
+        product_id=p.product_id,
+        name=p.name,
+        description=p.description,
+        price=p.price,
+        is_active=p.is_active
+    ) for p in products]
 
 # -----------------
 # Admin ShopProduct CRUD (soft delete)
