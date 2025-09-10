@@ -807,7 +807,10 @@ async def play_rps(
     new_balance = SimpleUserService.update_user_tokens(db, current_user.id, -bet_amount + win_amount)
     
     # 🎯 게임 통계 업데이트 추가
-    AuthService.update_game_stats(db, current_user.id, result)
+    GameService.update_game_stats(db, current_user.id, "rps", {
+        "betAmount": bet_amount,
+        "winAmount": win_amount
+    })
     
     # 플레이 기록 저장
     action_data = {

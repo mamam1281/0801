@@ -296,24 +296,33 @@ class GameService:
         if not stats:
             stats = GameStats(
                 user_id=user_id,
-                game_type=game_type
+                game_type=game_type,
+                total_games=0,
+                total_wins=0,
+                total_losses=0,
+                total_bet=0,
+                total_won=0,
+                best_score=0,
+                current_streak=0,
+                best_streak=0
             )
             db.add(stats)
         
-        stats.total_games += 1
-        stats.total_bet += result.get('betAmount', 0)
+        # None 값들을 0으로 초기화
+        stats.total_games = (stats.total_games or 0) + 1
+        stats.total_bet = (stats.total_bet or 0) + result.get('betAmount', 0)
         
         if result.get('winAmount', 0) > 0:
-            stats.total_wins += 1
-            stats.total_won += result['winAmount']
-            stats.current_streak += 1
-            if stats.current_streak > stats.best_streak:
+            stats.total_wins = (stats.total_wins or 0) + 1
+            stats.total_won = (stats.total_won or 0) + result['winAmount']
+            stats.current_streak = (stats.current_streak or 0) + 1
+            if stats.current_streak > (stats.best_streak or 0):
                 stats.best_streak = stats.current_streak
         else:
-            stats.total_losses += 1
+            stats.total_losses = (stats.total_losses or 0) + 1
             stats.current_streak = 0
         
-        if result.get('winAmount', 0) > stats.best_score:
+        if result.get('winAmount', 0) > (stats.best_score or 0):
             stats.best_score = result['winAmount']
         
         stats.last_played = datetime.utcnow()

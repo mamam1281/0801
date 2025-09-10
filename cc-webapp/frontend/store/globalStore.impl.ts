@@ -145,9 +145,9 @@ function reducer(state: GlobalState, action: Actions): GlobalState {
             const deepMergeNumericAdd = (a: any, b: any): any => {
                 if (Array.isArray(a) && Array.isArray(b)) return [...a, ...b];
                 if (typeof a === "number" && typeof b === "number") return a + b;
-                if (a === undefined) return b;
-                if (b === undefined) return a;
-                if (typeof a === "object" && typeof b === "object") {
+                if (a === undefined || a === null) return b;
+                if (b === undefined || b === null) return a;
+                if (typeof a === "object" && typeof b === "object" && a !== null && b !== null) {
                     const out: Record<string, any> = { ...a };
                     for (const k of Object.keys(b)) {
                         out[k] = deepMergeNumericAdd((a as any)[k], (b as any)[k]);

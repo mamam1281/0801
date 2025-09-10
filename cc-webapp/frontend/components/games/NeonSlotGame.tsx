@@ -442,7 +442,8 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
         // 전역 게임 통계 누적(표시용 캐시). 서버 실패(로컬 시뮬레이션) 시에는 증가하지 않음
         if (authoritativeUsed) {
           mergeGameStats(dispatch, 'slot', {
-            totalSpins: 1,
+            total_games: 1,
+            spins: 1,
             totalBet: costAmount,
             totalPayout: result.winAmount,
             totalWins: 1,
@@ -469,7 +470,8 @@ export function NeonSlotGame({ user, onBack, onUpdateUser, onAddNotification }: 
         // 전역 게임 통계 누적(표시용 캐시). 서버 실패(로컬 시뮬레이션) 시에는 증가하지 않음
         if (authoritativeUsed) {
           mergeGameStats(dispatch, 'slot', {
-            totalSpins: 1,
+            total_games: 1,
+            spins: 1,
             totalBet: costAmount,
             totalPayout: 0,
             totalWins: 0,

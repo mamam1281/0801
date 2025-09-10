@@ -179,6 +179,7 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
         const ultraAdds1 = mapped.filter((i) => ['legendary', 'mythic'].includes(i.rarity)).length;
         // 전역 통계는 표시용 캐시만 가산, 최종 값은 syncAfterGame으로 반영
         mergeGameStats(dispatch, 'gacha', {
+          total_games: 1,
           pulls: 1,
           totalSpent: cost,
           epicCount: epicAdds1,
@@ -316,6 +317,7 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
         }
         // 전역 통계는 표시용 캐시만 가산, 최종 값은 syncAfterGame으로 반영
         mergeGameStats(dispatch, 'gacha', {
+          total_games: 10,
           pulls: 10,
           totalSpent: discountedCost,
           epicCount: epicAdds,

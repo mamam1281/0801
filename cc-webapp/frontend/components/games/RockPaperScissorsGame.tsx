@@ -200,7 +200,8 @@ export function RockPaperScissorsGame({
         setRoundHistory((prev: GameRound[]) => [round, ...prev.slice(0, 9)]);
         // 통계 병합(표시용 캐시) — 최종 값은 syncAfterGame으로 서버 권위 반영
         mergeGameStats(dispatch, 'rps', {
-          totalGames: 1,
+          total_games: 1,
+          plays: 1,
           wins: result === 'win' ? 1 : 0,
           losses: result === 'lose' ? 1 : 0,
           draws: result === 'draw' ? 1 : 0,

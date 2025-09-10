@@ -179,7 +179,8 @@ export function NeonCrashGame({
       // 통계는 별도 fetch, 잔액은 withReconcile 후 하이드레이트에 위임
       // 통계 병합(표시용 캐시). 최종 값은 syncAfterGame으로 서버 권위 반영
       mergeGameStats(dispatch, 'crash', {
-        totalBets: 1,
+        total_games: 1,
+        games: 1,
         totalWagered: betAmount,
         totalWins: winAmount > 0 ? 1 : 0,
         totalProfit: winAmount - betAmount,
