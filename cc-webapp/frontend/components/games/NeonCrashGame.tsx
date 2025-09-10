@@ -50,7 +50,7 @@ export function NeonCrashGame({
   onUpdateUser,
   onAddNotification,
 }: NeonCrashGameProps) {
-  const crashStats = useGameTileStats('crash');
+  const crashStats = useGameTileStats('crash', user.gameStats?.crash);
   const withReconcile = useWithReconcile();
   const gold = useUserGold();
   const { dispatch } = useGlobalStore();

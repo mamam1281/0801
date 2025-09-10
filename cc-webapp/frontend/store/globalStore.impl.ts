@@ -57,6 +57,7 @@ type Actions =
     | { type: "APPLY_REWARD"; award: { gold?: number; gems?: number } }
     | { type: "MERGE_PROFILE"; patch: Partial<GlobalUserProfile> & Record<string, unknown> }
     | { type: "MERGE_GAME_STATS"; game: string; delta: Record<string, any> }
+    | { type: "SET_GAME_STATS"; gameStats: Record<string, any> }
     | { type: "APPLY_PURCHASE"; items: InventoryItem[]; replace?: boolean }
     | { type: "SET_ERROR"; error: { message: string; at: number } | null }
     | { type: "SET_BALANCES"; balances: { gold: number; gems?: number } }
@@ -141,24 +142,44 @@ function reducer(state: GlobalState, action: Actions): GlobalState {
         case "MERGE_GAME_STATS": {
             const current = state.gameStats || {};
             const prev = (current[action.game] as any) || {};
+            const delta = action.delta || {};
 
             const deepMergeNumericAdd = (a: any, b: any): any => {
+                // Early null/undefined checks
+                if (a === undefined || a === null) return b ?? {};
+                if (b === undefined || b === null) return a ?? {};
+                
+                // Array handling
                 if (Array.isArray(a) && Array.isArray(b)) return [...a, ...b];
+                
+                // Number handling  
                 if (typeof a === "number" && typeof b === "number") return a + b;
-                if (a === undefined || a === null) return b;
-                if (b === undefined || b === null) return a;
-                if (typeof a === "object" && typeof b === "object" && a !== null && b !== null) {
+                
+                // Object handling with comprehensive null checks
+                if (typeof a === "object" && typeof b === "object" && 
+                    a !== null && b !== null && 
+                    !Array.isArray(a) && !Array.isArray(b) &&
+                    Object.prototype.toString.call(a) === '[object Object]' &&
+                    Object.prototype.toString.call(b) === '[object Object]') {
+                    
                     const out: Record<string, any> = { ...a };
-                    for (const k of Object.keys(b)) {
+                    const keys = Object.keys(b);
+                    for (const k of keys) {
                         out[k] = deepMergeNumericAdd((a as any)[k], (b as any)[k]);
                     }
                     return out;
                 }
-                return b; // 다른 타입은 최근 delta로 덮기
+                
+                // Default fallback - return b if not mergeable
+                return b ?? a ?? {};
             };
 
-            const mergedForGame = deepMergeNumericAdd(prev, action.delta);
+            const mergedForGame = deepMergeNumericAdd(prev, delta);
             return { ...state, gameStats: { ...current, [action.game]: mergedForGame } };
+        }
+        case "SET_GAME_STATS": {
+            // 서버에서 받은 권위 있는 통계로 전체 교체
+            return { ...state, gameStats: action.gameStats || {} };
         }
         case "APPLY_PURCHASE": {
             const current = state.inventory || [];
@@ -243,6 +264,20 @@ export function mergeProfile(dispatch: DispatchFn, patch: Partial<GlobalUserProf
 
 // 통계 병합(숫자는 누적, 배열은 concat, 객체는 재귀 병합)
 export function mergeGameStats(dispatch: DispatchFn, game: string, delta: Record<string, any>) {
+    // Validate inputs to prevent null/undefined errors
+    if (!dispatch || typeof dispatch !== 'function') {
+        console.warn('[mergeGameStats] Invalid dispatch function');
+        return;
+    }
+    if (!game || typeof game !== 'string') {
+        console.warn('[mergeGameStats] Invalid game name:', game);
+        return;
+    }
+    if (!delta || typeof delta !== 'object') {
+        console.warn('[mergeGameStats] Invalid delta object:', delta);
+        return;
+    }
+    
     dispatch({ type: "MERGE_GAME_STATS", game, delta });
 }
 

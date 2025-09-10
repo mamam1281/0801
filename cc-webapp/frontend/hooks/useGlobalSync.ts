@@ -173,10 +173,60 @@ export function useGlobalSync() {
                 console.log('[GlobalSync] Normalized stats:', normalizedStats);
                 
                 if (Object.keys(normalizedStats).length > 0) {
-                    // MERGE_GAME_STATS 액션 사용 (globalStore.ts와 일치)
-                    dispatch({ type: 'MERGE_GAME_STATS', game: '_me', delta: normalizedStats });
+                    // 🎯 게임별로 분리하여 저장 (useGameTileStats와 일치)
+                    const breakdown = normalizedStats.game_breakdown || {};
+                    
+                    // 각 게임별 통계를 개별적으로 저장
+                    const gameUpdates = {
+                        slot: {
+                            spins: breakdown.slot?.plays || 0,
+                            wins: breakdown.slot?.wins || 0,
+                            losses: breakdown.slot?.losses || 0,
+                            max_win: breakdown.slot?.max_win || 0,
+                            total_games: breakdown.slot?.plays || 0
+                        },
+                        rps: {
+                            plays: breakdown.rps?.plays || 0,
+                            wins: breakdown.rps?.wins || 0,
+                            losses: breakdown.rps?.losses || 0,
+                            ties: breakdown.rps?.ties || 0,
+                            total_games: breakdown.rps?.plays || 0
+                        },
+                        crash: {
+                            bets: breakdown.crash?.plays || 0,
+                            wins: breakdown.crash?.wins || 0,
+                            losses: breakdown.crash?.losses || 0,
+                            max_win: breakdown.crash?.max_win || 0,
+                            max_multiplier: breakdown.crash?.max_multiplier || null,
+                            total_games: breakdown.crash?.plays || 0
+                        },
+                        gacha: {
+                            spins: breakdown.gacha?.plays || 0,
+                            rare_wins: breakdown.gacha?.rare_wins || 0,
+                            ultra_rare_wins: breakdown.gacha?.ultra_rare_wins || 0,
+                            max_win: breakdown.gacha?.max_win || 0,
+                            total_games: breakdown.gacha?.plays || 0
+                        }
+                    };
+                    
+                    // SET_GAME_STATS로 전체 게임 통계를 한번에 교체
+                    dispatch({ 
+                        type: 'SET_GAME_STATS', 
+                        gameStats: {
+                            ...gameUpdates,
+                            // 전역 통계도 함께 저장
+                            _global: {
+                                total_games_played: normalizedStats.total_games_played || 0,
+                                total_wins: normalizedStats.total_wins || 0,
+                                total_losses: normalizedStats.total_losses || 0,
+                                overall_max_win: normalizedStats.overall_max_win || 0,
+                                win_rate: normalizedStats.win_rate || 0
+                            }
+                        }
+                    });
+                    
                     lastSyncTimes.current.stats = Date.now();
-                    console.log('[GlobalSync] Game stats synced successfully');
+                    console.log('[GlobalSync] Game stats synced with breakdown:', gameUpdates);
                     return true;
                 } else {
                     console.warn('[GlobalSync] 정규화된 통계가 비어있음');

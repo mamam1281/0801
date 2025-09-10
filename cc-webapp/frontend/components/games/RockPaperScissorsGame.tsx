@@ -71,7 +71,7 @@ export function RockPaperScissorsGame({
   onUpdateUser,
   onAddNotification,
 }: RockPaperScissorsGameProps) {
-  const rpsStats = useGameTileStats('rps');
+  const rpsStats = useGameTileStats('rps', user.gameStats?.rps);
   const [playerChoice, setPlayerChoice] = useState(null as Choice | null);
   const [aiChoice, setAiChoice] = useState(null as Choice | null);
   const [gameResult, setGameResult] = useState(null as GameResult | null);
@@ -199,15 +199,16 @@ export function RockPaperScissorsGame({
         };
         setRoundHistory((prev: GameRound[]) => [round, ...prev.slice(0, 9)]);
         // 통계 병합(표시용 캐시) — 최종 값은 syncAfterGame으로 서버 권위 반영
-        mergeGameStats(dispatch, 'rps', {
+        const statsDelta = {
           total_games: 1,
           plays: 1,
           wins: result === 'win' ? 1 : 0,
           losses: result === 'lose' ? 1 : 0,
           draws: result === 'draw' ? 1 : 0,
-          totalBet: betAmount,
-          totalPayout: winnings,
-        });
+          totalBet: betAmount || 0,
+          totalPayout: winnings || 0,
+        };
+        mergeGameStats(dispatch, 'rps', statsDelta);
         // 게임 후 전역 동기화 (권위 반영)
         await syncAfterGame();
         return res;
