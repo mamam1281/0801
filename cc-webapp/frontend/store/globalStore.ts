@@ -281,7 +281,7 @@ export async function hydrateFromServer(dispatch: DispatchFn) {
                 // 백엔드 응답을 프론트엔드 형식으로 변환
                 const normalizedStats = normalizeGameStatsResponse(stats);
                 console.log('[hydrateFromServer] 정규화된 게임 통계:', normalizedStats);
-                dispatch({ type: "MERGE_GAME_STATS", game: "_me", delta: normalizedStats }); 
+                dispatch({ type: "SET_GAME_STATS", gameStats: normalizedStats }); 
                 console.log('[hydrateFromServer] 게임 통계 스토어에 저장 완료');
             } catch (e) { 
                 console.warn('게임 통계 처리 실패:', e);

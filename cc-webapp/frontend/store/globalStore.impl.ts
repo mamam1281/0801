@@ -311,7 +311,7 @@ export async function hydrateFromServer(dispatch: DispatchFn) {
         setProfile(dispatch, mapped);
         dispatch({ type: "SET_BALANCES", balances });
         if (stats && typeof stats === 'object') {
-            try { dispatch({ type: "MERGE_GAME_STATS", game: "_me", delta: stats as any }); } catch { /* noop */ }
+            try { dispatch({ type: "SET_GAME_STATS", gameStats: stats as any }); } catch { /* noop */ }
         }
     } catch (e:any) {
         dispatch({ type: "SET_ERROR", error: { message: e?.message || "hydrateFromServer failed", at: Date.now() } });

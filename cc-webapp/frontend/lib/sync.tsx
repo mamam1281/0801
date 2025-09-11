@@ -17,7 +17,7 @@ export async function hydrateProfile(dispatch: any) {
 
     if (profileRes) dispatch({ type: 'SET_USER', user: profileRes });
     if (balanceRes) dispatch({ type: 'SET_BALANCES', balances: balanceRes });
-    if (statsRes) dispatch({ type: 'MERGE_GAME_STATS', stats: statsRes });
+    if (statsRes) dispatch({ type: 'SET_GAME_STATS', gameStats: statsRes });
   } catch (e) {
     // ignore
     // console.warn('[sync] hydrateProfile failed', e)
@@ -109,7 +109,7 @@ export function RealtimeSyncProvider(props: { children?: React.ReactNode }) {
               );
               break;
             case 'game_update':
-              if (payload?.stats) dispatch({ type: 'MERGE_GAME_STATS', stats: payload.stats });
+              if (payload?.stats) dispatch({ type: 'SET_GAME_STATS', gameStats: payload.stats });
               break;
             default:
               break;
