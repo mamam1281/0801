@@ -45,9 +45,11 @@ export type InventoryItem = {
 type GlobalState = {
     // 권위 사용자/밸런스
     profile: GlobalUserProfile | null;
+    user: GlobalUserProfile | null; // sync.tsx 호환성을 위한 별칭
     balances?: { gold: number; gems?: number };
     // 준비 플래그
     hydrated: boolean;
+    ready: boolean; // sync.tsx 호환성을 위한 준비 상태
     lastHydratedAt?: number;
     // 게임별 통계(키: 게임 식별자)
     gameStats?: Record<string, any>;
@@ -63,23 +65,27 @@ type GlobalState = {
 
 type Actions =
     | { type: "SET_PROFILE"; profile: GlobalUserProfile | null }
+    | { type: "SET_USER"; user: GlobalUserProfile | null } // sync.tsx 호환성
     | { type: "SET_HYDRATED"; value: boolean }
+    | { type: "SET_READY"; ready: boolean } // sync.tsx 호환성
     | { type: "PATCH_BALANCES"; delta: { gold?: number; gems?: number } }
+    | { type: "SET_BALANCES"; balances: { gold: number; gems?: number } } // sync.tsx 호환성
     | { type: "APPLY_REWARD"; award: { gold?: number; gems?: number } }
     | { type: "MERGE_PROFILE"; patch: Partial<GlobalUserProfile> & Record<string, unknown> }
     | { type: "MERGE_GAME_STATS"; game: string; delta: Record<string, any> }
+    | { type: "SET_GAME_STATS"; gameStats: Record<string, any> } // sync.tsx 호환성
     | { type: "APPLY_PURCHASE"; items: InventoryItem[]; replace?: boolean }
     | { type: "SET_ERROR"; error: { message: string; at: number } | null }
-    | { type: "SET_BALANCES"; balances: { gold: number; gems?: number } }
     | { type: "SET_STREAK"; streak: Record<string, any> }
     | { type: "SET_EVENTS"; events: Record<string, any> }
-    | { type: "SET_GAME_STATS"; gameStats: Record<string, any> }
     | { type: "PUSH_NOTIFICATION"; item: { id: string; type: string; message: string; at: number } };
 
 const initialState: GlobalState = {
     profile: null,
+    user: null, // sync.tsx 호환성을 위한 별칭
     balances: { gold: 0, gems: 0 },
     hydrated: false,
+    ready: false, // sync.tsx 호환성을 위한 준비 상태
     lastHydratedAt: undefined,
     gameStats: {},
     inventory: [],
@@ -92,7 +98,11 @@ const initialState: GlobalState = {
 function reducer(state: GlobalState, action: Actions): GlobalState {
     switch (action.type) {
         case "SET_PROFILE":
-            return { ...state, profile: action.profile, hydrated: true, lastHydratedAt: Date.now() };
+            return { ...state, profile: action.profile, user: action.profile, hydrated: true, lastHydratedAt: Date.now() };
+        case "SET_USER":
+            return { ...state, user: action.user, profile: action.user, hydrated: true, lastHydratedAt: Date.now() };
+        case "SET_READY":
+            return { ...state, ready: action.ready };
     case "SET_HYDRATED":
             return { ...state, hydrated: action.value, lastHydratedAt: action.value ? Date.now() : state.lastHydratedAt };
         case "PATCH_BALANCES": {

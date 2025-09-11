@@ -480,7 +480,7 @@ export function ProfileScreen({
       const totalGames = entries.reduce(
         (acc: number, e) =>
           acc +
-          pickNumber(getData(e), TOTAL_KEYS_GLOBAL),
+          pickNumber(getData(e), [...TOTAL_KEYS_GLOBAL]),
         0
       );
       const totalWins = entries.reduce(
