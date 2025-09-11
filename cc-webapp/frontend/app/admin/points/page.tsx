@@ -93,10 +93,10 @@ export default function AdminPointsPage() {
 					</div>
 				)}
 				<h1 className="mb-2 bg-gradient-to-r from-pink-500 to-cyan-400 bg-clip-text text-2xl font-bold text-transparent md:text-3xl">
-					관리자: 포인트/토큰 지급
+					관리자: 골드 지급
 				</h1>
 				<p className="mb-6 text-sm text-muted-foreground">
-					특정 사용자에게 사이버 토큰을 지급합니다. 관리자 권한이 필요합니다.
+					특정 사용자에게 골드를 지급합니다. 관리자 권한이 필요합니다.
 				</p>
 
 				<Card className="border border-white/10 bg-black/30 p-5 shadow-xl backdrop-blur">
@@ -148,7 +148,7 @@ export default function AdminPointsPage() {
 							disabled={!canSubmit}
 							className="bg-gradient-to-r from-fuchsia-600 to-cyan-500 text-white hover:opacity-90"
 						>
-							{isSubmitting ? "지급 중..." : "포인트 지급"}
+							{isSubmitting ? "지급 중..." : "골드 지급"}
 						</Button>
 
 						{result.status === "success" && (

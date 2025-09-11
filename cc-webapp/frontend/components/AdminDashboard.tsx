@@ -292,8 +292,8 @@ export function AdminDashboard({ coreStats, loadingStats, statsError, onRefresh 
           >
             <TrendingUp className="h-5 w-5 text-yellow-400" />
             <div>
-              <div className="font-medium text-white">포인트 관리</div>
-              <div className="text-xs text-gray-400">포인트 지급, 차감</div>
+              <div className="font-medium text-white">골드 관리</div>
+              <div className="text-xs text-gray-400">골드 지급, 차감</div>
             </div>
           </button>
 
