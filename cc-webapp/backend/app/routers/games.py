@@ -1598,6 +1598,35 @@ def get_my_authoritative_game_stats(current_user: models.User = Depends(get_curr
         
         crash_max_multiplier = float(crash_stats_dict['highest_multiplier']) if crash_stats_dict['highest_multiplier'] is not None else None
 
+        # 연승 스트릭 계산 (오늘 날짜 기준)
+        from datetime import datetime, timezone
+        today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+        
+        # 오늘 게임 기록을 시간순으로 가져오기
+        today_actions = db.query(UserAction).filter(
+            UserAction.user_id == current_user.id,
+            UserAction.action_type.in_(['SLOT_SPIN', 'RPS_PLAY', 'CRASH_BET', 'GACHA_PULL']),
+            UserAction.created_at >= today_start
+        ).order_by(UserAction.created_at.desc()).all()
+        
+        # 연승 계산
+        current_win_streak = 0
+        for action in today_actions:
+            try:
+                action_data = action.action_data or {}
+                if isinstance(action_data, str):
+                    import json
+                    action_data = json.loads(action_data)
+                
+                win_amount = action_data.get('data', {}).get('win_amount', 0) if isinstance(action_data.get('data'), dict) else action_data.get('win_amount', 0)
+                
+                if win_amount and int(win_amount) > 0:
+                    current_win_streak += 1
+                else:
+                    break  # 패배하면 스트릭 중단
+            except:
+                break  # 데이터 파싱 실패시 스트릭 중단
+
         # 전체 게임에서 가장 큰 승리금액 계산
         overall_max_win = max(
             int(slot_max_win_result or 0),
@@ -1620,19 +1649,20 @@ def get_my_authoritative_game_stats(current_user: models.User = Depends(get_curr
             "total_profit": float(crash_stats_dict['total_profit'] or 0),
             "highest_multiplier": crash_max_multiplier,
             "overall_max_win": overall_max_win,
+            "current_win_streak": current_win_streak,
             "win_rate": round(total_games_won / max(total_games_played, 1) * 100, 2),
             "updated_at": crash_stats_dict['updated_at'].isoformat() if crash_stats_dict['updated_at'] else None,
             "game_breakdown": {
                 "crash": {
                     "bets": int(crash_stats_dict['total_bets'] or 0),
-                    "max_win": crash_max_win,
+                    "max_win": int(crash_max_win_result or 0),
                     "max_multiplier": crash_max_multiplier,
                     "wins": int(crash_stats_dict['total_wins'] or 0),
                     "losses": int(crash_stats_dict['total_losses'] or 0)
                 },
                 "slot": {
                     "spins": int(slot_stats_dict['spins'] or 0),
-                    "max_win": int(slot_stats_dict['max_win'] or 0),
+                    "max_win": int(slot_max_win_result or 0),
                     "wins": int(slot_stats_dict['wins'] or 0),
                     "losses": int(slot_stats_dict['losses'] or 0)
                 },
@@ -1640,13 +1670,14 @@ def get_my_authoritative_game_stats(current_user: models.User = Depends(get_curr
                     "spins": int(gacha_stats_dict['spins'] or 0),
                     "rare_wins": int(gacha_stats_dict['rare_wins'] or 0),
                     "ultra_rare_wins": int(gacha_stats_dict['ultra_rare_wins'] or 0),
-                    "max_win": int(gacha_stats_dict['max_win'] or 0)
+                    "max_win": int(gacha_max_win_result or 0)
                 },
                 "rps": {
                     "plays": int(rps_stats_dict['plays'] or 0),
                     "wins": int(rps_stats_dict['wins'] or 0),
                     "losses": int(rps_stats_dict['losses'] or 0),
-                    "ties": int(rps_stats_dict['ties'] or 0)
+                    "ties": int(rps_stats_dict['ties'] or 0),
+                    "max_win": int(rps_max_win_result or 0)
                 }
             }
         }}

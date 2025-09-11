@@ -212,21 +212,7 @@ export function GameDashboard({
               </div>
             </div>
 
-            {/* 게임별 참여횟수/최대 수익 */}
-            <div className="bg-[#14121a]/70 backdrop-blur-sm rounded-2xl p-6 border border-pink-500/20 max-w-md mx-auto">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold bg-gradient-to-r from-pink-300 to-yellow-300 bg-clip-text text-transparent">
-                  게임별 참여횟수 / 최대 수익
-                </h3>
-                <Trophy className="w-5 h-5 text-pink-400" />
-              </div>
-              <div className="space-y-2">
-                <div className="text-base font-bold text-purple-300">슬롯: {slotStats.playCount}회 / 최대 {slotStats.bestScore.toLocaleString()}G</div>
-                <div className="text-base font-bold text-blue-300">가위바위보: {rpsStats.playCount}회 / 최대 {rpsStats.bestScore.toLocaleString()}G</div>
-                <div className="text-base font-bold text-pink-300">가챠: {gachaStats.playCount}회 / 최대 {gachaStats.bestScore.toLocaleString()}G</div>
-                <div className="text-base font-bold text-red-300">크래시: {crashStats.playCount}회 / 최대 {crashStats.bestScore.toLocaleString()}G</div>
-              </div>
-            </div>
+
           </motion.div>
 
           {/* Games Grid */}

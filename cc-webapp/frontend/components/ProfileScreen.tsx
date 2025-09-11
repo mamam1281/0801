@@ -688,9 +688,6 @@ export function ProfileScreen({
                     </div>
                     <div className="text-right">
                       <div className="text-lg font-bold text-primary">{slotSpins}회</div>
-                      <div className="text-xs text-gold">
-                        최고: {Number(slotBiggestWin).toLocaleString()}G
-                      </div>
                     </div>
                   </div>
 
@@ -718,9 +715,6 @@ export function ProfileScreen({
                     </div>
                     <div className="text-right">
                       <div className="text-lg font-bold text-error">{crashGames}회</div>
-                      <div className="text-xs text-gold">
-                        최고: {Number(crashBiggestWin).toLocaleString()}G
-                      </div>
                     </div>
                   </div>
 
@@ -760,11 +754,11 @@ export function ProfileScreen({
                     <div className="text-center p-4 rounded-lg bg-gold/5 border border-gold/10">
                       <div
                         className="text-2xl font-bold text-gradient-gold"
-                        data-testid="stats-total-wins"
+                        data-testid="stats-win-streak"
                       >
-                        {displayTotalWins} 승
+                        🔥 {stats?.current_win_streak || 0}
                       </div>
-                      <div className="text-sm text-muted-foreground">총 수익</div>
+                      <div className="text-sm text-muted-foreground">연승 스트릭</div>
                     </div>
 
                     <div className="text-center p-4 rounded-lg bg-success/5 border border-success/10">
