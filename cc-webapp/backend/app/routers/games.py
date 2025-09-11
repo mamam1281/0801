@@ -1496,10 +1496,16 @@ def get_my_authoritative_game_stats(current_user: models.User = Depends(get_curr
         svc = _GSS(db)
         crash_stats = svc.get_or_create(current_user.id)
         
+        # user_actions 테이블에서 CRASH_BET 액션 통계도 추가로 조회
+        crash_bet_count = db.query(func.count(UserAction.id)).filter(
+            UserAction.user_id == current_user.id,
+            UserAction.action_type == 'CRASH_BET'
+        ).scalar() or 0
+        
         # Crash stats 기본값 설정
         if crash_stats is None:
             crash_stats_dict = {
-                'total_bets': 0,
+                'total_bets': crash_bet_count,  # user_actions의 CRASH_BET 포함
                 'total_wins': 0,
                 'total_losses': 0,
                 'total_profit': 0,
@@ -1507,9 +1513,9 @@ def get_my_authoritative_game_stats(current_user: models.User = Depends(get_curr
                 'updated_at': None
             }
         else:
-            # crash_stats 객체를 딕셔너리로 변환
+            # crash_stats 객체를 딕셔너리로 변환 + user_actions의 CRASH_BET 추가
             crash_stats_dict = {
-                'total_bets': getattr(crash_stats, 'total_bets', 0),
+                'total_bets': getattr(crash_stats, 'total_bets', 0) + crash_bet_count,
                 'total_wins': getattr(crash_stats, 'total_wins', 0),
                 'total_losses': getattr(crash_stats, 'total_losses', 0),
                 'total_profit': getattr(crash_stats, 'total_profit', 0),

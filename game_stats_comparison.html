@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>게임 통계 비교 테스트</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: white;
+        }
+        .comparison-section {
+            background: #2a2a2a;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin: 10px 0;
+        }
+        .stat-item {
+            background: #3a3a3a;
+            padding: 15px;
+            border-radius: 4px;
+        }
+        .different {
+            background: #cc4444 !important;
+        }
+        .same {
+            background: #44cc44 !important;
+        }
+        button {
+            background: #0066cc;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0088ff;
+        }
+        #results {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎮 게임 통계 비교 테스트</h1>
+    
+    <div class="comparison-section">
+        <h2>자동 비교 테스트</h2>
+        <button onclick="compareGameStats()">게임 대시보드 vs 프로필 페이지 통계 비교</button>
+        <button onclick="checkGlobalStore()">전역 스토어 게임 통계 확인</button>
+        <button onclick="checkIndividualGames()">개별 게임 통계 상세 확인</button>
+    </div>
+
+    <div id="results"></div>
+
+    <script>
+        // Casino Club 애플리케이션의 전역 스토어에 접근하는 함수들
+        function getGlobalStore() {
+            // React DevTools를 통해 전역 스토어 접근 시도
+            const reactRoot = document.querySelector('#__next') || document.querySelector('[data-reactroot]');
+            if (!reactRoot) {
+                return null;
+            }
+            
+            // React Fiber를 통한 접근 시도
+            const fiber = reactRoot._reactInternalFiber || reactRoot._reactInternalInstance;
+            if (fiber) {
+                // 컴포넌트 트리를 순회하여 GlobalStore 찾기
+                function findGlobalStore(node) {
+                    if (!node) return null;
+                    
+                    if (node.memoizedProps && node.memoizedProps.store) {
+                        return node.memoizedProps.store;
+                    }
+                    
+                    if (node.memoizedState && node.memoizedState.store) {
+                        return node.memoizedState.store;
+                    }
+                    
+                    if (node.child) return findGlobalStore(node.child);
+                    if (node.sibling) return findGlobalStore(node.sibling);
+                    
+                    return null;
+                }
+                
+                return findGlobalStore(fiber);
+            }
+            
+            return null;
+        }
+
+        function extractGameStats() {
+            // 현재 페이지의 게임 통계 데이터 추출
+            const results = {
+                currentPage: window.location.pathname,
+                gameStats: null,
+                totalGames: null,
+                individualGames: {},
+                errors: []
+            };
+
+            try {
+                // 1. 전역 스토어에서 게임 통계 추출
+                const store = getGlobalStore();
+                if (store && store.state && store.state.gameStats) {
+                    results.gameStats = store.state.gameStats;
+                } else {
+                    results.errors.push('전역 스토어의 gameStats를 찾을 수 없음');
+                }
+
+                // 2. DOM에서 표시된 통계값 추출
+                const totalGamesElements = document.querySelectorAll('[data-testid*="total-games"], .total-games, .총게임');
+                if (totalGamesElements.length > 0) {
+                    results.totalGames = Array.from(totalGamesElements).map(el => ({
+                        text: el.textContent,
+                        element: el.tagName,
+                        classes: el.className
+                    }));
+                }
+
+                // 3. 개별 게임 타일에서 통계 추출
+                const gameTypes = ['slot', 'rps', 'crash', 'gacha'];
+                gameTypes.forEach(gameType => {
+                    const gameElements = document.querySelectorAll(`[data-game="${gameType}"], .${gameType}-stats`);
+                    if (gameElements.length > 0) {
+                        results.individualGames[gameType] = Array.from(gameElements).map(el => ({
+                            text: el.textContent,
+                            playCount: el.querySelector('.play-count, .plays, .games')?.textContent || 'N/A'
+                        }));
+                    }
+                });
+
+            } catch (error) {
+                results.errors.push(`데이터 추출 중 오류: ${error.message}`);
+            }
+
+            return results;
+        }
+
+        function compareGameStats() {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<h3>🔄 게임 통계 비교 중...</h3>';
+
+            // 현재 페이지의 통계 추출
+            const currentStats = extractGameStats();
+            
+            let html = '<div class="comparison-section">';
+            html += '<h3>📊 현재 페이지 통계 분석</h3>';
+            html += `<p><strong>현재 페이지:</strong> ${currentStats.currentPage}</p>`;
+            
+            if (currentStats.gameStats) {
+                html += '<h4>전역 스토어 게임 통계:</h4>';
+                html += '<pre style="background: #1a1a1a; padding: 10px; border-radius: 4px; overflow-x: auto;">';
+                html += JSON.stringify(currentStats.gameStats, null, 2);
+                html += '</pre>';
+                
+                // 총 게임 수 계산
+                let totalFromStore = 0;
+                const games = Object.entries(currentStats.gameStats);
+                const filteredGames = games.filter(([key, _]) => key !== '_global');
+                
+                html += '<h4>개별 게임 통계 분석:</h4>';
+                html += '<div class="stats-grid">';
+                
+                filteredGames.forEach(([gameId, gameData]) => {
+                    const playKeys = ['total_games_played', 'total_games', 'games', 'plays', 'spins', 'bets', 'total_bets'];
+                    let playCount = 0;
+                    
+                    if (gameData && typeof gameData === 'object') {
+                        const data = gameData.data || gameData;
+                        for (const key of playKeys) {
+                            if (typeof data[key] === 'number' && !isNaN(data[key])) {
+                                playCount = data[key];
+                                break;
+                            }
+                        }
+                    }
+                    
+                    totalFromStore += playCount;
+                    
+                    html += `<div class="stat-item">`;
+                    html += `<strong>${gameId}</strong><br>`;
+                    html += `플레이 수: ${playCount}<br>`;
+                    html += `데이터: ${JSON.stringify(gameData, null, 2)}`;
+                    html += `</div>`;
+                });
+                
+                html += '</div>';
+                html += `<p><strong>계산된 총 게임 수 (_global 제외): ${totalFromStore}</strong></p>`;
+                
+                // _global이 있다면 표시
+                if (currentStats.gameStats._global) {
+                    html += '<h4>_global 통계 (중복 방지를 위해 제외됨):</h4>';
+                    html += '<pre style="background: #1a1a1a; padding: 10px; border-radius: 4px;">';
+                    html += JSON.stringify(currentStats.gameStats._global, null, 2);
+                    html += '</pre>';
+                }
+            }
+            
+            if (currentStats.errors.length > 0) {
+                html += '<h4>⚠️ 오류:</h4>';
+                html += '<ul>';
+                currentStats.errors.forEach(error => {
+                    html += `<li>${error}</li>`;
+                });
+                html += '</ul>';
+            }
+            
+            html += '</div>';
+            
+            // 페이지별 비교를 위한 안내
+            html += '<div class="comparison-section">';
+            html += '<h3>📋 페이지별 비교 방법</h3>';
+            html += '<p>1. 게임 대시보드 페이지로 이동하여 이 테스트를 실행</p>';
+            html += '<p>2. 프로필 페이지로 이동하여 이 테스트를 실행</p>';
+            html += '<p>3. 두 결과를 비교하여 동일한 값이 표시되는지 확인</p>';
+            html += '</div>';
+            
+            resultsDiv.innerHTML = html;
+        }
+
+        function checkGlobalStore() {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<h3>🔍 전역 스토어 확인 중...</h3>';
+            
+            try {
+                // React DevTools를 통한 스토어 접근 (브라우저 콘솔 사용)
+                const script = `
+                    // React DevTools Hook 확인
+                    console.log('🔍 React DevTools Hook:', window.__REACT_DEVTOOLS_GLOBAL_HOOK__);
+                    
+                    // Zustand 스토어 확인
+                    console.log('🏪 Window 객체에서 스토어 찾기...');
+                    Object.keys(window).forEach(key => {
+                        if (key.includes('store') || key.includes('Store')) {
+                            console.log('발견된 스토어 관련 키:', key, window[key]);
+                        }
+                    });
+                    
+                    // DOM에서 React 컴포넌트 찾기
+                    const reactElements = document.querySelectorAll('[data-reactroot], #__next');
+                    console.log('React 루트 엘리먼트들:', reactElements);
+                    
+                    return 'Console에서 스토어 정보를 확인하세요';
+                `;
+                
+                console.log(eval(script));
+                
+                resultsDiv.innerHTML = `
+                    <div class="comparison-section">
+                        <h3>💻 전역 스토어 디버깅</h3>
+                        <p>브라우저 개발자 도구 콘솔을 확인하세요.</p>
+                        <p>다음 명령어를 콘솔에서 실행해보세요:</p>
+                        <pre style="background: #1a1a1a; padding: 10px; border-radius: 4px;">
+// React 컴포넌트 확인
+$0.__reactInternalInstance || $0._reactInternalFiber
+
+// Zustand 스토어 확인 (전역 변수로 노출된 경우)
+window.useGlobalStore
+
+// 로컬 스토리지에서 상태 확인
+localStorage.getItem('casino-club-state')
+                        </pre>
+                    </div>
+                `;
+                
+            } catch (error) {
+                resultsDiv.innerHTML = `
+                    <div class="comparison-section">
+                        <h3>❌ 스토어 접근 실패</h3>
+                        <p>오류: ${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+
+        function checkIndividualGames() {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<h3>🎯 개별 게임 통계 확인 중...</h3>';
+            
+            const gameElements = {
+                slot: document.querySelectorAll('[data-game="slot"], .slot, *[class*="slot"]'),
+                rps: document.querySelectorAll('[data-game="rps"], .rps, *[class*="rps"]'),
+                crash: document.querySelectorAll('[data-game="crash"], .crash, *[class*="crash"]'),
+                gacha: document.querySelectorAll('[data-game="gacha"], .gacha, *[class*="gacha"]')
+            };
+            
+            let html = '<div class="comparison-section">';
+            html += '<h3>🎮 개별 게임 요소 검색 결과</h3>';
+            
+            Object.entries(gameElements).forEach(([gameId, elements]) => {
+                html += `<h4>${gameId.toUpperCase()}</h4>`;
+                if (elements.length > 0) {
+                    html += '<div class="stats-grid">';
+                    Array.from(elements).forEach((element, index) => {
+                        html += `<div class="stat-item">`;
+                        html += `<strong>요소 ${index + 1}</strong><br>`;
+                        html += `텍스트: ${element.textContent.substring(0, 100)}...<br>`;
+                        html += `클래스: ${element.className}<br>`;
+                        html += `태그: ${element.tagName}`;
+                        html += `</div>`;
+                    });
+                    html += '</div>';
+                } else {
+                    html += '<p>해당 게임 요소를 찾을 수 없습니다.</p>';
+                }
+            });
+            
+            html += '</div>';
+            resultsDiv.innerHTML = html;
+        }
+
+        // 페이지 로드 시 자동 실행
+        window.addEventListener('load', function() {
+            console.log('🎮 게임 통계 비교 테스트 페이지 로드됨');
+            console.log('현재 페이지:', window.location.pathname);
+        });
+    </script>
+</body>
+</html>

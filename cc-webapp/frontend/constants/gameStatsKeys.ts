@@ -27,7 +27,7 @@ export const PLAY_COUNT_KEYS_BY_GAME: Record<string, string[]> = {
   slot: ['totalSpins', 'total_spins', 'spin_count', 'spins', 'plays', 'games', 'total_games', 'slot_spins'],
   rps: ['totalGames', 'matches', 'games', 'plays', 'rps_games'],
   gacha: ['totalPulls', 'pulls', 'plays', 'gacha_pulls'],
-  crash: ['totalGames', 'games', 'plays', 'crash_games'],
+  crash: ['totalGames', 'games', 'plays', 'crash_games', 'bets', 'total_bets'], // bets 키 추가
 };
 
 export const BEST_SCORE_KEYS_BY_GAME: Record<string, string[]> = {

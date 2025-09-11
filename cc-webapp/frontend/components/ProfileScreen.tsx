@@ -16,6 +16,7 @@ import { validateNickname } from '@/utils/securityUtils';
 import { getTokens, setTokens } from '../utils/tokenStorage';
 import { useRealtimeProfile, useRealtimeStats } from '@/hooks/useRealtimeData';
 import ActionHistory from '@/components/profile/ActionHistory';
+import { TOTAL_KEYS_GLOBAL } from '../constants/gameStatsKeys';
 
 interface ProfileScreenProps {
   onBack: () => void;
@@ -467,22 +468,24 @@ export function ProfileScreen({
   const computeRtTotals = (): { totalGames?: number; totalWins?: number } => {
     try {
       // 전역 store 게임 통계를 우선 사용, 폴백으로 기존 실시간/로컬 사용
-      const primaryEntries = Object.values(storeGameStats || {}) as Array<
-        { data?: Record<string, any> } | Record<string, any>
-      >;
+      // _global 제외하고 개별 게임 통계만 계산 (중복 방지)
+      const primaryEntries = Object.entries(storeGameStats || {})
+        .filter(([key, entry]) => key !== '_global' && entry && Object.keys(entry).length > 0)
+        .map(([, entry]) => entry);
+      
       const entries = primaryEntries.length
         ? primaryEntries
         : (Object.values(rtAllStats || {}) as Array<{ data?: Record<string, any> }>);
       if (!entries?.length) return {};
       const getData = (e: any) => (e?.data ? e.data : e);
       const totalGames = entries.reduce(
-        (acc, e) =>
+        (acc: number, e) =>
           acc +
-          pickNumber(getData(e), ['total_games_played', 'total_games', 'games', 'plays', 'spins']),
+          pickNumber(getData(e), TOTAL_KEYS_GLOBAL),
         0
       );
       const totalWins = entries.reduce(
-        (acc, e) => acc + pickNumber(getData(e), ['total_wins', 'wins']),
+        (acc: number, e) => acc + pickNumber(getData(e), ['total_wins', 'wins']),
         0
       );
       return { totalGames, totalWins };
@@ -516,6 +519,10 @@ export function ProfileScreen({
     pickFromEntry(slotEntry, ['biggestWin', 'max_win', 'highest_win']) ??
     (user as any)?.gameStats?.slot?.biggestWin ??
     0;
+  const slotSpins =
+    pickFromEntry(slotEntry, ['totalSpins', 'total_spins', 'spin_count', 'spins', 'plays', 'games', 'total_games', 'slot_spins']) ??
+    (user as any)?.gameStats?.slot?.totalSpins ??
+    0;
   const rpsMatches =
     pickFromEntry(rpsEntry, ['totalGames', 'matches', 'games', 'plays']) ??
     (user as any)?.gameStats?.rps?.matches ??
@@ -526,7 +533,7 @@ export function ProfileScreen({
     (user as any)?.gameStats?.rps?.winStreak ??
     0;
   const crashGames =
-    pickFromEntry(crashEntry, ['totalGames', 'games', 'plays']) ??
+    pickFromEntry(crashEntry, ['totalGames', 'games', 'plays', 'bets', 'total_bets', 'crash_games']) ??
     (user as any)?.gameStats?.crash?.games ??
     0;
   const crashBiggestWin =
@@ -681,7 +688,7 @@ export function ProfileScreen({
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="text-lg font-bold text-primary">{displayTotalGames}회</div>
+                      <div className="text-lg font-bold text-primary">{slotSpins}회</div>
                       <div className="text-xs text-gold">
                         최고: {Number(slotBiggestWin).toLocaleString()}G
                       </div>

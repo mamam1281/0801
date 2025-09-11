@@ -65,7 +65,7 @@ export function HomeDashboard({
 }: HomeDashboardProps) {
   // 전역 동기화 사용
   const globalProfile = useGlobalProfile();
-  const { syncAll, syncAfterGame, isHydrated } = useGlobalSync();
+  const { syncAll, syncAfterGame, syncProfile, isHydrated } = useGlobalSync();
   const goldFromStore = useUserGold();
   // null-safe level 값 보장
   const levelFromStore = Number(useUserLevel() ?? 1);
@@ -336,6 +336,12 @@ export function HomeDashboard({
       );
       setShowDailyReward(false);
       setDailyClaimed(true);
+      // 🔄 프로필 동기화로 daily_streak 업데이트
+      try {
+        await syncProfile();
+      } catch (e) {
+        console.warn('[streak.claim] Profile sync failed:', e);
+      }
       // streak/status 재조회로 상태 동기화
       try {
         const s: any = await unifiedApi.get('streak/status');
