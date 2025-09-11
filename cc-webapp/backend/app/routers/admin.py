@@ -152,6 +152,26 @@ class AdminUserUpdateRequest(BaseModel):
     user_rank: Optional[str] = None
 
 
+class AdminUserCreateRequest(BaseModel):
+    """Admin user creation request"""
+    site_id: str = Field(..., min_length=3, max_length=50, description="사이트 아이디")
+    nickname: str = Field(..., min_length=2, max_length=50, description="닉네임")
+    phone_number: str = Field(default="01000000000", description="전화번호")
+    password: str = Field(..., min_length=4, description="비밀번호")
+    is_admin: bool = Field(default=False, description="관리자 권한")
+    is_active: bool = Field(default=True, description="활성 상태")
+
+
+class AdminUserCreateResponse(BaseModel):
+    """Admin user creation response"""
+    id: int
+    site_id: str
+    nickname: str
+    is_admin: bool
+    is_active: bool
+    created_at: datetime
+
+
 class ElevateRequest(BaseModel):
     site_id: str
 
@@ -302,6 +322,83 @@ async def admin_update_user(
         "is_active": getattr(u, "is_active", True),
         "user_rank": getattr(u, "user_rank", None),
     }
+
+
+@router.post("/users", response_model=AdminUserCreateResponse)
+async def admin_create_user(
+    body: AdminUserCreateRequest,
+    admin_user = Depends(require_admin_access),
+    db: Session = Depends(get_db),
+):
+    """Create a new user (admin only)"""
+    from ..services.auth_service import AuthService
+    
+    # Check if site_id already exists
+    existing_user = db.query(models.User).filter(models.User.site_id == body.site_id).first()
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Site ID already exists")
+    
+    # Create password hash
+    password_hash = AuthService.get_password_hash(body.password)
+    
+    # Create new user
+    new_user = models.User(
+        site_id=body.site_id,
+        nickname=body.nickname,
+        phone_number=body.phone_number,
+        password_hash=password_hash,
+        is_admin=body.is_admin,
+        is_active=body.is_active,
+        invite_code="5858",  # 기본 초대코드
+        created_at=datetime.utcnow(),
+    )
+    
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    
+    return AdminUserCreateResponse(
+        id=new_user.id,
+        site_id=new_user.site_id,
+        nickname=new_user.nickname,
+        is_admin=new_user.is_admin,
+        is_active=new_user.is_active,
+        created_at=new_user.created_at,
+    )
+
+
+@router.delete("/users/{user_id}")
+async def admin_delete_user(
+    user_id: int,
+    admin_user = Depends(require_admin_access),
+    db: Session = Depends(get_db),
+):
+    """Delete a user (admin only)"""
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Prevent deleting other admin users for safety
+    if user.is_admin and user.id != admin_user.id:
+        raise HTTPException(status_code=400, detail="Cannot delete other admin users")
+    
+    # Delete related records first (if needed)
+    # Note: Depending on your schema, you might need to handle foreign key constraints
+    try:
+        # Delete user sessions
+        db.query(UserSession).filter(UserSession.user_id == user_id).delete()
+        
+        # Delete refresh tokens
+        db.query(RefreshToken).filter(RefreshToken.user_id == user_id).delete()
+        
+        # Delete user
+        db.delete(user)
+        db.commit()
+        
+        return {"success": True, "message": f"User {user.site_id} deleted successfully"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to delete user: {str(e)}")
 
 
 @router.post("/users/elevate")

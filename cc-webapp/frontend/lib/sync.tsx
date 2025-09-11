@@ -26,8 +26,16 @@ export async function hydrateProfile(dispatch: any) {
 
 export function EnsureHydrated(props: { children?: React.ReactNode }) {
   const { state, dispatch } = useGlobalStore();
+  
   useEffect(() => {
     if (state.ready) return;
+    
+    // Skip hydration for admin login page
+    if (typeof window !== 'undefined' && window.location.pathname === '/admin-login') {
+      dispatch({ type: 'SET_READY', ready: true });
+      return;
+    }
+    
     hydrateProfile(dispatch).finally(() => {
       dispatch({ type: 'SET_READY', ready: true });
     });

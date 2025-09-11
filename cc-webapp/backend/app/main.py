@@ -20,7 +20,9 @@ from contextlib import asynccontextmanager
 import asyncio
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel, Field
+import json
 
 # Core imports
 from app.database import get_db
@@ -244,6 +246,17 @@ async def lifespan(app: FastAPI):
                 print(f"⚠️ Scheduler shutdown error: {e}")
         print("✅ Backend shutdown complete")
 
+# 한글 인코딩을 위한 JSON response 클래스 정의
+class UTF8JSONResponse(JSONResponse):
+    def render(self, content) -> bytes:
+        return json.dumps(
+            content,
+            ensure_ascii=False,
+            allow_nan=False,
+            indent=None,
+            separators=(",", ":")
+        ).encode("utf-8")
+
 # ===== FastAPI App Initialization =====
 
 app = FastAPI(
@@ -253,6 +266,7 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
     lifespan=lifespan,
+    default_response_class=UTF8JSONResponse,  # 한글 인코딩을 위한 기본 응답 클래스 설정
 )
 
 # ===== Request/Response Models =====

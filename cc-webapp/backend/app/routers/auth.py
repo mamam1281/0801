@@ -1,7 +1,22 @@
 """Authentication API Router (clean)
 
-Provides signup, login, admin login, refresh, and logout endpoints.
-Delegates business logic to services.auth_service.AuthService.
+Provides signup, login, admin login, refresh, and logo    return UserResponse(
+        id=user.id,
+        site_id=user.site_id,
+        nickname=user.nickname.encode('utf-8').decode('utf-8') if user.nickname else "",
+        phone_number=user.phone_number,
+        created_at=user.created_at,
+        last_login=user.last_login or user.created_at,
+        is_admin=getattr(user, "is_admin", False),
+        is_active=getattr(user, "is_active", True),
+        gold_balance=getattr(user, "gold_balance", 0),
+        vip_points=getattr(user, "vip_points", 0),
+        battlepass_level=level,
+        experience=total_xp,
+        experience_points=total_xp,
+        level=level,
+        max_experience=int(max_exp),
+    )legates business logic to services.auth_service.AuthService.
 """
 
 import logging

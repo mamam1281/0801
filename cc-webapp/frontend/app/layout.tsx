@@ -3,6 +3,9 @@ import { Inter } from "next/font/google";
 import "../styles/globals.css";
 import { Providers } from "./providers";
 
+// Import warning suppression script
+import "../lib/suppress-warnings.js";
+
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {

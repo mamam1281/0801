@@ -16,7 +16,7 @@ def get_database_url():
     postgres_db = os.getenv('POSTGRES_DB')
     
     if postgres_server and postgres_user and postgres_password and postgres_db:
-        return f"postgresql://{postgres_user}:{postgres_password}@{postgres_server}:5432/{postgres_db}"
+        return f"postgresql://{postgres_user}:{postgres_password}@{postgres_server}:5432/{postgres_db}?client_encoding=utf8"
     
     # Fallback to legacy environment variables
     if os.getenv('DB_HOST'):
@@ -25,7 +25,7 @@ def get_database_url():
         db_name = os.getenv('DB_NAME', 'cc_webapp')
         db_user = os.getenv('DB_USER', 'cc_user')
         db_password = os.getenv('DB_PASSWORD', 'cc_password')
-        return f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
+        return f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}?client_encoding=utf8"
     
     # 개발 환경 fallback - SQLite (only when no Postgres env)
     return os.getenv("DATABASE_URL", "sqlite:///./auth.db")
@@ -35,7 +35,10 @@ DATABASE_URL = get_database_url()
 
 # PostgreSQL vs SQLite 연결 옵션
 if DATABASE_URL.startswith("postgresql"):
-    connect_args = {}
+    connect_args = {
+        "client_encoding": "utf8",
+        "options": "-c client_encoding=utf8"
+    }
     echo = os.getenv('DEBUG', 'false').lower() == 'true'
 else:
     connect_args = {"check_same_thread": False}

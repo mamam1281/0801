@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>한글 인코딩 테스트</title>
+</head>
+<body>
+    <h1>한글 인코딩 테스트</h1>
+    
+    <button onclick="testAdminLogin()">어드민 로그인 테스트</button>
+    <button onclick="testUsersList()">사용자 목록 테스트</button>
+    
+    <div id="result"></div>
+
+    <script>
+        async function testAdminLogin() {
+            try {
+                const response = await fetch('http://localhost:8000/api/auth/admin/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        site_id: 'admin',
+                        password: '123456'
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                console.log('Admin login response:', data);
+                
+                document.getElementById('result').innerHTML = `
+                    <h3>어드민 로그인 결과:</h3>
+                    <p><strong>닉네임:</strong> ${data.user.nickname}</p>
+                    <p><strong>사이트 ID:</strong> ${data.user.site_id}</p>
+                    <p><strong>어드민 여부:</strong> ${data.user.is_admin}</p>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                `;
+                
+                // Store token for next test
+                window.adminToken = data.access_token;
+            } catch (error) {
+                console.error('Admin login error:', error);
+                document.getElementById('result').innerHTML = `<p>에러: ${error.message}</p>`;
+            }
+        }
+
+        async function testUsersList() {
+            if (!window.adminToken) {
+                alert('먼저 어드민 로그인을 해주세요');
+                return;
+            }
+
+            try {
+                const response = await fetch('http://localhost:8000/api/admin/users', {
+                    headers: {
+                        'Authorization': `Bearer ${window.adminToken}`
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                console.log('Users list response:', data);
+                
+                const usersHtml = data.map(user => `
+                    <li>ID: ${user.id}, 닉네임: ${user.nickname}, 사이트 ID: ${user.site_id}</li>
+                `).join('');
+                
+                document.getElementById('result').innerHTML = `
+                    <h3>사용자 목록 결과:</h3>
+                    <ul>${usersHtml}</ul>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                `;
+            } catch (error) {
+                console.error('Users list error:', error);
+                document.getElementById('result').innerHTML = `<p>에러: ${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>

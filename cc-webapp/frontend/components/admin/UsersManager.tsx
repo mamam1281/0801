@@ -45,6 +45,17 @@ export function UsersManager({ onAddNotification }: UsersManagerProps) {
   const [selected, setSelected] = useState(null as UserDetail | null);
   const [logs, setLogs] = useState([] as AdminLog[]);
   const [rankInput, setRankInput] = useState('');
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [createForm, setCreateForm] = useState({
+    site_id: '',
+    nickname: '',
+    phone_number: '',
+    password: '',
+    is_admin: false,
+    is_active: true,
+    vip_tier: 'STANDARD',  // user_rank 대신 vip_tier 사용
+    invite_code: '5858'     // 기본 초대코드
+  });
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -115,6 +126,43 @@ export function UsersManager({ onAddNotification }: UsersManagerProps) {
     }
   }, [selected, rankInput, selectUser, load, onAddNotification]);
 
+  const createUser = useCallback(async () => {
+    try {
+      await api.post('admin/users', createForm);
+      onAddNotification('사용자가 생성되었습니다.');
+      setShowCreateForm(false);
+      setCreateForm({
+        site_id: '',
+        nickname: '',
+        phone_number: '',
+        password: '',
+        is_admin: false,
+        is_active: true,
+        vip_tier: 'STANDARD',  // user_rank 대신 vip_tier
+        invite_code: '5858'
+      });
+      await load();
+    } catch (e: any) {
+      onAddNotification(`사용자 생성 실패: ${e?.message || e}`);
+    }
+  }, [createForm, load, onAddNotification]);
+
+  const deleteUser = useCallback(async (userId: number, siteId: string) => {
+    if (!confirm(`정말로 사용자 "${siteId}"를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`)) {
+      return;
+    }
+    try {
+      await api.del(`admin/users/${userId}`);
+      onAddNotification('사용자가 삭제되었습니다.');
+      if (selected?.id === userId) {
+        setSelected(null);
+      }
+      await load();
+    } catch (e: any) {
+      onAddNotification(`사용자 삭제 실패: ${e?.message || e}`);
+    }
+  }, [selected, load, onAddNotification]);
+
   const hasPrev = useMemo(() => skip > 0, [skip]);
   const hasNext = useMemo(() => items.length === limit, [items.length, limit]);
 
@@ -134,22 +182,38 @@ export function UsersManager({ onAddNotification }: UsersManagerProps) {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
-            <CardTitle>사용자 목록</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle>사용자 목록</CardTitle>
+              <Button size="sm" onClick={() => setShowCreateForm(true)}>+ 새 사용자</Button>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
               {items.map((u: UserSummary) => (
-                <button key={u.id} onClick={()=>selectUser(u)} className={`w-full text-left p-3 rounded border border-border-secondary hover:bg-secondary/30 ${selected?.id===u.id ? 'bg-secondary/40' : ''}`}>
+                <div key={u.id} className={`p-3 rounded border border-border-secondary hover:bg-secondary/30 ${selected?.id===u.id ? 'bg-secondary/40' : ''}`}>
                   <div className="flex items-center justify-between">
-                    <div className="font-medium text-foreground">{u.nickname} <span className="text-muted-foreground">({u.site_id})</span></div>
-                    <div className="flex gap-2">
+                    <button onClick={()=>selectUser(u)} className="flex-1 text-left">
+                      <div className="font-medium text-foreground">{u.nickname} <span className="text-muted-foreground">({u.site_id})</span></div>
+                      <div className="text-xs text-muted-foreground mt-1">가입: {new Date(u.created_at).toLocaleString()}</div>
+                    </button>
+                    <div className="flex items-center gap-2 ml-2">
                       <Badge variant="outline" className={u.is_active ? 'text-emerald-400' : 'text-red-400'}>{u.is_active ? 'active' : 'inactive'}</Badge>
                       {u.is_admin && <Badge variant="outline" className="text-amber-300">admin</Badge>}
                       {u.user_rank && <Badge variant="outline">{u.user_rank}</Badge>}
+                      <Button 
+                        size="sm" 
+                        variant="destructive" 
+                        onClick={(e: any) => {
+                          e.stopPropagation();
+                          deleteUser(u.id, u.site_id);
+                        }}
+                        className="h-6 px-2 text-xs"
+                      >
+                        삭제
+                      </Button>
                     </div>
                   </div>
-                  <div className="text-xs text-muted-foreground mt-1">가입: {new Date(u.created_at).toLocaleString()}</div>
-                </button>
+                </div>
               ))}
             </div>
             <div className="flex justify-between items-center mt-4">
@@ -223,6 +287,85 @@ export function UsersManager({ onAddNotification }: UsersManagerProps) {
           </CardContent>
         </Card>
       </div>
+
+      {/* 사용자 생성 폼 모달 */}
+      {showCreateForm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <Card className="w-full max-w-md mx-4">
+            <CardHeader>
+              <CardTitle>새 사용자 생성</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label htmlFor="create_site_id">사이트 ID</Label>
+                <Input 
+                  id="create_site_id" 
+                  value={createForm.site_id} 
+                  onChange={(e: any) => setCreateForm((prev: any) => ({...prev, site_id: e.target.value}))}
+                  placeholder="사이트 ID"
+                />
+              </div>
+              <div>
+                <Label htmlFor="create_nickname">닉네임</Label>
+                <Input 
+                  id="create_nickname" 
+                  value={createForm.nickname} 
+                  onChange={(e: any) => setCreateForm((prev: any) => ({...prev, nickname: e.target.value}))}
+                  placeholder="닉네임"
+                />
+              </div>
+              <div>
+                <Label htmlFor="create_phone">전화번호</Label>
+                <Input 
+                  id="create_phone" 
+                  value={createForm.phone_number} 
+                  onChange={(e: any) => setCreateForm((prev: any) => ({...prev, phone_number: e.target.value}))}
+                  placeholder="전화번호"
+                />
+              </div>
+              <div>
+                <Label htmlFor="create_password">비밀번호</Label>
+                <Input 
+                  id="create_password" 
+                  type="password"
+                  value={createForm.password} 
+                  onChange={(e: any) => setCreateForm((prev: any) => ({...prev, password: e.target.value}))}
+                  placeholder="비밀번호"
+                />
+              </div>
+              <div>
+                <Label htmlFor="create_tier">VIP 등급</Label>
+                <Input 
+                  id="create_tier" 
+                  value={createForm.vip_tier} 
+                  onChange={(e: any) => setCreateForm((prev: any) => ({...prev, vip_tier: e.target.value}))}
+                  placeholder="STANDARD, VIP 등"
+                />
+              </div>
+              <div className="flex items-center space-x-4">
+                <div className="flex items-center space-x-2">
+                  <Switch 
+                    checked={createForm.is_admin} 
+                    onCheckedChange={(checked: any) => setCreateForm((prev: any) => ({...prev, is_admin: checked}))}
+                  />
+                  <Label>관리자</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Switch 
+                    checked={createForm.is_active} 
+                    onCheckedChange={(checked: any) => setCreateForm((prev: any) => ({...prev, is_active: checked}))}
+                  />
+                  <Label>활성</Label>
+                </div>
+              </div>
+              <div className="flex gap-2 pt-4">
+                <Button onClick={createUser} className="flex-1">생성</Button>
+                <Button variant="outline" onClick={() => setShowCreateForm(false)} className="flex-1">취소</Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }

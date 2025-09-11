@@ -75,7 +75,15 @@ class UserResponse(BaseModel):
     level: int = 1  # 프론트 레벨 필드 (battlepass_level과 동일)
     max_experience: int = 1000  # UI에서 maxExperience fallback 사용
     
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(
+        from_attributes=True,
+        # UTF-8 인코딩을 위한 설정
+        str_strip_whitespace=True,
+        # JSON serialization config
+        json_encoders={
+            str: lambda v: v if isinstance(v, str) else str(v)
+        }
+    )
 
 
 class Token(BaseModel):

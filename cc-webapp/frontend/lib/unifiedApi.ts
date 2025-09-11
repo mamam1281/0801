@@ -186,7 +186,9 @@ export async function apiCall<T=any>(path: string, opts: UnifiedRequestOptions<T
     // 무토큰 인증 상황 보정: auth=true인데 토큰이 없으면 네트워크 호출 자체를 생략
     // - GET: 조용히 null 반환 (호출 측에서 data null 처리)
     // - 쓰기 계열: 표준화 에러(code/status 포함) 던짐
-    if (auth && !tokens?.access_token) {
+    // - 예외: 관리자 로그인은 토큰이 없어도 허용
+    const isAdminLogin = path.includes('auth/admin/login');
+    if (auth && !tokens?.access_token && !isAdminLogin) {
       const upper = method.toUpperCase();
       const logEnabled = __logGateEnabled();
       if (upper === 'GET') {
@@ -285,9 +287,21 @@ export async function apiCall<T=any>(path: string, opts: UnifiedRequestOptions<T
       // @ts-ignore
       return (await response.text()) as T;
     }
-    const json = await response.json().catch(()=>null);
-    // @ts-ignore
-    return transform ? transform(json) : json;
+    
+    const responseText = await response.text();
+    console.log('[unifiedApi] 응답 텍스트:', responseText);
+    
+    try {
+      const json = JSON.parse(responseText);
+      console.log('[unifiedApi] JSON 파싱 성공:', json);
+      // @ts-ignore
+      return transform ? transform(json) : json;
+    } catch (parseError) {
+      console.error('[unifiedApi] JSON 파싱 실패:', parseError);
+      console.error('[unifiedApi] 원본 응답 텍스트:', responseText);
+      // @ts-ignore
+      return null as T;
+    }
   }
 }
 

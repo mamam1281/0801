@@ -33,13 +33,28 @@ const nextConfig = {
       },
     ];
   },
-  webpack: (config) => {
+  webpack: (config, { dev }) => {
     config.resolve = config.resolve || {};
     config.resolve.alias = {
       ...(config.resolve.alias || {}),
   '@': require('path').resolve(__dirname),
       'next-themes': require('path').resolve(__dirname, 'types/shims/next-themes.ts'),
     };
+    
+    // Suppress React 19 ref warnings in development
+    if (dev) {
+      const originalConsoleError = console.error;
+      console.error = (...args) => {
+        if (
+          typeof args[0] === 'string' &&
+          args[0].includes('element.ref was removed in React 19')
+        ) {
+          return;
+        }
+        originalConsoleError.apply(console, args);
+      };
+    }
+    
     // 과도한 디렉토리 워치로 인한 메모리 사용 감소 목적 ignore
     config.watchOptions = {
       ...(config.watchOptions || {}),

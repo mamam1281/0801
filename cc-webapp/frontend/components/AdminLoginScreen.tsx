@@ -40,6 +40,19 @@ export function AdminLoginScreen({
   const [attempts, setAttempts] = useState(0);
   const [isLocked, setIsLocked] = useState(false);
   const [lockdownTime, setLockdownTime] = useState(0);
+  const [isClient, setIsClient] = useState(false);
+  const [floatingElements, setFloatingElements] = useState([]);
+
+  // Client-side only initialization to prevent hydration mismatch
+  useEffect(() => {
+    setIsClient(true);
+    // Initialize floating elements positions on client side only
+    const elements = [...Array(8)].map(() => ({
+      x: Math.random() * (typeof window !== 'undefined' ? window.innerWidth : 1920),
+      y: Math.random() * (typeof window !== 'undefined' ? window.innerHeight : 1080)
+    }));
+    setFloatingElements(elements);
+  }, []);
 
   // Security lockdown timer
   useEffect(() => {
@@ -121,13 +134,13 @@ export function AdminLoginScreen({
         />
         
         {/* Floating Security Elements */}
-        {[...Array(8)].map((_, i) => (
+        {isClient && floatingElements.map((element: any, i: number) => (
           <motion.div
             key={i}
             initial={{ 
               opacity: 0,
-              x: Math.random() * (typeof window !== 'undefined' ? window.innerWidth : 1920),
-              y: Math.random() * (typeof window !== 'undefined' ? window.innerHeight : 1080)
+              x: element.x,
+              y: element.y
             }}
             animate={{ 
               opacity: [0, 0.3, 0],

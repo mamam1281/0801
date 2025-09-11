@@ -12,6 +12,7 @@ export default function middleware(req: NextRequest) {
     '/api', 
     '/login',
     '/signup',
+    '/admin-login',  // 관리자 로그인 페이지 허용
     '/favicon.ico',
     '/public',
     '/healthz'
@@ -47,11 +48,21 @@ export default function middleware(req: NextRequest) {
   console.log(`[MIDDLEWARE] 경로 ${pathname} 접근 시도`);
   
   if (!token) {
-    console.log(`[MIDDLEWARE] 비인증 → /login 리다이렉트`);
-    const loginUrl = req.nextUrl.clone();
-    loginUrl.pathname = '/login';
-    loginUrl.search = `?next=${encodeURIComponent(pathname)}`;
-    return NextResponse.redirect(loginUrl);
+    console.log(`[MIDDLEWARE] 비인증 → 리다이렉트`);
+    const redirectUrl = req.nextUrl.clone();
+    
+    // 관리자 페이지 접근 시 관리자 로그인으로 리다이렉션
+    if (pathname.startsWith('/admin')) {
+      console.log(`[MIDDLEWARE] 관리자 페이지 접근 → /admin-login 리다이렉트`);
+      redirectUrl.pathname = '/admin-login';
+      redirectUrl.search = `?next=${encodeURIComponent(pathname)}`;
+      return NextResponse.redirect(redirectUrl);
+    } else {
+      console.log(`[MIDDLEWARE] 일반 페이지 접근 → /login 리다이렉트`);
+      redirectUrl.pathname = '/login';
+      redirectUrl.search = `?next=${encodeURIComponent(pathname)}`;
+      return NextResponse.redirect(redirectUrl);
+    }
   }
 
   console.log(`[MIDDLEWARE] 인증됨 → 계속`);
