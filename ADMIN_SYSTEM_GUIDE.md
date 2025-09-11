@@ -49,6 +49,7 @@ Content-Type: application/json
 
 {
   "nickname": "수정된닉네임",
+  "user_rank": "VIP",
   "is_active": true,
   "is_admin": false
 }
@@ -63,7 +64,7 @@ Authorization: Bearer {admin_token}
 ### 🎯 프론트엔드 접근
 - **경로**: http://localhost:3000/admin/users
 - **컴포넌트**: `components/admin/UsersManager.tsx`
-- **기능**: 목록조회, 상세보기, 생성, 수정, 삭제, 검색, 페이징
+- **기능**: 목록조회, 상세보기, 생성, 수정, 삭제, 검색, 페이징, 닉네임 수정, 등급 수정
 
 ---
 
@@ -104,7 +105,7 @@ Authorization: Bearer {admin_token}
 ### 🎯 프론트엔드 접근
 - **경로**: http://localhost:3000/admin/points
 - **컴포넌트**: `app/admin/points/page.tsx`
-- **기능**: 골드 지급, 멱등성 처리, 영수증 코드 발급
+- **기능**: 골드 지급, 멱등성 처리, 영수증 코드 발급, 전역동기화 연동
 
 ---
 
@@ -162,26 +163,35 @@ Content-Type: application/json
 - selected: UserDetail | null // 선택된 사용자
 - search: string // 검색어
 - loading: boolean // 로딩 상태
+- nicknameInput: string // 닉네임 수정 입력
+- rankInput: string // 등급 수정 입력
+// 새 기능:
+- updateNickname() // 닉네임 수정 함수
+- updateRank() // 등급 수정 함수
 ```
 
 ### **AdminPointsPage.tsx**
 ```typescript
 // 위치: app/admin/points/page.tsx
-// 기능: 골드 지급 전용 페이지
+// 기능: 골드 지급 전용 페이지 (명칭 통일: 포인트→골드)
 // 주요 상태:
 - userId: string // 대상 사용자 ID
 - amount: string // 지급 수량
 - memo: string // 지급 사유
 - isSubmitting: boolean // 제출 중 상태
+// 개선사항:
+- 디버깅 로그 추가
+- withReconcile을 통한 전역동기화 연동
+- 골드 명칭 통일 완료
 ```
 
 ### **AdminDashboard.tsx**
 ```typescript
 // 위치: components/AdminDashboard.tsx
-// 기능: 어드민 메인 대시보드
+// 기능: 어드민 메인 대시보드 (명칭 통일 완료)
 // 네비게이션:
 - 사용자 관리 버튼 → /admin/users
-- 골드 관리 버튼 → /admin/points
+- 골드 관리 버튼 → /admin/points (포인트→골드 명칭 변경)
 ```
 
 ---
@@ -275,9 +285,11 @@ async def get_users(current_user: User = Depends(get_current_admin_user)):
 ✅ 사용자 목록 조회
 ✅ 사용자 검색 기능
 ✅ 새 사용자 생성
-✅ 사용자 정보 수정
+✅ 사용자 정보 수정 (닉네임, 등급)
 ✅ 사용자 삭제
 ✅ 페이징 기능
+✅ 닉네임 실시간 수정
+✅ 등급 실시간 수정
 ```
 
 #### 골드 관리 테스트
@@ -289,6 +301,8 @@ async def get_users(current_user: User = Depends(get_current_admin_user)):
 ✅ 영수증 코드 확인
 ✅ 사용자 잔액 업데이트 확인
 ✅ 멱등성 키 중복 방지
+🔧 디버깅 로그 추가 (클릭 문제 해결용)
+🔧 전역동기화 개선 진행중
 ```
 
 ### **API 테스트 스크립트**
@@ -350,13 +364,24 @@ ADD COLUMN IF NOT EXISTS is_suspicious BOOLEAN DEFAULT FALSE;
 
 ### **현재 상태**
 - ✅ 사용자 CRUD 완전 구현
-- ✅ 골드 지급 CRUD 완전 구현
+- ✅ 골드 지급 CRUD 완전 구현 (명칭 통일 완료)
 - ✅ 데이터베이스 스키마 동기화 완료
 - ✅ 프론트엔드 UI 완전 작동
 - ✅ 보안 및 권한 시스템 구현
 - ✅ 멱등성 및 감사 로그 시스템
+- ✅ 닉네임 수정 기능 추가
+- ✅ 등급 수정 기능 추가
+- 🔧 골드 지급 클릭 문제 디버깅 중
+- 🔧 전역동기화 개선 진행중
 
 ---
 
-**📅 마지막 업데이트**: 2025-09-11
-**🎯 상태**: 완료 - 사용자 및 골드 관리 시스템 완전 구현
+**📅 마지막 업데이트**: 2025-09-12
+**🎯 상태**: 개선 진행중 - 사용자 닉네임/등급 수정 기능 추가, 골드 명칭 통일 완료, 디버깅 로그 추가
+
+### **최근 변경사항 (2025-09-12)**
+- ✅ 포인트/토큰 → 골드 명칭 통일 (AdminDashboard, AdminPointsPage)
+- ✅ 사용자 관리에 닉네임 수정 기능 추가
+- ✅ 사용자 관리에 등급 수정 기능 추가  
+- 🔧 골드 지급 버튼 클릭 문제 디버깅용 로그 추가
+- 🔧 전역동기화 개선을 위한 withReconcile 활용

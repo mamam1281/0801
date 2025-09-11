@@ -4,7 +4,6 @@ import React, { useCallback, useEffect, useState } from "react";
 import { api as unifiedApi } from "@/lib/unifiedApi";
 import { useWithReconcile } from "@/lib/sync";
 import { Input } from "../../../components/ui/input";
-// 라벨 컴포넌트는 프로젝트에서 'Label.tsx' 대소문자로 사용 중
 import { Label } from "../../../components/ui/Label";
 import { Button } from "../../../components/ui/button";
 import { Card } from "../../../components/ui/card";
@@ -52,7 +51,11 @@ export default function AdminPointsPage() {
 	const amtOk = /^\d*(?:\.\d+)?$/.test(parsedAmt) && Number(parsedAmt) > 0;
 	const canSubmit = idOk && amtOk && !isSubmitting;
 
+	// 디버깅용 로그 추가
+	console.log('Form validation:', { parsedId, parsedAmt, idOk, amtOk, canSubmit, isSubmitting });
+
 		const handleSubmit = useCallback(async () => {
+		console.log('handleSubmit called, canSubmit:', canSubmit);
 		if (!canSubmit) return;
 		setIsSubmitting(true);
 		setResult({ status: "idle" });
