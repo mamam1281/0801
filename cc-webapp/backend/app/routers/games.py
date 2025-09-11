@@ -1496,32 +1496,21 @@ def get_my_authoritative_game_stats(current_user: models.User = Depends(get_curr
         svc = _GSS(db)
         crash_stats = svc.get_or_create(current_user.id)
         
-        # user_actions 테이블에서 CRASH_BET 액션 통계도 추가로 조회
+        # user_actions 테이블에서 CRASH_BET 액션 통계 직접 조회 (user_game_stats 대신 사용)
         crash_bet_count = db.query(func.count(UserAction.id)).filter(
             UserAction.user_id == current_user.id,
             UserAction.action_type == 'CRASH_BET'
         ).scalar() or 0
         
-        # Crash stats 기본값 설정
-        if crash_stats is None:
-            crash_stats_dict = {
-                'total_bets': crash_bet_count,  # user_actions의 CRASH_BET 포함
-                'total_wins': 0,
-                'total_losses': 0,
-                'total_profit': 0,
-                'highest_multiplier': None,
-                'updated_at': None
-            }
-        else:
-            # crash_stats 객체를 딕셔너리로 변환 + user_actions의 CRASH_BET 추가
-            crash_stats_dict = {
-                'total_bets': getattr(crash_stats, 'total_bets', 0) + crash_bet_count,
-                'total_wins': getattr(crash_stats, 'total_wins', 0),
-                'total_losses': getattr(crash_stats, 'total_losses', 0),
-                'total_profit': getattr(crash_stats, 'total_profit', 0),
-                'highest_multiplier': getattr(crash_stats, 'highest_multiplier', None),
-                'updated_at': getattr(crash_stats, 'updated_at', None)
-            }
+        # user_actions의 CRASH_BET을 기준으로 사용하고 user_game_stats는 보조적으로만 활용
+        crash_stats_dict = {
+            'total_bets': crash_bet_count,  # user_actions의 CRASH_BET만 사용
+            'total_wins': getattr(crash_stats, 'total_wins', 0) if crash_stats else 0,
+            'total_losses': getattr(crash_stats, 'total_losses', 0) if crash_stats else 0,
+            'total_profit': getattr(crash_stats, 'total_profit', 0) if crash_stats else 0,
+            'highest_multiplier': getattr(crash_stats, 'highest_multiplier', None) if crash_stats else None,
+            'updated_at': getattr(crash_stats, 'updated_at', None) if crash_stats else None
+        }
 
         # 슬롯 통계 조회
         slot_stats = db.query(
@@ -1568,18 +1557,53 @@ def get_my_authoritative_game_stats(current_user: models.User = Depends(get_curr
             'ties': getattr(rps_stats, 'ties', 0) if rps_stats else 0
         }
 
-        # 최대 승리 금액 계산
-        crash_max_win = db.query(func.max(case((UserAction.action_type == 'CRASH_WIN', func.cast(UserAction.action_data, Integer)), else_=0))).filter(UserAction.user_id == current_user.id).scalar() or 0
-        rps_max_win = db.query(func.max(case((UserAction.action_type == 'RPS_WIN', func.cast(UserAction.action_data, Integer)), else_=0))).filter(UserAction.user_id == current_user.id).scalar() or 0
+        # JSON action_data에서 win_amount 추출하여 최대 승리 금액 계산
+        from sqlalchemy import text
+        
+        # 슬롯 게임 최대 승리 금액
+        slot_max_win_result = db.execute(text("""
+            SELECT MAX(CAST(action_data::json->'data'->>'win_amount' AS INTEGER))
+            FROM user_actions 
+            WHERE user_id = :user_id 
+              AND action_type = 'SLOT_SPIN'
+              AND action_data::json->'data'->>'win_amount' IS NOT NULL
+        """), {"user_id": current_user.id}).scalar() or 0
+        
+        # RPS 게임 최대 승리 금액
+        rps_max_win_result = db.execute(text("""
+            SELECT MAX(CAST(action_data::json->'data'->>'win_amount' AS INTEGER))
+            FROM user_actions 
+            WHERE user_id = :user_id 
+              AND action_type = 'RPS_PLAY'
+              AND action_data::json->'data'->>'win_amount' IS NOT NULL
+        """), {"user_id": current_user.id}).scalar() or 0
+        
+        # 크래시 게임 최대 승리 금액
+        crash_max_win_result = db.execute(text("""
+            SELECT MAX(CAST(action_data::json->'data'->>'win_amount' AS INTEGER))
+            FROM user_actions 
+            WHERE user_id = :user_id 
+              AND action_type = 'CRASH_BET'
+              AND action_data::json->'data'->>'win_amount' IS NOT NULL
+        """), {"user_id": current_user.id}).scalar() or 0
+        
+        # 가챠 게임 최대 승리 금액
+        gacha_max_win_result = db.execute(text("""
+            SELECT MAX(CAST(action_data::json->'data'->>'win_amount' AS INTEGER))
+            FROM user_actions 
+            WHERE user_id = :user_id 
+              AND action_type = 'GACHA_PULL'
+              AND action_data::json->'data'->>'win_amount' IS NOT NULL
+        """), {"user_id": current_user.id}).scalar() or 0
         
         crash_max_multiplier = float(crash_stats_dict['highest_multiplier']) if crash_stats_dict['highest_multiplier'] is not None else None
 
         # 전체 게임에서 가장 큰 승리금액 계산
         overall_max_win = max(
-            int(slot_stats_dict['max_win'] or 0),
-            int(gacha_stats_dict['max_win'] or 0), 
-            crash_max_win,
-            rps_max_win
+            int(slot_max_win_result or 0),
+            int(rps_max_win_result or 0),
+            int(crash_max_win_result or 0),
+            int(gacha_max_win_result or 0)
         )
 
         # 총 게임 통계 계산
