@@ -16,7 +16,7 @@ export default function AdminLoginPage() {
     
     try {
       console.log('[DEBUG] API 호출 전...');
-      const response = await api.post('auth/admin/login', {
+      const response = await api.post('auth/login', {
         site_id: adminId,
         password: password
       });

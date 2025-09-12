@@ -25,6 +25,8 @@ export async function hydrateProfile(dispatch: ReturnType<typeof useGlobalStore>
       api.get("users/balance").catch(() => null),
       // 통계는 실패/401 무시 (호출만 수행)
       api.get("games/stats/me").catch(() => null),
+      // 로그인 시 자동으로 streak tick 호출 (daily streak 카운터 업데이트)
+      api.post("streak/tick").catch(() => null),
     ]);
 
     const data = profileRes as any;

@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Admin Gold Grant Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .form-group { margin: 10px 0; }
+        label { display: block; margin-bottom: 5px; }
+        input, button { padding: 8px; margin: 5px 0; }
+        .result { margin-top: 20px; padding: 10px; border: 1px solid #ccc; }
+        .success { background-color: #d4edda; }
+        .error { background-color: #f8d7da; }
+    </style>
+</head>
+<body>
+    <h1>Admin Gold Grant Test</h1>
+    
+    <div class="form-group">
+        <h3>1. Login as Admin</h3>
+        <label>Site ID:</label>
+        <input type="text" id="siteId" value="testadmin001">
+        <label>Password:</label>
+        <input type="password" id="password" value="password123">
+        <button onclick="login()">Login</button>
+    </div>
+
+    <div class="form-group">
+        <h3>2. Grant Gold</h3>
+        <label>User ID:</label>
+        <input type="number" id="userId" value="3">
+        <label>Amount:</label>
+        <input type="number" id="amount" value="100">
+        <label>Reason:</label>
+        <input type="text" id="reason" value="테스트 지급">
+        <button onclick="grantGold()">Grant Gold</button>
+    </div>
+
+    <div id="result" class="result"></div>
+
+    <script>
+        let token = '';
+
+        async function login() {
+            const siteId = document.getElementById('siteId').value;
+            const password = document.getElementById('password').value;
+            
+            try {
+                const response = await fetch('http://localhost:8000/api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        site_id: siteId,
+                        password: password
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    token = data.access_token;
+                    document.getElementById('result').innerHTML = `
+                        <div class="success">
+                            <h4>Login Success!</h4>
+                            <p>User: ${data.user.nickname} (ID: ${data.user.id})</p>
+                            <p>Admin: ${data.user.is_admin}</p>
+                            <p>Token: ${token.substring(0, 50)}...</p>
+                        </div>
+                    `;
+                } else {
+                    document.getElementById('result').innerHTML = `
+                        <div class="error">
+                            <h4>Login Failed!</h4>
+                            <p>${JSON.stringify(data, null, 2)}</p>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                document.getElementById('result').innerHTML = `
+                    <div class="error">
+                        <h4>Login Error!</h4>
+                        <p>${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+
+        async function grantGold() {
+            if (!token) {
+                alert('Please login first!');
+                return;
+            }
+
+            const userId = document.getElementById('userId').value;
+            const amount = parseInt(document.getElementById('amount').value);
+            const reason = document.getElementById('reason').value;
+
+            try {
+                // 먼저 현재 잔액 확인
+                const beforeResponse = await fetch(`http://localhost:8000/api/admin/users/${userId}`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                const beforeData = await beforeResponse.json();
+                const beforeBalance = beforeData.cyber_token_balance || 0;
+
+                // 골드 지급
+                const response = await fetch(`http://localhost:8000/api/admin/users/${userId}/gold/grant`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        amount: amount,
+                        reason: reason
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    document.getElementById('result').innerHTML = `
+                        <div class="success">
+                            <h4>Gold Grant Success!</h4>
+                            <p>User ID: ${data.user_id}</p>
+                            <p>Granted: ${data.granted}</p>
+                            <p>Before Balance: ${beforeBalance}</p>
+                            <p>New Balance: ${data.new_gold_balance}</p>
+                            <p>Receipt: ${data.receipt_code}</p>
+                            <p>Reason: ${data.reason}</p>
+                        </div>
+                    `;
+                } else {
+                    document.getElementById('result').innerHTML = `
+                        <div class="error">
+                            <h4>Gold Grant Failed!</h4>
+                            <p>Status: ${response.status}</p>
+                            <p>${JSON.stringify(data, null, 2)}</p>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                document.getElementById('result').innerHTML = `
+                    <div class="error">
+                        <h4>Gold Grant Error!</h4>
+                        <p>${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>

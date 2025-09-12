@@ -45,7 +45,6 @@ export function UsersManager({ onAddNotification }: UsersManagerProps) {
   const [selected, setSelected] = useState(null as UserDetail | null);
   const [logs, setLogs] = useState([] as AdminLog[]);
   const [rankInput, setRankInput] = useState('');
-  const [nicknameInput, setNicknameInput] = useState('');
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [createForm, setCreateForm] = useState({
     site_id: '',
@@ -81,7 +80,6 @@ export function UsersManager({ onAddNotification }: UsersManagerProps) {
   const d = (await api.get(`admin/users/${u.id}`)) as UserDetail;
       setSelected(d);
       setRankInput(d.user_rank || '');
-      setNicknameInput(d.nickname || '');
       try {
   const lg = (await api.get(`admin/users/${u.id}/logs?limit=50`)) as AdminLog[];
   setLogs(lg || []);
@@ -127,23 +125,6 @@ export function UsersManager({ onAddNotification }: UsersManagerProps) {
       onAddNotification(`등급 업데이트 실패: ${e?.message || e}`);
     }
   }, [selected, rankInput, selectUser, load, onAddNotification]);
-
-  const updateNickname = useCallback(async () => {
-    if (!selected) return;
-    const newNickname = (nicknameInput || '').trim();
-    if (!newNickname) {
-      onAddNotification('닉네임을 입력해주세요.');
-      return;
-    }
-    try {
-      await api.put(`admin/users/${selected.id}`, { nickname: newNickname });
-      onAddNotification('닉네임이 업데이트되었습니다.');
-      await selectUser(selected);
-      await load();
-    } catch (e: any) {
-      onAddNotification(`닉네임 업데이트 실패: ${e?.message || e}`);
-    }
-  }, [selected, nicknameInput, selectUser, load, onAddNotification]);
 
   const createUser = useCallback(async () => {
     try {
@@ -272,14 +253,6 @@ export function UsersManager({ onAddNotification }: UsersManagerProps) {
                     <div className="text-xs text-muted-foreground">마지막 로그인</div>
                     <div className="text-foreground font-semibold">{selected.last_login ? new Date(selected.last_login).toLocaleString() : '-'}</div>
                   </div>
-                </div>
-
-                <div className="flex items-end gap-2">
-                  <div className="flex-1">
-                    <Label htmlFor="nickname">닉네임</Label>
-                    <Input id="nickname" placeholder="새 닉네임" value={nicknameInput} onChange={(e:any)=>setNicknameInput((e.target as HTMLInputElement).value)} />
-                  </div>
-                  <Button variant="outline" onClick={updateNickname}>닉네임 저장</Button>
                 </div>
 
                 <div className="flex items-end gap-2">

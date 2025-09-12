@@ -304,6 +304,15 @@ export function HomeDashboard({
     }
 
     try {
+      // 🔄 먼저 streak tick을 호출하여 연속일수 증가
+      try {
+        const tickData = await unifiedApi.post('streak/tick', { action_type: 'DAILY_LOGIN' });
+        console.log('[streak.tick] success:', tickData);
+      } catch (tickError) {
+        console.warn('[streak.tick] failed, continuing with claim:', tickError);
+        // tick 실패해도 claim은 계속 진행
+      }
+
       const data = await unifiedApi.post('streak/claim', { action_type: 'DAILY_LOGIN' });
       // data: { awarded_gold, awarded_xp, new_gold_balance, streak_count }
       const fallback = {
