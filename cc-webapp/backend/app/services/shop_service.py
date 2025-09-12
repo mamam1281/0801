@@ -645,3 +645,400 @@ class ShopService:
                 return {"success": False, "message": "DB commit failed"}
             new_balance = TokenService(self.db).get_token_balance(tx.user_id)
             return {"success": True, "status": 'success', "new_balance": new_balance}
+
+    # ----- ADMIN MANAGEMENT FUNCTIONS -----
+    # 기존 상품을 손대지 않고 관리 기능만 제공
+    
+    async def get_products_list(
+        self, 
+        skip: int = 0, 
+        limit: int = 50,
+        search: Optional[str] = None,
+        is_active: Optional[bool] = None
+    ) -> tuple[List[Dict[str, Any]], int]:
+        """
+        상품 목록 조회 (관리자용)
+        """
+        from sqlalchemy import and_, or_
+        
+        if not self._table_exists('shop_products'):
+            return [], 0
+            
+        query = self.db.query(models.ShopProduct)
+        
+        # 삭제되지 않은 상품만 조회
+        query = query.filter(models.ShopProduct.deleted_at.is_(None))
+        
+        # 검색 조건
+        if search:
+            search_term = f"%{search}%"
+            query = query.filter(
+                or_(
+                    models.ShopProduct.name.ilike(search_term),
+                    models.ShopProduct.description.ilike(search_term),
+                    models.ShopProduct.product_id.ilike(search_term)
+                )
+            )
+        
+        # 활성 상태 필터
+        if is_active is not None:
+            query = query.filter(models.ShopProduct.is_active == is_active)
+        
+        # 전체 개수
+        total = query.count()
+        
+        # 페이징
+        products = query.offset(skip).limit(limit).all()
+        
+        # 응답 변환
+        product_responses = [
+            {
+                "id": product.id,
+                "product_id": product.product_id,
+                "name": product.name,
+                "description": product.description,
+                "price": product.price,
+                "is_active": product.is_active,
+                "metadata": getattr(product, 'metadata', {}),
+                "extra": getattr(product, 'extra', {}),
+                "created_at": product.created_at,
+                "updated_at": product.updated_at,
+                "deleted_at": getattr(product, 'deleted_at', None)
+            }
+            for product in products
+        ]
+        
+        return product_responses, total
+    
+    async def get_product_by_id(self, product_id: int) -> Optional[Dict[str, Any]]:
+        """
+        특정 상품 조회 (관리자용)
+        """
+        from sqlalchemy import and_
+        
+        if not self._table_exists('shop_products'):
+            return None
+            
+        product = self.db.query(models.ShopProduct).filter(
+            and_(
+                models.ShopProduct.id == product_id,
+                models.ShopProduct.deleted_at.is_(None)
+            )
+        ).first()
+        
+        if product:
+            return {
+                "id": product.id,
+                "product_id": product.product_id,
+                "name": product.name,
+                "description": product.description,
+                "price": product.price,
+                "is_active": product.is_active,
+                "metadata": getattr(product, 'metadata', {}),
+                "extra": getattr(product, 'extra', {}),
+                "created_at": product.created_at,
+                "updated_at": product.updated_at,
+                "deleted_at": getattr(product, 'deleted_at', None)
+            }
+        return None
+    
+    async def create_product(
+        self, 
+        product_data: Dict[str, Any], 
+        admin_id: int
+    ) -> Dict[str, Any]:
+        """
+        새 상품 생성 (기존 상품에 영향 없음)
+        """
+        if not self._table_exists('shop_products'):
+            raise Exception("shop_products 테이블이 없습니다.")
+        
+        # product_id 중복 확인
+        existing = self.db.query(models.ShopProduct).filter(
+            models.ShopProduct.product_id == product_data['product_id']
+        ).first()
+        
+        if existing:
+            raise ValueError(f"상품 ID '{product_data['product_id']}'가 이미 존재합니다.")
+        
+        # 새 상품 생성
+        db_product = models.ShopProduct(
+            product_id=product_data['product_id'],
+            name=product_data['name'],
+            description=product_data.get('description'),
+            price=product_data['price'],
+            is_active=product_data.get('is_active', True),
+            metadata=product_data.get('metadata', {}),
+            extra=product_data.get('extra', {}),
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow()
+        )
+        
+        self.db.add(db_product)
+        self.db.commit()
+        self.db.refresh(db_product)
+        
+        return {
+            "id": db_product.id,
+            "product_id": db_product.product_id,
+            "name": db_product.name,
+            "description": db_product.description,
+            "price": db_product.price,
+            "is_active": db_product.is_active,
+            "metadata": getattr(db_product, 'metadata', {}),
+            "extra": getattr(db_product, 'extra', {}),
+            "created_at": db_product.created_at,
+            "updated_at": db_product.updated_at,
+            "deleted_at": getattr(db_product, 'deleted_at', None)
+        }
+    
+    async def update_product(
+        self, 
+        product_id: int, 
+        product_data: Dict[str, Any], 
+        admin_id: int
+    ) -> Optional[Dict[str, Any]]:
+        """
+        기존 상품 수정 (기존 9개 상품도 수정 가능)
+        """
+        from sqlalchemy import and_
+        
+        if not self._table_exists('shop_products'):
+            return None
+            
+        product = self.db.query(models.ShopProduct).filter(
+            and_(
+                models.ShopProduct.id == product_id,
+                models.ShopProduct.deleted_at.is_(None)
+            )
+        ).first()
+        
+        if not product:
+            return None
+        
+        # product_id 중복 확인 (변경하는 경우)
+        if 'product_id' in product_data and product_data['product_id'] != product.product_id:
+            existing = self.db.query(models.ShopProduct).filter(
+                and_(
+                    models.ShopProduct.product_id == product_data['product_id'],
+                    models.ShopProduct.id != product_id
+                )
+            ).first()
+            
+            if existing:
+                raise ValueError(f"상품 ID '{product_data['product_id']}'가 이미 존재합니다.")
+        
+        # 업데이트 적용
+        for field, value in product_data.items():
+            if value is not None and hasattr(product, field):
+                setattr(product, field, value)
+        
+        product.updated_at = datetime.utcnow()
+        
+        self.db.commit()
+        self.db.refresh(product)
+        
+        return {
+            "id": product.id,
+            "product_id": product.product_id,
+            "name": product.name,
+            "description": product.description,
+            "price": product.price,
+            "is_active": product.is_active,
+            "metadata": getattr(product, 'metadata', {}),
+            "extra": getattr(product, 'extra', {}),
+            "created_at": product.created_at,
+            "updated_at": product.updated_at,
+            "deleted_at": getattr(product, 'deleted_at', None)
+        }
+    
+    async def delete_product(self, product_id: int, admin_id: int) -> bool:
+        """
+        상품 삭제 (소프트 삭제)
+        """
+        from sqlalchemy import and_
+        
+        if not self._table_exists('shop_products'):
+            return False
+            
+        product = self.db.query(models.ShopProduct).filter(
+            and_(
+                models.ShopProduct.id == product_id,
+                models.ShopProduct.deleted_at.is_(None)
+            )
+        ).first()
+        
+        if not product:
+            return False
+        
+        # 소프트 삭제
+        product.deleted_at = datetime.utcnow()
+        product.updated_at = datetime.utcnow()
+        
+        self.db.commit()
+        return True
+    
+    async def set_product_active(
+        self, 
+        product_id: int, 
+        is_active: bool, 
+        admin_id: int
+    ) -> bool:
+        """
+        상품 활성화/비활성화
+        """
+        from sqlalchemy import and_
+        
+        if not self._table_exists('shop_products'):
+            return False
+            
+        product = self.db.query(models.ShopProduct).filter(
+            and_(
+                models.ShopProduct.id == product_id,
+                models.ShopProduct.deleted_at.is_(None)
+            )
+        ).first()
+        
+        if not product:
+            return False
+        
+        product.is_active = is_active
+        product.updated_at = datetime.utcnow()
+        
+        self.db.commit()
+        return True
+    
+    async def get_categories(self) -> List[str]:
+        """
+        상품 카테고리 목록 조회 (metadata에서 category 추출)
+        """
+        if not self._table_exists('shop_products'):
+            return ["기본", "특별", "이벤트", "프리미엄"]
+            
+        try:
+            from sqlalchemy import text
+            # metadata.category 필드에서 카테고리 추출
+            result = self.db.execute(
+                text("""
+                    SELECT DISTINCT 
+                        metadata->>'category' as category
+                    FROM shop_products 
+                    WHERE deleted_at IS NULL 
+                        AND metadata->>'category' IS NOT NULL
+                        AND metadata->>'category' != ''
+                    ORDER BY category
+                """)
+            ).fetchall()
+            
+            categories = [row[0] for row in result if row[0]]
+            
+            # 기본 카테고리가 없으면 추가
+            if not categories:
+                categories = ["기본", "특별", "이벤트", "프리미엄"]
+            
+            return categories
+        except Exception:
+            return ["기본", "특별", "이벤트", "프리미엄"]
+    
+    async def get_shop_stats(self) -> Dict[str, Any]:
+        """
+        상점 통계 조회
+        """
+        try:
+            # 기본 상품 통계
+            total_products = 0
+            active_products = 0
+            inactive_products = 0
+            deleted_products = 0
+            
+            if self._table_exists('shop_products'):
+                from sqlalchemy import and_
+                
+                total_products = self.db.query(models.ShopProduct).filter(
+                    models.ShopProduct.deleted_at.is_(None)
+                ).count()
+                
+                active_products = self.db.query(models.ShopProduct).filter(
+                    and_(
+                        models.ShopProduct.deleted_at.is_(None),
+                        models.ShopProduct.is_active == True
+                    )
+                ).count()
+                
+                inactive_products = total_products - active_products
+                
+                deleted_products = self.db.query(models.ShopProduct).filter(
+                    models.ShopProduct.deleted_at.is_not(None)
+                ).count()
+            
+            # 판매 통계 (shop_transactions 테이블이 있다면)
+            total_sales = 0
+            total_revenue = 0
+            
+            if self._table_exists('shop_transactions'):
+                try:
+                    from sqlalchemy import text
+                    sales_result = self.db.execute(
+                        text("""
+                            SELECT 
+                                COUNT(*) as sales_count,
+                                COALESCE(SUM(amount), 0) as total_revenue
+                            FROM shop_transactions 
+                            WHERE status = 'completed'
+                        """)
+                    ).fetchone()
+                    
+                    if sales_result:
+                        total_sales = sales_result[0] or 0
+                        total_revenue = sales_result[1] or 0
+                        
+                except Exception:
+                    pass
+            
+            # 카테고리 목록
+            categories = await self.get_categories()
+            
+            return {
+                "total_products": total_products,
+                "active_products": active_products,
+                "inactive_products": inactive_products,
+                "deleted_products": deleted_products,
+                "total_sales": total_sales,
+                "total_revenue": total_revenue,
+                "categories": categories
+            }
+            
+        except Exception:
+            return {
+                "total_products": 0,
+                "active_products": 0,
+                "inactive_products": 0,
+                "deleted_products": 0,
+                "total_sales": 0,
+                "total_revenue": 0,
+                "categories": ["기본", "특별", "이벤트", "프리미엄"]
+            }
+    
+    async def get_existing_products_info(self) -> List[Dict[str, Any]]:
+        """
+        기존 9개 상품 정보 조회 (보존 확인용)
+        """
+        if not self._table_exists('shop_products'):
+            return []
+            
+        products = self.db.query(models.ShopProduct).filter(
+            models.ShopProduct.deleted_at.is_(None)
+        ).order_by(models.ShopProduct.id).all()
+        
+        return [
+            {
+                "id": product.id,
+                "product_id": product.product_id,
+                "name": product.name,
+                "price": product.price,
+                "is_active": product.is_active,
+                "created_at": product.created_at,
+                "is_original": product.id <= 9  # 기존 9개 상품 표시
+            }
+            for product in products
+        ]

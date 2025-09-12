@@ -40,6 +40,7 @@ from app.routers import (
     auth,
     users,  # Re-enabled
     admin,
+    admin_shop,  # Shop management for admins
     actions,
     olap,
     # gacha,  # 중복 제거: games.router에 포함됨
@@ -338,6 +339,7 @@ if Instrumentator is not None:
 app.include_router(auth.router, tags=["Authentication"])
 app.include_router(users.router)  # 태그 오버라이드 제거 - 이미 users.py에서 "Users" 태그를 지정함
 app.include_router(admin.router)  # 태그 오버라이드 제거 - 이미 admin.py에서 "Admin" 태그를 지정함
+app.include_router(admin_shop.router)  # Admin shop management
 app.include_router(olap.router)   # OLAP/ClickHouse health endpoints
 
 # Core Game Systems (no prefix - routers have their own)

@@ -15,10 +15,57 @@ class ShopProduct(Base, SoftDeleteMixin):
     description = Column(String(1000))
     price = Column(Integer, nullable=False)  # base price in coins
     is_active = Column(Boolean, default=True)
+    
+    # 교환권 시스템 관련 필드
+    voucher_type = Column(String(50), default='external')  # external, internal, bonus
+    external_service = Column(String(100))  # 외부 서비스 명 (예: "daily_comp", "charge_boost")
+    stock_total = Column(Integer, nullable=True)  # 총 재고 (unlimited면 null)
+    stock_remaining = Column(Integer, nullable=True)  # 남은 재고
+    per_user_limit = Column(Integer, nullable=True)  # 사용자당 구매 제한
+    
     # Avoid SQLAlchemy reserved attribute name 'metadata' on declarative models
     extra = Column(JSON)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow)
+
+
+class VoucherUsage(Base):
+    """교환권 사용 내역 추적"""
+    __tablename__ = "voucher_usage"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    voucher_id = Column(String(100), nullable=False)  # shop_products.product_id 참조
+    voucher_name = Column(String(200), nullable=False)  # 사용 시점의 교환권 이름
+    external_service = Column(String(100), nullable=True)  # 외부 서비스 명
+    
+    # 사용 상태
+    status = Column(String(20), nullable=False, default="purchased")  
+    # purchased: 구매됨, used: 사용됨, expired: 만료됨, refunded: 환불됨
+    
+    # 사용 정보
+    purchased_at = Column(DateTime, default=datetime.utcnow)
+    used_at = Column(DateTime, nullable=True)
+    expires_at = Column(DateTime, nullable=True)
+    
+    # 거래 정보
+    transaction_id = Column(Integer, ForeignKey("shop_transactions.id"), nullable=True)
+    purchase_price = Column(Integer, nullable=False)
+    
+    # 외부 서비스 연동 정보
+    external_request_id = Column(String(100), nullable=True)  # 외부 API 요청 ID
+    external_response = Column(JSON, nullable=True)  # 외부 API 응답
+    
+    # 메타 정보
+    extra = Column(JSON)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow)
+
+    # 인덱스
+    __table_args__ = (
+        # 사용자별 교환권별 빠른 조회
+        UniqueConstraint('user_id', 'voucher_id', 'transaction_id', name='uq_voucher_usage_user_voucher_tx'),
+    )
 
 
 class ShopDiscount(Base):

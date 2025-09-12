@@ -205,6 +205,7 @@ __all__ = [
     "ShopPromoCode",
     "ShopPromoUsage",
     "AdminAuditLog",
+    "VoucherUsage",
     # Admin content persistence
     "AdminEvent",
     "MissionTemplate",
@@ -245,4 +246,5 @@ from .shop_models import (
     ShopPromoCode,
     ShopPromoUsage,
     AdminAuditLog,
+    VoucherUsage,
 )
