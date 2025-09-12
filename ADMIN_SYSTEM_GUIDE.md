@@ -3,11 +3,15 @@
 ## 📋 목차
 1. [사용자 관리 CRUD](#사용자-관리-crud)
 2. [골드 관리 CRUD](#골드-관리-crud)
-3. [API 명세서](#api-명세서)
-4. [프론트엔드 컴포넌트](#프론트엔드-컴포넌트)
-5. [데이터베이스 스키마](#데이터베이스-스키마)
-6. [보안 및 권한](#보안-및-권한)
-7. [테스트 가이드](#테스트-가이드)
+3. [상점 관리 CRUD (구현 예정)](#상점-관리-crud-구현-예정)
+4. [이벤트 관리 CRUD (구현 예정)](#이벤트-관리-crud-구현-예정)
+5. [통계 관리 시스템 (구현 예정)](#통계-관리-시스템-구현-예정)
+6. [전체 개발 로드맵](#전체-개발-로드맵)
+7. [API 명세서](#api-명세서)
+8. [프론트엔드 컴포넌트](#프론트엔드-컴포넌트)
+9. [데이터베이스 스키마](#데이터베이스-스키마)
+10. [보안 및 권한](#보안-및-권한)
+11. [테스트 가이드](#테스트-가이드)
 
 ---
 
@@ -295,14 +299,14 @@ async def get_users(current_user: User = Depends(get_current_admin_user)):
 #### 골드 관리 테스트
 ```bash
 ✅ 골드 지급 페이지 접근
-✅ 사용자 ID 입력 검증
+✅ 사용자 ID 입력 검증 (숫자 ID와 site_id 모두 지원)
 ✅ 골드 수량 입력 검증
 ✅ 골드 지급 실행
 ✅ 영수증 코드 확인
 ✅ 사용자 잔액 업데이트 확인
 ✅ 멱등성 키 중복 방지
-🔧 디버깅 로그 추가 (클릭 문제 해결용)
-🔧 전역동기화 개선 진행중
+✅ site_id 검색 문제 해결 완료
+✅ 프로덕션 준비 완료 (디버깅 로그 정리)
 ```
 
 ### **API 테스트 스크립트**
@@ -364,24 +368,328 @@ ADD COLUMN IF NOT EXISTS is_suspicious BOOLEAN DEFAULT FALSE;
 
 ### **현재 상태**
 - ✅ 사용자 CRUD 완전 구현
-- ✅ 골드 지급 CRUD 완전 구현 (명칭 통일 완료)
+- ✅ 골드 지급 CRUD 완전 구현 (site_id 지원 포함)
 - ✅ 데이터베이스 스키마 동기화 완료
 - ✅ 프론트엔드 UI 완전 작동
 - ✅ 보안 및 권한 시스템 구현
 - ✅ 멱등성 및 감사 로그 시스템
 - ✅ 닉네임 수정 기능 추가
 - ✅ 등급 수정 기능 추가
-- 🔧 골드 지급 클릭 문제 디버깅 중
-- 🔧 전역동기화 개선 진행중
+- ✅ site_id 검색 문제 해결 완료
+- ✅ 프로덕션 준비 완료 (디버깅 로그 정리)
+- � 상점 관리 시스템 (미구현)
+- 🚧 이벤트 관리 시스템 (미구현)
+- 🚧 통계 관리 시스템 (미구현)
 
 ---
 
-**📅 마지막 업데이트**: 2025-09-12
-**🎯 상태**: 개선 진행중 - 사용자 닉네임/등급 수정 기능 추가, 골드 명칭 통일 완료, 디버깅 로그 추가
+## 🏪 상점 관리 CRUD (구현 예정)
 
-### **최근 변경사항 (2025-09-12)**
-- ✅ 포인트/토큰 → 골드 명칭 통일 (AdminDashboard, AdminPointsPage)
-- ✅ 사용자 관리에 닉네임 수정 기능 추가
-- ✅ 사용자 관리에 등급 수정 기능 추가  
-- 🔧 골드 지급 버튼 클릭 문제 디버깅용 로그 추가
-- 🔧 전역동기화 개선을 위한 withReconcile 활용
+### **📋 기능 요구사항**
+
+#### **상품 관리**
+- 상품 생성/수정/삭제
+- 상품 카테고리 관리 (코인팩, 아이템, 한정상품)
+- 가격 설정 (일반가, 할인가, VIP가)
+- 상품 활성화/비활성화
+- 재고 관리 (무제한/제한)
+
+#### **한정 상품 관리**
+- 시간 제한 상품 (시작/종료 시간)
+- 수량 제한 상품
+- VIP 전용 상품
+- 일일/주간 한정 상품
+
+#### **할인 및 프로모션**
+- 퍼센트 할인
+- 고정 금액 할인
+- N+1 이벤트
+- 첫구매 보너스
+
+### **🎯 구현 계획**
+
+#### **Phase 1: 기본 상품 CRUD**
+```typescript
+// 백엔드 API 설계
+POST /api/admin/shop/products     // 상품 생성
+GET  /api/admin/shop/products     // 상품 목록
+GET  /api/admin/shop/products/{id} // 상품 상세
+PUT  /api/admin/shop/products/{id} // 상품 수정
+DELETE /api/admin/shop/products/{id} // 상품 삭제
+```
+
+#### **Phase 2: 프론트엔드 UI**
+```typescript
+// 컴포넌트 구조
+components/admin/shop/
+├── ProductsManager.tsx      // 상품 목록 관리
+├── ProductForm.tsx          // 상품 생성/수정 폼
+├── CategoryManager.tsx      // 카테고리 관리
+└── PriceEditor.tsx         // 가격 설정 UI
+```
+
+#### **Phase 3: 고급 기능**
+- 대량 가격 수정
+- 상품 복사 기능
+- 판매 통계 연동
+- 이미지 업로드
+
+---
+
+## 🎊 이벤트 관리 CRUD (구현 예정)
+
+### **📋 기능 요구사항**
+
+#### **이벤트 생성**
+- 이벤트 타입 (로그인 보너스, 미션 이벤트, 가챠 이벤트)
+- 기간 설정 (시작/종료 시간)
+- 대상 사용자 (전체/VIP/신규)
+- 보상 설정
+
+#### **미션 이벤트**
+- 일일 미션
+- 누적 미션
+- 단계별 보상
+- 진행률 추적
+
+#### **특별 이벤트**
+- 더블 골드 이벤트
+- 무료 가챠 이벤트
+- 한정 시간 할인
+
+### **🎯 구현 계획**
+
+#### **Phase 1: 이벤트 기본 CRUD**
+```typescript
+// 백엔드 API 설계
+POST /api/admin/events        // 이벤트 생성
+GET  /api/admin/events        // 이벤트 목록
+PUT  /api/admin/events/{id}   // 이벤트 수정
+DELETE /api/admin/events/{id} // 이벤트 삭제
+POST /api/admin/events/{id}/activate // 이벤트 활성화
+```
+
+#### **Phase 2: 미션 시스템**
+```typescript
+// 미션 관리 API
+POST /api/admin/missions      // 미션 생성
+GET  /api/admin/missions      // 미션 목록
+GET  /api/admin/missions/{id}/progress // 진행률 조회
+```
+
+#### **Phase 3: 자동화 시스템**
+- 스케줄러 연동
+- 자동 시작/종료
+- 알림 발송
+- 성과 분석
+
+---
+
+## 📊 통계 관리 시스템 (구현 예정)
+
+### **📋 기능 요구사항**
+
+#### **사용자 통계**
+- 일간/주간/월간 활성 사용자
+- 신규 가입자 추이
+- 이탈률 분석
+- 등급별 분포
+
+#### **매출 통계**
+- 일매출/월매출
+- 상품별 판매량
+- ARPU/ARPPU
+- 결제 수단별 분석
+
+#### **게임 통계**
+- 플레이 시간
+- 게임별 인기도
+- 승률 통계
+- 골드 사용 패턴
+
+### **🎯 구현 계획**
+
+#### **Phase 1: 기본 대시보드**
+```typescript
+// 통계 API 설계
+GET /api/admin/stats/users    // 사용자 통계
+GET /api/admin/stats/revenue  // 매출 통계
+GET /api/admin/stats/games    // 게임 통계
+```
+
+#### **Phase 2: 시각화**
+```typescript
+// 차트 컴포넌트
+components/admin/stats/
+├── UserStatsChart.tsx       // 사용자 통계 차트
+├── RevenueChart.tsx         // 매출 차트
+├── GameStatsChart.tsx       // 게임 통계 차트
+└── StatsDashboard.tsx       // 통합 대시보드
+```
+
+#### **Phase 3: 고급 분석**
+- 코호트 분석
+- 리텐션 분석
+- A/B 테스트 결과
+- 예측 모델링
+
+---
+
+## 🗺️ 전체 개발 로드맵
+
+### **🎯 Phase 1: 상점 관리 시스템 (우선순위: 높음)**
+**예상 소요시간**: 1-2주
+
+#### **Week 1: 백엔드 구현**
+1. **데이터베이스 설계**
+   ```sql
+   -- 상품 테이블
+   CREATE TABLE shop_products (
+       id SERIAL PRIMARY KEY,
+       name VARCHAR(200) NOT NULL,
+       description TEXT,
+       category VARCHAR(50),
+       price_regular INTEGER NOT NULL,
+       price_vip INTEGER,
+       is_active BOOLEAN DEFAULT TRUE,
+       stock_limit INTEGER, -- NULL = 무제한
+       created_at TIMESTAMP DEFAULT NOW()
+   );
+   
+   -- 구매 내역 테이블  
+   CREATE TABLE shop_purchases (
+       id SERIAL PRIMARY KEY,
+       user_id INTEGER REFERENCES users(id),
+       product_id INTEGER REFERENCES shop_products(id),
+       amount_paid INTEGER,
+       created_at TIMESTAMP DEFAULT NOW()
+   );
+   ```
+
+2. **API 엔드포인트 구현**
+   - `app/routers/admin_shop.py` 생성
+   - CRUD 로직 구현
+   - 권한 검사 추가
+
+#### **Week 2: 프론트엔드 구현**
+1. **컴포넌트 개발**
+   - 상품 목록 UI
+   - 상품 생성/수정 폼
+   - 카테고리 관리
+
+2. **페이지 연동**
+   - `/admin/shop` 페이지 생성
+   - 네비게이션 메뉴 추가
+
+### **🎯 Phase 2: 이벤트 관리 시스템 (우선순위: 중간)**
+**예상 소요시간**: 2-3주
+
+#### **Week 1-2: 기본 이벤트 시스템**
+1. **데이터베이스 설계**
+   ```sql
+   CREATE TABLE events (
+       id SERIAL PRIMARY KEY,
+       name VARCHAR(200) NOT NULL,
+       event_type VARCHAR(50),
+       start_time TIMESTAMP,
+       end_time TIMESTAMP,
+       is_active BOOLEAN DEFAULT FALSE,
+       config JSONB -- 이벤트별 설정
+   );
+   ```
+
+2. **API 구현**
+   - 이벤트 CRUD
+   - 활성화/비활성화
+   - 스케줄링 연동
+
+#### **Week 3: 미션 시스템**
+1. **미션 테이블 설계**
+2. **진행률 추적 시스템**
+3. **보상 지급 자동화**
+
+### **🎯 Phase 3: 통계 관리 시스템 (우선순위: 낮음)**
+**예상 소요시간**: 2-3주
+
+#### **Week 1: 데이터 수집**
+1. **이벤트 로깅 시스템**
+2. **집계 테이블 설계**
+3. **배치 작업 스케줄러**
+
+#### **Week 2-3: 대시보드 구현**
+1. **차트 라이브러리 연동**
+2. **실시간 데이터 업데이트**
+3. **필터링 및 검색**
+
+---
+
+## 🚀 다음 단계 실행 가이드
+
+### **즉시 시작 가능한 작업들**
+
+#### **1. 상점 관리 시스템 킷 준비**
+```bash
+# 1. 데이터베이스 마이그레이션 생성
+cd cc-webapp/backend
+docker-compose exec backend alembic revision --autogenerate -m "add_shop_management_tables"
+
+# 2. 백엔드 라우터 파일 생성
+touch app/routers/admin_shop.py
+touch app/services/shop_service.py
+touch app/schemas/shop.py
+
+# 3. 프론트엔드 컴포넌트 디렉토리 생성
+mkdir -p cc-webapp/frontend/components/admin/shop
+touch cc-webapp/frontend/components/admin/shop/ProductsManager.tsx
+touch cc-webapp/frontend/app/admin/shop/page.tsx
+```
+
+#### **2. 기본 구조 생성**
+```typescript
+// 상품 스키마 정의
+interface ShopProduct {
+  id: number;
+  name: string;
+  description?: string;
+  category: 'coins' | 'items' | 'limited';
+  price_regular: number;
+  price_vip?: number;
+  is_active: boolean;
+  stock_limit?: number;
+  created_at: string;
+}
+```
+
+#### **3. 개발 우선순위**
+1. **최우선**: 상품 목록 조회/생성 (기본 CRUD)
+2. **차순위**: 가격 설정 및 카테고리 관리
+3. **향후**: 한정상품, 할인 시스템
+
+### **효율적인 개발을 위한 팁**
+
+#### **기존 코드 활용**
+- 사용자 관리의 `UsersManager.tsx` 컴포넌트 구조 재사용
+- 골드 지급의 API 호출 패턴 참고
+- 동일한 인증/권한 시스템 활용
+
+#### **점진적 개발**
+- MVP(최소 기능) 먼저 구현
+- 고급 기능은 단계적 추가
+- 각 단계마다 테스트 및 검증
+
+#### **문서화 습관**
+- API 명세서 실시간 업데이트
+- 컴포넌트 JSDoc 작성
+- 데이터베이스 스키마 변경 기록
+
+---
+
+**� 마지막 업데이트**: 2025-09-13
+**🎯 상태**: 기본 시스템 완료, 확장 시스템 구현 대기
+
+### **최근 변경사항 (2025-09-13)**
+- ✅ 골드 지급 site_id 검색 문제 완전 해결
+- ✅ 프로덕션 준비 완료 (디버깅 로그 정리)
+- ✅ 상점/이벤트/통계 관리 로드맵 추가
+- 📋 다음 개발 우선순위: 상점 관리 시스템
+- �️ 전체 개발 일정 및 가이드 수립

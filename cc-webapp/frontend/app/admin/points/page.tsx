@@ -1,16 +1,6 @@
 "use client";
 
 import React, { useCallback, useEffect, useState } from "react";
-					console.log(`[Admin Points] Found user: ${uid} → ID ${targetUserId}`);
-				} catch (searchError: any) {
-					console.error('[Admin Points] User search failed:', searchError);
-					setResult({ 
-						status: "error", 
-						message: `❌ 사용자 검색 중 오류: ${searchError?.message || 'Unknown error'}` 
-					});
-					return;
-				}
-			}t";
 import { api as unifiedApi } from "@/lib/unifiedApi";
 import { useWithReconcile } from "@/lib/sync";
 import { Input } from "../../../components/ui/input";
@@ -44,64 +34,109 @@ export default function AdminPointsPage() {
 		return () => { cancelled = true; };
 	}, []);
 
-	const [userId, setUserId] = useState("");
+	const [userInput, setUserInput] = useState("");
 	const [amount, setAmount] = useState("");
 	const [memo, setMemo] = useState("");
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [result, setResult] = useState({ status: "idle" } as ResultState);
 	const withReconcile = useWithReconcile();
 
-	// Compute validity inline to avoid any potential memoization edge cases in CI/Playwright
-	// 즉시 계산 방식으로 전환하여 하이드레이션/렌더 타이밍에 따른 메모이제이션 엣지 케이스 회피
-	// 입력 유효성(테스트 시나리오 준수):
-	// - user_id: 숫자 또는 site_id (문자열) 허용
-	// - amount: 양수(소수 허용)
-	const parsedId = (userId || '').toString().trim();
+	// 입력 유효성 검사 개선: 숫자 ID 또는 site_id 모두 허용
+	const parsedInput = (userInput || '').toString().trim();
 	const parsedAmt = (amount || '').toString().trim();
-	const idOk = /^\d+$/.test(parsedId) || /^[a-zA-Z0-9_-]{3,}$/.test(parsedId); // 숫자 또는 유효한 site_id
+	
+	// ID 검증: 숫자(user_id) 또는 3자 이상 영숫자+언더스코어(site_id)
+	const isNumericId = /^\d+$/.test(parsedInput);
+	const isSiteId = /^[a-zA-Z0-9_-]{3,50}$/.test(parsedInput);
+	const idOk = isNumericId || isSiteId;
+	
 	const amtOk = /^\d*(?:\.\d+)?$/.test(parsedAmt) && Number(parsedAmt) > 0;
-	const canSubmit = idOk && amtOk && !isSubmitting;
-
-	// 실시간 디버깅 정보
-	console.log('[Admin Points] Form state:', {
-		userId, amount, memo,
-		parsedId, parsedAmt,
-		idOk, amtOk, isSubmitting,
-		canSubmit
-	});
-
-		const handleSubmit = useCallback(async () => {
-		console.log('[Admin Points] Button clicked!', { canSubmit, userId, amount, memo });
+	
+	const handleSubmit = useCallback(async () => {
+		// 입력 유효성 검사를 함수 내부에서 다시 수행
+		const parsedInputLocal = (userInput || '').toString().trim();
+		const parsedAmtLocal = (amount || '').toString().trim();
 		
-		if (!canSubmit) {
-			console.warn('[Admin Points] Cannot submit:', { idOk, amtOk, isSubmitting, parsedId, parsedAmt });
+		const isNumericIdLocal = /^\d+$/.test(parsedInputLocal);
+		const isSiteIdLocal = /^[a-zA-Z0-9_-]{3,50}$/.test(parsedInputLocal);
+		const idOkLocal = isNumericIdLocal || isSiteIdLocal;
+		
+		const amtOkLocal = /^\d*(?:\.\d+)?$/.test(parsedAmtLocal) && Number(parsedAmtLocal) > 0;
+		const canSubmitLocal = idOkLocal && amtOkLocal && !isSubmitting;
+		
+		if (!canSubmitLocal) {
 			return;
 		}
 		
 		setIsSubmitting(true);
 		setResult({ status: "idle" });
-		console.log('[Admin Points] Starting gold grant...');
 		
 		try {
-			const uid = userId.trim();
+			const inputValue = userInput.trim();
 			const amt = Number(amount);
-				const note = memo?.trim() || "admin:gold-grant";
-				const res: any = await withReconcile(async (idemKey: string) =>
-					unifiedApi.post(
-						`admin/users/${uid}/gold/grant`,
-						{ amount: amt, reason: note, idempotency_key: idemKey },
-						{ headers: { "X-Idempotency-Key": idemKey } }
-					)
-				);
+			const note = memo?.trim() || "admin:gold-grant";
+			
+			let targetUserId = inputValue;
+			
+			// site_id인 경우 숫자 user_id로 변환
+			if (!isNumericIdLocal) {
+				try {
+					// 관리자 사용자 목록에서 site_id로 검색
+					const userListResponse: any = await unifiedApi.get(`admin/users?skip=0&limit=100`);
+					
+					// 다양한 응답 구조를 시도
+					let users = [];
+					if (Array.isArray(userListResponse)) {
+						users = userListResponse;
+					} else if (userListResponse?.users) {
+						users = userListResponse.users;
+					} else if (userListResponse?.items) {
+						users = userListResponse.items;
+					} else if (userListResponse?.data) {
+						users = userListResponse.data;
+					} else {
+						users = [];
+					}
+					
+					const targetUser = users.find((u: any) => u.site_id === inputValue);
+					
+					if (!targetUser) {
+						// 사용자 목록에서 site_id들을 확인
+						const siteIds = users.map((u: any) => u.site_id).filter(Boolean);
+						
+						setResult({ 
+							status: "error", 
+							message: `❌ 사용자 "${inputValue}"를 찾을 수 없습니다. 사용 가능한 site_id: ${siteIds.join(', ')}` 
+						});
+						return;
+					}
+					
+					targetUserId = targetUser.id.toString();
+				} catch (searchError: any) {
+					console.error('[Admin Points] User search failed:', searchError);
+					setResult({ 
+						status: "error", 
+						message: `❌ 사용자 검색 중 오류: ${searchError?.message || 'Unknown error'}` 
+					});
+					return;
+				}
+			}
 
-				const rc = res?.receipt_code ? ` (영수증: ${res.receipt_code})` : "";
-				console.log('[Admin Points] Gold grant success:', res);
-				setResult({ 
-					status: "success", 
-					message: `✅ 골드 ${amt}G 지급 완료! 새 잔액: ${res?.new_gold_balance?.toLocaleString() || 'Unknown'}G${rc}` 
-				});
-			// 성공 후 폼 유지(감사 로그 용). 필요 시 초기화하려면 아래 주석 해제
-			// setUserId(""); setAmount(""); setMemo("");
+			// 골드 지급 실행
+			const res: any = await withReconcile(async (idemKey: string) =>
+				unifiedApi.post(
+					`admin/users/${targetUserId}/gold/grant`,
+					{ amount: amt, reason: note, idempotency_key: idemKey },
+					{ headers: { "X-Idempotency-Key": idemKey } }
+				)
+			);
+
+			const rc = res?.receipt_code ? ` (영수증: ${res.receipt_code})` : "";
+			setResult({ 
+				status: "success", 
+				message: `✅ 골드 ${amt}G 지급 완료! 새 잔액: ${res?.new_gold_balance?.toLocaleString() || 'Unknown'}G${rc}` 
+			});
+			
 		} catch (err: any) {
 			console.error('[Admin Points] Gold grant failed:', err);
 			const msg = err?.message || "지급 중 오류가 발생했습니다.";
@@ -122,7 +157,7 @@ export default function AdminPointsPage() {
 		} finally {
 			setIsSubmitting(false);
 		}
-		}, [canSubmit, userId, amount, memo, withReconcile]);
+	}, [userInput, amount, memo, withReconcile, isSubmitting]);
 
 	return (
 		<div className="min-h-[calc(100vh-4rem)] w-full px-4 py-6 md:px-8 lg:px-12">
@@ -140,23 +175,25 @@ export default function AdminPointsPage() {
 					관리자: 포인트/토큰 지급
 				</h1>
 				<p className="mb-6 text-sm text-muted-foreground">
-					특정 사용자에게 사이버 토큰을 지급합니다. 관리자 권한이 필요합니다.
+					특정 사용자에게 사이버 토큰을 지급합니다. 숫자 ID 또는 site_id로 사용자를 찾을 수 있습니다.
 				</p>
 
 				<Card className="border border-white/10 bg-black/30 p-5 shadow-xl backdrop-blur">
 					<div className="grid grid-cols-1 gap-4 md:grid-cols-2">
 						<div className="flex flex-col gap-2">
-							<Label htmlFor="user_id">사용자 ID</Label>
+							<Label htmlFor="user_input">사용자 ID 또는 site_id</Label>
 							<Input
-								data-testid="admin-points-user-id"
-								id="user_id"
+								data-testid="admin-points-user-input"
+								id="user_input"
 								type="text"
-								inputMode="numeric"
-								placeholder="예) 123"
-								value={userId}
-								onChange={(e: any) => setUserId((e.target as HTMLInputElement).value)}
-								onInput={(e: any) => setUserId((e.target as HTMLInputElement).value)}
+								placeholder="예) 123 또는 admin, user001"
+								value={userInput}
+								onChange={(e: any) => setUserInput((e.target as HTMLInputElement).value)}
+								onInput={(e: any) => setUserInput((e.target as HTMLInputElement).value)}
 							/>
+							<div className="text-xs text-gray-400">
+								숫자 ID (예: 123) 또는 site_id (예: admin, user001)
+							</div>
 						</div>
 						<div className="flex flex-col gap-2">
 							<Label htmlFor="amount">지급 수량</Label>
@@ -186,60 +223,23 @@ export default function AdminPointsPage() {
 					</div>
 
 					<div className="mt-5 flex items-center gap-3">
-						{/* 테스트 버튼 추가 */}
-						<button
-							type="button"
-							onClick={() => {
-								console.log('[Test] 일반 HTML 버튼 클릭됨!');
-								alert('일반 버튼 클릭 성공!');
-							}}
-							className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-						>
-							테스트 버튼
-						</button>
-
 						<Button
 							type="button"
 							data-testid="admin-points-submit"
 							onClick={(e: any) => {
 								e.preventDefault();
 								e.stopPropagation();
-								console.log('[Admin Points] Button click event triggered!', e);
-								console.log('[Admin Points] Event target:', e.target);
-								console.log('[Admin Points] Can submit check:', canSubmit);
-								if (canSubmit) {
-									console.log('[Admin Points] Calling handleSubmit...');
-									handleSubmit();
-								} else {
-									console.warn('[Admin Points] Cannot submit - button disabled');
-								}
+								handleSubmit();
 							}}
-							disabled={!canSubmit}
+							disabled={isSubmitting}
 							className="bg-gradient-to-r from-fuchsia-600 to-cyan-500 text-white hover:opacity-90 relative z-10 pointer-events-auto"
 							style={{ 
 								minHeight: '44px', 
-								minWidth: '120px',
-								cursor: canSubmit ? 'pointer' : 'not-allowed'
+								minWidth: '120px'
 							}}
 						>
 							{isSubmitting ? "지급 중..." : "포인트 지급"}
 						</Button>
-
-						{/* 디버깅 정보 표시 */}
-						<div className="text-xs text-gray-400 space-y-1">
-							<div>Debug: canSubmit={canSubmit.toString()}</div>
-							<div>- User ID Valid: {idOk.toString()} (value: "{parsedId}")</div>
-							<div>- Amount Valid: {amtOk.toString()} (value: "{parsedAmt}", number: {Number(parsedAmt)})</div>
-							<div>- Not Submitting: {(!isSubmitting).toString()}</div>
-							{!canSubmit && (
-								<div className="text-red-400 font-bold">
-									버튼 비활성화 이유: 
-									{!idOk && " [User ID 숫자 아님]"}
-									{!amtOk && " [Amount 양수 아님]"}
-									{isSubmitting && " [현재 제출 중]"}
-								</div>
-							)}
-						</div>
 
 						{result.status === "success" && (
 							<span className="text-sm text-emerald-400">{result.message}</span>
@@ -250,11 +250,12 @@ export default function AdminPointsPage() {
 					</div>
 				</Card>
 
-								<div className="mt-6 text-xs text-muted-foreground">
-									{/* eslint-disable-next-line react/no-unescaped-entities */}
-									• 백엔드: POST /api/admin/users/{"{user_id}"}/gold/grant (관리자 전용, 멱등키 지원)
-									<br />• 필수: amount(number) / 선택: reason(string), idempotency_key(string)
-								</div>
+				<div className="mt-6 text-xs text-muted-foreground">
+					{/* eslint-disable-next-line react/no-unescaped-entities */}
+					• 백엔드: POST /api/admin/users/{"{user_id}"}/gold/grant (관리자 전용, 멱등키 지원)
+					<br />• 필수: amount(number) / 선택: reason(string), idempotency_key(string)
+					<br />• 지원: 숫자 ID (예: 123) 또는 site_id (예: admin, user001, testuser)
+				</div>
 			</div>
 		</div>
 	);
