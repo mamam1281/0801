@@ -16,12 +16,12 @@ class ShopProduct(Base, SoftDeleteMixin):
     price = Column(Integer, nullable=False)  # base price in coins
     is_active = Column(Boolean, default=True)
     
-    # 교환권 시스템 관련 필드
-    voucher_type = Column(String(50), default='external')  # external, internal, bonus
-    external_service = Column(String(100))  # 외부 서비스 명 (예: "daily_comp", "charge_boost")
-    stock_total = Column(Integer, nullable=True)  # 총 재고 (unlimited면 null)
-    stock_remaining = Column(Integer, nullable=True)  # 남은 재고
-    per_user_limit = Column(Integer, nullable=True)  # 사용자당 구매 제한
+    # 교환권 시스템 관련 필드 - 임시 주석 처리 (DB 스키마 불일치)
+    # voucher_type = Column(String(50), default='external')  # external, internal, bonus
+    # external_service = Column(String(100))  # 외부 서비스 명 (예: "daily_comp", "charge_boost")
+    # stock_total = Column(Integer, nullable=True)  # 총 재고 (unlimited면 null)
+    # stock_remaining = Column(Integer, nullable=True)  # 남은 재고
+    # per_user_limit = Column(Integer, nullable=True)  # 사용자당 구매 제한
     
     # Avoid SQLAlchemy reserved attribute name 'metadata' on declarative models
     extra = Column(JSON)
