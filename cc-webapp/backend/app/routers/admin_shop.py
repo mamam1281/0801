@@ -90,7 +90,9 @@ async def create_shop_product(
     
     try:
         shop_service = ShopService(db)
-        product = await shop_service.create_product(product_data, admin_id=current_admin.id)
+        # SQLAlchemy 모델의 id 속성에서 실제 값 추출
+        admin_id = getattr(current_admin, 'id')
+        product = await shop_service.create_product(product_data, admin_id=admin_id)
         
         return product
     except ValueError as e:
@@ -113,7 +115,8 @@ async def update_shop_product(
     
     try:
         shop_service = ShopService(db)
-        product = await shop_service.update_product(product_id, product_data, admin_id=current_admin.id)
+        admin_id = getattr(current_admin, 'id')
+        product = await shop_service.update_product(product_id, product_data, admin_id=admin_id)
         
         if not product:
             raise HTTPException(status_code=404, detail="상품을 찾을 수 없습니다.")
@@ -140,7 +143,8 @@ async def delete_shop_product(
     
     try:
         shop_service = ShopService(db)
-        success = await shop_service.delete_product(product_id, admin_id=current_admin.id)
+        admin_id = getattr(current_admin, 'id')
+        success = await shop_service.delete_product(product_id, admin_id=admin_id)
         
         if not success:
             raise HTTPException(status_code=404, detail="상품을 찾을 수 없습니다.")
@@ -165,7 +169,8 @@ async def activate_product(
     
     try:
         shop_service = ShopService(db)
-        success = await shop_service.set_product_active(product_id, True, admin_id=current_admin.id)
+        admin_id = getattr(current_admin, 'id')
+        success = await shop_service.set_product_active(product_id, True, admin_id=admin_id)
         
         if not success:
             raise HTTPException(status_code=404, detail="상품을 찾을 수 없습니다.")
@@ -190,7 +195,8 @@ async def deactivate_product(
     
     try:
         shop_service = ShopService(db)
-        success = await shop_service.set_product_active(product_id, False, admin_id=current_admin.id)
+        admin_id = getattr(current_admin, 'id')
+        success = await shop_service.set_product_active(product_id, False, admin_id=admin_id)
         
         if not success:
             raise HTTPException(status_code=404, detail="상품을 찾을 수 없습니다.")

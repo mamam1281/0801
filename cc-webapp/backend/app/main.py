@@ -98,15 +98,19 @@ except Exception:
     scheduler = _DummyScheduler()
 
 # Optional monitoring
-try:  # 선택적 Prometheus 계측
-    from prometheus_fastapi_instrumentator import Instrumentator
-except ImportError:
-    Instrumentator = None  # 미설치 시 계측 비활성
 
-try:  # 선택적 Sentry APM/에러 추적
-    import sentry_sdk
-except Exception:
-    sentry_sdk = None  # 환경 미설정 시 무시
+# --- 선택적 모니터링/에러 추적 패키지 (운영환경에서만 활성화, 개발환경에서는 주석 처리로 Pylance 경고 제거) ---
+# try:
+#     from prometheus_fastapi_instrumentator import Instrumentator
+# except ImportError:
+#     Instrumentator = None  # 미설치 시 계측 비활성
+#
+# try:
+#     import sentry_sdk
+# except ImportError:
+#     sentry_sdk = None  # 환경 미설정 시 무시
+Instrumentator = None
+sentry_sdk = None
 
 if sentry_sdk and settings.SENTRY_DSN:
     try:

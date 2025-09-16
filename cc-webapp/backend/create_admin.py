@@ -2,41 +2,42 @@
 관리자 계정 생성 스크립트
 """
 import asyncio
-import sys
 import os
-
-# 현재 디렉토리를 Python 경로에 추가
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-
-from app.core.config import settings
-from app.models import User
-from app.core.auth import get_password_hash
-from app.core.database import SessionLocal
+import sys
 from datetime import datetime
+
+# app 패키지 경로 추가 (이 스크립트 위치 기준)
+APP_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'app')
+if APP_PATH not in sys.path:
+    sys.path.insert(0, APP_PATH)
+
+from app.database import SessionLocal  # type: ignore
+from app.services.auth_service import AuthService  # type: ignore
+from app.models.auth_models import User  # type: ignore
 
 async def create_admin_user():
     """관리자 사용자 생성"""
     db = SessionLocal()
     try:
         # 기존 관리자 계정 확인
-        admin_user = db.query(User).filter(User.email == 'admin@casino-club.com').first()
+        admin_user = db.query(User).filter(User.site_id == 'admin').first()
         
         if admin_user:
             # 기존 계정 업데이트
-            admin_user.password_hash = get_password_hash('admin123!')
-            admin_user.vip_tier = 'ADMIN'
-            admin_user.is_active = True
+            setattr(admin_user, 'password_hash', AuthService.get_password_hash('admin123!'))
+            setattr(admin_user, 'user_rank', 'ADMIN')
+            setattr(admin_user, 'is_active', True)
             db.commit()
             print('✅ 기존 관리자 계정이 업데이트되었습니다.')
         else:
             # 새 관리자 계정 생성
             admin_user = User(
-                email='admin@casino-club.com',
+                site_id='admin',
                 nickname='관리자',
-                password_hash=get_password_hash('admin123!'),
-                vip_tier='ADMIN',
-                total_spent=0,
-                battlepass_level=1,
+                phone_number='01000000000',
+                password_hash=AuthService.get_password_hash('admin123!'),
+                invite_code='5858',
+                user_rank='ADMIN',
                 is_active=True,
                 created_at=datetime.utcnow()
             )
@@ -45,9 +46,9 @@ async def create_admin_user():
             db.refresh(admin_user)
             print('✅ 새 관리자 계정이 생성되었습니다.')
         
-        print(f'📧 이메일: admin@casino-club.com')
+        print(f'� 사이트 ID: admin')
         print(f'🔑 비밀번호: admin123!')
-        print(f'👑 VIP 등급: {admin_user.vip_tier}')
+        print(f'👑 VIP 등급: {admin_user.user_rank}')
         print(f'🆔 사용자 ID: {admin_user.id}')
         
         return admin_user

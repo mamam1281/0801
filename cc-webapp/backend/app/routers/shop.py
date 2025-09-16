@@ -92,6 +92,19 @@ from fastapi import Request, BackgroundTasks
 
 logger = logging.getLogger(__name__)
 
+# 안전 캐스팅/기본값 유틸리티
+def _to_int(x, default: int = 0) -> int:
+    try:
+        if isinstance(x, bool):
+            return int(x)
+        if isinstance(x, (int,)):
+            return x
+        if x is None:
+            return default
+        return int(str(x))
+    except Exception:
+        return default
+
 # --- Metrics (best-effort; 실패시 무시) ---
 try:
     from prometheus_client import Counter  # type: ignore
@@ -156,16 +169,22 @@ def list_shop_products(db: Session = Depends(get_db)):
     """List active shop products from shop_products table"""
     from sqlalchemy.orm import Session
     from ..models.shop_models import ShopProduct
-    
-    products = db.query(ShopProduct).filter(ShopProduct.is_active == True).order_by(ShopProduct.price).all()
-    return [ShopProductOut(
-        id=p.id,
-        product_id=p.product_id,
-        name=p.name,
-        description=p.description,
-        price=p.price,
-        is_active=p.is_active
-    ) for p in products]
+    try:
+        products = db.query(ShopProduct).filter(ShopProduct.is_active == True).order_by(ShopProduct.price).all()
+        result = []
+        for p in products:
+            result.append(ShopProductOut(
+                id=int(getattr(p, 'id', 0) or 0),
+                product_id=str(getattr(p, 'product_id', '') or ''),
+                name=str(getattr(p, 'name', '') or ''),
+                description=str(getattr(p, 'description', '') or ''),
+                price=int(getattr(p, 'price', 0) or 0),
+                is_active=bool(getattr(p, 'is_active', False) or False)
+            ))
+        return result
+    except Exception as e:
+        logger.error(f"shop products error: {e}")
+        raise HTTPException(status_code=500, detail=f"상품 목록 조회 중 오류: {e}")
 
 # -----------------
 # Admin ShopProduct CRUD (soft delete)
@@ -187,7 +206,7 @@ class ShopProductUpdate(BaseModel):
 
 @router.post("/admin/products", response_model=ShopProductCreate)
 def admin_create_product(data: ShopProductCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    if not current_user.is_admin:
+    if not getattr(current_user, 'is_admin', False):
         raise HTTPException(status_code=403, detail="권한 없음")
     exists = db.query(ShopProduct).filter(ShopProduct.product_id == data.product_id).first()
     if exists:
@@ -199,7 +218,7 @@ def admin_create_product(data: ShopProductCreate, db: Session = Depends(get_db),
 
 @router.get("/admin/products", summary="List products (soft delete aware)")
 def admin_list_products(include_deleted: bool = Query(False), db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    if not current_user.is_admin:
+    if not getattr(current_user, 'is_admin', False):
         raise HTTPException(status_code=403, detail="권한 없음")
     q = db.query(ShopProduct)
     if not include_deleted:
@@ -216,7 +235,7 @@ def admin_list_products(include_deleted: bool = Query(False), db: Session = Depe
 
 @router.put("/admin/products/{product_id}")
 def admin_update_product(product_id: str, data: ShopProductUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    if not current_user.is_admin:
+    if not getattr(current_user, 'is_admin', False):
         raise HTTPException(status_code=403, detail="권한 없음")
     p = db.query(ShopProduct).filter(ShopProduct.product_id == product_id).first()
     if not p:
@@ -228,7 +247,7 @@ def admin_update_product(product_id: str, data: ShopProductUpdate, db: Session =
 
 @router.delete("/admin/products/{product_id}")
 def admin_soft_delete_product(product_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    if not current_user.is_admin:
+    if not getattr(current_user, 'is_admin', False):
         raise HTTPException(status_code=403, detail="권한 없음")
     p = db.query(ShopProduct).filter(ShopProduct.product_id == product_id).first()
     if not p:
@@ -241,7 +260,7 @@ def admin_soft_delete_product(product_id: str, db: Session = Depends(get_db), cu
 
 @router.post("/admin/products/{product_id}/restore")
 def admin_restore_product(product_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    if not current_user.is_admin:
+    if not getattr(current_user, 'is_admin', False):
         raise HTTPException(status_code=403, detail="권한 없음")
     p = db.query(ShopProduct).filter(ShopProduct.product_id == product_id).first()
     if not p:
@@ -371,7 +390,13 @@ def buy_limited_compat(req: LimitedBuyCompatRequest, *, db = Depends(get_db), ba
                 card_uniques = scard_fn(skey)
             else:
                 card_uniques = 0
-            if count >= FRAUD_MAX_COUNT or card_uniques >= FRAUD_MAX_CARD_UNIQUE:
+            _count_i = 0
+            try:
+                _count_i = int(count or 0)
+            except Exception:
+                _count_i = 0
+            _card_uniques_i = _to_int(card_uniques, 0)
+            if _count_i >= int(FRAUD_MAX_COUNT) or _card_uniques_i >= int(FRAUD_MAX_CARD_UNIQUE):
                 _metric_inc("limited", "fail", "FRAUD_BLOCK")
                 try:
                     db.add(models.ShopTransaction(
@@ -384,7 +409,7 @@ def buy_limited_compat(req: LimitedBuyCompatRequest, *, db = Depends(get_db), ba
                         payment_method="card" if req.card_token else "unknown",
                         status="failed",
                         failure_reason="fraud_velocity_threshold",
-                        extra={"limited": True, "reason": "FRAUD_BLOCK", "count_5m": int(count), "cards_5m": int(card_uniques)},
+                        extra={"limited": True, "reason": "FRAUD_BLOCK", "count_5m": _count_i, "cards_5m": _card_uniques_i},
                     ))
                     db.commit()
                 except Exception:
@@ -405,7 +430,7 @@ def buy_limited_compat(req: LimitedBuyCompatRequest, *, db = Depends(get_db), ba
                         background_tasks.add_task(broadcast_purchase_update, user_id, status="idempotent_reuse", product_id=pkg.code)
                 except Exception:
                     pass
-                return LimitedBuyReceipt(success=True, message="중복 요청 처리됨", user_id=user_id, code=pkg.code)
+                return LimitedBuyReceipt(success=True, message="중복 요청 처리됨", user_id=user_id, code=pkg.code, reason_code="IDEMPOTENT_HIT")
         except Exception:
             pass
 
@@ -647,6 +672,7 @@ def buy_limited_compat(req: LimitedBuyCompatRequest, *, db = Depends(get_db), ba
         new_gold_balance=new_gold_balance,
         charge_id=cap.charge_id,
         receipt_code=receipt_code,
+        reason_code=None,
     )
     return resp
  
@@ -799,7 +825,7 @@ def purchase_shop_item(
             resp = ShopPurchaseResponse(
                 success=False,
                 message=result["message"],
-                new_gold_balance=result.get("new_gold_balance") or result.get("new_balance"),
+                new_gold_balance=_to_int(result.get("new_gold_balance") or result.get("new_balance"), 0),
                 item_id=request.item_id,
                 item_name=request.item_name,
                 new_item_count=0
@@ -815,7 +841,7 @@ def purchase_shop_item(
         resp = ShopPurchaseResponse(
             success=True,
             message=result["message"],
-            new_gold_balance=result.get("new_gold_balance") or result.get("new_balance"),
+            new_gold_balance=_to_int(result.get("new_gold_balance") or result.get("new_balance"), 0),
             item_id=result["item_id"],
             item_name=result["item_name"],
             new_item_count=result["new_item_count"]
@@ -932,6 +958,9 @@ def buy(
         from app.services.currency_service import CurrencyService, InsufficientBalanceError
         cur_svc = CurrencyService(db)
         currency_mode = 'gem'  # 향후 req.payload 확장으로 선택 가능
+        # 금액 보정: None 방지
+        if req.amount is None:
+            req.amount = 0
         try:
             new_bal = cur_svc.deduct(req_user_id, req.amount, 'gem' if currency_mode == 'gem' else 'coin')
         except InsufficientBalanceError as ie:
@@ -957,7 +986,7 @@ def buy(
             user_id=req_user_id,
             item_id=0,
             item_name=req.item_name or req.product_id,
-            price=req.amount,
+            price=int(req.amount),
             description=None,
             product_id=req.product_id,
         )
@@ -1189,10 +1218,12 @@ def buy(
         # Update to failed
         db_tx = existing_tx or shop_svc.get_tx_by_receipt_for_user(req_user_id, receipt_code)
         if db_tx:
-            db_tx.status = 'failed'
-            if idem and not getattr(db_tx, 'idempotency_key', None):
-                try: db_tx.idempotency_key = idem
-                except Exception: pass
+            try:
+                setattr(db_tx, 'status', 'failed')
+                if idem and not getattr(db_tx, 'idempotency_key', None):
+                    setattr(db_tx, 'idempotency_key', idem)
+            except Exception:
+                pass
             try:
                 db.commit()
             except Exception:
@@ -1234,10 +1265,17 @@ def buy(
         try:
             db_tx = existing_tx or shop_svc.get_tx_by_receipt_for_user(req_user_id, receipt_code)
             if db_tx:
-                if not isinstance(db_tx.extra, dict):
-                    db_tx.extra = {"currency": req.currency}
-                db_tx.extra.setdefault('currency', req.currency)
-                db_tx.extra['gateway_reference'] = pres.get('gateway_reference')
+                try:
+                    current_extra = getattr(db_tx, 'extra', None)
+                    if not isinstance(current_extra, dict):
+                        current_extra = {"currency": str(req.currency) if req.currency is not None else "USD"}
+                    # ensure string values for JSON-like storage
+                    current_extra.setdefault('currency', str(req.currency) if req.currency is not None else "USD")
+                    gw_ref_val = pres.get('gateway_reference') if isinstance(pres, dict) else None
+                    current_extra['gateway_reference'] = str(gw_ref_val) if gw_ref_val is not None else ""
+                    setattr(db_tx, 'extra', current_extra)
+                except Exception:
+                    pass
                 db.commit()
         except Exception:
             db.rollback()
@@ -1295,12 +1333,15 @@ def buy(
         # mark success
     db_tx = existing_tx or shop_svc.get_tx_by_receipt_for_user(req_user_id, receipt_code)
     if db_tx:
-        db_tx.status = 'success'
+        try:
+            setattr(db_tx, 'status', 'success')
+        except Exception:
+            pass
         try:
             # store idempotency key if not already (for reuse)
             if idem and not getattr(db_tx, 'idempotency_key', None):
                 try:
-                    db_tx.idempotency_key = idem
+                    setattr(db_tx, 'idempotency_key', idem)
                 except Exception:
                     pass
             db.commit()
@@ -1353,7 +1394,7 @@ def settle_my_transaction(receipt: str, *, db = Depends(get_db), current_user = 
         if status and background_tasks is not None:
             background_tasks.add_task(broadcast_purchase_update, current_user.id, status=status, receipt_code=receipt)
             if status == "success" and res.get("new_balance") is not None:
-                background_tasks.add_task(broadcast_profile_update, current_user.id, {"gold_balance": int(res.get("new_balance"))})
+                background_tasks.add_task(broadcast_profile_update, current_user.id, {"gold_balance": _to_int(res.get("new_balance"), 0)})
     except Exception:
         pass
     return res
@@ -1371,7 +1412,7 @@ def list_limited_catalog(db = Depends(get_db)):
     summary="Buy limited-time package (compat)",
     operation_id="compat_buy_limited_package_legacy",
 )
-def buy_limited_compat(req: LegacyLimitedBuyRequest, db = Depends(get_db)):
+def buy_limited_compat_legacy(req: LegacyLimitedBuyRequest, db = Depends(get_db)):
     # Map to new endpoint using explicit user context
     # Authenticate as provided user_id for test compatibility
     user = db.query(models.User).filter(models.User.id == req.user_id).first()
@@ -1386,7 +1427,9 @@ def buy_limited_compat(req: LegacyLimitedBuyRequest, db = Depends(get_db)):
         idempotency_key=req.idempotency_key,
     )
     # Call core handler by temporarily faking current_user dependency
-    res = buy_limited(mapped, db=db, current_user=user)  # background_tasks는 없음
+    # background_tasks가 필수 파라미터이므로 None 전달
+    from fastapi import BackgroundTasks as _BT
+    res = buy_limited(mapped, db=db, current_user=user, background_tasks=_BT())  # background_tasks는 없음
     # Map certain failures to HTTP status codes expected by legacy tests
     if isinstance(res, LimitedBuyReceipt) and not res.success:
         code_map = {
@@ -1440,7 +1483,7 @@ def buy_limited(req: LimitedBuyRequest, *, db = Depends(get_db), current_user = 
             cnt = incr_fn(rl_key) if callable(incr_fn) else 1
             if cnt == 1 and callable(expire_fn):
                 expire_fn(rl_key, 10)
-            if cnt > 5:
+            if _to_int(cnt, 0) > 5:
                 rate_limited = True
                 _metric_inc("limited", "fail", "RATE_LIMIT")
                 return LimitedBuyReceipt(success=False, message="Rate limit exceeded", user_id=user_id, code=req.package_id, reason_code="RATE_LIMIT")
@@ -1454,7 +1497,7 @@ def buy_limited(req: LimitedBuyRequest, *, db = Depends(get_db), current_user = 
             if callable(exists_fn) and exists_fn(_idem_key(user_id, req.package_id, idem)):
                 # 이미 성공 처리됨
                 cur_user = db.query(models.User).filter(models.User.id == user_id).first()
-                return LimitedBuyReceipt(success=True, message="중복 요청 처리됨", user_id=user_id, code=req.package_id, new_gold_balance=getattr(cur_user, 'gold_balance', 0) if cur_user else None)
+                return LimitedBuyReceipt(success=True, message="중복 요청 처리됨", user_id=user_id, code=req.package_id, new_gold_balance=getattr(cur_user, 'gold_balance', 0) if cur_user else 0, reason_code="IDEMPOTENT_HIT")
             # pre-lock 획득 시도
             set_fn = getattr(rman.redis_client, 'set', None)
             ok = set_fn(_idem_lock_key(user_id, req.package_id, idem), "1", nx=True, ex=60) if callable(set_fn) else True
@@ -1622,7 +1665,7 @@ def buy_limited(req: LimitedBuyRequest, *, db = Depends(get_db), current_user = 
             cnt = incr_fn(rl_key) if callable(incr_fn) else 1
             if cnt == 1 and callable(expire_fn):
                 expire_fn(rl_key, 10)
-            if cnt > 5:
+            if _to_int(cnt, 0) > 5:
                 _metric_inc("limited", "fail", "RATE_LIMIT")
                 return LimitedBuyReceipt(success=False, message="Rate limit exceeded", user_id=user_id, code=req.package_id, reason_code="RATE_LIMIT")
         except Exception:
@@ -1794,6 +1837,7 @@ def buy_limited(req: LimitedBuyRequest, *, db = Depends(get_db), current_user = 
     new_gold_balance=new_gold_balance,
         charge_id=cap.charge_id,
         receipt_code=receipt_code,
+        reason_code=None,
     )
     # remove hold after successful finalize
     try:
