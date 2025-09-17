@@ -7,6 +7,26 @@ os.environ["CLICKHOUSE_ENABLED"] = "0"
 os.environ["DISABLE_SCHEMA_DRIFT_GUARD"] = "1"
 
 # --- FastAPI app 라이프사이클 중 블로킹 요소 노옵 패치 ---
+import os
+import sys
+import pytest
+from types import SimpleNamespace
+from fastapi.testclient import TestClient
+
+# --- pytest 시작 전 외부 의존 비활성화(블로킹 방지) ---
+# Settings/import 이전에 환경 변수를 강제로 덮어써서 lifespan 초기화 중 대기 제거
+os.environ["KAFKA_ENABLED"] = "0"
+os.environ["CLICKHOUSE_ENABLED"] = "0"
+# 스타트업 스키마 드리프트 검사 비활성화(테스트 본문에서 별도 가드로 검증)
+os.environ["DISABLE_SCHEMA_DRIFT_GUARD"] = "1"
+
+# Add backend root to sys.path if missing (when pytest launched from repo root)
+_here = os.path.dirname(__file__)
+_backend_root = os.path.abspath(os.path.join(_here, "..", ".."))
+if _backend_root not in sys.path:
+	sys.path.insert(0, _backend_root)
+
+# --- FastAPI app 라이프사이클 중 블로킹 요소 노옵 패치 ---
 try:
 	import app.main as _main_mod  # type: ignore
 	# 스케줄러 기동 차단
@@ -17,20 +37,12 @@ try:
 	_main_mod.start_consumer = _noop_async  # type: ignore[attr-defined]
 	_main_mod.stop_consumer = _noop_async  # type: ignore[attr-defined]
 except Exception:
+	# 실패해도 테스트는 계속 진행 (기본 lifespan 사용)
 	pass
-from types import SimpleNamespace
-from fastapi.testclient import TestClient
-from types import SimpleNamespace
 
-# Add backend root to sys.path if missing (when pytest launched from repo root)
-_here = os.path.dirname(__file__)
-_backend_root = os.path.abspath(os.path.join(_here, "..", ".."))
-if _backend_root not in sys.path:
-	sys.path.insert(0, _backend_root)
-
-# Ensure DB tables exist for tests
 from app.database import Base, engine  # noqa: E402
 from app.main import app as fastapi_app  # noqa: E402
+
 # 테스트 시 FastAPI lifespan(startup/shutdown) 완전 무력화 옵션
 try:
 	if os.getenv("TEST_DISABLE_LIFESPAN", "1") == "1":
@@ -48,21 +60,9 @@ try:
 except Exception:
 	# 실패해도 테스트는 계속 진행 (기본 lifespan 사용)
 	pass
-try:
-	from app.routers.admin_content import require_admin as _require_admin  # noqa: E402
-	# Ensure admin dependency always passes during tests (isolated persistence tests)
-	fastapi_app.dependency_overrides[_require_admin] = lambda: SimpleNamespace(is_admin=True, id=0)
-except Exception:
-	pass
+
 from sqlalchemy import text as _text  # 추가: 컬럼 보강용
 import app.models  # noqa: F401, E402 - register all models on Base
-
-
-try:
-	from app.main import app as _app_reload  # noqa
-except Exception:
-	pass
-
 
 @pytest.fixture(scope="session", autouse=True)
 def _ensure_schema():
@@ -96,28 +96,13 @@ def _ensure_schema():
 
 	try:
 		_dialect = engine.url.get_backend_name()
-<<<<<<< HEAD
-		# Postgres: entrypoint에서 이미 alembic upgrade head 수행 → 테스트에서는 기본 skip
-		# 필요 시 TEST_FORCE_ALEMBIC=1 로 강제 실행
-		if _dialect == "postgresql":
-			if os.getenv("TEST_FORCE_ALEMBIC", "0") == "1":
-				from alembic.config import Config
-				from alembic import command
-				cfg = Config("alembic.ini")
-				command.upgrade(cfg, "head")
-		else:
-			# SQLite 등에서는 간단히 head까지 올려 테스트 스키마 보장
-=======
-
-		# Postgres에서는 컨테이너 entrypoint에서 이미 upgrade head가 수행됨.
-		# 테스트 중에는 잠재적 락/경합을 피하기 위해 기본적으로 Alembic upgrade를 건너뜀.
-		# 강제 필요 시 TEST_FORCE_ALEMBIC=1로 재활성화.
+		# Alembic upgrade 정책:
+		# - PostgreSQL: 기본 skip (엔트리포인트에서 수행 가정). TEST_FORCE_ALEMBIC=1일 때만 수행.
+		# - 그 외(SQLite 등): head까지 올려 테스트 스키마 보장.
 		do_upgrade = True
 		if _dialect == "postgresql":
 			do_upgrade = os.getenv("TEST_FORCE_ALEMBIC", "0") == "1"
-
 		if do_upgrade:
->>>>>>> copilot/vscode1756626445491
 			from alembic.config import Config
 			from alembic import command
 			cfg = Config("alembic.ini")

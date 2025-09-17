@@ -9,37 +9,6 @@ from pydantic import BaseModel, Field
 from datetime import datetime
 import uuid
 
-# 프라이즈 룰렛 스키마 정의
-class Prize(BaseModel):
-   class CrashBetResponse(BaseModel):
-    """크래시 게임 베팅 응답 모델"""
-    success: bool
-    game_id: str
-    bet_amount: int
-    potential_win: int
-    max_multiplier: Optional[float] = None
-    message: str
-    balance: int
-    status: Optional[str] = Field(default=None, description="베팅 직후 상태 placed|auto_cashed|active 등")
-    simulated_max_win: Optional[int] = Field(default=None, description="UI 표시용 – 현재 multiplier 기반 가상의 최대 승리금 (auto_cashout 미지정 시 안내)")
-    win_amount: Optional[int] = Field(default=None, description="실제 획득 금액")
-
-
-class CrashCashoutRequest(BaseModel):
-    """크래시 게임 수동 캐시아웃 요청 모델"""
-    game_id: str
-    multiplier: float
-
-
-class CrashCashoutResponse(BaseModel):
-    """크래시 게임 수동 캐시아웃 응답 모델"""
-    success: bool
-    game_id: str
-    cashout_multiplier: float
-    win_amount: int
-    balance: int
-    message: str
-
 
 class Prize(BaseModel):
     """상품 모델"""
@@ -324,3 +293,19 @@ class CrashBetResponse(BaseModel):
     balance: int
     status: Optional[str] = Field(default=None, description="베팅 직후 상태 placed|auto_cashed|active 등")
     simulated_max_win: Optional[int] = Field(default=None, description="UI 표시용 – 현재 multiplier 기반 가상의 최대 승리금 (auto_cashout 미지정 시 안내)")
+
+
+class CrashCashoutRequest(BaseModel):
+    """크래시 게임 수동 캐시아웃 요청 모델"""
+    game_id: str
+    multiplier: float
+
+
+class CrashCashoutResponse(BaseModel):
+    """크래시 게임 수동 캐시아웃 응답 모델"""
+    success: bool
+    game_id: str
+    cashout_multiplier: float
+    win_amount: int
+    balance: int
+    message: str

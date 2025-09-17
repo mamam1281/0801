@@ -11,6 +11,11 @@ from ..database import get_db
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import func
+
+def _safe_attr(obj, attr: str, default=None):
+    """SQLAlchemy Column 타입을 안전하게 추출"""
+    return getattr(obj, attr, default) or default
+
 from ..utils.redis import (
     update_streak_counter,
     get_streak_counter,
@@ -106,7 +111,7 @@ async def tick(
             loop = asyncio.get_event_loop()
             if loop.is_running():
                 loop.create_task(broadcast_streak_update(
-                    user_id=current_user.id,
+                    user_id=getattr(current_user, 'id', 0),
                     action_type=action_type,
                     streak_count=cnt
                 ))
@@ -292,27 +297,27 @@ async def claim(
         raise HTTPException(status_code=500, detail="Streak 업데이트 실패")
     # 멱등키: user_id + action_type + UTC date
     claim_day = datetime.utcnow().date().isoformat()
-    idempotency_key = f"streak:{current_user.id}:{action_type}:{claim_day}"
+    idempotency_key = f"streak:{getattr(current_user, 'id', 0)}:{action_type}:{claim_day}"
 
     # Redis/DB 멱등: Redis 플래그(선택적) 우선 확인 (존재 시 DB 조회 생략 가능)
     from app.utils.redis import get_redis
     try:
         r = get_redis()
-        redis_flag_key = f"streak_claimed:{current_user.id}:{action_type}:{claim_day}"
-        if r.get(redis_flag_key):
+        redis_flag_key = f"streak_claimed:{getattr(current_user, 'id', 0)}:{action_type}:{claim_day}"
+        if r and r.get(redis_flag_key):
             existing = (
                 db.query(UserReward)
-                .filter(UserReward.user_id == current_user.id, UserReward.idempotency_key == idempotency_key)
+                .filter(UserReward.user_id == getattr(current_user, 'id', 0), UserReward.idempotency_key == idempotency_key)
                 .first()
             )
             if existing:
                 return StreakClaimResponse(
                     action_type=action_type,
                     streak_count=streak_count,
-                    awarded_gold=existing.gold_amount or 0,
-                    awarded_xp=existing.xp_amount or 0,
-                    new_gold_balance=current_user.gold_balance,
-                    claimed_at=existing.claimed_at,
+                    awarded_gold=getattr(existing, 'gold_amount', 0) or 0,
+                    awarded_xp=getattr(existing, 'xp_amount', 0) or 0,
+                    new_gold_balance=getattr(current_user, 'gold_balance', 0),
+                    claimed_at=getattr(existing, 'claimed_at', None) or datetime.utcnow(),
                 )
     except Exception:
         pass
@@ -320,17 +325,17 @@ async def claim(
     # 이미 동일 날 보상 지급된 경우 DB user_rewards 조회
     existing = (
         db.query(UserReward)
-        .filter(UserReward.user_id == current_user.id, UserReward.idempotency_key == idempotency_key)
+        .filter(UserReward.user_id == getattr(current_user, 'id', 0), UserReward.idempotency_key == idempotency_key)
         .first()
     )
     if existing:
         return StreakClaimResponse(
             action_type=action_type,
             streak_count=streak_count,
-            awarded_gold=existing.gold_amount or 0,
-            awarded_xp=existing.xp_amount or 0,
-            new_gold_balance=current_user.gold_balance,
-            claimed_at=existing.claimed_at,
+            awarded_gold=getattr(existing, 'gold_amount', 0) or 0,
+            awarded_xp=getattr(existing, 'xp_amount', 0) or 0,
+            new_gold_balance=getattr(current_user, 'gold_balance', 0),
+            claimed_at=getattr(existing, 'claimed_at', None) or datetime.utcnow(),
         )
 
     # 새로운 선형 보상 시스템으로 보상 계산
@@ -419,19 +424,19 @@ async def claim(
         loop = asyncio.get_event_loop()
         if loop.is_running():
             loop.create_task(broadcast_reward_granted(
-                user_id=current_user.id,
+                user_id=getattr(current_user, 'id', 0),
                 reward_type="streak_daily",
                 amount=gold,
-                balance_after=current_user.gold_balance
+                balance_after=getattr(current_user, 'gold_balance', 0)
             ))
             
             # 프로필 변경 알림 (골드 + 경험치)
-            profile_changes = {"gold_balance": current_user.gold_balance}
-            if hasattr(orm_user, 'experience'):
-                profile_changes["experience"] = orm_user.experience
+            profile_changes = {"gold_balance": getattr(current_user, 'gold_balance', 0)}
+            if hasattr(orm_user, 'experience') and orm_user is not None:
+                profile_changes["experience"] = getattr(orm_user, 'experience', 0)
             
             loop.create_task(broadcast_profile_update(
-                user_id=current_user.id,
+                user_id=getattr(current_user, 'id', 0),
                 changes=profile_changes
             ))
     except Exception as e:
@@ -443,12 +448,12 @@ async def claim(
             logger.info(
                 "[streak.claim] success",
                 extra={
-                    "user_id": current_user.id,
+                    "user_id": getattr(current_user, 'id', 0),
                     "action_type": action_type,
                     "streak_count": streak_count,
                     "gold": gold,
                     "xp": xp,
-                    "new_gold_balance": getattr(current_user, 'gold_balance', None),
+                    "new_gold_balance": getattr(current_user, 'gold_balance', 0),
                 },
             )
         except Exception:
@@ -459,8 +464,8 @@ async def claim(
         streak_count=streak_count,
         awarded_gold=gold,
         awarded_xp=xp,
-        new_gold_balance=current_user.gold_balance,
-        claimed_at=reward.claimed_at,
+        new_gold_balance=getattr(current_user, 'gold_balance', 0),
+        claimed_at=getattr(reward, 'claimed_at', None) or datetime.utcnow(),
     )
 class ProtectionRequest(BaseModel):
     action_type: Optional[str] = None

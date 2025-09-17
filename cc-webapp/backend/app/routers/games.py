@@ -19,6 +19,10 @@ from ..services.achievement_service import AchievementService
 from ..services.auth_service import AuthService
 from pydantic import BaseModel, ConfigDict
 
+def _safe_user_id(user: User) -> int:
+    """SQLAlchemy Column[int] 타입을 안전하게 int로 변환"""
+    return getattr(user, "id", 0) or 0
+
 def _lazy_broadcast_game_session_event():
     try:
         from app import main  # type: ignore
@@ -190,7 +194,7 @@ def list_achievements(db: Session = Depends(get_db)):
 @router.get("/achievements/my", response_model=AchievementProgressResponse)
 def my_achievements(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     svc = AchievementService(db)
-    items = [AchievementProgressItem(**row) for row in svc.user_progress(current_user.id)]
+    items = [AchievementProgressItem(**row) for row in svc.user_progress(_safe_user_id(current_user))]
     return {"items": items}
 
 # ----------------------------- GameHistory 기반 통계 스키마 -----------------------------
@@ -229,6 +233,8 @@ class FollowListItem(BaseModel):
 class FollowListResponse(BaseModel):
     total: int
     items: List[FollowListItem]
+    limit: Optional[int] = None
+    offset: Optional[int] = None
 
 # ----------------------------- Game Session API -----------------------------
 class GameSessionStartResponse(BaseModel):
@@ -317,9 +323,9 @@ async def user_game_ws(
         if not user:
             await websocket.close(code=4403)
             return
-        await hub.register_user(user.id, websocket)
+        await hub.register_user(_safe_user_id(user), websocket)
         # 간단한 hello
-        await websocket.send_json({"type": "ws_ack", "user_id": user.id})
+        await websocket.send_json({"type": "ws_ack", "user_id": _safe_user_id(user)})
         while True:
             try:
                 _ = await websocket.receive_text()
@@ -331,7 +337,7 @@ async def user_game_ws(
     finally:
         if user:
             try:
-                await hub.unregister_user(user.id, websocket)
+                await hub.unregister_user(_safe_user_id(user), websocket)
             except Exception:
                 pass
         await websocket.close()
@@ -390,7 +396,7 @@ def get_basic_stats(
 ):
     from ..services.stats_service import GameStatsService  # lazy import
     if user_scope:
-        items = GameStatsService(db).basic_stats(user_id=current_user.id, game_type=game_type)
+        items = GameStatsService(db).basic_stats(user_id=_safe_user_id(current_user), game_type=game_type)
     else:
         if not getattr(current_user, "is_admin", False):
             raise HTTPException(status_code=403, detail="admin required")
@@ -430,25 +436,26 @@ async def start_game_session(
     # GameHistory 기록
     log_game_history(
         db,
-        user_id=current_user.id,
+        user_id=_safe_user_id(current_user),
         game_type=payload.game_type,
         action_type="SESSION_START",
-        session_id=session_row.id,
+        session_id=getattr(session_row, 'id', None),
         result_meta={"external_session_id": ext_id, "bet_amount": payload.bet_amount or 0}
     )
     db.refresh(session_row)
     # 브로드캐스트
     try:
         broadcast_game_session_event = _lazy_broadcast_game_session_event()
-        await broadcast_game_session_event({
-            "event": "start",
-            "session_id": session_row.id,
-            "external_session_id": ext_id,
-            "user_id": current_user.id,
-            "game_type": payload.game_type,
-            "bet_amount": payload.bet_amount or 0,
-            "ts": now.isoformat()
-        })
+        if broadcast_game_session_event:
+            await broadcast_game_session_event({
+                "event": "start",
+                "session_id": getattr(session_row, 'id', None),
+                "external_session_id": ext_id,
+                "user_id": _safe_user_id(current_user),
+                "game_type": payload.game_type,
+                "bet_amount": payload.bet_amount or 0,
+                "ts": now.isoformat()
+            })
     except Exception:
         pass
     return {
@@ -483,15 +490,15 @@ async def end_game_session(
     ).first()
     if not session_row:
         raise HTTPException(status_code=404, detail="Session not found")
-    if session_row.status != "active":
+    if getattr(session_row, 'status', '') != "active":
         raise HTTPException(status_code=409, detail="Session already ended")
 
     now = datetime.utcnow()
-    session_row.end_time = now
-    session_row.status = "ended"
-    session_row.total_rounds = payload.rounds_played
-    session_row.total_bet = payload.total_bet
-    session_row.total_win = payload.total_win
+    setattr(session_row, 'end_time', now)
+    setattr(session_row, 'status', "ended")
+    setattr(session_row, 'total_rounds', payload.rounds_played)
+    setattr(session_row, 'total_bet', payload.total_bet)
+    setattr(session_row, 'total_win', payload.total_win)
     # result_data 요약 구성 및 저장 (세션 KPI)
     summary = {
         "duration": payload.duration,
@@ -503,23 +510,23 @@ async def end_game_session(
         "game_result": payload.game_result or {},
     }
     try:
-        session_row.result_data = summary
+        setattr(session_row, 'result_data', summary)
     except Exception:
         # JSON 직렬화 실패 시 텍스트 fallback
         try:
             import json as _json
-            session_row.result_data = _json.dumps(summary, default=str)  # type: ignore
+            setattr(session_row, 'result_data', _json.dumps(summary, default=str))
         except Exception:
-            session_row.result_data = None  # 최종 포기
+            setattr(session_row, 'result_data', None)  # 최종 포기
     db.add(session_row)
     db.flush()
 
     log_game_history(
         db,
-        user_id=current_user.id,
-        game_type=session_row.game_type,
+        user_id=_safe_user_id(current_user),
+        game_type=getattr(session_row, 'game_type', ''),
         action_type="SESSION_END",
-        session_id=session_row.id,
+        session_id=getattr(session_row, 'id', None),
         result_meta={
             "external_session_id": payload.session_id,
             "duration": payload.duration,
@@ -532,18 +539,19 @@ async def end_game_session(
 
     try:
         broadcast_game_session_event = _lazy_broadcast_game_session_event()
-        await broadcast_game_session_event({
-            "event": "end",
-            "session_id": session_row.id,
-            "external_session_id": payload.session_id,
-            "user_id": current_user.id,
-            "duration": payload.duration,
-            "total_bet": payload.total_bet,
-            "total_win": payload.total_win,
-            "game_type": session_row.game_type,
-            "ts": now.isoformat(),
-            "result_data": summary,
-        })
+        if broadcast_game_session_event:
+            await broadcast_game_session_event({
+                "event": "end",
+                "session_id": getattr(session_row, 'id', None),
+                "external_session_id": payload.session_id,
+                "user_id": _safe_user_id(current_user),
+                "duration": payload.duration,
+                "total_bet": payload.total_bet,
+                "total_win": payload.total_win,
+                "game_type": getattr(session_row, 'game_type', ''),
+                "ts": now.isoformat(),
+                "result_data": summary,
+            })
     except Exception:
         pass
 
@@ -574,14 +582,14 @@ async def get_active_session(
     if not row:
         raise HTTPException(status_code=404, detail="No active session")
     return GameSession(
-        session_id=row.external_session_id,
-        user_id=row.user_id,
-        game_type=row.game_type,
-        start_time=row.start_time,
+        session_id=getattr(row, 'external_session_id', ''),
+        user_id=getattr(row, 'user_id', 0),
+        game_type=getattr(row, 'game_type', ''),
+        start_time=getattr(row, 'start_time', datetime.utcnow()),
         duration=None,
-        current_bet=row.initial_bet,
-        current_round=row.total_rounds,
-        status=row.status
+        current_bet=getattr(row, 'initial_bet', None),
+        current_round=getattr(row, 'total_rounds', None),
+        status=getattr(row, 'status', '')
     )
 # 가챠 확률 공개/구성 조회
 @router.get("/gacha/config")
@@ -599,7 +607,7 @@ async def get_gacha_stats(
     db: Session = Depends(get_db),
 ):
     svc = GameService(db)
-    return svc.gacha_service.get_user_gacha_stats(current_user.id)
+    return svc.gacha_service.get_user_gacha_stats(_safe_user_id(current_user))
 
 # ================= Existing Simple Game Feature Endpoints =================
 
@@ -648,7 +656,7 @@ async def spin_slot(
     bet_amount = request.bet_amount
     
     # 잔액 확인 (토큰 잔액)
-    current_tokens = SimpleUserService.get_user_tokens(db, current_user.id)
+    current_tokens = SimpleUserService.get_user_tokens(db, _safe_user_id(current_user))
     if current_tokens < bet_amount:
         raise HTTPException(status_code=400, detail="토큰이 부족합니다")
     
@@ -685,7 +693,7 @@ async def spin_slot(
         win_amount = int(win_amount * bonus_multiplier * rng_variation)
 
     # 잔액 업데이트
-    new_balance = SimpleUserService.update_user_tokens(db, current_user.id, -bet_amount + win_amount)
+    new_balance = SimpleUserService.update_user_tokens(db, _safe_user_id(current_user), -bet_amount + win_amount)
     
     # 플레이 기록 저장
     action_data = {
@@ -698,7 +706,7 @@ async def spin_slot(
     
     _log_user_action(
         db,
-        user_id=current_user.id,
+        user_id=_safe_user_id(current_user),
         action_type="SLOT_SPIN",
         data={**action_data, "streak": streak_count}
     )
@@ -713,7 +721,7 @@ async def spin_slot(
         delta = -bet_amount + win_amount
         log_game_history(
             db,
-            user_id=current_user.id,
+            user_id=_safe_user_id(current_user),
             game_type="slot",
             action_type="WIN" if win_amount > 0 else "BET",
             delta_coin=delta,
@@ -777,7 +785,7 @@ async def play_rps(
     bet_amount = request.bet_amount
     
     # 잔액 확인
-    current_tokens = SimpleUserService.get_user_tokens(db, current_user.id)
+    current_tokens = SimpleUserService.get_user_tokens(db, _safe_user_id(current_user))
     if current_tokens < bet_amount:
         raise HTTPException(status_code=400, detail="토큰이 부족합니다")
     
@@ -804,10 +812,10 @@ async def play_rps(
         win_amount = 0
     
     # 잔액 업데이트
-    new_balance = SimpleUserService.update_user_tokens(db, current_user.id, -bet_amount + win_amount)
+    new_balance = SimpleUserService.update_user_tokens(db, _safe_user_id(current_user), -bet_amount + win_amount)
     
     # 🎯 게임 통계 업데이트 추가
-    GameService.update_game_stats(db, current_user.id, "rps", {
+    GameService.update_game_stats(db, _safe_user_id(current_user), "rps", {
         "betAmount": bet_amount,
         "winAmount": win_amount
     })
@@ -824,7 +832,7 @@ async def play_rps(
     
     _log_user_action(
         db,
-        user_id=current_user.id,
+        user_id=_safe_user_id(current_user),
         action_type="RPS_PLAY",
         data=action_data
     )
@@ -840,7 +848,7 @@ async def play_rps(
         delta = -bet_amount + win_amount
         log_game_history(
             db,
-            user_id=current_user.id,
+            user_id=_safe_user_id(current_user),
             game_type="rps",
             action_type="WIN" if result == 'win' else ("DRAW" if result == 'draw' else "BET"),
             delta_coin=delta,
@@ -890,7 +898,7 @@ async def pull_gacha(
     # 서비스 초기화 및 실행 전 잔액 캡처(net_change 계산용)
     game_service = GameService(db)
     try:
-        old_balance = SimpleUserService.get_user_tokens(db, current_user.id)
+        old_balance = SimpleUserService.get_user_tokens(db, _safe_user_id(current_user))
     except Exception:
         old_balance = None
 
@@ -905,7 +913,7 @@ async def pull_gacha(
     # 10연 배치 실행
     for _ in range(batches_of_10):
         try:
-            res = game_service.gacha_pull(current_user.id, 10)
+            res = game_service.gacha_pull(_safe_user_id(current_user), 10)
         except ValueError as ve:
             msg = str(ve)
             if "일일 가챠" in msg:
@@ -919,7 +927,7 @@ async def pull_gacha(
     # 단일 실행
     for _ in range(singles):
         try:
-            res = game_service.gacha_pull(current_user.id, 1)
+            res = game_service.gacha_pull(_safe_user_id(current_user), 1)
         except ValueError as ve:
             msg = str(ve)
             if "일일 가챠" in msg:
@@ -930,7 +938,7 @@ async def pull_gacha(
         last_message = res.psychological_message or last_message
 
     # 현재 잔액 조회
-    new_balance = SimpleUserService.get_user_tokens(db, current_user.id)
+    new_balance = SimpleUserService.get_user_tokens(db, _safe_user_id(current_user))
     net_change = None
     if old_balance is not None and new_balance is not None:
         net_change = new_balance - old_balance
@@ -969,7 +977,7 @@ async def pull_gacha(
         }
         _log_user_action(
             db,
-            user_id=current_user.id,
+            user_id=_safe_user_id(current_user),
             action_type="GACHA_PULL",
             data=summary,
         )
@@ -982,7 +990,7 @@ async def pull_gacha(
         await hub.broadcast({
             "type": "game_event",
             "subtype": "gacha_pull",
-            "user_id": current_user.id,
+            "user_id": _safe_user_id(current_user),
             "game_type": "gacha",
             "pull_count": pull_count,
             "rare": rare_count,
@@ -1054,7 +1062,7 @@ async def place_crash_bet(
         "crash_bet_request",
         extra={
             "request_id": _rid,
-            "user_id": getattr(current_user, "id", None),
+            "user_id": _safe_user_id(current_user),
             "bet_amount": bet_amount,
             "auto_cashout_multiplier": auto_cashout_multiplier,
         },
@@ -1097,11 +1105,12 @@ async def place_crash_bet(
     try:
         # 사용자 행 잠금 (비관적 락) → 동시 중복 베팅 중복 차감 방지
         user_row = db.execute(
-            select(UserModel).where(UserModel.id == current_user.id).with_for_update()
+            select(UserModel).where(UserModel.id == _safe_user_id(current_user)).with_for_update()
         ).scalar_one_or_none()
         if not user_row:
             raise HTTPException(status_code=404, detail="사용자 없음")
-        if user_row.gold_balance < bet_amount:
+        current_balance = getattr(user_row, 'gold_balance', 0)
+        if current_balance < bet_amount:
             raise HTTPException(status_code=400, detail="골드가 부족합니다")
 
         import uuid, random as _r
@@ -1109,7 +1118,7 @@ async def place_crash_bet(
 
         # 정규화된 크래시 멀티플라이어 로직 - 지수 분포 사용
         import time, hashlib, math
-        seed = f"{current_user.id}:{int(time.time() * 1000)}:{game_id}"
+        seed = f"{_safe_user_id(current_user)}:{int(time.time() * 1000)}:{game_id}"
         hash_val = int(hashlib.md5(seed.encode()).hexdigest()[:8], 16)
         
         # 0-1 사이의 균등 분포 난수 생성
@@ -1134,9 +1143,10 @@ async def place_crash_bet(
         multiplier = round(multiplier, 2)
 
         # 잔액 차감
-        user_row.gold_balance -= bet_amount
-        if user_row.gold_balance < 0:
-            user_row.gold_balance = 0
+        new_balance = current_balance - bet_amount
+        if new_balance < 0:
+            new_balance = 0
+        setattr(user_row, 'gold_balance', new_balance)
 
         win_amount = 0
         status = "placed"
@@ -1146,7 +1156,8 @@ async def place_crash_bet(
             # 자동 캐시아웃 성공
             net_win = int(bet_amount * (auto_cashout_multiplier - 1.0))  # 순이익만 계산
             win_amount = net_win
-            user_row.gold_balance += net_win  # 순이익만 추가
+            current_balance = getattr(user_row, 'gold_balance', 0)
+            setattr(user_row, 'gold_balance', current_balance + net_win)  # 순이익만 추가
             status = "auto_cashed"
         elif auto_cashout_multiplier is None:
             # 자동 캐시아웃이 설정되지 않은 경우 - 수동 캐시아웃 대기 상태
@@ -1169,7 +1180,7 @@ async def place_crash_bet(
         }
         _log_user_action(
             db,
-            user_id=current_user.id,
+            user_id=_safe_user_id(current_user),
             action_type="CRASH_BET",
             data=action_data
         )
@@ -1188,7 +1199,7 @@ async def place_crash_bet(
             """
         ), {
             "external_session_id": game_id,
-            "user_id": current_user.id,
+            "user_id": _safe_user_id(current_user),
             "bet_amount": bet_amount,
             "status": status,
             "auto_cashout_multiplier": auto_cashout_multiplier,
@@ -1207,7 +1218,7 @@ async def place_crash_bet(
             """
         ), {
             "external_session_id": game_id,
-            "user_id": current_user.id,
+            "user_id": _safe_user_id(current_user),
             "bet_amount": bet_amount,
             "payout_amount": win_amount if win_amount > 0 else None,
             "cashout_multiplier": auto_cashout_multiplier if win_amount > 0 else None,
@@ -1215,7 +1226,7 @@ async def place_crash_bet(
 
         # 유저 게임 통계 업데이트
         try:
-            current_stats = current_user.game_stats or {}
+            current_stats = getattr(current_user, 'game_stats', None) or {}
             crash_stats = current_stats.get('crash', {
                 'totalGames': 0,
                 'highestMultiplier': 0,
@@ -1243,7 +1254,7 @@ async def place_crash_bet(
             
             # 업데이트된 통계를 저장
             current_stats['crash'] = crash_stats
-            current_user.game_stats = current_stats
+            setattr(current_user, 'game_stats', current_stats)
             db.add(current_user)
             
         except Exception as e:
@@ -1254,20 +1265,20 @@ async def place_crash_bet(
             from ..services.game_stats_service import GameStatsService as _GSS
             gss = _GSS(db)
             gss.update_from_round(
-                user_id=current_user.id,
+                user_id=_safe_user_id(current_user),
                 bet_amount=bet_amount,
                 win_amount=win_amount,
                 final_multiplier=float(auto_cashout_multiplier or multiplier)
             )
         except Exception as e:  # pragma: no cover
-            logger.warning("GameStatsService.update_from_round failed user=%s err=%s", current_user.id, e)
+            logger.warning("GameStatsService.update_from_round failed user=%s err=%s", _safe_user_id(current_user), e)
 
         # GameHistory
         try:
             delta = -bet_amount + win_amount
             log_game_history(
                 db,
-                user_id=current_user.id,
+                user_id=_safe_user_id(current_user),
                 game_type="crash",
                 action_type="WIN" if win_amount > 0 else "BET",
                 delta_coin=delta,
@@ -1295,7 +1306,7 @@ async def place_crash_bet(
                 "crash_bet_failed",
                 extra={
                     "request_id": _rid,
-                    "user_id": getattr(current_user, "id", None),
+                    "user_id": _safe_user_id(current_user),
                     "bet_amount": bet_amount,
                     "auto_cashout_multiplier": auto_cashout_multiplier,
                     "error": str(e),
@@ -1311,7 +1322,7 @@ async def place_crash_bet(
         await hub.broadcast({
             "type": "game_event",
             "subtype": "crash_bet",
-            "user_id": current_user.id,
+            "user_id": _safe_user_id(current_user),
             "game_type": "crash",
             "bet": bet_amount,
             "auto_cashout": auto_cashout_multiplier,
@@ -1370,7 +1381,7 @@ async def cashout_crash_bet(
         "manual_cashout_request",
         extra={
             "request_id": _rid,
-            "user_id": current_user.id,
+            "user_id": _safe_user_id(current_user),
             "game_id": game_id,
             "cashout_multiplier": multiplier,
         }
@@ -1382,7 +1393,7 @@ async def cashout_crash_bet(
         # 게임 세션 존재 여부 확인
         game_session = db.execute(text(
             "SELECT bet_amount, max_multiplier, status FROM crash_sessions WHERE game_id = :game_id AND user_id = :user_id"
-        ), {"game_id": game_id, "user_id": current_user.id}).fetchone()
+        ), {"game_id": game_id, "user_id": _safe_user_id(current_user)}).fetchone()
         
         if not game_session:
             raise HTTPException(status_code=404, detail="게임 세션을 찾을 수 없습니다")
@@ -1403,7 +1414,7 @@ async def cashout_crash_bet(
         # 사용자 정보 조회 및 잠금
         user_row = db.execute(
             text("SELECT id, gold_balance FROM users WHERE id = :user_id FOR UPDATE"),
-            {"user_id": current_user.id}
+            {"user_id": _safe_user_id(current_user)}
         ).scalar_one_or_none()
         
         if not user_row:
@@ -1417,7 +1428,7 @@ async def cashout_crash_bet(
         new_balance = user_row.gold_balance + net_profit
         db.execute(
             text("UPDATE users SET gold_balance = :balance WHERE id = :user_id"),
-            {"balance": new_balance, "user_id": current_user.id}
+            {"balance": new_balance, "user_id": _safe_user_id(current_user)}
         )
         
         # 게임 세션 상태 업데이트
@@ -1435,7 +1446,7 @@ async def cashout_crash_bet(
         }
         _log_user_action(
             db,
-            user_id=current_user.id,
+            user_id=_safe_user_id(current_user),
             action_type="CRASH_CASHOUT",
             data=action_data
         )
@@ -1446,7 +1457,7 @@ async def cashout_crash_bet(
             "manual_cashout_success",
             extra={
                 "request_id": _rid,
-                "user_id": current_user.id,
+                "user_id": _safe_user_id(current_user),
                 "game_id": game_id,
                 "win_amount": net_profit,
                 "new_balance": new_balance,
@@ -1471,7 +1482,7 @@ async def cashout_crash_bet(
             "manual_cashout_failed",
             extra={
                 "request_id": _rid,
-                "user_id": current_user.id,
+                "user_id": _safe_user_id(current_user),
                 "game_id": game_id,
                 "error": str(e),
             }
@@ -1494,11 +1505,11 @@ def get_my_authoritative_game_stats(current_user: models.User = Depends(get_curr
         import traceback
 
         svc = _GSS(db)
-        crash_stats = svc.get_or_create(current_user.id)
+        crash_stats = svc.get_or_create(_safe_user_id(current_user))
         
         # user_actions 테이블에서 CRASH_BET 액션 통계 직접 조회 (user_game_stats 대신 사용)
         crash_bet_count = db.query(func.count(UserAction.id)).filter(
-            UserAction.user_id == current_user.id,
+            UserAction.user_id == _safe_user_id(current_user),
             UserAction.action_type == 'CRASH_BET'
         ).scalar() or 0
         
@@ -1518,7 +1529,7 @@ def get_my_authoritative_game_stats(current_user: models.User = Depends(get_curr
             func.max(case((UserAction.action_type == 'SLOT_WIN', func.cast(UserAction.action_data, Integer)), else_=0)).label('max_win'),
             func.count(case((UserAction.action_type == 'SLOT_WIN', 1), else_=None)).label('wins'),
             func.count(case((UserAction.action_type == 'SLOT_LOSE', 1), else_=None)).label('losses')
-        ).filter(UserAction.user_id == current_user.id, UserAction.action_type.in_(['SLOT_SPIN', 'SLOT_WIN', 'SLOT_LOSE'])).first()
+        ).filter(UserAction.user_id == _safe_user_id(current_user), UserAction.action_type.in_(['SLOT_SPIN', 'SLOT_WIN', 'SLOT_LOSE'])).first()
         
         slot_stats_dict = {
             'spins': getattr(slot_stats, 'spins', 0) if slot_stats else 0,
@@ -1533,7 +1544,7 @@ def get_my_authoritative_game_stats(current_user: models.User = Depends(get_curr
             func.count(case((UserAction.action_type == 'GACHA_RARE_WIN', 1), else_=None)).label('rare_wins'),
             func.count(case((UserAction.action_type == 'GACHA_ULTRA_RARE_WIN', 1), else_=None)).label('ultra_rare_wins'),
             func.max(case((UserAction.action_type.in_(['GACHA_RARE_WIN', 'GACHA_ULTRA_RARE_WIN']), func.cast(UserAction.action_data, Integer)), else_=0)).label('max_win')
-        ).filter(UserAction.user_id == current_user.id, UserAction.action_type.in_(['GACHA_SPIN', 'GACHA_RARE_WIN', 'GACHA_ULTRA_RARE_WIN'])).first()
+        ).filter(UserAction.user_id == _safe_user_id(current_user), UserAction.action_type.in_(['GACHA_SPIN', 'GACHA_RARE_WIN', 'GACHA_ULTRA_RARE_WIN'])).first()
         
         gacha_stats_dict = {
             'spins': getattr(gacha_stats, 'spins', 0) if gacha_stats else 0,
@@ -1548,7 +1559,7 @@ def get_my_authoritative_game_stats(current_user: models.User = Depends(get_curr
             func.count(case((UserAction.action_type == 'RPS_WIN', 1), else_=None)).label('wins'),
             func.count(case((UserAction.action_type == 'RPS_LOSE', 1), else_=None)).label('losses'),
             func.count(case((UserAction.action_type == 'RPS_TIE', 1), else_=None)).label('ties')
-        ).filter(UserAction.user_id == current_user.id, UserAction.action_type.in_(['RPS_PLAY', 'RPS_WIN', 'RPS_LOSE', 'RPS_TIE'])).first()
+        ).filter(UserAction.user_id == _safe_user_id(current_user), UserAction.action_type.in_(['RPS_PLAY', 'RPS_WIN', 'RPS_LOSE', 'RPS_TIE'])).first()
         
         rps_stats_dict = {
             'plays': getattr(rps_stats, 'plays', 0) if rps_stats else 0,
@@ -1567,7 +1578,7 @@ def get_my_authoritative_game_stats(current_user: models.User = Depends(get_curr
             WHERE user_id = :user_id 
               AND action_type = 'SLOT_SPIN'
               AND action_data::json->'data'->>'win_amount' IS NOT NULL
-        """), {"user_id": current_user.id}).scalar() or 0
+        """), {"user_id": _safe_user_id(current_user)}).scalar() or 0
         
         # RPS 게임 최대 승리 금액
         rps_max_win_result = db.execute(text("""
@@ -1576,7 +1587,7 @@ def get_my_authoritative_game_stats(current_user: models.User = Depends(get_curr
             WHERE user_id = :user_id 
               AND action_type = 'RPS_PLAY'
               AND action_data::json->'data'->>'win_amount' IS NOT NULL
-        """), {"user_id": current_user.id}).scalar() or 0
+        """), {"user_id": _safe_user_id(current_user)}).scalar() or 0
         
         # 크래시 게임 최대 승리 금액
         crash_max_win_result = db.execute(text("""
@@ -1585,7 +1596,7 @@ def get_my_authoritative_game_stats(current_user: models.User = Depends(get_curr
             WHERE user_id = :user_id 
               AND action_type = 'CRASH_BET'
               AND action_data::json->'data'->>'win_amount' IS NOT NULL
-        """), {"user_id": current_user.id}).scalar() or 0
+        """), {"user_id": _safe_user_id(current_user)}).scalar() or 0
         
         # 가챠 게임 최대 승리 금액
         gacha_max_win_result = db.execute(text("""
@@ -1594,7 +1605,7 @@ def get_my_authoritative_game_stats(current_user: models.User = Depends(get_curr
             WHERE user_id = :user_id 
               AND action_type = 'GACHA_PULL'
               AND action_data::json->'data'->>'win_amount' IS NOT NULL
-        """), {"user_id": current_user.id}).scalar() or 0
+        """), {"user_id": _safe_user_id(current_user)}).scalar() or 0
         
         crash_max_multiplier = float(crash_stats_dict['highest_multiplier']) if crash_stats_dict['highest_multiplier'] is not None else None
 
@@ -1604,7 +1615,7 @@ def get_my_authoritative_game_stats(current_user: models.User = Depends(get_curr
         
         # 오늘 게임 기록을 시간순으로 가져오기
         today_actions = db.query(UserAction).filter(
-            UserAction.user_id == current_user.id,
+            UserAction.user_id == _safe_user_id(current_user),
             UserAction.action_type.in_(['SLOT_SPIN', 'RPS_PLAY', 'CRASH_BET', 'GACHA_PULL']),
             UserAction.created_at >= today_start
         ).order_by(UserAction.created_at.desc()).all()
@@ -1641,7 +1652,7 @@ def get_my_authoritative_game_stats(current_user: models.User = Depends(get_curr
         total_games_lost = (slot_stats_dict['losses'] or 0) + (rps_stats_dict['losses'] or 0) + int(crash_stats_dict['total_losses'] or 0)
 
         return {"success": True, "stats": {
-            "user_id": current_user.id,
+            "user_id": _safe_user_id(current_user),
             "total_bets": int(crash_stats_dict['total_bets'] or 0),
             "total_games_played": total_games_played,
             "total_wins": total_games_won,
@@ -1682,7 +1693,7 @@ def get_my_authoritative_game_stats(current_user: models.User = Depends(get_curr
             }
         }}
     except Exception as e:
-        logger.error("get_my_authoritative_game_stats failed user=%s err=%s\n%s", current_user.id, e, traceback.format_exc())
+        logger.error("get_my_authoritative_game_stats failed user=%s err=%s\n%s", _safe_user_id(current_user), e, traceback.format_exc())
         return {"success": False, "error": {"code": "HTTP_500", "message": "GameStats 조회 실패", "details": str(e)}}
 
 # -------------------------------------------------------------------------
@@ -1697,7 +1708,7 @@ def get_game_stats(user_id: int, db: Session = Depends(get_db)):
 
     # TODO: 보상 테이블 존재 여부 검증 후 reward 집계 로직 조정 필요
     total_coins_won = 0
-    total_gold_won = 0
+    total_gems_won = 0
     special_items_won = 0
     jackpots_won = db.query(models.UserAction).filter(
         models.UserAction.user_id == user_id,
@@ -1708,7 +1719,7 @@ def get_game_stats(user_id: int, db: Session = Depends(get_db)):
         user_id=user_id,
         total_spins=total_spins,
         total_coins_won=total_coins_won,
-        total_gold_won=total_gold_won,
+        total_gems_won=total_gems_won,
         special_items_won=special_items_won,
         jackpots_won=jackpots_won,
         bonus_spins_won=0,
@@ -1720,6 +1731,7 @@ def get_game_stats(user_id: int, db: Session = Depends(get_db)):
 @router.get("/profile/{user_id}/stats", response_model=ProfileGameStats)
 def get_profile_game_stats(user_id: int, db: Session = Depends(get_db)):
     """프로필용 상세 게임 통계"""
+    from sqlalchemy import func as sqlfunc, text
     user = db.query(models.User).filter(models.User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -1732,10 +1744,10 @@ def get_profile_game_stats(user_id: int, db: Session = Depends(get_db)):
 
     favorite_game_query = db.query(
         models.UserAction.action_type,
-        db.func.count(models.UserAction.id).label('count')
+        sqlfunc.count(models.UserAction.id).label('count')
     ).filter(
         models.UserAction.user_id == user_id
-    ).group_by(models.UserAction.action_type).order_by(db.text('count DESC')).first()
+    ).group_by(models.UserAction.action_type).order_by(text('count DESC')).first()
     favorite_game = favorite_game_query[0] if favorite_game_query else None
 
     return ProfileGameStats(
@@ -1750,18 +1762,19 @@ def get_profile_game_stats(user_id: int, db: Session = Depends(get_db)):
 @router.get("/leaderboard", response_model=List[GameLeaderboard])
 def get_game_leaderboard(game_type: Optional[str] = None, limit: int = 10, db: Session = Depends(get_db)):
     """게임별 또는 전체 리더보드"""
+    from sqlalchemy import func as sqlfunc, text
     if game_type:
         leaderboard_query = db.query(
             models.User.id,
             models.User.nickname,
-            db.func.count(models.UserAction.id).label('score')
+            sqlfunc.count(models.UserAction.id).label('score')
         ).join(
             models.UserAction, models.User.id == models.UserAction.user_id
         ).filter(
             models.UserAction.action_type == game_type
         ).group_by(
             models.User.id, models.User.nickname
-        ).order_by(db.text('score DESC')).limit(limit).all()
+        ).order_by(text('score DESC')).limit(limit).all()
     else:
         leaderboard_query = db.query(
             models.User.id,
@@ -1837,7 +1850,7 @@ def get_game_history(
     정렬: 최신(created_at desc)
     """
     from ..models.history_models import GameHistory
-    q = db.query(GameHistory).filter(GameHistory.user_id == current_user.id)
+    q = db.query(GameHistory).filter(GameHistory.user_id == _safe_user_id(current_user))
     if game_type:
         q = q.filter(GameHistory.game_type == game_type)
     if action_type:
@@ -1849,7 +1862,20 @@ def get_game_history(
         except ValueError:
             raise HTTPException(status_code=400, detail="since 형식이 잘못되었습니다(ISO8601)")
     total = q.count()
-    items = q.order_by(GameHistory.created_at.desc()).limit(min(limit, 200)).offset(offset).all()
+    rows = q.order_by(GameHistory.created_at.desc()).limit(min(limit, 200)).offset(offset).all()
+    # ORM 객체를 스키마 아이템으로 변환하여 정적 타입 일치 보장
+    items: List[GameHistoryItem] = [
+        GameHistoryItem(
+            id=getattr(r, 'id', 0),
+            user_id=getattr(r, 'user_id', 0),
+            game_type=getattr(r, 'game_type', ''),
+            action_type=getattr(r, 'action_type', ''),
+            delta_coin=int(getattr(r, 'delta_coin', 0) or 0),
+            delta_gem=int(getattr(r, 'delta_gem', 0) or 0),
+            created_at=getattr(r, 'created_at', datetime.utcnow()),
+            result_meta=getattr(r, 'result_meta', None),
+        ) for r in rows
+    ]
     return GameHistoryListResponse(
         total=total,
         items=items,
@@ -1865,19 +1891,20 @@ def get_game_type_stats(
     db: Session = Depends(get_db)
 ):
     from ..models.history_models import GameHistory
+    from sqlalchemy import func as sqlfunc, case
     q = db.query(GameHistory).filter(
-        GameHistory.user_id == current_user.id,
+        GameHistory.user_id == _safe_user_id(current_user),
         GameHistory.game_type == game_type
     )
     play_count = q.count()
     agg = db.query(
-        db.func.coalesce(db.func.sum(GameHistory.delta_coin), 0),
-        db.func.coalesce(db.func.sum(GameHistory.delta_gem), 0),
-        db.func.coalesce(db.func.sum(db.case((GameHistory.action_type == 'WIN', 1), else_=0)), 0),
-        db.func.coalesce(db.func.sum(db.case((GameHistory.action_type.in_(['BET','LOSE']), 1), else_=0)), 0),
-        db.func.max(GameHistory.created_at)
+        sqlfunc.coalesce(sqlfunc.sum(GameHistory.delta_coin), 0),
+        sqlfunc.coalesce(sqlfunc.sum(GameHistory.delta_gem), 0),
+        sqlfunc.coalesce(sqlfunc.sum(case((GameHistory.action_type == 'WIN', 1), else_=0)), 0),
+        sqlfunc.coalesce(sqlfunc.sum(case((GameHistory.action_type.in_(['BET','LOSE']), 1), else_=0)), 0),
+        sqlfunc.max(GameHistory.created_at)
     ).filter(
-        GameHistory.user_id == current_user.id,
+        GameHistory.user_id == _safe_user_id(current_user),
         GameHistory.game_type == game_type
     ).one()
     net_coin, net_gem, wins, losses, last_played = agg
@@ -1898,22 +1925,23 @@ def get_profile_stats(
     db: Session = Depends(get_db)
 ):
     from ..models.history_models import GameHistory
-    base_q = db.query(GameHistory).filter(GameHistory.user_id == current_user.id)
+    from sqlalchemy import func as sqlfunc, case, text
+    base_q = db.query(GameHistory).filter(GameHistory.user_id == _safe_user_id(current_user))
     total_play = base_q.count()
     sums = db.query(
-        db.func.coalesce(db.func.sum(GameHistory.delta_coin), 0),
-        db.func.coalesce(db.func.sum(GameHistory.delta_gem), 0),
-        db.func.max(GameHistory.created_at)
-    ).filter(GameHistory.user_id == current_user.id).one()
+        sqlfunc.coalesce(sqlfunc.sum(GameHistory.delta_coin), 0),
+        sqlfunc.coalesce(sqlfunc.sum(GameHistory.delta_gem), 0),
+        sqlfunc.max(GameHistory.created_at)
+    ).filter(GameHistory.user_id == _safe_user_id(current_user)).one()
     net_coin, net_gem, last_played = sums
     # 즐겨찾기 게임: play count 상위 1개
     fav_row = db.query(
         GameHistory.game_type,
-        db.func.count(GameHistory.id).label('cnt')
-    ).filter(GameHistory.user_id == current_user.id).group_by(GameHistory.game_type).order_by(db.text('cnt DESC')).first()
+        sqlfunc.count(GameHistory.id).label('cnt')
+    ).filter(GameHistory.user_id == _safe_user_id(current_user)).group_by(GameHistory.game_type).order_by(text('cnt DESC')).first()
     favorite = fav_row[0] if fav_row else None
-    distinct_game_types = db.query(db.func.count(db.func.distinct(GameHistory.game_type))).filter(GameHistory.user_id == current_user.id).scalar() or 0
-    recent_game_types_rows = db.query(GameHistory.game_type).filter(GameHistory.user_id == current_user.id).order_by(GameHistory.created_at.desc()).limit(5).all()
+    distinct_game_types = db.query(sqlfunc.count(sqlfunc.distinct(GameHistory.game_type))).filter(GameHistory.user_id == _safe_user_id(current_user)).scalar() or 0
+    recent_game_types_rows = db.query(GameHistory.game_type).filter(GameHistory.user_id == _safe_user_id(current_user)).order_by(GameHistory.created_at.desc()).limit(5).all()
     recent_game_types = []
     seen = set()
     for (gt,) in recent_game_types_rows:
@@ -1923,7 +1951,7 @@ def get_profile_stats(
         if len(recent_game_types) >= 5:
             break
     return ProfileAggregateStats(
-        user_id=current_user.id,
+        user_id=_safe_user_id(current_user),
         total_play_count=total_play,
         total_net_coin=net_coin,
         total_net_gem=net_gem,
@@ -1941,26 +1969,26 @@ def follow_user(
     db: Session = Depends(get_db)
 ):
     from ..models.social_models import FollowRelation
-    if target_user_id == current_user.id:
+    if target_user_id == _safe_user_id(current_user):
         raise HTTPException(status_code=400, detail="자기 자신은 팔로우할 수 없습니다")
     # 대상 유저 존재 확인
     target = db.query(models.User).filter(models.User.id == target_user_id).first()
     if not target:
         raise HTTPException(status_code=404, detail="대상 유저를 찾을 수 없습니다")
     existing = db.query(FollowRelation).filter(
-        FollowRelation.user_id == current_user.id,
+        FollowRelation.user_id == _safe_user_id(current_user),
         FollowRelation.target_user_id == target_user_id
     ).first()
     if existing:
         # 이미 팔로우 상태 → idempotent 응답
         follower_count = db.query(FollowRelation).filter(FollowRelation.target_user_id == target_user_id).count()
-        following_count = db.query(FollowRelation).filter(FollowRelation.user_id == current_user.id).count()
+        following_count = db.query(FollowRelation).filter(FollowRelation.user_id == _safe_user_id(current_user)).count()
         return FollowActionResponse(success=True, following=True, target_user_id=target_user_id, follower_count=follower_count, following_count=following_count)
-    rel = FollowRelation(user_id=current_user.id, target_user_id=target_user_id)
+    rel = FollowRelation(user_id=_safe_user_id(current_user), target_user_id=target_user_id)
     db.add(rel)
     db.commit()
     follower_count = db.query(FollowRelation).filter(FollowRelation.target_user_id == target_user_id).count()
-    following_count = db.query(FollowRelation).filter(FollowRelation.user_id == current_user.id).count()
+    following_count = db.query(FollowRelation).filter(FollowRelation.user_id == _safe_user_id(current_user)).count()
     return FollowActionResponse(success=True, following=True, target_user_id=target_user_id, follower_count=follower_count, following_count=following_count)
 
 @router.delete("/follow/{target_user_id}", response_model=FollowActionResponse)
@@ -1971,14 +1999,14 @@ def unfollow_user(
 ):
     from ..models.social_models import FollowRelation
     rel = db.query(FollowRelation).filter(
-        FollowRelation.user_id == current_user.id,
+        FollowRelation.user_id == _safe_user_id(current_user),
         FollowRelation.target_user_id == target_user_id
     ).first()
     if rel:
         db.delete(rel)
         db.commit()
     follower_count = db.query(FollowRelation).filter(FollowRelation.target_user_id == target_user_id).count()
-    following_count = db.query(FollowRelation).filter(FollowRelation.user_id == current_user.id).count()
+    following_count = db.query(FollowRelation).filter(FollowRelation.user_id == _safe_user_id(current_user)).count()
     return FollowActionResponse(success=True, following=False, target_user_id=target_user_id, follower_count=follower_count, following_count=following_count)
 
 @router.get("/follow/list", response_model=FollowListResponse)
@@ -1989,7 +2017,7 @@ def list_following(
     db: Session = Depends(get_db)
 ):
     from ..models.social_models import FollowRelation
-    q = db.query(FollowRelation, models.User).join(models.User, FollowRelation.target_user_id == models.User.id).filter(FollowRelation.user_id == current_user.id)
+    q = db.query(FollowRelation, models.User).join(models.User, FollowRelation.target_user_id == models.User.id).filter(FollowRelation.user_id == _safe_user_id(current_user))
     total = q.count()
     rows = q.order_by(FollowRelation.created_at.desc()).limit(min(limit,200)).offset(offset).all()
     items = [
@@ -2006,7 +2034,7 @@ def list_followers(
     db: Session = Depends(get_db)
 ):
     from ..models.social_models import FollowRelation
-    q = db.query(FollowRelation, models.User).join(models.User, FollowRelation.user_id == models.User.id).filter(FollowRelation.target_user_id == current_user.id)
+    q = db.query(FollowRelation, models.User).join(models.User, FollowRelation.user_id == models.User.id).filter(FollowRelation.target_user_id == _safe_user_id(current_user))
     total = q.count()
     rows = q.order_by(FollowRelation.created_at.desc()).limit(min(limit,200)).offset(offset).all()
     items = [
