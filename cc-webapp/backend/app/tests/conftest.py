@@ -26,6 +26,16 @@ _backend_root = os.path.abspath(os.path.join(_here, "..", ".."))
 if _backend_root not in sys.path:
 	sys.path.insert(0, _backend_root)
 
+# --- Use a deterministic absolute SQLite DB path for tests ---
+try:
+	if not os.getenv("DATABASE_URL"):
+		_db_file = os.path.join(_backend_root, "test_app.db")
+		# Normalize to URI form with forward slashes for SQLAlchemy
+		_db_uri = "sqlite:///" + _db_file.replace("\\", "/")
+		os.environ["DATABASE_URL"] = _db_uri
+except Exception:
+	pass
+
 # --- FastAPI app 라이프사이클 중 블로킹 요소 노옵 패치 ---
 try:
 	import app.main as _main_mod  # type: ignore
@@ -105,7 +115,13 @@ def _ensure_schema():
 		if do_upgrade:
 			from alembic.config import Config
 			from alembic import command
-			cfg = Config("alembic.ini")
+			# Ensure Alembic uses the same DB URL as the app engine (especially for SQLite relative paths)
+			try:
+				os.environ["DATABASE_URL"] = engine.url.render_as_string(hide_password=False)
+			except Exception:
+				pass
+			cfg_path = os.path.join(_backend_root, "alembic.ini")
+			cfg = Config(cfg_path)
 			command.upgrade(cfg, "head")
 		# Safety net: 단일 골드 통화 컬럼 존재 보장 (테스트 SQLite 환경 한정)
 		try:
@@ -203,7 +219,7 @@ def _ensure_schema():
 # --- Session fixture for DB-bound service tests (e.g., GameStats) ---
 # 각 테스트를 트랜잭션으로 샌드박싱하여 commit 호출이 있어도 테스트 종료 시 롤백되도록 함.
 @pytest.fixture
-def db():
+def db(_ensure_schema):
 	"""Function-scoped SQLAlchemy Session with transactional sandbox.
 
 	- Opens a dedicated connection
@@ -245,7 +261,7 @@ def db():
 
 
 @pytest.fixture(scope="session")
-def client():
+def client(_ensure_schema):
 	from fastapi.testclient import TestClient as _TC
 
 	# QUICK_SMOKE=1인 경우, DB 보강/어드민 오버라이드 없이 즉시 TestClient 반환 (health/docs 등 초경량 스모크용)
@@ -261,6 +277,11 @@ def client():
 			return SimpleNamespace(id=12345, is_admin=True, nickname="test-admin-event", gold_balance=1000, experience=0)
 		if hasattr(_admin_events_router, 'require_admin'):
 			fastapi_app.dependency_overrides[_admin_events_router.require_admin] = _admin_test_user
+		# 공개 라우터에서 사용하는 인증 의존성도 테스트 모드에서 고정 유저로 오버라이드
+		from app.dependencies import get_current_user as _get_current_user_dep
+		def _standard_test_user():
+			return SimpleNamespace(id=12345, is_admin=True, nickname="test-admin-event", gold_balance=1000, experience=0)
+		fastapi_app.dependency_overrides[_get_current_user_dep] = _standard_test_user
 	except Exception:
 		pass
 
@@ -333,25 +354,33 @@ def _seed_users_for_gamestats():
 
 # --- Ensure clean GameHistory for common test users per test (determinism) ---
 @pytest.fixture(autouse=True)
-def _cleanup_gamestats_history(db):  # noqa: D401
-	"""각 테스트 시작 시 GameHistory를 정리해 이전 실행/수동 디버그 잔여분 영향 제거."""
+def _cleanup_gamestats_history():  # noqa: D401
+	"""각 테스트 시작 시 GameHistory를 정리해 이전 실행/수동 디버그 잔여분 영향 제거.
+
+	주의: SQLite 파일 잠금 방지를 위해 짧은 수명의 세션을 사용하고 즉시 종료한다.
+	"""
 	try:
+		from app.database import SessionLocal as _Sess
 		from app.models.history_models import GameHistory as _GH
 		from app.models.game_stats_models import UserGameStats as _UGS
-		# 히스토리 삭제
-		(db.query(_GH)
-		 	.filter(_GH.user_id.in_([1, 2, 3]), _GH.game_type == 'crash')
-		 	.delete(synchronize_session=False))
-		# 누적 스탯 초기화
-		for uid in [1, 2, 3]:
-			stats = db.get(_UGS, uid)
-			if stats:
-				stats.total_bets = 0
-				stats.total_wins = 0
-				stats.total_losses = 0
-				stats.total_profit = 0
-				stats.highest_multiplier = None
-		db.commit()
+		sess = _Sess()
+		try:
+			# 히스토리 삭제
+			(sess.query(_GH)
+				.filter(_GH.user_id.in_([1, 2, 3]), _GH.game_type == 'crash')
+				.delete(synchronize_session=False))
+			# 누적 스탯 초기화
+			for uid in [1, 2, 3]:
+				stats = sess.get(_UGS, uid)
+				if stats:
+					setattr(stats, "total_bets", 0)
+					setattr(stats, "total_wins", 0)
+					setattr(stats, "total_losses", 0)
+					setattr(stats, "total_profit", 0)
+					setattr(stats, "highest_multiplier", None)
+			sess.commit()
+		finally:
+			sess.close()
 	except Exception:
 		# 비치명적 – 청소 실패 시 해당 테스트에서 드러남
 		pass

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import { SessionExpiredBanner } from "../components/SessionExpiredBanner";
 import "../styles/globals.css";
 import { Providers } from "./providers";
 
@@ -20,6 +21,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="ko" className="dark">
       <body className={inter.className}>
+        <SessionExpiredBanner />
         <Providers>{children}</Providers>
       </body>
     </html>

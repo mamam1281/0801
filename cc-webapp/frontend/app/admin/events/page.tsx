@@ -1,24 +1,23 @@
 "use client";
-import React, { useEffect, useState, useCallback } from 'react';
-import type { ChangeEvent } from 'react';
-import { useRouter } from 'next/navigation';
-import { motion } from 'framer-motion';
-import { 
-  ArrowLeft, 
-  Plus, 
-  Edit2, 
-  Trash2, 
-  Clock, 
-  Gift, 
-  CheckCircle,
-  XCircle,
-  AlertTriangle,
-  Save,
-  X,
-  RefreshCw,
-  Calendar,
-} from 'lucide-react';
 import { api } from '@/lib/unifiedApi';
+import { motion } from 'framer-motion';
+import {
+    AlertTriangle,
+    ArrowLeft,
+    Calendar,
+    CheckCircle,
+    Clock,
+    Edit2,
+    Gift,
+    Plus,
+    RefreshCw,
+    Save,
+    Trash2,
+    X,
+    XCircle,
+} from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { useCallback, useEffect, useState } from 'react';
 
 interface AdminEvent {
   id: number;
@@ -45,6 +44,11 @@ export default function AdminEventsPage() {
   const [error, setError] = useState(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingEvent, setEditingEvent] = useState(null);
+  // 강제지급 대상 사용자 ID (전역 입력 방식)
+  const [forceUserId, setForceUserId] = useState('');
+  // 이벤트별 강제지급 처리 중 상태 추적
+  // 진행중인 force-claim 이벤트 id 집합
+  const [forceClaimLoading, setForceClaimLoading] = useState(() => new Set<number>());
   
   const [formData, setFormData] = useState({
     name: '',
@@ -57,7 +61,7 @@ export default function AdminEventsPage() {
     setLoading(true);
     setError(null);
     try {
-      const response = await api.get('admin/content/events') as AdminEvent[];
+  const response = await api.get('admin/content/events') as any;
       setEvents(response);
     } catch (err: any) {
       setError(err.message || '이벤트 로드 실패');
@@ -72,7 +76,7 @@ export default function AdminEventsPage() {
 
   const handleCreate = async () => {
     try {
-      await api.post('admin/content/events', formData);
+  await api.post('admin/content/events', formData);
       setShowCreateForm(false);
       setFormData({ name: '', start_at: '', end_at: '', reward_scheme: { gold: 1000, experience: 100 } });
       await loadEvents();
@@ -84,7 +88,7 @@ export default function AdminEventsPage() {
   const handleUpdate = async () => {
     if (!editingEvent) return;
     try {
-      await api.put(`admin/content/events/${editingEvent.id}`, formData);
+  await api.put(`admin/content/events/${editingEvent.id}`, formData);
       setEditingEvent(null);
       setFormData({ name: '', start_at: '', end_at: '', reward_scheme: { gold: 1000, experience: 100 } });
       await loadEvents();
@@ -96,7 +100,7 @@ export default function AdminEventsPage() {
   const handleDelete = async (id: number) => {
     if (!confirm('정말 삭제하시겠습니까?')) return;
     try {
-      await api.del(`admin/content/events/${id}`);
+  await api.del(`admin/content/events/${id}`);
       await loadEvents();
     } catch (err: any) {
       setError(err.message || '이벤트 삭제 실패');
@@ -113,6 +117,43 @@ export default function AdminEventsPage() {
       await loadEvents();
     } catch (err: any) {
       setError(err.message || '상태 변경 실패');
+    }
+  };
+
+  const dispatchToast = (type: string, message: string) => {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('app:notification', { detail: { type, message } }));
+    }
+  };
+
+  const handleForceClaim = async (eventId: number) => {
+    if (!forceUserId.trim()) {
+      dispatchToast('warning', '강제지급 대상 user_id 를 입력하세요.');
+      return;
+    }
+    const numericId = Number(forceUserId.trim());
+    if (Number.isNaN(numericId) || numericId <= 0) {
+      dispatchToast('error', '유효한 양의 정수 user_id 를 입력하세요.');
+      return;
+    }
+    setForceClaimLoading((prev: Set<number>) => {
+      const next = new Set(prev);
+      next.add(eventId);
+      return next;
+    });
+    try {
+      await api.post(`admin/events/${eventId}/force-claim/${numericId}`, {});
+      dispatchToast('success', `이벤트 #${eventId} 대상 사용자(${numericId}) 강제지급 성공`);
+      await loadEvents();
+    } catch (err:any) {
+      setError(err.message || '강제 지급 실패');
+      dispatchToast('error', err.message || '강제 지급 실패');
+    } finally {
+      setForceClaimLoading((prev: Set<number>) => {
+        const next = new Set(prev);
+        next.delete(eventId);
+        return next;
+      });
     }
   };
 
@@ -168,13 +209,25 @@ export default function AdminEventsPage() {
           </div>
           <div className="flex items-center space-x-2">
             <button 
+              data-testid="admin-events-refresh"
               onClick={loadEvents} 
               className="flex items-center space-x-2 px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-sm transition-colors"
             >
               <RefreshCw className="h-4 w-4" />
               <span>새로고침</span>
             </button>
+            <div className="flex items-center space-x-2 bg-neutral-800 px-3 py-2 rounded-lg border border-neutral-700">
+              <label className="text-xs text-gray-400">force user_id</label>
+              <input
+                data-testid="force-claim-user-id-input"
+                value={forceUserId}
+                onChange={e => setForceUserId(e.target.value)}
+                placeholder="예: 101"
+                className="w-24 bg-neutral-900 text-sm px-2 py-1 rounded border border-neutral-600 focus:outline-none focus:ring-1 focus:ring-purple-500"
+              />
+            </div>
             <button 
+              data-testid="admin-events-create-open"
               onClick={() => setShowCreateForm(true)} 
               className="flex items-center space-x-2 px-4 py-2 rounded-lg bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-500 hover:to-purple-600 text-sm transition-all"
             >
@@ -209,7 +262,7 @@ export default function AdminEventsPage() {
               <h2 className="text-xl font-semibold">
                 {editingEvent ? '이벤트 수정' : '새 이벤트 생성'}
               </h2>
-              <button onClick={cancelEdit} className="p-2 rounded-lg hover:bg-neutral-800 transition-colors">
+              <button data-testid="admin-events-form-cancel" onClick={cancelEdit} className="p-2 rounded-lg hover:bg-neutral-800 transition-colors">
                 <X className="h-5 w-5" />
               </button>
             </div>
@@ -218,6 +271,7 @@ export default function AdminEventsPage() {
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">이벤트 이름</label>
                 <input
+                  data-testid="admin-events-form-name"
                   type="text"
                   value={formData.name}
                   onChange={(e: any) => setFormData({ ...formData, name: e.target.value })}
@@ -229,6 +283,7 @@ export default function AdminEventsPage() {
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">보상 구성</label>
                 <textarea
+                  data-testid="admin-events-form-reward"
                   value={JSON.stringify(formData.reward_scheme, null, 2)}
                   onChange={(e: any) => {
                     try {
@@ -246,6 +301,7 @@ export default function AdminEventsPage() {
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">시작 시간</label>
                 <input
+                  data-testid="admin-events-form-start"
                   type="datetime-local"
                   value={formData.start_at}
                   onChange={(e: any) => setFormData({ ...formData, start_at: e.target.value })}
@@ -256,6 +312,7 @@ export default function AdminEventsPage() {
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">종료 시간</label>
                 <input
+                  data-testid="admin-events-form-end"
                   type="datetime-local"
                   value={formData.end_at}
                   onChange={(e: any) => setFormData({ ...formData, end_at: e.target.value })}
@@ -266,12 +323,14 @@ export default function AdminEventsPage() {
 
             <div className="mt-6 flex justify-end space-x-3">
               <button
+                data-testid="admin-events-form-cancel-btn"
                 onClick={cancelEdit}
                 className="px-4 py-2 rounded-lg bg-neutral-700 hover:bg-neutral-600 transition-colors"
               >
                 취소
               </button>
               <button
+                data-testid="admin-events-form-submit"
                 onClick={editingEvent ? handleUpdate : handleCreate}
                 className="flex items-center space-x-2 px-4 py-2 rounded-lg bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-500 hover:to-purple-600 transition-all"
               >
@@ -335,6 +394,7 @@ export default function AdminEventsPage() {
 
                     <div className="flex items-center space-x-2">
                       <button
+                        data-testid={`admin-event-toggle-${event.id}`}
                         onClick={() => handleToggleActive(event.id, event.is_active)}
                         className={`p-2 rounded-lg transition-colors ${
                           event.is_active 
@@ -347,14 +407,30 @@ export default function AdminEventsPage() {
                       </button>
                       
                       <button
+                        data-testid={`admin-event-edit-${event.id}`}
                         onClick={() => startEdit(event)}
                         className="p-2 rounded-lg bg-blue-600 hover:bg-blue-700 transition-colors"
                         title="수정"
                       >
                         <Edit2 className="h-4 w-4" />
                       </button>
+
+                      <button
+                        data-testid={`admin-event-forceclaim-${event.id}`}
+                        onClick={() => handleForceClaim(event.id)}
+                        disabled={forceClaimLoading.has(event.id)}
+                        className={`p-2 rounded-lg transition-colors ${forceClaimLoading.has(event.id) ? 'bg-emerald-900 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700'}`}
+                        title="강제 지급"
+                      >
+                        {forceClaimLoading.has(event.id) ? (
+                          <RefreshCw className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Gift className="h-4 w-4" />
+                        )}
+                      </button>
                       
                       <button
+                        data-testid={`admin-event-delete-${event.id}`}
                         onClick={() => handleDelete(event.id)}
                         className="p-2 rounded-lg bg-red-600 hover:bg-red-700 transition-colors"
                         title="삭제"

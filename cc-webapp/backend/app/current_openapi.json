@@ -615,7 +615,7 @@
           "Users"
         ],
         "summary": "Get User Balance",
-        "description": "사용자 잔액 조회",
+        "description": "사용자 잔액 조회 - 전역동기화 핵심 엔드포인트",
         "operationId": "get_user_balance_api_users_balance_get",
         "responses": {
           "200": {
@@ -893,6 +893,51 @@
                     "$ref": "#/components/schemas/UserSummary"
                   },
                   "title": "Response Admin List Users Api Admin Users Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Admin Create User",
+        "description": "Create a new user (admin only)",
+        "operationId": "admin_create_user_api_admin_users_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminUserCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUserCreateResponse"
                 }
               }
             }
@@ -2717,6 +2762,462 @@
         }
       }
     },
+    "/api/admin/shop/products": {
+      "get": {
+        "tags": [
+          "admin-shop"
+        ],
+        "summary": "Get Shop Products",
+        "description": "상점 상품 목록 조회 (관리자 전용)",
+        "operationId": "get_shop_products_api_admin_shop_products_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "건너뛸 상품 수",
+              "default": 0,
+              "title": "Skip"
+            },
+            "description": "건너뛸 상품 수"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "조회할 상품 수",
+              "default": 50,
+              "title": "Limit"
+            },
+            "description": "조회할 상품 수"
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "상품명 검색",
+              "title": "Search"
+            },
+            "description": "상품명 검색"
+          },
+          {
+            "name": "is_active",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "활성 상태 필터",
+              "title": "Is Active"
+            },
+            "description": "활성 상태 필터"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "admin-shop"
+        ],
+        "summary": "Create Shop Product",
+        "description": "새 상품 생성 (관리자 전용)",
+        "operationId": "create_shop_product_api_admin_shop_products_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "title": "Product Data"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/shop/products/{product_id}": {
+      "get": {
+        "tags": [
+          "admin-shop"
+        ],
+        "summary": "Get Shop Product",
+        "description": "특정 상품 상세 조회 (관리자 전용)",
+        "operationId": "get_shop_product_api_admin_shop_products__product_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "product_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Product Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "admin-shop"
+        ],
+        "summary": "Update Shop Product",
+        "description": "기존 상품 수정 (관리자 전용)",
+        "operationId": "update_shop_product_api_admin_shop_products__product_id__put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "product_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Product Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "title": "Product Data"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "admin-shop"
+        ],
+        "summary": "Delete Shop Product",
+        "description": "상품 삭제 (소프트 삭제)",
+        "operationId": "delete_shop_product_api_admin_shop_products__product_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "product_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Product Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/shop/products/{product_id}/activate": {
+      "post": {
+        "tags": [
+          "admin-shop"
+        ],
+        "summary": "Activate Product",
+        "description": "상품 활성화",
+        "operationId": "activate_product_api_admin_shop_products__product_id__activate_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "product_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Product Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/shop/products/{product_id}/deactivate": {
+      "post": {
+        "tags": [
+          "admin-shop"
+        ],
+        "summary": "Deactivate Product",
+        "description": "상품 비활성화",
+        "operationId": "deactivate_product_api_admin_shop_products__product_id__deactivate_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "product_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Product Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/shop/categories": {
+      "get": {
+        "tags": [
+          "admin-shop"
+        ],
+        "summary": "Get Product Categories",
+        "description": "상품 카테고리 목록 조회",
+        "operationId": "get_product_categories_api_admin_shop_categories_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/admin/shop/stats": {
+      "get": {
+        "tags": [
+          "admin-shop"
+        ],
+        "summary": "Get Shop Stats",
+        "description": "상점 통계 조회",
+        "operationId": "get_shop_stats_api_admin_shop_stats_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/admin/shop/existing-products": {
+      "get": {
+        "tags": [
+          "admin-shop"
+        ],
+        "summary": "Get Existing Products Info",
+        "description": "기존 상품 정보 조회 (보존 확인용)",
+        "operationId": "get_existing_products_info_api_admin_shop_existing_products_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/olap/health": {
       "get": {
         "summary": "Olap Health",
@@ -3011,6 +3512,33 @@
                   },
                   "type": "array",
                   "title": "Response List Catalog Api Shop Catalog Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/shop/products": {
+      "get": {
+        "tags": [
+          "Shop",
+          "Shop"
+        ],
+        "summary": "List shop products from database",
+        "description": "List active shop products from shop_products table",
+        "operationId": "list_shop_products_api_shop_products_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ShopProductOut"
+                  },
+                  "type": "array",
+                  "title": "Response List Shop Products Api Shop Products Get"
                 }
               }
             }
@@ -3896,52 +4424,6 @@
             "HTTPBearer": []
           }
         ]
-      }
-    },
-    "/api/streak/next-reward": {
-      "get": {
-        "tags": [
-          "Streaks"
-        ],
-        "summary": "Next Reward",
-        "operationId": "next_reward_api_streak_next_reward_get",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "action_type",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "default": "SLOT_SPIN",
-              "title": "Action Type"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
       }
     },
     "/api/streak/history": {
@@ -6232,13 +6714,60 @@
         ]
       }
     },
+    "/api/games/crash/cashout": {
+      "post": {
+        "tags": [
+          "Games"
+        ],
+        "summary": "Cashout Crash Bet",
+        "description": "크래시 게임 수동 캐시아웃\n- 진행 중인 게임에서 사용자가 원하는 시점에 캐시아웃\n- Redis 또는 DB에서 게임 세션 상태 확인",
+        "operationId": "cashout_crash_bet_api_games_crash_cashout_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CrashCashoutRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CrashCashoutResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/games/stats/me": {
       "get": {
         "tags": [
           "Games"
         ],
         "summary": "Get My Authoritative Game Stats",
-        "description": "현재 로그인 사용자에 대한 서버 권위 Crash GameStats.\n\nuser_game_stats 테이블 row 없으면 생성 후 반환. (MVP: crash 전용)\nTODO: 멀티 게임 타입 확장 시 game_type 파라미터 도입.",
+        "description": "현재 로그인 사용자에 대한 서버 권위 게임 통계 (Crash + 슬롯 + 가챠 + RPS 통합).\n\nuser_game_stats 테이블 (Crash 전용) + user_actions 테이블 (슬롯/가챠/RPS 등) 통합 조회.",
         "operationId": "get_my_authoritative_game_stats_api_games_stats_me_get",
         "responses": {
           "200": {
@@ -8600,6 +9129,96 @@
         "title": "AdminStatsResponse",
         "description": "Admin statistics response (확장)\n\n필드 설명:\n    - total_users: 전체 가입 사용자 수\n    - active_users: is_active = true 사용자 수\n    - total_games_played: UserAction 총 레코드 수 (임시 지표)\n    - total_tokens_in_circulation: users.cyber_token_balance 총합\n    - online_users: 최근 5분 내 활동 세션 사용자 수\n    - total_revenue: 누적 성공 거래 금액 (amount 단위 그대로)\n    - today_revenue: 금일 00:00 이후 성공 거래 금액\n    - critical_alerts: 최근 10분 내 주요 경보성 action 카운트\n    - pending_actions: pending 상태 거래 수\n    - generated_at: 서버 생성 시각 ISO8601"
       },
+      "AdminUserCreateRequest": {
+        "properties": {
+          "site_id": {
+            "type": "string",
+            "maxLength": 50,
+            "minLength": 3,
+            "title": "Site Id",
+            "description": "사이트 아이디"
+          },
+          "nickname": {
+            "type": "string",
+            "maxLength": 50,
+            "minLength": 2,
+            "title": "Nickname",
+            "description": "닉네임"
+          },
+          "phone_number": {
+            "type": "string",
+            "title": "Phone Number",
+            "description": "전화번호",
+            "default": "01000000000"
+          },
+          "password": {
+            "type": "string",
+            "minLength": 4,
+            "title": "Password",
+            "description": "비밀번호"
+          },
+          "is_admin": {
+            "type": "boolean",
+            "title": "Is Admin",
+            "description": "관리자 권한",
+            "default": false
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active",
+            "description": "활성 상태",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "site_id",
+          "nickname",
+          "password"
+        ],
+        "title": "AdminUserCreateRequest",
+        "description": "Admin user creation request"
+      },
+      "AdminUserCreateResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "site_id": {
+            "type": "string",
+            "title": "Site Id"
+          },
+          "nickname": {
+            "type": "string",
+            "title": "Nickname"
+          },
+          "is_admin": {
+            "type": "boolean",
+            "title": "Is Admin"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "site_id",
+          "nickname",
+          "is_admin",
+          "is_active",
+          "created_at"
+        ],
+        "title": "AdminUserCreateResponse",
+        "description": "Admin user creation response"
+      },
       "AdminUserUpdateRequest": {
         "properties": {
           "is_admin": {
@@ -9226,6 +9845,64 @@
         "title": "CrashBetResponse",
         "description": "크래시 게임 베팅 응답 모델"
       },
+      "CrashCashoutRequest": {
+        "properties": {
+          "game_id": {
+            "type": "string",
+            "title": "Game Id"
+          },
+          "multiplier": {
+            "type": "number",
+            "title": "Multiplier"
+          }
+        },
+        "type": "object",
+        "required": [
+          "game_id",
+          "multiplier"
+        ],
+        "title": "CrashCashoutRequest",
+        "description": "크래시 게임 수동 캐시아웃 요청 모델"
+      },
+      "CrashCashoutResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "game_id": {
+            "type": "string",
+            "title": "Game Id"
+          },
+          "cashout_multiplier": {
+            "type": "number",
+            "title": "Cashout Multiplier"
+          },
+          "win_amount": {
+            "type": "integer",
+            "title": "Win Amount"
+          },
+          "balance": {
+            "type": "integer",
+            "title": "Balance"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success",
+          "game_id",
+          "cashout_multiplier",
+          "win_amount",
+          "balance",
+          "message"
+        ],
+        "title": "CrashCashoutResponse",
+        "description": "크래시 게임 수동 캐시아웃 응답 모델"
+      },
       "ElevateRequest": {
         "properties": {
           "site_id": {
@@ -9676,6 +10353,28 @@
             },
             "type": "array",
             "title": "Items"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit"
+          },
+          "offset": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Offset"
           }
         },
         "type": "object",
@@ -12416,6 +13115,51 @@
         ],
         "title": "ShopProductCreate"
       },
+      "ShopProductOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "product_id": {
+            "type": "string",
+            "title": "Product Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "price": {
+            "type": "integer",
+            "title": "Price"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "product_id",
+          "name",
+          "description",
+          "price",
+          "is_active"
+        ],
+        "title": "ShopProductOut"
+      },
       "ShopProductUpdate": {
         "properties": {
           "name": {
@@ -12777,17 +13521,6 @@
               }
             ],
             "title": "Ttl Seconds"
-          },
-          "next_reward": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Next Reward"
           }
         },
         "type": "object",
@@ -13860,6 +14593,16 @@
             "type": "integer",
             "title": "Experience",
             "default": 0
+          },
+          "experience_points": {
+            "type": "integer",
+            "title": "Experience Points",
+            "default": 0
+          },
+          "level": {
+            "type": "integer",
+            "title": "Level",
+            "default": 1
           },
           "max_experience": {
             "type": "integer",

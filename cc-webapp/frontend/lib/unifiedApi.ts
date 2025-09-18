@@ -9,7 +9,7 @@
  * - 개발 환경 로깅(console.groupCollapsed)
  */
 
-import { getTokens, setTokens, clearTokens } from '../utils/tokenStorage';
+import { clearTokens, getTokens, setTokens } from '../utils/tokenStorage';
 
 // 간단 토큰 유무 확인 유틸
 export function hasAccessToken(): boolean {
@@ -102,6 +102,22 @@ function __uuidv4() {
   });
 }
 
+// refresh 성공 토스트 디바운스(중복 억제)를 위한 마지막 알림 시간
+let __lastRefreshToast = 0;
+const REFRESH_TOAST_DEBOUNCE_MS = 5 * 60 * 1000; // 5분
+
+function __notifyRefreshSuccess() {
+  if (typeof window === 'undefined') return;
+  const now = Date.now();
+  if (now - __lastRefreshToast < REFRESH_TOAST_DEBOUNCE_MS) return;
+  __lastRefreshToast = now;
+  try {
+    window.dispatchEvent(new CustomEvent('app:notification', {
+      detail: { type: 'system', message: '세션이 자동 연장되었습니다.' }
+    }));
+  } catch {}
+}
+
 async function refreshOnce(): Promise<boolean> {
   try {
     const tokens = getTokens();
@@ -115,6 +131,7 @@ async function refreshOnce(): Promise<boolean> {
     const data = await res.json().catch(()=>null);
     if (data?.access_token) {
       setTokens({ access_token: data.access_token, refresh_token: data.refresh_token || tokens.refresh_token });
+      __notifyRefreshSuccess();
       return true;
     }
     return false;
@@ -254,6 +271,13 @@ export async function apiCall<T=any>(path: string, opts: UnifiedRequestOptions<T
       const refreshed = await refreshOnce();
       didRefresh = true;
       if (refreshed) { attempt++; continue; }
+      // refresh 실패 → 토큰 제거 전 UX 알림 디스패치
+      try {
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('app:notification', { detail: { type: 'warning', message: '세션이 만료되었습니다. 다시 로그인 해주세요.' } }));
+          window.dispatchEvent(new CustomEvent('app:session-expired', { detail: { at: Date.now() } }));
+        }
+      } catch {}
       clearTokens();
     }
 
