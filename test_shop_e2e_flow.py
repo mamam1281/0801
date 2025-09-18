@@ -125,9 +125,9 @@ class ShopE2ETest:
     
     def get_user_balance(self, user_id: int) -> int:
         """사용자 잔액 조회 (DB)"""
-        query = "SELECT cyber_token_balance FROM users WHERE id = %s"
+        query = "SELECT gold_balance FROM users WHERE id = %s"
         result = self.db_query(query, (user_id,))
-        return result[0]['cyber_token_balance'] if result else 0
+        return result[0]['gold_balance'] if result else 0
     
     def buy_item(self, product_id: str, price: int, idempotency_key: str = None) -> dict:
         """아이템 구매"""
