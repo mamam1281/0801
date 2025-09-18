@@ -49,18 +49,49 @@ def test_event_join_progress_claim_flow(client: TestClient):
     assert data.get("success") is True
 
 
-def test_force_claim_idempotent(client: TestClient):
+def test_force_claim_idempotent_and_duplicate_paths(client: TestClient):
+    """멱등 키 재사용 vs 신규 키 중복 호출 경로 검증.
+
+    시나리오:
+      A. 동일 키 두 번 → 두 번째는 '재사용' 메시지 & rewards 동일
+      B. 다른 키로 재호출(이미 지급 후) → '이미 보상 수령' & 빈 rewards
+    """
     rs = client.post("/api/admin/events/seed/model-index")
     event_id = rs.json()["id"]
 
-    # 일반 사용자 참여 및 일부 진행(미완료 상태 유지)
+    # 참여만 (미완료라도 강제 지급 허용)
     client.post("/api/events/join", json={"event_id": event_id})
-    user_id = 12345  # override 유저 id (conftest 설정)
-    r1 = client.post(f"/api/admin/events/{event_id}/force-claim/{user_id}")
+    user_id = 12345
+
+    idem_key = "force-claim-test-KEY-001"
+    r1 = client.post(
+        f"/api/admin/events/{event_id}/force-claim/{user_id}",
+        headers={"X-Idempotency-Key": idem_key},
+    )
     assert r1.status_code == 200, r1.text
-    r2 = client.post(f"/api/admin/events/{event_id}/force-claim/{user_id}")
+    rewards_first = r1.json().get("rewards") or {}
+    assert rewards_first, "첫 지급은 rewards 비어 있으면 안 됨"
+
+    r2 = client.post(
+        f"/api/admin/events/{event_id}/force-claim/{user_id}",
+        headers={"X-Idempotency-Key": idem_key},
+    )
     assert r2.status_code == 200
-    assert "이미" in (r2.json().get("message") or "")
+    assert r2.json().get("rewards") == rewards_first
+    assert "재사용" in (r2.json().get("message") or "")
+
+    # 새 키로 다시 호출 → 이미 수령 처리 (빈 rewards)
+    r3 = client.post(
+        f"/api/admin/events/{event_id}/force-claim/{user_id}",
+        headers={"X-Idempotency-Key": "force-claim-test-KEY-002"},
+    )
+    assert r3.status_code == 200
+    assert r3.json().get("rewards") == {}
+    assert "이미" in (r3.json().get("message") or "")
+
+    # 키 누락 시 400
+    r4 = client.post(f"/api/admin/events/{event_id}/force-claim/{user_id}")
+    assert r4.status_code == 400
 
 
 def test_seed_model_index_idempotent(client: TestClient):

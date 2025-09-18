@@ -80,9 +80,12 @@ async def admin_create_event(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    if not current_user.is_admin:
+    # 테스트/타입 추론 환경에서 is_admin 이 SQLAlchemy InstrumentedAttribute 로 간주되는 케이스 방어
+    if not bool(getattr(current_user, "is_admin", False)):
         raise HTTPException(status_code=403, detail="권한 없음")
     ev = Event(**data.model_dump())
+    # 명시적으로 활성화 (DB default NULL 처리 환경 방어)
+    ev.is_active = True  # type: ignore[assignment]
     db.add(ev)
     db.commit()
     db.refresh(ev)
@@ -94,7 +97,7 @@ async def admin_list_events(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    if not current_user.is_admin:
+    if not bool(getattr(current_user, "is_admin", False)):
         raise HTTPException(status_code=403, detail="권한 없음")
     q = db.query(Event)
     if not include_deleted:
@@ -109,7 +112,7 @@ async def admin_update_event(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    if not current_user.is_admin:
+    if not bool(getattr(current_user, "is_admin", False)):
         raise HTTPException(status_code=403, detail="권한 없음")
     ev = db.query(Event).filter(Event.id == event_id).first()
     if not ev:
@@ -126,7 +129,7 @@ async def admin_soft_delete_event(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    if not current_user.is_admin:
+    if not bool(getattr(current_user, "is_admin", False)):
         raise HTTPException(status_code=403, detail="권한 없음")
     ev = db.query(Event).filter(Event.id == event_id).first()
     if not ev:
@@ -145,7 +148,7 @@ async def admin_restore_event(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    if not current_user.is_admin:
+    if not bool(getattr(current_user, "is_admin", False)):
         raise HTTPException(status_code=403, detail="권한 없음")
     ev = db.query(Event).filter(Event.id == event_id).first()
     if not ev:
@@ -178,7 +181,7 @@ async def join_event(
     """이벤트 참여"""
     try:
         participation = EventService.join_event(
-            db, current_user.id, request.event_id
+            db, int(getattr(current_user, "id")), request.event_id
         )
         _metric("events", "join", "success", "y")
         return participation
@@ -196,7 +199,7 @@ async def update_event_progress(
     """이벤트 진행 상황 업데이트"""
     try:
         participation = EventService.update_event_progress(
-            db, current_user.id, event_id, request.progress
+            db, int(getattr(current_user, "id")), event_id, request.progress
         )
         _metric("events", "progress", "success", "y")
         return participation
@@ -213,7 +216,7 @@ async def claim_event_rewards(
     """이벤트 보상 수령"""
     try:
         rewards = EventService.claim_event_rewards(
-            db, current_user.id, event_id
+            db, int(getattr(current_user, "id")), event_id
         )
         # participation progress_version 조회 (이미 완료 상태)
         from ..models.event_models import EventParticipation as _EP
@@ -241,12 +244,12 @@ async def get_daily_missions(
     db: Session = Depends(get_db)
 ):
     """일일 미션 목록 조회"""
-    missions = MissionService.get_user_missions(db, current_user.id, 'daily')
+    missions = MissionService.get_user_missions(db, int(getattr(current_user, "id")), 'daily')
     
     # 미션이 없으면 초기화
     if not missions:
-        MissionService.initialize_daily_missions(db, current_user.id)
-        missions = MissionService.get_user_missions(db, current_user.id, 'daily')
+        MissionService.initialize_daily_missions(db, int(getattr(current_user, "id")))
+        missions = MissionService.get_user_missions(db, int(getattr(current_user, "id")), 'daily')
     
     _metric("missions", "list_daily", "success", "y")
     return missions
@@ -258,7 +261,7 @@ async def get_weekly_missions(
 ):
     """주간 미션 목록 조회"""
     _metric("missions", "list_weekly", "success", "y")
-    return MissionService.get_user_missions(db, current_user.id, 'weekly')
+    return MissionService.get_user_missions(db, int(getattr(current_user, "id")), 'weekly')
 
 @router.get("/missions/all", response_model=List[UserMissionResponse], operation_id="missions_list_all")
 async def get_all_missions(
@@ -267,7 +270,7 @@ async def get_all_missions(
 ):
     """모든 미션 목록 조회"""
     _metric("missions", "list_all", "success", "y")
-    return MissionService.get_user_missions(db, current_user.id)
+    return MissionService.get_user_missions(db, int(getattr(current_user, "id")))
 
 @router.put("/missions/progress", response_model=Dict, operation_id="missions_progress_update")
 async def update_mission_progress(
@@ -278,7 +281,7 @@ async def update_mission_progress(
     """미션 진행 상황 업데이트"""
     # 미션 타입에 따라 진행 상황 업데이트
     completed = MissionService.update_mission_progress(
-        db, current_user.id,
+        db, int(getattr(current_user, "id")),
         request.mission_id,
         request.progress_increment
     )
@@ -299,7 +302,7 @@ async def claim_mission_rewards(
     """미션 보상 수령"""
     try:
         claim_ctx = MissionService.claim_mission_rewards(
-            db, current_user.id, mission_id
+            db, int(getattr(current_user, "id")), mission_id
         )
         _metric("missions", "claim", "success", "y")
         # claim_ctx 는 {'rewards': {...}, 'balance': int, 'progress_version': int|None}
