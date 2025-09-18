@@ -70,6 +70,7 @@ def _build_user_response(user: User) -> UserResponse:
     # streak 보상 경험치 합산
     from sqlalchemy.orm import Session
     from app.models.game_models import UserReward
+    from datetime import datetime  # datetime import 추가
     db = None
     try:
         import inspect
@@ -83,7 +84,6 @@ def _build_user_response(user: User) -> UserResponse:
         db = None
     streak_xp = 0
     if db:
-        from datetime import datetime
         today = datetime.utcnow().date()
         rewards = db.query(UserReward).filter(
             UserReward.user_id == user.id,
@@ -423,6 +423,7 @@ async def login(data: UserLogin, request: Request, db: Session = Depends(get_db)
         except Exception:
             logger.exception("create_session (login) failed (non-fatal)")
         # DB 기반 리프레시 토큰 발급 및 저장
+        refresh_token = None  # 기본값 설정
         try:
             ip = request.client.host if request and request.client else None
             ua = request.headers.get("User-Agent") if request else None

@@ -1,34 +1,25 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useGlobalSync } from '@/hooks/useGlobalSync';
+import { useUserGold } from '@/hooks/useSelectors';
+import { useWithReconcile } from '@/lib/sync';
+import { api } from '@/lib/unifiedApi';
+import { applyPurchase, mergeGameStats, mergeProfile, useGlobalStore } from '@/store/globalStore';
+import { AnimatePresence, motion } from 'framer-motion';
 import {
   ArrowLeft,
+  Flame,
   Package,
-  Star,
-  Crown,
-  Gem,
-  Gift,
-  Sparkles,
   ShoppingCart,
-  Coins,
-  Zap,
-  Trophy,
-  Shield,
-  Tag,
   Timer,
-  Flame
+  Trophy
 } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { GameItem, User } from '../types';
+import ShopPurchaseHistory from './ShopPurchaseHistory';
+import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
-import { Badge } from './ui/badge';
-import { User, GameItem } from '../types';
-import { useGlobalSync } from '@/hooks/useGlobalSync';
-import { api } from '@/lib/unifiedApi';
-import { useWithReconcile } from '@/lib/sync';
-import { useUserGold } from '@/hooks/useSelectors';
-import { useGlobalStore, mergeProfile, applyPurchase, mergeGameStats } from '@/store/globalStore';
-import ShopPurchaseHistory from './ShopPurchaseHistory';
 
 interface ShopScreenProps {
   user: User;
@@ -210,7 +201,14 @@ export function ShopScreen({
 
     try {
       const res: any = await withReconcile(async (idemKey: string) =>
-        api.post('shop/buy', { item_id: item.id, price: finalPrice }, { headers: { 'X-Idempotency-Key': idemKey } })
+        api.post('shop/buy', { 
+          user_id: user.id,
+          product_id: item.id, 
+          amount: finalPrice,
+          quantity: 1,
+          kind: 'item',
+          payment_method: 'tokens'
+        }, { headers: { 'X-Idempotency-Key': idemKey } })
       );
       // 서버 응답에 new balance가 있으면 즉시 전역 프로필에 병합(시각적 지연 최소화)
       const newBal = res?.new_balance ?? res?.balance ?? res?.gold ?? res?.gold_balance ?? res?.cyber_token_balance;
