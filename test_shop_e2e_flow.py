@@ -36,6 +36,12 @@ class ShopE2ETest:
         """로그 출력"""
         timestamp = datetime.now().strftime("%H:%M:%S")
         print(f"[{timestamp}] {message}")
+    
+    def ensure_user_id(self) -> int:
+        """user_id가 설정되어 있는지 확인하고 반환"""
+        if self.user_id is None:
+            raise ValueError("User ID가 설정되지 않았습니다. 먼저 로그인을 수행하세요.")
+        return self.user_id
         
     def get_db_connection(self):
         """DB 연결"""
@@ -129,14 +135,14 @@ class ShopE2ETest:
         result = self.db_query(query, (user_id,))
         return result[0]['gold_balance'] if result else 0
     
-    def buy_item(self, product_id: str, price: int, idempotency_key: str = None) -> dict:
+    def buy_item(self, product_id: str, price: int, idempotency_key: str | None = None) -> dict:
         """아이템 구매"""
         if not idempotency_key:
             idempotency_key = str(uuid.uuid4())
         
         headers = {'Authorization': f'Bearer {self.user_token}'}
         payload = {
-            'user_id': self.user_id,
+            'user_id': self.ensure_user_id(),
             'product_id': product_id,
             'amount': price,
             'quantity': 1,
@@ -156,9 +162,9 @@ class ShopE2ETest:
             self.log(f"구매 실패: {response.status_code} - {response.text}")
             return {'success': False, 'message': response.text}
     
-    def get_transactions(self, user_id: int = None) -> list:
+    def get_transactions(self, user_id: int | None = None) -> list:
         """거래 내역 조회"""
-        target_user = user_id or self.user_id
+        target_user = user_id or self.ensure_user_id()
         headers = {'Authorization': f'Bearer {self.user_token}'}
         response = self.session.get(f"{API_BASE}/api/shop/transactions?user_id={target_user}", 
                                   headers=headers)
@@ -192,7 +198,7 @@ class ShopE2ETest:
         self.log("\n=== 멱등성 테스트 시작 ===")
         
         # 초기 잔액 확인
-        initial_balance = self.get_user_balance(self.user_id)
+        initial_balance = self.get_user_balance(self.ensure_user_id())
         self.log(f"초기 잔액: {initial_balance}")
         
         # 첫 번째 구매
@@ -200,14 +206,14 @@ class ShopE2ETest:
         result1 = self.buy_item(product_id, price, idempotency_key)
         
         # 잔액 확인
-        balance_after_1st = self.get_user_balance(self.user_id)
+        balance_after_1st = self.get_user_balance(self.ensure_user_id())
         self.log(f"첫 구매 후 잔액: {balance_after_1st}")
         
         # 동일한 멱등성 키로 재구매
         result2 = self.buy_item(product_id, price, idempotency_key)
         
         # 최종 잔액 확인
-        final_balance = self.get_user_balance(self.user_id)
+        final_balance = self.get_user_balance(self.ensure_user_id())
         self.log(f"재구매 후 잔액: {final_balance}")
         
         # 검증
@@ -231,7 +237,7 @@ class ShopE2ETest:
         """잔액 부족 테스트"""
         self.log("\n=== 잔액 부족 테스트 시작 ===")
         
-        current_balance = self.get_user_balance(self.user_id)
+        current_balance = self.get_user_balance(self.ensure_user_id())
         excessive_price = current_balance + 10000
         
         result = self.buy_item("expensive_test_item", excessive_price)

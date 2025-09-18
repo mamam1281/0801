@@ -279,10 +279,16 @@ async def update_mission_progress(
     db: Session = Depends(get_db)
 ):
     """미션 진행 상황 업데이트"""
+    # 미션 정보 조회하여 target_type 가져오기
+    from ..models.event_models import Mission
+    mission = db.query(Mission).filter(Mission.id == request.mission_id).first()
+    if not mission:
+        raise HTTPException(status_code=404, detail="Mission not found")
+    
     # 미션 타입에 따라 진행 상황 업데이트
     completed = MissionService.update_mission_progress(
         db, int(getattr(current_user, "id")),
-        request.mission_id,
+        str(mission.target_type),
         request.progress_increment
     )
     _metric("missions", "progress", "success", "y")

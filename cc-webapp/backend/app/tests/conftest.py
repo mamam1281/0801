@@ -82,9 +82,10 @@ def _ensure_schema():
 	"""
 	# 항상 초기화 (drift 지속 발생하므로 test DB 파일 제거)
 	try:
+		import os
 		from sqlalchemy import inspect as _insp
 		engine.dispose()
-		if engine.url.database and os.path.exists(engine.url.database):
+		if engine.url.database and isinstance(engine.url.database, str) and os.path.exists(engine.url.database):
 			os.remove(engine.url.database)
 	except Exception:
 		pass
@@ -293,7 +294,8 @@ def client(_ensure_schema):
 		sess = _Sess()
 		try:
 			# 테이블 존재 시에만 (마이그레이션 레이스 컨디션 방지)
-			if _insp(sess.bind).has_table('users'):
+			inspector = _insp(sess.bind)
+			if inspector and inspector.has_table('users'):
 				u = sess.query(_User).filter(_User.id == 12345).first()
 				if not u:
 					# 필수 고유 컬럼 충족 (site_id / nickname / phone_number)
