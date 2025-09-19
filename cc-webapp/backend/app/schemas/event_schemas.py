@@ -108,6 +108,21 @@ class UserMissionResponse(BaseModel):
     
     model_config = ConfigDict(from_attributes=True)
 
+class MissionProgressResponse(BaseModel):
+    """미션 진행 상황 포함한 응답 모델"""
+    mission_id: int
+    title: str
+    description: Optional[str] = None
+    target_value: int
+    target_type: str
+    reward_amount: int
+    reward_type: str
+    current_progress: int
+    completed: bool
+    claimed: bool
+    
+    model_config = ConfigDict(from_attributes=True)
+
 class ClaimRewardRequest(BaseModel):
     mission_id: Optional[int] = None
     event_id: Optional[int] = None
