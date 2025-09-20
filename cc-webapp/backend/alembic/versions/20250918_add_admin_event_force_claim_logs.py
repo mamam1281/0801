@@ -33,7 +33,8 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = "20250918_add_admin_event_force_claim_logs"
-down_revision: Union[str, None] = "86171b66491f_add_progress_meta_uniques_for_events_"
+# down_revision은 파일명이 아닌 실제 리비전 ID를 가리켜야 합니다.
+down_revision: Union[str, None] = "86171b66491f"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
