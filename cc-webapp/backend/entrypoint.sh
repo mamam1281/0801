@@ -25,6 +25,35 @@ else
   echo "Database $DB_NAME already exists."
 fi
 
+# --- Seed shop products (9 items: 5 gold-type, 4 voucher-type) ---
+seed_shop_products() {
+  if [ "${AUTO_SEED_BASIC:-0}" != "1" ]; then
+    echo "AUTO_SEED_BASIC disabled. Skipping shop_products seed."
+    return
+  fi
+  # Ensure target table exists before seeding
+  TABLE_EXISTS=$(PGPASSWORD=$DB_PASSWORD psql -h $DB_HOST -U $DB_USER -p $DB_PORT -d $DB_NAME -tAc "SELECT to_regclass('public.shop_products') IS NOT NULL;" | tr -d '[:space:]')
+  if [ "$TABLE_EXISTS" != "t" ]; then
+    echo "shop_products table not found. Skipping seed."
+    return
+  fi
+  echo "Seeding shop_products (idempotent) ..."
+  PGPASSWORD=$DB_PASSWORD psql -h $DB_HOST -U $DB_USER -p $DB_PORT -d $DB_NAME -v ON_ERROR_STOP=1 <<'SQL'
+-- Insert 9 products (5 gold-type utility, 4 model-point vouchers)
+INSERT INTO shop_products (product_id, name, description, price, is_active, extra) VALUES
+('anti_bankruptcy', '한폴방지', '한폴방지 상품', 20000, true, '{"type":"gold","gold_amount":20000}'),
+('attendance_connect', '출석연결', '출석연결 상품 (월 3회)', 30000, true, '{"type":"gold","gold_amount":30000,"monthly_limit":3}'),
+('daily_comp_2x', '1일 콤프2배', '1일 콤프2배 상품', 40000, true, '{"type":"gold","gold_amount":40000}'),
+('charge_30_percent', '충전30%', '충전30% 상품 (주 1회)', 50000, true, '{"type":"gold","gold_amount":50000,"weekly_limit":1}'),
+('early_promotion', '조기등업', '조기등업 상품 (1회만 구매가능)', 500000, true, '{"type":"gold","gold_amount":500000,"purchase_limit":1}'),
+('model_30k_voucher', '모델 30,000 포인트교환권', '모델 30,000 포인트교환권', 30000, true, '{"type":"voucher","gold_amount":30000,"model_points":30000}'),
+('model_105k_voucher', '모델 105,000 포인트교환권', '모델 105,000 포인트교환권', 100000, true, '{"type":"voucher","gold_amount":100000,"model_points":105000}'),
+('model_330k_voucher', '모델 330,000 포인트교환권', '모델 330,000 포인트교환권', 300000, true, '{"type":"voucher","gold_amount":300000,"model_points":330000}'),
+('model_1150k_voucher', '모델 1,150,000 포인트교환권', '모델 1,150,000 포인트교환권', 1000000, true, '{"type":"voucher","gold_amount":1000000,"model_points":1150000}')
+ON CONFLICT (product_id) DO NOTHING;
+SQL
+}
+
 # Redis 연결 확인 (비밀번호 지원)
 echo "Checking Redis connection..."
 python - <<'PY'
@@ -64,6 +93,8 @@ if [ "$USERS_EXISTS" = "t" ] && [ -z "$CUR_VER" ]; then
   alembic stamp head || true
   echo "Alembic stamped successfully. Skipping further migrations..."
   echo "Setting up initial data... (SKIPPED: app/core/init_db.py not found)"
+  # Seed shop products (idempotent)
+  seed_shop_products || true
   echo "Starting FastAPI application..."
   uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
   exit 0
@@ -74,6 +105,8 @@ if [ "$USERS_EXISTS" = "t" ] && [ -n "$CUR_VER" ]; then
   echo "Core tables exist and alembic_version is at $CUR_VER. Skipping migration to avoid DuplicateTable errors..."
   echo "Use 'alembic upgrade head' manually if schema changes are needed."
   echo "Setting up initial data... (SKIPPED: app/core/init_db.py not found)"
+  # Seed shop products (idempotent)
+  seed_shop_products || true
   echo "Starting FastAPI application..."
   uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
   exit 0
@@ -92,5 +125,8 @@ echo "Setting up initial data... (SKIPPED: app/core/init_db.py not found)"
 # "
 
 # FastAPI 애플리케이션 실행
+# Seed shop products (idempotent)
+seed_shop_products || true
+
 echo "Starting FastAPI application..."
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload

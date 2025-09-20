@@ -280,10 +280,12 @@ async def update_mission_progress(
 ):
     """미션 진행 상황 업데이트"""
     # 미션 타입에 따라 진행 상황 업데이트
-    completed = MissionService.update_mission_progress(
-        db, int(getattr(current_user, "id")),
+    # 기존 target_type 기반 메서드가 아닌 mission_id 기반 메서드를 사용 (시그니처 정합)
+    completed = MissionService.update_mission_progress_by_mission_id(
+        db,
+        int(getattr(current_user, "id")),
         request.mission_id,
-        request.progress_increment
+        request.progress_increment,
     )
     _metric("missions", "progress", "success", "y")
     
