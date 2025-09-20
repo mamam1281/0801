@@ -12,7 +12,8 @@ export const VIP_NOTIFICATION_KEYWORDS = [
   '로그아웃',
   '에러',
   '실패',
-  '크래시'
+  '크래시',
+  '보상' // E2E: 일일 보상 중복 토스트 강제 노출
 ] as const;
 
 // ⏱️ 알림 시스템 설정

@@ -1,10 +1,11 @@
-
 import { cookies } from 'next/headers';
+import App from './App';
 
 export default async function Home() {
   const c = await cookies();
   const token = c.get('auth_token')?.value;
   if (!token) {
+    // 서버 리다이렉트 타입 호환 이슈 회피: 클라이언트에서 안전 리다이렉트
     return (
       <>
         <noscript>
@@ -14,17 +15,6 @@ export default async function Home() {
       </>
     );
   }
-  return (
-    <main className="min-h-screen p-4">
-      <div className="max-w-5xl mx-auto">
-        <h1 className="text-2xl font-bold mb-4">Casino Club</h1>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-          <a href="/events" className="p-4 rounded-lg bg-neutral-900 border border-neutral-800 hover:border-neutral-700 transition-colors">
-            <div className="text-lg font-semibold">이벤트</div>
-            <div className="text-sm text-gray-400">참여/보상 수령</div>
-          </a>
-        </div>
-      </div>
-    </main>
-  );
+  // 인증된 경우 전체 애플리케이션 UI 렌더링 (대시보드/내비 포함)
+  return <App />;
 }

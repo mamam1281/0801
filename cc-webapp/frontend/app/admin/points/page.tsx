@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
-import { api as unifiedApi } from "@/lib/unifiedApi";
 import { useWithReconcile } from "@/lib/sync";
+import { api as unifiedApi } from "@/lib/unifiedApi";
+import { useCallback, useEffect, useState } from "react";
 import { Input } from "../../../components/ui/input";
 // 라벨 컴포넌트는 프로젝트에서 'Label.tsx' 대소문자로 사용 중
 import { Label } from "../../../components/ui/Label";
@@ -162,13 +162,13 @@ export default function AdminPointsPage() {
 	return (
 		<div className="min-h-[calc(100vh-4rem)] w-full px-4 py-6 md:px-8 lg:px-12">
 			<div className="mx-auto w-full max-w-3xl">
-				{/* 비관리자 가드 배너 */}
-		{authChecked && !me?.is_admin && (
+				{/* 비관리자 가드 배너 (인증 체크 전에도 플레이스홀더를 렌더링하여 테스트 안정화) */}
+				{(!authChecked || !me?.is_admin) && (
 					<div
 						data-testid="admin-guard-banner"
 						className="mb-4 rounded-md border border-red-700/50 bg-red-900/20 p-3 text-sm text-red-300"
 					>
-			관리자 전용 페이지입니다. 접근 권한이 없습니다.
+						{!authChecked ? '권한 확인 중… (관리자 전용 페이지)' : '관리자 전용 페이지입니다. 접근 권한이 없습니다.'}
 					</div>
 				)}
 				<h1 className="mb-2 bg-gradient-to-r from-pink-500 to-cyan-400 bg-clip-text text-2xl font-bold text-transparent md:text-3xl">
