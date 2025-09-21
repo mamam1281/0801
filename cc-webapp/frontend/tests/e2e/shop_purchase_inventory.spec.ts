@@ -1,13 +1,16 @@
-import { test, expect, request } from '@playwright/test';
+import { expect, request, test } from '@playwright/test';
 
 // 구매 성공 후: 잔액 감소/인벤 증가/이벤트 수신 스펙(가드 포함)
 // 실행 조건: E2E_SHOP_SYNC=1
 
-const API = process.env.API_BASE_URL || 'http://localhost:8000';
+// process 타입 의존 없이 환경변수 안전 접근
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const __env: any = (typeof globalThis !== 'undefined' && (globalThis as any).process && (globalThis as any).process.env) ? (globalThis as any).process.env : {};
+const API = __env.API_BASE_URL || 'http://localhost:8000';
 
 async function signup(ctx: any) {
     const nickname = `shop_${Date.now().toString(36)}`;
-    const invite = process.env.E2E_INVITE_CODE || '5858';
+    const invite = __env.E2E_INVITE_CODE || '5858';
     const res = await ctx.post(`${API}/api/auth/register`, { data: { invite_code: invite, nickname } });
     if (!res.ok()) return null;
     try { return await res.json(); } catch { return null; }
@@ -20,9 +23,25 @@ async function getBalance(ctx: any, token: string) {
 }
 
 async function listProducts(ctx: any, token: string) {
-    const res = await ctx.get(`${API}/api/shop/products`, { headers: { Authorization: `Bearer ${token}` } }).catch(() => null);
+    // 1차: 레거시/문서 상 경로
+    let res = await ctx.get(`${API}/api/shop/products`, { headers: { Authorization: `Bearer ${token}` } }).catch(() => null);
+    // 2차: 또 다른 변종 경로
+    if (!res || !res.ok()) {
+        res = await ctx.get(`${API}/api/shop/items`, { headers: { Authorization: `Bearer ${token}` } }).catch(() => null);
+    }
+    // 3차: 표준 카탈로그 경로 (권장, OpenAPI 상 존재)
+    if (!res || !res.ok()) {
+        res = await ctx.get(`${API}/api/shop/catalog`, { headers: { Authorization: `Bearer ${token}` } }).catch(() => null);
+    }
     if (!res || !res.ok()) return [];
-    try { const j = await res.json(); return Array.isArray(j) ? j : (Array.isArray(j?.items) ? j.items : []); } catch { return []; }
+    try {
+        const j = await res.json();
+        // 가능한 형태: [] | {items:[...]} | {data:[...]} 등
+        if (Array.isArray(j)) return j;
+        if (Array.isArray(j?.items)) return j.items;
+        if (Array.isArray(j?.data)) return j.data;
+        return [];
+    } catch { return []; }
 }
 
 async function buy(ctx: any, token: string, productId: string) {
@@ -34,7 +53,7 @@ async function buy(ctx: any, token: string, productId: string) {
 }
 
 test('[Shop] purchase reduces balance and increases inventory (guarded)', async ({ page, request: rq }: { page: import('@playwright/test').Page; request: import('@playwright/test').APIRequestContext }) => {
-    test.skip(process.env.E2E_SHOP_SYNC !== '1', 'E2E_SHOP_SYNC!=1');
+    test.skip(__env.E2E_SHOP_SYNC !== '1', 'E2E_SHOP_SYNC!=1');
 
     const ctx = await request.newContext();
     const reg = await signup(ctx);

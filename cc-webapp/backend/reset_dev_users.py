@@ -11,6 +11,7 @@
 """
 import os
 import sys
+import json
 from datetime import datetime
 from sqlalchemy import text
 
@@ -86,6 +87,133 @@ def main():
         created.append(upsert_user(db, site_id='user003', nickname='유저03', is_admin=False, gold=1_000))
         created.append(upsert_user(db, site_id='user004', nickname='유저04', is_admin=False, gold=1_000))
         created.append(upsert_user(db, site_id='user005', nickname='유저05', is_admin=False, gold=1_000))
+
+        # 3) 상점 상품 9개 정규화 (화이트리스트만 유지)
+        try:
+            whitelist_products = [
+                {
+                    'product_id': 'anti_bankruptcy',
+                    'name': '한폴방지',
+                    'description': '한폴방지 상품',
+                    'price': 20000,
+                    'is_active': True,
+                    'metadata': {"type": "gold", "gold_amount": 20000},
+                },
+                {
+                    'product_id': 'attendance_connect',
+                    'name': '출석연결',
+                    'description': '출석연결 상품 (월 3회)',
+                    'price': 30000,
+                    'is_active': True,
+                    'metadata': {"type": "gold", "gold_amount": 30000, "monthly_limit": 3},
+                },
+                {
+                    'product_id': 'daily_comp_2x',
+                    'name': '1일 컴프2배',
+                    'description': '1일 컴프2배 상품',
+                    'price': 40000,
+                    'is_active': True,
+                    'metadata': {"type": "gold", "gold_amount": 40000},
+                },
+                {
+                    'product_id': 'charge_30_percent',
+                    'name': '충전30%',
+                    'description': '충전30% 상품 (주 1회)',
+                    'price': 50000,
+                    'is_active': True,
+                    'metadata': {"type": "gold", "gold_amount": 50000, "weekly_limit": 1},
+                },
+                {
+                    'product_id': 'early_promotion',
+                    'name': '조기등업',
+                    'description': '조기등업 상품 (1회만 구매가능)',
+                    'price': 500000,
+                    'is_active': True,
+                    'metadata': {"type": "gold", "gold_amount": 500000, "purchase_limit": 1},
+                },
+                {
+                    'product_id': 'model_30k_voucher',
+                    'name': '모델 30,000 포인트교환권',
+                    'description': '모델 30,000 포인트교환권',
+                    'price': 30000,
+                    'is_active': True,
+                    'metadata': {"type": "voucher", "gold_amount": 30000, "model_points": 30000},
+                },
+                {
+                    'product_id': 'model_105k_voucher',
+                    'name': '모델 105,000 포인트교환권',
+                    'description': '모델 105,000 포인트교환권',
+                    'price': 100000,
+                    'is_active': True,
+                    'metadata': {"type": "voucher", "gold_amount": 100000, "model_points": 105000},
+                },
+                {
+                    'product_id': 'model_330k_voucher',
+                    'name': '모델 330,000 포인트교환권',
+                    'description': '모델 330,000 포인트교환권',
+                    'price': 300000,
+                    'is_active': True,
+                    'metadata': {"type": "voucher", "gold_amount": 300000, "model_points": 330000},
+                },
+                {
+                    'product_id': 'model_1150k_voucher',
+                    'name': '모델 1,150,000 포인트교환권',
+                    'description': '모델 1,150,000 포인트교환권',
+                    'price': 1000000,
+                    'is_active': True,
+                    'metadata': {"type": "voucher", "gold_amount": 1000000, "model_points": 1150000},
+                },
+            ]
+
+            product_ids = ",".join([f"'{p['product_id']}'" for p in whitelist_products])
+
+            # 불필요 상품 제거
+            db.execute(text(f"DELETE FROM shop_products WHERE product_id NOT IN ({product_ids})"))
+
+            # 누락 상품 UPSERT (멱등)
+            for p in whitelist_products:
+                db.execute(
+                    text(
+                        """
+                        INSERT INTO shop_products (product_id, name, description, price, is_active, metadata)
+                        VALUES (:product_id, :name, :description, :price, :is_active, CAST(:metadata AS JSONB))
+                        ON CONFLICT (product_id)
+                        DO UPDATE SET
+                            name = EXCLUDED.name,
+                            description = EXCLUDED.description,
+                            price = EXCLUDED.price,
+                            is_active = EXCLUDED.is_active,
+                            metadata = EXCLUDED.metadata
+                        """
+                    ),
+                    {
+                        'product_id': p['product_id'],
+                        'name': p['name'],
+                        'description': p['description'],
+                        'price': p['price'],
+                        'is_active': p['is_active'],
+                        'metadata': json.dumps(p['metadata']),
+                    },
+                )
+            # product_id가 NULL인 비정상 레코드 정리
+            db.execute(text("DELETE FROM shop_products WHERE product_id IS NULL"))
+
+        except Exception as se:
+            # 상점 정규화 실패는 롤백하고 재-raise (데이터 일관성 보장)
+            db.rollback()
+            raise se
+
+        # 4) 사용자 화이트리스트 강제 정리 (예외 데이터 제거)
+        whitelist_users = ('admin','admin2','user001','user002','user003','user004','user005')
+        db.execute(
+            text(
+                """
+                DELETE FROM users
+                WHERE site_id NOT IN :wl
+                """
+            ),
+            { 'wl': whitelist_users },
+        )
 
         db.commit()
 

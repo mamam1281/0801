@@ -1,12 +1,13 @@
-import { test, expect, request } from '@playwright/test';
+import { expect, request, test } from '@playwright/test';
 
-// 환경 변수 기반 API 오리진
-const __env: any = (typeof process !== 'undefined' ? (process as any).env : {});
+// 환경 변수 기반 API 오리진 (process 타입 의존 제거)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const __env: any = (typeof globalThis !== 'undefined' && (globalThis as any).process && (globalThis as any).process.env) ? (globalThis as any).process.env : {};
 const API = __env.API_BASE_URL || 'http://localhost:8000';
 
 // 유틸: 간단 프로필 조회 (site_id 확보용); 실패시 null
 async function getProfile(ctx: any, token: string) {
-  const res = await ctx.get(`${API}/auth/profile`, {
+  const res = await ctx.get(`${API}/api/auth/profile`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok()) return null;

@@ -24,7 +24,7 @@ async def create_admin_user():
         
         if admin_user:
             # 기존 계정 업데이트
-            setattr(admin_user, 'password_hash', AuthService.get_password_hash('admin123!'))
+            setattr(admin_user, 'password_hash', AuthService.get_password_hash('123456'))
             setattr(admin_user, 'user_rank', 'ADMIN')
             setattr(admin_user, 'is_active', True)
             db.commit()
@@ -35,7 +35,7 @@ async def create_admin_user():
                 site_id='admin',
                 nickname='관리자',
                 phone_number='01000000000',
-                password_hash=AuthService.get_password_hash('admin123!'),
+                password_hash=AuthService.get_password_hash('123456'),
                 invite_code='5858',
                 user_rank='ADMIN',
                 is_active=True,
@@ -47,7 +47,7 @@ async def create_admin_user():
             print('✅ 새 관리자 계정이 생성되었습니다.')
         
         print(f'� 사이트 ID: admin')
-        print(f'🔑 비밀번호: admin123!')
+        print(f'🔑 비밀번호: 123456')
         print(f'👑 VIP 등급: {admin_user.user_rank}')
         print(f'🆔 사용자 ID: {admin_user.id}')
         

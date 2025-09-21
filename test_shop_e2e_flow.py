@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# pyright: reportArgumentType=false
 """
 상점 거래 E2E 플로우 실제 테스트 스크립트
 API 호출 + DB 상태 검증을 통한 전체 거래 플로우 검증
