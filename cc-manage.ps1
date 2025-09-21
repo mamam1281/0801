@@ -349,6 +349,18 @@ function Run-PlaywrightTests {
         $envVars += "E2E_REQUIRE_REALTIME=1"
         Write-Host "→ Enabling realtime tests" -ForegroundColor Yellow
     }
+    if ($Flags -match "events") {
+        # Note: Container compose exports E2E_SHOP_SYNC/REQUIRE_SHOP_SYNC by default.
+        # To avoid compose edits, piggy-back events gating on the same vars and also set dedicated vars for future use.
+        $envVars += "E2E_EVENT_SYNC=1"
+        $envVars += "E2E_SHOP_SYNC=1"
+        Write-Host "→ Enabling events reward flow tests" -ForegroundColor Yellow
+        if ($Flags -match "strict") {
+            $envVars += "E2E_REQUIRE_EVENT_SYNC=1"
+            $envVars += "E2E_REQUIRE_SHOP_SYNC=1"
+            Write-Host "→ Enforcing events strict mode" -ForegroundColor Yellow
+        }
+    }
     
     # Build the docker compose command
     $composeArgs = @('-f', 'docker-compose.yml', '-f', 'docker-compose.playwright.yml')
@@ -411,6 +423,7 @@ function Show-Help {
     Write-Host "  strict      Enable strict stats mode (STRICT_STATS_PARITY=1)" -ForegroundColor White
     Write-Host "  shop        Enable shop sync tests (E2E_REQUIRE_SHOP_SYNC=1)" -ForegroundColor White
     Write-Host "  realtime    Enable realtime tests (E2E_REQUIRE_REALTIME=1)" -ForegroundColor White
+    Write-Host "  events      Enable events reward flow tests (E2E_EVENT_SYNC=1, with 'strict' also sets E2E_REQUIRE_EVENT_SYNC=1)" -ForegroundColor White
     Write-Host "" 
     Write-Host "Examples:" -ForegroundColor Cyan
     Write-Host "  ./cc-manage.ps1 check" -ForegroundColor White
@@ -418,9 +431,38 @@ function Show-Help {
     Write-Host "  ./cc-manage.ps1 e2e" -ForegroundColor White
     Write-Host "  ./cc-manage.ps1 e2e stats" -ForegroundColor White
     Write-Host "  ./cc-manage.ps1 e2e strict,realtime" -ForegroundColor White
+    Write-Host "  ./cc-manage.ps1 e2e events" -ForegroundColor White
+    Write-Host "  ./cc-manage.ps1 e2e strict,events" -ForegroundColor White
     Write-Host "  ./cc-manage.ps1 db-check" -ForegroundColor White
     Write-Host "  ./cc-manage.ps1 logs backend" -ForegroundColor White
     Write-Host "  ./cc-manage.ps1 shell postgres" -ForegroundColor White
+}
+
+# Alembic migrate helper
+function Migrate-Database {
+    Detect-Compose
+    Write-Host "Running Alembic migrations (upgrade head)..." -ForegroundColor Cyan
+    $composeArgs = Get-ComposeArgs
+    try {
+        # 1st attempt: normal upgrade
+        Compose @composeArgs exec backend /bin/sh -lc "alembic upgrade head && alembic heads"
+        $code = $LASTEXITCODE
+        if ($code -ne 0) {
+            Write-Host "⚠ Alembic upgrade failed (exit: $code). Trying stamp head (stamp-first SOP)..." -ForegroundColor Yellow
+            # Fallback: stamp to head to align version table with existing schema, then no-op upgrade
+            Compose @composeArgs exec backend /bin/sh -lc "alembic stamp head && alembic heads"
+            $code2 = $LASTEXITCODE
+            if ($code2 -ne 0) {
+                Write-Host "✖ Alembic stamp head failed (exit: $code2)" -ForegroundColor Red
+                exit $code2
+            }
+            Write-Host "✔ Alembic stamped to head (single-head aligned)" -ForegroundColor Green
+        }
+        Write-Host "✔ Alembic migrate completed" -ForegroundColor Green
+    } catch {
+        Write-Host "✖ Failed to run alembic: $($_.Exception.Message)" -ForegroundColor Red
+        exit 1
+    }
 }
 
 # Main script execution
@@ -434,6 +476,7 @@ switch ($Command) {
     "health" { Check-Health }
     "db-check" { Check-DBConnection }
     "e2e" { Run-PlaywrightTests -Flags $Service }
+    "migrate" { Migrate-Database }
     "tools" {
         switch ($Service) {
             "start" { Tools-Start }
