@@ -304,6 +304,8 @@ _default_origins = [
     "https://127.0.0.1:3000",
     "http://139.180.155.143:3000",
     "https://139.180.155.143:3000",
+    "null",  # 로컬 파일 접근 허용 (file:// 프로토콜)
+    "*",     # 개발환경에서 임시 허용
 ]
 _env_origins = os.getenv("CORS_ORIGINS", "").strip()
 origins = (
@@ -319,8 +321,8 @@ app.add_middleware(SimpleLoggingMiddleware)
 app.add_middleware(LoggingContextMiddleware)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
+    allow_origins=["*"],  # 개발환경에서 모든 origin 허용
+    allow_credentials=False,  # credentials 비활성화 (모든 origin 허용 시 필요)
     allow_methods=["*"],
     allow_headers=["*"],
 )

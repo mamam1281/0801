@@ -252,12 +252,11 @@
             const result = await apiCall('/api/auth/signup', {
                 method: 'POST',
                 body: JSON.stringify({
+                    site_id: `test_${Date.now()}`,
                     nickname: document.getElementById('nickname').value,
-                    email: document.getElementById('email').value,
-                    password: document.getElementById('password').value,
-                    invite_code: document.getElementById('invite_code').value,
-                    site_id: 'casino-club',
-                    phone_number: '+821012345678'
+                    phone_number: '01012345678',
+                    invite_code: '5858',
+                    password: document.getElementById('password').value
                 }),
                 noAuth: true
             });
@@ -269,8 +268,8 @@
             const result = await apiCall('/api/auth/login', {
                 method: 'POST',
                 body: JSON.stringify({
-                    nickname: document.getElementById('nickname').value,
-                    password: document.getElementById('password').value
+                    site_id: 'testuser20250926012525',  // 이미 생성된 테스트 계정 사용
+                    password: '1234'
                 }),
                 noAuth: true
             });
@@ -346,7 +345,7 @@
             const result = await apiCall('/api/auth/admin/login', {
                 method: 'POST',
                 body: JSON.stringify({
-                    nickname: document.getElementById('admin_nickname').value,
+                    site_id: document.getElementById('admin_nickname').value,
                     password: document.getElementById('admin_password').value
                 }),
                 noAuth: true
