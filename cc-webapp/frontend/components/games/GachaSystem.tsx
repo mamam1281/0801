@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { api } from '@/lib/unifiedApi';
 import { useWithReconcile } from '@/lib/sync';
 import { useUserGold } from '@/hooks/useSelectors';
-import { useGlobalStore, mergeProfile, mergeGameStats, applyPurchase } from '@/store/globalStore';
+import { useGlobalStore, mergeProfile, applyPurchase } from '@/store/globalStore';
 import { useGlobalSync } from '@/hooks/useGlobalSync';
 import useAuthToken from '../../hooks/useAuthToken';
 import useFeedback from '../../hooks/useFeedback';
@@ -177,13 +177,8 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
         }
         const epicAdds1 = mapped.filter((i) => i.rarity === 'epic').length;
         const ultraAdds1 = mapped.filter((i) => ['legendary', 'mythic'].includes(i.rarity)).length;
-        // 전역 통계는 표시용 캐시만 가산, 최종 값은 syncAfterGame으로 반영
-        mergeGameStats(dispatch, 'gacha', {
-          pulls: 1,
-          totalSpent: cost,
-          epicCount: epicAdds1,
-          legendaryCount: ultraAdds1,
-        });
+        // 🎯 중요: mergeGameStats 제거 - 누적 버그 방지, 서버 권위 동기화만 사용
+        // mergeGameStats(dispatch, 'gacha', { ... }); // 제거됨
         // onUpdateUser는 인벤토리 표시 호환만 유지(합계 누적 제거)
         const first = mapped[0];
         const updatedUser = updateUserInventory(
@@ -314,13 +309,8 @@ export function GachaSystem({ user, onBack, onUpdateUser, onAddNotification }: G
             }))
           );
         }
-        // 전역 통계는 표시용 캐시만 가산, 최종 값은 syncAfterGame으로 반영
-        mergeGameStats(dispatch, 'gacha', {
-          pulls: 10,
-          totalSpent: discountedCost,
-          epicCount: epicAdds,
-          legendaryCount: ultraAdds,
-        });
+        // 🎯 중요: mergeGameStats 제거 - 누적 버그 방지, 서버 권위 동기화만 사용
+        // mergeGameStats(dispatch, 'gacha', { ... }); // 제거됨
         const updatedUser = mapped.reduce(
           (acc, item) => updateUserInventory(acc as User, item) as User,
           {

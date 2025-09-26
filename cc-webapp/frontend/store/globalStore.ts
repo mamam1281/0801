@@ -7,6 +7,7 @@
 
 import React, { createContext, useContext, useMemo, useReducer } from "react";
 import { api } from "@/lib/unifiedApi";
+import { normalizeGameStatsResponse } from "@/utils/gameStatsNormalizer";
 
 export type GlobalUserProfile = {
     id: string | number;
@@ -15,6 +16,16 @@ export type GlobalUserProfile = {
     gemsBalance?: number;
     level?: number;
     xp?: number;
+    // 게임 통계 필드들 추가
+    experience_points?: number;
+    daily_streak?: number;
+    total_games_played?: number;
+    total_games_won?: number;
+    total_games_lost?: number;
+    win_rate?: number;
+    // 관리자 여부
+    isAdmin?: boolean;
+    is_admin?: boolean;
     updatedAt?: string;
     [k: string]: unknown;
 };
@@ -34,9 +45,11 @@ export type InventoryItem = {
 type GlobalState = {
     // 권위 사용자/밸런스
     profile: GlobalUserProfile | null;
+    user: GlobalUserProfile | null; // sync.tsx 호환성을 위한 별칭
     balances?: { gold: number; gems?: number };
     // 준비 플래그
     hydrated: boolean;
+    ready: boolean; // sync.tsx 호환성을 위한 준비 상태
     lastHydratedAt?: number;
     // 게임별 통계(키: 게임 식별자)
     gameStats?: Record<string, any>;
@@ -52,23 +65,27 @@ type GlobalState = {
 
 type Actions =
     | { type: "SET_PROFILE"; profile: GlobalUserProfile | null }
+    | { type: "SET_USER"; user: GlobalUserProfile | null } // sync.tsx 호환성
     | { type: "SET_HYDRATED"; value: boolean }
+    | { type: "SET_READY"; ready: boolean } // sync.tsx 호환성
     | { type: "PATCH_BALANCES"; delta: { gold?: number; gems?: number } }
+    | { type: "SET_BALANCES"; balances: { gold: number; gems?: number } } // sync.tsx 호환성
     | { type: "APPLY_REWARD"; award: { gold?: number; gems?: number } }
     | { type: "MERGE_PROFILE"; patch: Partial<GlobalUserProfile> & Record<string, unknown> }
     | { type: "MERGE_GAME_STATS"; game: string; delta: Record<string, any> }
+    | { type: "SET_GAME_STATS"; gameStats: Record<string, any> } // sync.tsx 호환성
     | { type: "APPLY_PURCHASE"; items: InventoryItem[]; replace?: boolean }
     | { type: "SET_ERROR"; error: { message: string; at: number } | null }
-    | { type: "SET_BALANCES"; balances: { gold: number; gems?: number } }
     | { type: "SET_STREAK"; streak: Record<string, any> }
     | { type: "SET_EVENTS"; events: Record<string, any> }
-    | { type: "SET_GAME_STATS"; gameStats: Record<string, any> }
     | { type: "PUSH_NOTIFICATION"; item: { id: string; type: string; message: string; at: number } };
 
 const initialState: GlobalState = {
     profile: null,
+    user: null, // sync.tsx 호환성을 위한 별칭
     balances: { gold: 0, gems: 0 },
     hydrated: false,
+    ready: false, // sync.tsx 호환성을 위한 준비 상태
     lastHydratedAt: undefined,
     gameStats: {},
     inventory: [],
@@ -81,7 +98,11 @@ const initialState: GlobalState = {
 function reducer(state: GlobalState, action: Actions): GlobalState {
     switch (action.type) {
         case "SET_PROFILE":
-            return { ...state, profile: action.profile, hydrated: true, lastHydratedAt: Date.now() };
+            return { ...state, profile: action.profile, user: action.profile, hydrated: true, lastHydratedAt: Date.now() };
+        case "SET_USER":
+            return { ...state, user: action.user, profile: action.user, hydrated: true, lastHydratedAt: Date.now() };
+        case "SET_READY":
+            return { ...state, ready: action.ready };
     case "SET_HYDRATED":
             return { ...state, hydrated: action.value, lastHydratedAt: action.value ? Date.now() : state.lastHydratedAt };
         case "PATCH_BALANCES": {
@@ -251,7 +272,13 @@ export async function hydrateFromServer(dispatch: DispatchFn) {
             goldBalance: Number.isFinite(Number(goldFromBalanceRaw)) ? Number(goldFromBalanceRaw) : Number(me?.gold ?? me?.gold_balance ?? 0),
             gemsBalance: Number(me?.gems ?? me?.gems_balance ?? 0),
             level: me?.level ?? me?.battlepass_level ?? undefined,
-            xp: me?.xp ?? undefined,
+            // XP/experience normalization
+            xp: me?.experience_points ?? me?.experience ?? me?.xp ?? 0,
+            experience_points: me?.experience_points ?? me?.experience ?? me?.xp ?? 0,
+            maxExperience: me?.max_experience ?? me?.maxExperience ?? 1000,
+            // daily streak normalization (server may use snake_case or camelCase)
+            daily_streak: me?.daily_streak ?? me?.dailyStreak ?? me?.streak ?? 0,
+            dailyStreak: me?.daily_streak ?? me?.dailyStreak ?? me?.streak ?? 0,
             updatedAt: new Date().toISOString(),
             ...me,
         } as GlobalUserProfile as any;
@@ -259,7 +286,18 @@ export async function hydrateFromServer(dispatch: DispatchFn) {
         setProfile(dispatch, mapped);
         dispatch({ type: "SET_BALANCES", balances });
         if (stats && typeof stats === 'object') {
-            try { dispatch({ type: "MERGE_GAME_STATS", game: "_me", delta: stats as any }); } catch { /* noop */ }
+            try { 
+                console.log('[hydrateFromServer] 원본 게임 통계:', stats);
+                // 백엔드 응답을 프론트엔드 형식으로 변환
+                const normalizedStats = normalizeGameStatsResponse(stats);
+                console.log('[hydrateFromServer] 정규화된 게임 통계:', normalizedStats);
+                dispatch({ type: "SET_GAME_STATS", gameStats: normalizedStats }); 
+                console.log('[hydrateFromServer] 게임 통계 스토어에 저장 완료');
+            } catch (e) { 
+                console.warn('게임 통계 처리 실패:', e);
+            }
+        } else {
+            console.warn('[hydrateFromServer] 게임 통계 데이터 없음:', stats);
         }
     } catch (e:any) {
         dispatch({ type: "SET_ERROR", error: { message: e?.message || "hydrateFromServer failed", at: Date.now() } });

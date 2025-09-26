@@ -1,11 +1,19 @@
-import React from 'react';
+
 import App from '../App';
+import { cookies } from 'next/headers';
 
-export const metadata = {
-  title: 'Shop - Casino-Club F2P',
-  description: 'Browse and purchase in-game items in the Casino-Club F2P shop.',
-};
-
-export default function ShopPage() {
-  return <App />;
+export default async function ShopPage() {
+  const c = await cookies();
+  const token = c.get('auth_token')?.value;
+  if (!token) {
+    return (
+      <>
+        <noscript>
+          <meta httpEquiv="refresh" content="0;url=/login" />
+        </noscript>
+        <script dangerouslySetInnerHTML={{ __html: "location.replace('/login');" }} />
+      </>
+    );
+  }
+  return <App isAuthenticated={true} />;
 }

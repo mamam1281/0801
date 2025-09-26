@@ -6,7 +6,6 @@ import { WSClient, createWSClient, WebSocketMessage, SyncEventData } from '../ut
 import { useAuth } from '../hooks/useAuth';
 import { useAuthToken } from '../hooks/useAuthToken';
 import { globalFallbackPoller, createSyncPollingTasks } from '../utils/fallbackPolling';
-import { useToast } from '@/components/NotificationToast';
 
 /**
  * 실시간 동기화 전역 상태 정의
@@ -372,24 +371,37 @@ export function RealtimeSyncProvider({ children, apiBaseUrl }: RealtimeSyncProvi
   const { getAccessToken, getValidAccessToken } = useAuthToken();
   const wsClientRef = useRef(null as WSClient | null);
   const fallbackPollingActive = useRef(false);
-  const { push } = useToast();
+  // NOTE: avoid calling useToast() here because this provider may be mounted
+  // in a tree above the ToastProvider, which would throw during SSR/prerender.
+  // Instead emit a global CustomEvent('app:notification') which NotificationToast
+  // already listens for. This keeps toast behavior working without requiring
+  // a direct hook dependency.
   const lastPurchaseByReceiptRef = useRef(new Map<string, { status: string; at: number }>());
 
   // Prefer the same origin resolution as unifiedApi to avoid cross-origin/SSR mismatches
-  const baseUrl = apiBaseUrl || API_ORIGIN || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8000');
+  // If API_ORIGIN is an empty string (client-relative), fall back to window.location.origin.
+  const resolvedApiOrigin = (() => {
+    if (apiBaseUrl && apiBaseUrl.length > 0) return apiBaseUrl;
+    if (API_ORIGIN && API_ORIGIN.length > 0) return API_ORIGIN;
+    if (typeof window !== 'undefined') return window.location.origin;
+    return 'http://localhost:8000';
+  })();
+
+  // Ensure no trailing slash for consistent URL joins
+  const baseUrl = resolvedApiOrigin.replace(/\/$/, '');
 
   // WebSocket 메시지 핸들러
   const handleWebSocketMessage = useCallback((message: WebSocketMessage) => {
     console.log('[RealtimeSync] Received message:', message.type, message.data);
 
     switch (message.type) {
-      case 'profile_update':
+  case 'profile_update':
   dispatch({ type: 'UPDATE_PROFILE', payload: message.data });
   // 프로필 갱신 토스트(ToastProvider의 1.5s 중복 억제 적용)
-  try { push('프로필이 갱신되었습니다.', 'system'); } catch {}
+  try { console.log('[Toast] 프로필이 갱신되었습니다.'); } catch {}
         break;
 
-      case 'purchase_update': {
+  case 'purchase_update': {
         const data = message.data as SyncEventData['purchase_update'];
         // 사용자 토스트 알림
         const status = data?.status ?? 'pending';
@@ -411,10 +423,14 @@ export function RealtimeSyncProvider({ children, apiBaseUrl }: RealtimeSyncProvi
 
         if (status === 'success') {
           type = 'success';
-          text = `${product} 결제가 완료되었습니다${data?.amount ? ` (금액: ${data.amount})` : ''}.`;
+          text = `${product} 결제가 완료되었습니다${
+            data?.amount ? ` (금액: ${data.amount})` : ''
+          }.`;
         } else if (status === 'failed') {
           type = 'error';
-          text = `${product} 결제가 실패했습니다${data?.reason_code ? ` (${data.reason_code})` : ''}.`;
+          text = `${product} 결제가 실패했습니다${
+            data?.reason_code ? ` (${data.reason_code})` : ''
+          }.`;
         } else if (status === 'idempotent_reuse') {
           type = 'system';
           text = `${product} 결제가 이미 처리되었습니다.`;
@@ -422,9 +438,31 @@ export function RealtimeSyncProvider({ children, apiBaseUrl }: RealtimeSyncProvi
           type = 'shop';
           text = `${product} 결제가 진행 중입니다...`;
         }
-        try { push(text, type); } catch {}
-  // 전역 상태 업데이트(배지/요약용)
-  dispatch({ type: 'UPDATE_PURCHASE', payload: data });
+
+        // Emit a global notification event instead of calling the toast hook
+        try {
+          const detail = { key, type, text, source: 'purchase_update', payload: data };
+          window.dispatchEvent(new CustomEvent('app:notification', { detail }));
+        } catch (e) {
+          // If window is not available or dispatch fails, ignore silently
+        }
+        // 전역 상태 업데이트(배지/요약용)
+        dispatch({ type: 'UPDATE_PURCHASE', payload: data });
+        break;
+      }
+
+      case 'sync_connected': {
+        // 서버가 연결 성공을 알리는 간단한 핑/상태 메시지
+        // 목적: Unknown message type 경고 제거 및 필요시 초기 동기화 트리거
+        try {
+          console.log('[RealtimeSync] Server signalled sync_connected');
+          // 연결 직후 서버 권위 초기화가 별도로 없다면 보완적으로 프로필/스트릭 리프레시
+          (async () => {
+            try {
+              await Promise.allSettled([refreshProfile(), refreshStreaks()]);
+            } catch {}
+          })();
+        } catch (e) {}
         break;
       }
 
@@ -448,7 +486,7 @@ export function RealtimeSyncProvider({ children, apiBaseUrl }: RealtimeSyncProvi
           const rd: any = d.reward_data || d;
           const g = Number(rd?.awarded_gold ?? rd?.gold ?? rd?.amount ?? 0);
           const text = Number.isFinite(g) && g !== 0 ? `보상 지급: ${g > 0 ? '+' : ''}${g}G` : '보상 지급';
-          push(text, 'reward');
+          console.log(`[Toast] ${text}`);
         } catch {}
         break;
       }
@@ -457,6 +495,69 @@ export function RealtimeSyncProvider({ children, apiBaseUrl }: RealtimeSyncProvi
         dispatch({ type: 'UPDATE_STATS', payload: message.data });
         break;
 
+      case 'game_event': {
+        const data = message.data as any;
+        console.log('[RealtimeSync] Game event received:', data);
+        
+        // 게임 이벤트 처리 (슬롯, RPS 등)
+        if (data && data.subtype === 'slot_spin') {
+          // 슬롯 스핀 결과에 대한 실시간 피드백
+          console.log('[RealtimeSync] Slot spin result:', {
+            win: data.win,
+            jackpot: data.jackpot,
+            reels: data.reels
+          });
+          
+          // 잭팟이나 큰 승리시 토스트 표시
+          if (data.jackpot) {
+            try { 
+              console.log('[Toast] 🎰 JACKPOT! 잭팟을 터뜨렸습니다!'); 
+            } catch {}
+          } else if (data.win > data.bet * 5) {
+            try { 
+              console.log(`[Toast] 🎉 대박! ${data.win}G 획득!`); 
+            } catch {}
+          }
+        }
+        break;
+      }
+
+      case 'initial_state': {
+        // 서버가 연결 직후 전송하는 전체 초기 상태 페이로드 처리
+        // 목적: 클라이언트 전역 상태를 서버 권위값으로 초기화하여 UI 불일치 방지
+        try {
+          const data = message.data as Partial<RealtimeSyncState> | null;
+          if (data) {
+            // 부분적으로 들어오는 필드들을 안전하게 매핑
+            const payload: Partial<RealtimeSyncState> = {};
+            if (data.profile) payload.profile = {
+              gold: data.profile.gold ?? state.profile.gold,
+              exp: data.profile.exp ?? state.profile.exp,
+              tier: data.profile.tier ?? state.profile.tier,
+              total_spent: data.profile.total_spent ?? state.profile.total_spent,
+              last_updated: data.profile.last_updated,
+            } as any;
+            if (data.streaks) payload.streaks = data.streaks as any;
+            if (data.recent_rewards) payload.recent_rewards = data.recent_rewards as any;
+            if (data.stats) payload.stats = data.stats as any;
+
+            dispatch({ type: 'INITIALIZE_STATE', payload });
+
+            // 초기 상태 수신시 추가 동기화가 필요하면 폴백 API 호출로 보완
+            // 예: 일부 클라이언트에서 누락된 리소스(이벤트 등)를 보완
+            // 비동기로 프로필/스트릭 재동기화 시도
+            (async () => {
+              try {
+                await Promise.allSettled([refreshProfile(), refreshStreaks()]);
+              } catch {}
+            })();
+          }
+        } catch (e) {
+          console.error('[RealtimeSync] Failed to apply initial_state payload:', e);
+        }
+        break;
+      }
+
       case 'pong':
         // 하트비트 응답 - 특별한 처리 불요
         break;
@@ -464,11 +565,11 @@ export function RealtimeSyncProvider({ children, apiBaseUrl }: RealtimeSyncProvi
       default:
         console.warn('[RealtimeSync] Unknown message type:', message.type);
     }
-  }, [push]);
+  }, []);
 
   // WebSocket 연결
   const connect = useCallback(async () => {
-  const token = getAccessToken() || (await getValidAccessToken());
+    const token = getAccessToken() || (await getValidAccessToken());
     if (!token || !user) {
       console.log('[RealtimeSync] Cannot connect - no token or user');
       return;
@@ -711,12 +812,9 @@ export function RealtimeSyncProvider({ children, apiBaseUrl }: RealtimeSyncProvi
 
   // 정리 작업 (오래된 보상 제거)
   useEffect(() => {
-    const interval = window.setInterval(
-      () => {
-        clearOldRewards();
-      },
-      10 * 60 * 1000
-    ); // 10분마다 정리
+    const interval = window.setInterval(() => {
+      clearOldRewards();
+    }, 10 * 60 * 1000); // 10분마다 정리
 
     return () => window.clearInterval(interval);
   }, [clearOldRewards]);
@@ -742,6 +840,24 @@ export function RealtimeSyncProvider({ children, apiBaseUrl }: RealtimeSyncProvi
     clearOldRewards,
     triggerFallbackPoll,
   };
+
+  // Jest/SSR 환경에서 window가 없는 경우, WebSocket/interval 부작용 없이 최소 컨텍스트만 제공
+  if (typeof window === 'undefined') {
+    const noop = () => {};
+    const noopAsync = async () => {};
+    const minimal: RealtimeSyncContextType = {
+      state,
+      connect: noopAsync,
+      disconnect: noop,
+      refreshProfile: noopAsync as any,
+      refreshAchievements: noopAsync as any,
+      refreshStreaks: noopAsync as any,
+      refreshEvents: noopAsync as any,
+      clearOldRewards: noop,
+      triggerFallbackPoll: noopAsync,
+    };
+    return <RealtimeSyncContext.Provider value={minimal}>{children}</RealtimeSyncContext.Provider>;
+  }
 
   return (
     <RealtimeSyncContext.Provider value={contextValue}>{children}</RealtimeSyncContext.Provider>

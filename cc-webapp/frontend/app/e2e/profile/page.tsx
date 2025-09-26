@@ -1,7 +1,7 @@
 'use client';
 
-import React from 'react';
 import { ProfileScreen } from '@/components/ProfileScreen';
+import ActionHistory from '@/components/profile/ActionHistory';
 
 export default function E2EProfilePage() {
   return (
@@ -14,6 +14,10 @@ export default function E2EProfilePage() {
         maxRetries={0}
         retryDelayMs={0}
       />
+      {/* E2E 전용: 액션 이력 컴포넌트를 명시적으로 포함하여 selector 안정화 */}
+      <div className="mt-4">
+        <ActionHistory pageSize={10} />
+      </div>
     </div>
   );
 }

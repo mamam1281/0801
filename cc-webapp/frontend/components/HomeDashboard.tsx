@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { User } from '../types';
 import { calculateExperiencePercentage, calculateWinRate, checkLevelUp } from '../utils/userUtils';
+import { calculateLevelProgress } from '../utils/levelUtils';
 import { QUICK_ACTIONS, ACHIEVEMENTS_DATA } from '../constants/dashboardData';
 import { Button } from './ui/button';
 import { useGameConfig } from '../hooks/useGameConfig';
@@ -64,10 +65,21 @@ export function HomeDashboard({
 }: HomeDashboardProps) {
   // 전역 동기화 사용
   const globalProfile = useGlobalProfile();
-  const { syncAll, syncAfterGame, isHydrated } = useGlobalSync();
+  const { syncAll, syncAfterGame, syncProfile, isHydrated } = useGlobalSync();
   const goldFromStore = useUserGold();
-  const levelFromStore = useUserLevel();
+  // null-safe level 값 보장
+  const levelFromStore = Number(useUserLevel() ?? 1);
   const router = useRouter();
+
+  // 연속일 동기화: globalProfile.daily_streak를 우선 사용
+  useEffect(() => {
+    if (globalProfile?.daily_streak !== undefined) {
+      setStreak((prev: StreakState) => ({
+        ...prev,
+        count: globalProfile.daily_streak ?? 0
+      }));
+    }
+  }, [globalProfile?.daily_streak]);
 
   // 초기 동기화
   useEffect(() => {
@@ -98,9 +110,9 @@ export function HomeDashboard({
   );
   const [isAchievementsExpanded, setIsAchievementsExpanded] = useState(false);
   const [streak, setStreak] = useState({
-    count: user?.dailyStreak ?? 0,
+    count: globalProfile?.daily_streak ?? user?.dailyStreak ?? 0,
     ttl_seconds: null as number | null,
-    next_reward: null as string | null,
+    // next_reward 필드 제거 (2025-01-09)
   });
   // streakProtection 토글 기능 제거(요구사항: 보호 토글/표시 제거) → 관련 상태/호출 삭제
   // const [streakProtection, setStreakProtection] = useState(null as boolean | null);
@@ -112,8 +124,8 @@ export function HomeDashboard({
       return [] as { id: number; x: number; y: number; delay: number }[];
     return Array.from({ length: 20 }).map((_, i) => ({
       id: i,
-      x: Math.random() * window.innerWidth,
-      y: Math.random() * window.innerHeight,
+      x: Math.random() * (typeof window !== 'undefined' ? window.innerWidth : 1920),
+      y: Math.random() * (typeof window !== 'undefined' ? window.innerHeight : 1080),
       delay: i * 0.3,
     }));
   });
@@ -122,13 +134,12 @@ export function HomeDashboard({
   interface StreakState {
     count: number;
     ttl_seconds: number | null;
-    next_reward: string | null;
+    // next_reward 필드 제거 (2025-01-09)
   }
   const safeSetStreak = (next: StreakState) => {
     setStreak((prev: StreakState) =>
       prev.count === next.count &&
-      prev.ttl_seconds === next.ttl_seconds &&
-      prev.next_reward === next.next_reward
+      prev.ttl_seconds === next.ttl_seconds
         ? prev
         : next
     );
@@ -180,7 +191,7 @@ export function HomeDashboard({
         safeSetStreak({
           count: s?.count ?? 0,
           ttl_seconds: s?.ttl_seconds ?? null,
-          next_reward: s?.next_reward ?? null,
+          // next_reward 필드 제거 (2025-01-09)
         });
         if (typeof s?.claimed_today !== 'undefined') setDailyClaimed(!!s.claimed_today);
       } catch {}
@@ -293,6 +304,15 @@ export function HomeDashboard({
     }
 
     try {
+      // 🔄 먼저 streak tick을 호출하여 연속일수 증가
+      try {
+        const tickData = await unifiedApi.post('streak/tick', { action_type: 'DAILY_LOGIN' });
+        console.log('[streak.tick] success:', tickData);
+      } catch (tickError) {
+        console.warn('[streak.tick] failed, continuing with claim:', tickError);
+        // tick 실패해도 claim은 계속 진행
+      }
+
       const data = await unifiedApi.post('streak/claim', { action_type: 'DAILY_LOGIN' });
       // data: { awarded_gold, awarded_xp, new_gold_balance, streak_count }
       const fallback = {
@@ -320,18 +340,24 @@ export function HomeDashboard({
         rewardMessages.success(
           data.awarded_gold || 0,
           data.awarded_xp || 0,
-          (streak.count || user.dailyStreak || 0) + 0
+          (globalProfile?.daily_streak ?? streak.count ?? 0) + 0
         )
       );
       setShowDailyReward(false);
       setDailyClaimed(true);
+      // 🔄 프로필 동기화로 daily_streak 업데이트
+      try {
+        await syncProfile();
+      } catch (e) {
+        console.warn('[streak.claim] Profile sync failed:', e);
+      }
       // streak/status 재조회로 상태 동기화
       try {
         const s: any = await unifiedApi.get('streak/status');
         safeSetStreak({
           count: s?.count ?? 0,
           ttl_seconds: s?.ttl_seconds ?? null,
-          next_reward: s?.next_reward ?? null,
+          // next_reward 필드 제거 (2025-01-09)
         });
         if (typeof s?.claimed_today !== 'undefined') setDailyClaimed(!!s.claimed_today);
       } catch {}
@@ -419,7 +445,7 @@ export function HomeDashboard({
         case 'gold_100k':
           return user.goldBalance >= 100000;
         case 'daily_7':
-          return (streak.count ?? user.dailyStreak) >= 7;
+          return (globalProfile?.daily_streak ?? streak.count ?? 0) >= 7;
         default:
           return false;
       }
@@ -698,17 +724,23 @@ export function HomeDashboard({
               </div>
               <div className="grid grid-cols-3 gap-3 text-center">
                 <div className="bg-secondary/40 rounded-lg p-3">
-                  <div className="text-2xl font-bold text-primary">{streak.count}</div>
+                  <div className="text-2xl font-bold text-primary">
+                    {(() => {
+                      const streakCountRaw = globalProfile?.daily_streak ?? streak.count ?? 0;
+                      const displayStreak = streakCountRaw === 0 ? 1 : streakCountRaw; // 시작일을 1로 표기
+                      return displayStreak;
+                    })()}
+                  </div>
                   <div className="text-xs text-muted-foreground">연속일</div>
                 </div>
+                {/* 다음 보상 타입 표시 제거 (2025-01-09) */}
                 <div className="bg-secondary/40 rounded-lg p-3">
-                  <div className="text-sm font-bold text-gold">
-                    {streak.next_reward || 'Coins + XP'}
-                  </div>
-                  <div className="text-xs text-muted-foreground">다음 보상</div>
-                </div>
-                <div className="bg-secondary/40 rounded-lg p-3">
-                  <Button size="sm" className="w-full" onClick={() => setShowDailyReward(true)}>
+                  <Button
+                    size="sm"
+                    className="w-full"
+                    data-testid="open-daily-reward"
+                    onClick={() => setShowDailyReward(true)}
+                  >
                     보상 보기
                   </Button>
                 </div>
@@ -890,23 +922,35 @@ export function HomeDashboard({
 
               <h3 className="text-2xl font-bold text-gold mb-2">일일 보상!</h3>
               <p className="text-muted-foreground mb-6">
-                연속 {streak.count ?? user.dailyStreak}일 접속 보너스를 받으세요!
+                {(() => {
+                  const streakCountRaw = globalProfile?.daily_streak ?? streak.count ?? 0;
+                  const displayStreak = streakCountRaw === 0 ? 1 : streakCountRaw;
+                  return `연속 ${displayStreak}일 접속 보너스를 받으세요!`;
+                })()}
               </p>
 
               <div className="bg-gold-soft rounded-lg p-4 mb-6">
                 <div className="text-gold font-bold text-xl">
                   {/* 서버 설정 기반 일일 보너스 계산 */}
                   {(
-                    gameConfig.dailyBonusBase +
-                    (streak.count ?? user.dailyStreak) * gameConfig.dailyBonusPerStreak
+                    (() => {
+                      const streakCountRaw = globalProfile?.daily_streak ?? streak.count ?? 0;
+                      const displayStreak = streakCountRaw === 0 ? 1 : streakCountRaw;
+                      return gameConfig.dailyBonusBase + displayStreak * gameConfig.dailyBonusPerStreak;
+                    })()
                   ).toLocaleString()}
                   G
                 </div>
                 <div className="text-sm text-muted-foreground">
                   {/* 서버 설정 기반 XP 계산 */}+{' '}
-                  {Math.floor(gameConfig.dailyBonusBase / 20) +
-                    (streak.count ?? user.dailyStreak) *
-                      Math.floor(gameConfig.dailyBonusPerStreak / 8)}{' '}
+                  {(() => {
+                    const streakCountRaw = globalProfile?.daily_streak ?? streak.count ?? 0;
+                    const displayStreak = streakCountRaw === 0 ? 1 : streakCountRaw;
+                    return (
+                      Math.floor(gameConfig.dailyBonusBase / 20) +
+                      displayStreak * Math.floor(gameConfig.dailyBonusPerStreak / 8)
+                    );
+                  })()}{' '}
                   XP
                 </div>
               </div>
@@ -947,7 +991,7 @@ export function HomeDashboard({
               </motion.div>
 
               <h3 className="text-3xl font-bold text-gradient-primary mb-2">레벨업!</h3>
-              <p className="text-xl text-gold font-bold mb-4">레벨 {user.level}</p>
+              <p className="text-xl text-gold font-bold mb-4">레벨 {levelFromStore}</p>
               <p className="text-muted-foreground mb-6">축하합니다! 새로운 레벨에 도달했습니다!</p>
 
               <Button

@@ -28,6 +28,7 @@ import {
   Eye,
   Settings
 } from 'lucide-react';
+import { useGlobalStore } from '@/store/globalStore';
 import { User, Event, Mission } from '../types';
 import { EventBackend, MissionBackend, UserMissionBackend } from '../types/eventMission';
 import { eventMissionApi } from '../utils/eventMissionApi';
@@ -196,6 +197,8 @@ export function EventMissionPanel({
     if (!authReady) return;
     fetchData();
   }, [authReady, authenticated]);
+
+  const { dispatch } = useGlobalStore();
 
   // Statistics
   const activeEvents = events.filter((e: Event) => e.status === 'active').length;
@@ -383,8 +386,8 @@ export function EventMissionPanel({
             key={i}
             initial={{
               opacity: 0,
-              x: Math.random() * window.innerWidth,
-              y: Math.random() * window.innerHeight,
+              x: Math.random() * (typeof window !== 'undefined' ? window.innerWidth : 1920),
+              y: Math.random() * (typeof window !== 'undefined' ? window.innerHeight : 1080),
             }}
             animate={{
               opacity: [0, 0.3, 0],

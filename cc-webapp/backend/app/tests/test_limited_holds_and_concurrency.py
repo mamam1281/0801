@@ -86,6 +86,8 @@ def setup_module(module):
             for m, s in list(z.items()):
                 if s <= high and s >= low:
                     z.pop(m, None)
+        def exists(self, key):
+            return 1 if key in self.store else 0
     init_redis_manager(_FakeRedis())
 
     # create a user

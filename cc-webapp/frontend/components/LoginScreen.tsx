@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { apiLogTry, apiLogSuccess, apiLogFail } from '../utils/apiLogger';
 import { 
@@ -40,12 +40,31 @@ export function LoginScreen({
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // 🎯 디버깅용 로그
+  React.useEffect(() => {
+    console.log('[LoginScreen] 🔧 DEBUG - props 타입 확인:', {
+      onSwitchToSignup: typeof onSwitchToSignup,
+      onAdminAccess: typeof onAdminAccess,
+      isOnSwitchToSignupFunction: typeof onSwitchToSignup === 'function',
+      isOnAdminAccessFunction: typeof onAdminAccess === 'function'
+    });
+    console.log('[LoginScreen] 상태 업데이트:', {
+      isLoading,
+      isSubmitting,
+      hasOnSwitchToSignup: !!onSwitchToSignup,
+      hasOnAdminAccess: !!onAdminAccess,
+      disabled: isSubmitting || isLoading
+    });
+  }, [isLoading, isSubmitting, onSwitchToSignup, onAdminAccess]);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    console.log('[LoginScreen] handleLogin 시작, onLogin 함수:', !!onLogin);
     apiLogTry('POST /api/auth/login');
 
     const { nickname, password } = formData;
+    console.log('[LoginScreen] 입력값:', { nickname, password: '***' });
 
     if (!nickname || !password) {
       setError('모든 필드를 입력해주세요.');
@@ -55,7 +74,9 @@ export function LoginScreen({
 
     setIsSubmitting(true);
     try {
+      console.log('[LoginScreen] onLogin 호출 직전');
       const success = onLogin ? await onLogin(nickname, password) : false;
+      console.log('[LoginScreen] onLogin 결과:', success);
       if (success) {
         apiLogSuccess('POST /api/auth/login');
       } else {
@@ -80,28 +101,40 @@ export function LoginScreen({
     <div className="min-h-screen bg-gradient-to-br from-background via-black to-primary/10 flex items-center justify-center p-4 relative overflow-hidden">
       {/* Animated Background Elements */}
       <div className="absolute inset-0">
-        {[...Array(15)].map((_, i) => (
-          <motion.div
-            key={i}
-            initial={{
-              opacity: 0,
-              x: Math.random() * window.innerWidth,
-              y: Math.random() * window.innerHeight,
-            }}
-            animate={{
-              opacity: [0, 0.3, 0],
-              scale: [0, 1, 0],
-              rotate: 360,
-            }}
-            transition={{
-              duration: 8,
-              repeat: Infinity,
-              delay: i * 0.5,
-              ease: 'easeInOut',
-            }}
-            className="absolute w-1 h-1 bg-primary rounded-full"
-          />
-        ))}
+        {[...Array(15)].map((_, i) => {
+          // SSR에서는 고정값, CSR에서는 useEffect로 랜덤 위치 적용
+          const [pos, setPos] = useState({ x: 0, y: 0 });
+          useEffect(() => {
+            if (typeof window !== 'undefined') {
+              setPos({
+                x: Math.random() * (typeof window !== 'undefined' ? window.innerWidth : 1920),
+                y: Math.random() * (typeof window !== 'undefined' ? window.innerHeight : 1080),
+              });
+            }
+          }, []);
+          return (
+            <motion.div
+              key={i}
+              initial={{
+                opacity: 0,
+                x: pos.x,
+                y: pos.y,
+              }}
+              animate={{
+                opacity: [0, 0.3, 0],
+                scale: [0, 1, 0],
+                rotate: 360,
+              }}
+              transition={{
+                duration: 8,
+                repeat: Infinity,
+                delay: i * 0.5,
+                ease: 'easeInOut',
+              }}
+              className="absolute w-32 h-32 bg-primary/10 rounded-full blur-2xl"
+            />
+          );
+        })}
       </div>
 
       {/* Main Login Card */}
@@ -159,7 +192,7 @@ export function LoginScreen({
             {/* Nickname Field */}
             <div className="space-y-2">
               <Label htmlFor="nickname" className="text-foreground">
-                닉네임
+                사용자 ID
               </Label>
               <div className="relative">
                 <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
@@ -168,11 +201,14 @@ export function LoginScreen({
                   type="text"
                   value={formData.nickname}
                   onChange={handleInputChange('nickname')}
-                  placeholder="닉네임을 입력하세요"
+                  placeholder="user001, admin 등 사용자 ID를 입력하세요"
                   className="pl-10 bg-input-background border-input-border focus:border-primary focus:ring-primary/20 text-foreground"
                   disabled={isSubmitting || isLoading}
                 />
               </div>
+              <p className="text-xs text-muted-foreground">
+                💡 테스트 계정: admin/123456, user001-004/123455
+              </p>
             </div>
 
             {/* Password Field */}
@@ -192,6 +228,9 @@ export function LoginScreen({
                   disabled={isSubmitting || isLoading}
                 />
                 <button
+                  aria-label={showPassword ? '비밀번호 숨기기' : '비밀번호 보이기'}
+                  title={showPassword ? '비밀번호 숨기기' : '비밀번호 보이기'}
+                  aria-pressed={showPassword}
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
@@ -252,7 +291,10 @@ export function LoginScreen({
             <Button
               type="button"
               variant="outline"
-              onClick={onSwitchToSignup}
+              onClick={() => {
+                console.log('[LoginScreen] 회원가입 버튼 클릭됨, onSwitchToSignup 함수:', !!onSwitchToSignup);
+                onSwitchToSignup?.();
+              }}
               className="w-full border-border-secondary hover:border-primary hover:bg-primary/10 text-foreground flex items-center justify-center gap-2"
               disabled={isSubmitting || isLoading}
             >
@@ -263,7 +305,10 @@ export function LoginScreen({
             {/* Admin Access Button */}
             <button
               type="button"
-              onClick={onAdminAccess}
+              onClick={() => {
+                console.log('[LoginScreen] 관리자 로그인 버튼 클릭됨, onAdminAccess 함수:', !!onAdminAccess);
+                onAdminAccess?.();
+              }}
               className="w-full p-2 text-xs text-muted-foreground hover:text-primary transition-colors flex items-center justify-center gap-1"
               disabled={isSubmitting || isLoading}
             >

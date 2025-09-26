@@ -28,10 +28,29 @@ function normalizeEntry(e: any): Record<string, any> | undefined {
 export function useGlobalTotalGames(): number {
   const { state } = useGlobalStore();
   return useMemo(() => {
-    const stats = state?.gameStats || {};
-    const entries = Object.values(stats);
-    if (!entries.length) return 0;
-  return entries.reduce((acc: number, e: any) => acc + firstNumber(normalizeEntry(e), [...TOTAL_KEYS_GLOBAL]), 0 as number);
+      const stats = state?.gameStats || {};
+      // _global 제외하고 개별 게임 통계만 계산 (중복 방지)
+      const gameEntries = Object.entries(stats)
+        .filter(([key, entry]) => key !== '_global' && entry && Object.keys(entry).length > 0)
+        .map(([, entry]) => entry);
+      
+      console.log('[useGlobalTotalGames] 전역 스토어 게임 통계:', stats);
+      console.log('[useGlobalTotalGames] 개별 게임 엔트리들 (_global 제외):', gameEntries);
+      
+      if (!gameEntries.length) {
+        console.log('[useGlobalTotalGames] 게임 통계 엔트리 없음');
+        return 0;
+      }
+      
+      const total = gameEntries.reduce((acc: number, e: any) => {
+        const normalized = normalizeEntry(e);
+        const count = firstNumber(normalized, [...TOTAL_KEYS_GLOBAL]);
+        console.log('[useGlobalTotalGames] 엔트리:', e, '정규화:', normalized, '카운트:', count);
+        return acc + count;
+      }, 0 as number);
+      
+      console.log('[useGlobalTotalGames] 최종 총합 (_global 제외):', total);
+      return total;
   }, [state?.gameStats]);
 }
 

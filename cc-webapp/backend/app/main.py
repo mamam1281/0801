@@ -16,11 +16,14 @@ from datetime import datetime
 from typing import Optional, List, Dict, Any
 
 from fastapi import FastAPI, HTTPException, Depends, status, WebSocket, WebSocketDisconnect
+from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 import asyncio
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel, Field
+import json
 
 # Core imports
 from app.database import get_db
@@ -38,6 +41,7 @@ from app.routers import (
     auth,
     users,  # Re-enabled
     admin,
+    admin_shop,  # Shop management for admins
     actions,
     olap,
     # gacha,  # 중복 제거: games.router에 포함됨
@@ -95,15 +99,19 @@ except Exception:
     scheduler = _DummyScheduler()
 
 # Optional monitoring
-try:  # 선택적 Prometheus 계측
-    from prometheus_fastapi_instrumentator import Instrumentator
-except ImportError:
-    Instrumentator = None  # 미설치 시 계측 비활성
 
-try:  # 선택적 Sentry APM/에러 추적
-    import sentry_sdk
-except Exception:
-    sentry_sdk = None  # 환경 미설정 시 무시
+# --- 선택적 모니터링/에러 추적 패키지 (운영환경에서만 활성화, 개발환경에서는 주석 처리로 Pylance 경고 제거) ---
+# try:
+#     from prometheus_fastapi_instrumentator import Instrumentator
+# except ImportError:
+#     Instrumentator = None  # 미설치 시 계측 비활성
+#
+# try:
+#     import sentry_sdk
+# except ImportError:
+#     sentry_sdk = None  # 환경 미설정 시 무시
+Instrumentator = None
+sentry_sdk = None
 
 if sentry_sdk and settings.SENTRY_DSN:
     try:
@@ -244,6 +252,17 @@ async def lifespan(app: FastAPI):
                 print(f"⚠️ Scheduler shutdown error: {e}")
         print("✅ Backend shutdown complete")
 
+# 한글 인코딩을 위한 JSON response 클래스 정의
+class UTF8JSONResponse(JSONResponse):
+    def render(self, content) -> bytes:
+        return json.dumps(
+            content,
+            ensure_ascii=False,
+            allow_nan=False,
+            indent=None,
+            separators=(",", ":")
+        ).encode("utf-8")
+
 # ===== FastAPI App Initialization =====
 
 app = FastAPI(
@@ -253,6 +272,7 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
     lifespan=lifespan,
+    default_response_class=UTF8JSONResponse,  # 한글 인코딩을 위한 기본 응답 클래스 설정
 )
 
 # ===== Request/Response Models =====
@@ -285,6 +305,8 @@ _default_origins = [
     "https://127.0.0.1:3000",
     "http://139.180.155.143:3000",
     "https://139.180.155.143:3000",
+    "null",  # 로컬 파일 접근 허용 (file:// 프로토콜)
+    "*",     # 개발환경에서 임시 허용
 ]
 _env_origins = os.getenv("CORS_ORIGINS", "").strip()
 origins = (
@@ -300,8 +322,8 @@ app.add_middleware(SimpleLoggingMiddleware)
 app.add_middleware(LoggingContextMiddleware)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
+    allow_origins=["*"],  # 개발환경에서 모든 origin 허용
+    allow_credentials=False,  # credentials 비활성화 (모든 origin 허용 시 필요)
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -324,6 +346,7 @@ if Instrumentator is not None:
 app.include_router(auth.router, tags=["Authentication"])
 app.include_router(users.router)  # 태그 오버라이드 제거 - 이미 users.py에서 "Users" 태그를 지정함
 app.include_router(admin.router)  # 태그 오버라이드 제거 - 이미 admin.py에서 "Admin" 태그를 지정함
+app.include_router(admin_shop.router)  # Admin shop management
 app.include_router(olap.router)   # OLAP/ClickHouse health endpoints
 
 # Core Game Systems (no prefix - routers have their own)
@@ -418,6 +441,18 @@ print("✅ Using integrated games router with improved JSON responses")
 
 # ===== Core API Endpoints =====
 
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    """Simple WebSocket endpoint for testing"""
+    await websocket.accept()
+    try:
+        await websocket.send_text("Connected to WebSocket")
+        while True:
+            data = await websocket.receive_text()
+            await websocket.send_text(f"Echo: {data}")
+    except WebSocketDisconnect:
+        pass
+
 @app.get("/", tags=["Root"])
 async def root():
     """Root endpoint"""
@@ -427,6 +462,16 @@ async def root():
         "status": "running",
         "docs": "/docs"
     }
+
+# ===== Static Files (Development Test Pages) =====
+import os
+if os.getenv("ENVIRONMENT", "development") == "development":
+    # Mount static files for test pages in development only
+    try:
+        app.mount("/test", StaticFiles(directory="static"), name="static")
+        print("🧪 Test pages mounted at /test (development mode)")
+    except Exception as e:
+        print(f"⚠️  Static files not mounted: {e}")
 
 @app.get("/health", response_model=HealthResponse, tags=["Health"])
 async def health_check():

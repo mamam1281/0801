@@ -221,16 +221,16 @@ export function SideMenu({
                 <div className="p-4 border-t border-border-secondary">
                   <div className="grid grid-cols-3 gap-2 text-center">
                     <div>
-          <div className="text-sm font-bold text-success">0</div>
+          <div className="text-sm font-bold text-success">{summary.totalGamesWon || 0}</div>
                       <div className="text-xs text-muted-foreground">승리</div>
                     </div>
                     <div>
-          <div className="text-sm font-bold text-warning">0</div>
+          <div className="text-sm font-bold text-warning">{summary.currentWinStreak || 0}</div>
                       <div className="text-xs text-muted-foreground">연승</div>
                     </div>
                     <div>
-          <div className="text-sm font-bold text-info">0</div>
-                      <div className="text-xs text-muted-foreground">업적</div>
+          <div className="text-sm font-bold text-info">{summary.totalGamesPlayed || 0}</div>
+                      <div className="text-xs text-muted-foreground">게임수</div>
                     </div>
                   </div>
                 </div>

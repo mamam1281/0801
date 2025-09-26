@@ -1,14 +1,12 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import {
   ArrowLeft,
   Sparkles,
   Crown,
-  TrendingUp,
   Trophy,
-  Heart,
   ExternalLink,
   Menu,
   Dice1,
@@ -27,6 +25,7 @@ import { createLeaderboardData } from '../constants/gameConstants';
 import { createGameNavigator, handleModelNavigation } from '../utils/gameUtils';
 import { useGlobalStore } from '@/store/globalStore';
 import { useGlobalTotalGames, useGameTileStats } from '@/hooks/useGameStats';
+import { useUserLevel } from '@/hooks/useSelectors';
 
 export interface GameDashboardProps {
   user: User;
@@ -51,11 +50,16 @@ export function GameDashboard({
   onAddNotification,
   onToggleSideMenu,
 }: GameDashboardProps) {
-  const [popularityIndex, setPopularityIndex] = useState(85);
-  const [totalPlayTime] = useState(245);
   const totalGamesFromStore = useGlobalTotalGames();
+  const levelFromStore = useUserLevel();
+  const globalStore = useGlobalStore();
+  const goldBalance = globalStore?.state?.profile?.goldBalance ?? user.goldBalance ?? 0;
 
-  // 로컬 게임 데이터 (API 호출 없이)
+  // 모든 게임별 통계 추출 (전역 store 기반)
+  const slotStats = useGameTileStats('slot', user.gameStats?.slot);
+  const rpsStats = useGameTileStats('rps', user.gameStats?.rps);
+  const gachaStats = useGameTileStats('gacha', user.gameStats?.gacha);
+  const crashStats = useGameTileStats('crash', user.gameStats?.crash);
   const games: GameDashboardGame[] = [
     {
       id: 'slot',
@@ -119,23 +123,12 @@ export function GameDashboard({
   const leaderboardData = createLeaderboardData(user);
   
   // 게임 네비게이터
-  const navigateToGame = createGameNavigator(games, user.goldBalance, onAddNotification ?? (() => {}), {
+  const navigateToGame = createGameNavigator(games, goldBalance, onAddNotification ?? (() => {}), {
     onNavigateToSlot: onNavigateToSlot ?? (() => {}),
     onNavigateToRPS: onNavigateToRPS ?? (() => {}),
     onNavigateToGacha: onNavigateToGacha ?? (() => {}),
     onNavigateToCrash: onNavigateToCrash ?? (() => {}),
   });
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setPopularityIndex((prev: number) => {
-        const change = Math.random() * 6 - 3;
-        return Math.max(70, Math.min(100, prev + change));
-      });
-    }, 2000);
-
-    return () => clearInterval(timer);
-  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#0e0a17] via-black to-[#1a0f1f] relative" data-testid="game-dashboard">
@@ -156,6 +149,7 @@ export function GameDashboard({
                   size="icon"
                   onClick={onToggleSideMenu}
                   className="lg:hidden hover:bg-purple-500/20"
+                  aria-label="사이드바 열기"
                 >
                   <Menu className="w-5 h-5" />
                 </Button>
@@ -178,13 +172,13 @@ export function GameDashboard({
                 <div className="flex items-center gap-2 px-4 py-2 bg-black/50 backdrop-blur-sm rounded-full border border-yellow-500/50">
                   <Coins className="w-5 h-5 text-yellow-400" />
                   <span className="font-bold text-yellow-400">
-                    {user.goldBalance.toLocaleString()}
+                    {(goldBalance ?? 0).toLocaleString()}
                   </span>
                 </div>
 
                 <div className="flex items-center gap-2 px-4 py-2 bg-black/50 backdrop-blur-sm rounded-full border border-purple-500/50">
                   <Trophy className="w-5 h-5 text-purple-400" />
-                  <span className="font-semibold text-white">Lv.{user.level}</span>
+                  <span className="font-semibold text-white">Lv.{levelFromStore}</span>
                 </div>
               </div>
             </div>
@@ -198,67 +192,27 @@ export function GameDashboard({
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8"
+            className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8"
           >
-            {/* Popularity Index */}
-            <div className="bg-[#14121a]/70 backdrop-blur-sm rounded-2xl p-6 border border-purple-500/20">
+            {/* 전체 게임 총 참여횟수 */}
+            <div className="bg-[#14121a]/70 backdrop-blur-sm rounded-2xl p-6 border border-purple-500/20 max-w-md mx-auto">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold bg-gradient-to-r from-purple-300 to-pink-300 bg-clip-text text-transparent">
-                  인기도 지민
-                </h3>
-                <TrendingUp className="w-5 h-5 text-purple-400" />
-              </div>
-              <div className="space-y-3">
-                <div className="text-3xl font-bold text-yellow-400">
-                  {popularityIndex.toFixed(1)}%
-                </div>
-                <Progress value={popularityIndex} className="h-2 bg-purple-900/50" />
-                <p className="text-sm text-gray-400">현재 서버 활성도</p>
-                {/* 전역 게임 합계(서버 권위 동기화 기준). 디자인 영향 최소화 표시 */}
-                <div className="text-sm text-gray-300">
-                  총 플레이 <span data-testid="games-stats-total">{totalGamesFromStore}</span>회
-                </div>
-              </div>
-            </div>
-
-            {/* Total Play Time */}
-            <div className="bg-[#14121a]/70 backdrop-blur-sm rounded-2xl p-6 border border-purple-500/20">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold bg-gradient-to-r from-purple-300 to-pink-300 bg-clip-text text-transparent">
-                  오늘 플레이
-                </h3>
-                <Heart className="w-5 h-5 text-pink-400" />
-              </div>
-              <div className="space-y-3">
-                <div className="text-3xl font-bold text-yellow-400">
-                  {Math.floor(totalPlayTime / 60)}시간 {totalPlayTime % 60}분
-                </div>
-                <Progress value={(totalPlayTime / 480) * 100} className="h-2 bg-purple-900/50" />
-                <p className="text-sm text-gray-400">일일 목표: 8시간</p>
-              </div>
-            </div>
-
-            {/* VIP Status */}
-            <div className="bg-[#14121a]/70 backdrop-blur-sm rounded-2xl p-6 border border-purple-500/20">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold bg-gradient-to-r from-purple-300 to-pink-300 bg-clip-text text-transparent">
-                  VIP 등급
+                  전체 게임 총 참여횟수
                 </h3>
                 <Crown className="w-5 h-5 text-yellow-400" />
               </div>
               <div className="space-y-3">
                 <div className="text-3xl font-bold text-yellow-400">
-                  {(user.vipTier ?? 0) > 0 ? `VIP ${user.vipTier}` : 'Standard'}
+                  {totalGamesFromStore}
                 </div>
-                <Progress
-                  value={(user.vipTier ?? 0) > 0 ? ((user.vipTier ?? 0) / 5) * 100 : 10}
-                  className="h-2 bg-purple-900/50"
-                />
                 <p className="text-sm text-gray-400">
-                  {(user.vipTier ?? 0) > 0 ? '프리미엄 혜택 활성화' : '더 많은 혜택을 누리세요'}
+                  모든 게임의 실제 플레이 합산값 (전역 store 기준)
                 </p>
               </div>
             </div>
+
+
           </motion.div>
 
           {/* Games Grid */}
@@ -268,7 +222,7 @@ export function GameDashboard({
                 <GameCard
                   game={game}
                   index={index}
-                  userGoldBalance={user.goldBalance}
+                  userGoldBalance={goldBalance}
                   onGameClick={navigateToGame}
                 />
               </div>
@@ -325,7 +279,7 @@ export function GameDashboard({
                   <div className="flex-1">
                     <div className="font-semibold text-white">{entry.name}</div>
                     <div className="text-sm text-gray-400">
-                      {entry.score.toLocaleString()} 포인트
+                      {(entry.score ?? 0).toLocaleString()} 포인트
                     </div>
                   </div>
                   {index < 3 && (

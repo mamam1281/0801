@@ -1,34 +1,25 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useGlobalSync } from '@/hooks/useGlobalSync';
+import { useUserGold } from '@/hooks/useSelectors';
+import { useWithReconcile } from '@/lib/sync';
+import { api } from '@/lib/unifiedApi';
+import { applyPurchase, mergeGameStats, mergeProfile, useGlobalStore } from '@/store/globalStore';
+import { AnimatePresence, motion } from 'framer-motion';
 import {
   ArrowLeft,
+  Flame,
   Package,
-  Star,
-  Crown,
-  Gem,
-  Gift,
-  Sparkles,
   ShoppingCart,
-  Coins,
-  Zap,
-  Trophy,
-  Shield,
-  Tag,
   Timer,
-  Flame
+  Trophy
 } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { GameItem, User } from '../types';
+import ShopPurchaseHistory from './ShopPurchaseHistory';
+import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
-import { Badge } from './ui/badge';
-import { User, GameItem } from '../types';
-import { useGlobalSync } from '@/hooks/useGlobalSync';
-import { api } from '@/lib/unifiedApi';
-import { useWithReconcile } from '@/lib/sync';
-import { useUserGold } from '@/hooks/useSelectors';
-import { useGlobalStore, mergeProfile, applyPurchase, mergeGameStats } from '@/store/globalStore';
-import ShopPurchaseHistory from './ShopPurchaseHistory';
 
 interface ShopScreenProps {
   user: User;
@@ -39,116 +30,59 @@ interface ShopScreenProps {
   onAddNotification: (message: string) => void;
 }
 
-// 🏪 상점 아이템 데이터 (서버 장애/초기 구동 시 폴백)
-const SHOP_ITEMS = [
-  {
-    id: 'gold_pack_small',
-    name: '골드 팩 (소)',
+// API 응답 타입 정의
+interface ShopProductResponse {
+  id: number;
+  product_id: string;
+  name: string;
+  description: string;
+  price: number;
+  is_active: boolean;
+}
+
+// 기존 UI 호환을 위한 변환 함수
+const convertToShopItem = (product: ShopProductResponse) => {
+  // 기본 아이콘 매핑
+  const getIcon = (productId: string) => {
+    if (productId.includes('model')) return '🎫';
+    if (productId.includes('anti_bankruptcy')) return '�️';
+    if (productId.includes('attendance')) return '📅';
+    if (productId.includes('comp')) return '⚡';
+    if (productId.includes('charge')) return '💎';
+    if (productId.includes('promotion')) return '👑';
+    return '💰';
+  };
+
+  // 카테고리 결정
+  const getCategory = (productId: string) => {
+    if (productId.includes('model')) return 'voucher';
+    if (productId.includes('promotion')) return 'premium';
+    return 'currency';
+  };
+
+  // 희귀도 결정 (가격 기준)
+  const getRarity = (price: number) => {
+    if (price >= 500000) return 'legendary' as const;
+    if (price >= 100000) return 'epic' as const;
+    if (price >= 50000) return 'rare' as const;
+    return 'common' as const;
+  };
+
+  return {
+    id: product.product_id,
+    name: product.name,
     type: 'currency' as const,
-    rarity: 'common' as const,
-    price: 1000,
-    description: '5,000G를 즉시 획득하세요',
-    value: 5000,
-    icon: '💰',
-    category: 'currency',
-    isLimited: false,
+    rarity: getRarity(product.price),
+    price: product.price,
+    description: product.description || '',
+    value: product.price, // GOLD 값으로 설정
+    icon: getIcon(product.product_id),
+    category: getCategory(product.product_id),
+    isLimited: product.product_id.includes('promotion') || product.product_id.includes('attendance'),
     discount: 0,
-    popular: false
-  },
-  {
-    id: 'gold_pack_medium',
-    name: '골드 팩 (중)',
-    type: 'currency' as const,
-    rarity: 'rare' as const,
-    price: 2500,
-    description: '15,000G를 즉시 획득하세요',
-    value: 15000,
-    icon: '💎',
-    category: 'currency',
-    isLimited: false,
-    discount: 20,
-    popular: true
-  },
-  {
-    id: 'gold_pack_large',
-    name: '골드 팩 (대)',
-    type: 'currency' as const,
-    rarity: 'epic' as const,
-    price: 5000,
-    description: '35,000G를 즉시 획득하세요',
-    value: 35000,
-    icon: '💸',
-    category: 'currency',
-    isLimited: false,
-    discount: 30,
-    popular: false
-  },
-  {
-    id: 'vip_skin_neon',
-    name: '네온 VIP 스킨',
-    type: 'skin' as const,
-    rarity: 'legendary' as const,
-    price: 3000,
-    description: '특별한 네온 효과가 적용된 VIP 전용 스킨',
-    icon: '👑',
-    category: 'cosmetic',
-    isLimited: true,
-    discount: 0,
-    popular: false
-  },
-  {
-    id: 'lucky_charm',
-    name: '행운의 부적',
-    type: 'powerup' as const,
-    rarity: 'epic' as const,
-    price: 2000,
-    description: '모든 게임에서 승률 +15% (24시간)',
-    icon: '🍀',
-    category: 'powerup',
-    isLimited: false,
-    discount: 0,
-    popular: true
-  },
-  {
-    id: 'exp_booster',
-    name: '경험치 부스터',
-    type: 'powerup' as const,
-    rarity: 'rare' as const,
-    price: 1500,
-    description: '획득 경험치 +100% (12시간)',
-    icon: '⚡',
-    category: 'powerup',
-    isLimited: false,
-    discount: 0,
-    popular: false
-  },
-  {
-    id: 'premium_gacha_ticket',
-    name: '프리미엄 가챠 티켓',
-    type: 'collectible' as const,
-    rarity: 'legendary' as const,
-    price: 2500,
-    description: '전설급 아이템 확률 +50%',
-    icon: '🎫',
-    category: 'special',
-    isLimited: true,
-    discount: 25,
-    popular: true
-  },
-  {
-    id: 'slot_multiplier',
-    name: '슬롯 멀티플라이어',
-    type: 'powerup' as const,
-    rarity: 'epic' as const,
-    price: 3500,
-    description: '슬롯 게임 당첨금 2배 (1시간)',
-    icon: '🎰',
-    category: 'powerup',
-    isLimited: false,
-    discount: 15,
-    popular: false
-  }
-];
+    popular: product.price === 30000 || product.price === 100000 // 인기 상품 표시
+  };
+};
 
 export function ShopScreen({
   user,
@@ -160,7 +94,8 @@ export function ShopScreen({
 }: ShopScreenProps) {
   const [showPurchaseModal, setShowPurchaseModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null as import('../types').GameItem | null);
-  const [catalog, setCatalog] = useState(null as any[] | null);
+  const [shopProducts, setShopProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
   const { syncBalance } = useGlobalSync();
   const withReconcile = useWithReconcile();
   const gold = useUserGold();
@@ -172,59 +107,36 @@ export function ShopScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 서버 카탈로그 로드 (fallback: SHOP_ITEMS)
+  // 새로운 상점 상품 API 로드
   useEffect(() => {
     let cancelled = false;
-    async function load() {
+    async function loadShopProducts() {
       try {
-        const res1: any = await api.get('shop/catalog');
-        if (!cancelled && Array.isArray(res1)) {
-          setCatalog(res1);
-          return;
+        setLoading(true);
+        const res: ShopProductResponse[] = await api.get('shop/products');
+        if (!cancelled && Array.isArray(res)) {
+          setShopProducts(res);
         }
-      } catch {}
-      try {
-        const res2: any = await api.get('shop/items');
-        if (!cancelled && Array.isArray(res2)) {
-          setCatalog(res2);
-          return;
+      } catch (error) {
+        console.error('Failed to load shop products:', error);
+        // 폴백: 빈 배열로 설정
+        if (!cancelled) {
+          setShopProducts([]);
         }
-      } catch {}
-      if (!cancelled) setCatalog([]); // 빈 배열이면 아래에서 폴백 사용
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
     }
-    load();
-    // 간단한 캐시 무효화 훅: 어드민 업서트 이후 window 이벤트로 무효화
-    const invalidate = () => {
-      load();
-    };
-    if (typeof window !== 'undefined') {
-      window.addEventListener('cc:catalog.invalidate', invalidate as EventListener);
-      // 전역 트리거 유틸 (선택적)
-      // @ts-ignore
-      window.__ccInvalidateCatalog = () => {
-        window.dispatchEvent(new Event('cc:catalog.invalidate'));
-      };
-    }
+    loadShopProducts();
     return () => { cancelled = true; };
   }, []);
 
-  // 서버 → UI 매핑 (널 안전)
+  // 서버 → UI 매핑 (새로운 API 사용)
   const itemsToRender = useMemo(() => {
-    const source = (catalog && catalog.length > 0) ? catalog : SHOP_ITEMS;
-    return source.map((it: any) => ({
-      id: String(it.id ?? it.item_id ?? it.slug ?? it.code ?? Math.random().toString(36).slice(2)),
-      name: String(it.name ?? '아이템'),
-      type: String(it.type ?? 'item'),
-      rarity: String(it.rarity ?? 'common'),
-      price: Number(it.price ?? it.cost ?? 0),
-      discount: Number(it.discount ?? it.sale_pct ?? 0),
-      description: String(it.description ?? it.desc ?? ''),
-      value: Number(it.value ?? it.amount ?? 0),
-      icon: String(it.icon ?? '🎁'),
-      isLimited: Boolean(it.isLimited ?? it.limited ?? false),
-      popular: Boolean(it.popular ?? it.isPopular ?? false),
-    }));
-  }, [catalog]);
+    return shopProducts.map(convertToShopItem);
+  }, [shopProducts]);
 
   // 🎨 등급별 스타일링 (글래스메탈 버전)
   const getRarityStyles = (rarity: string) => {
@@ -289,7 +201,14 @@ export function ShopScreen({
 
     try {
       const res: any = await withReconcile(async (idemKey: string) =>
-        api.post('shop/buy', { item_id: item.id, price: finalPrice }, { headers: { 'X-Idempotency-Key': idemKey } })
+        api.post('shop/buy', { 
+          user_id: user.id,
+          product_id: item.id, 
+          amount: finalPrice,
+          quantity: 1,
+          kind: 'item',
+          payment_method: 'tokens'
+        }, { headers: { 'X-Idempotency-Key': idemKey } })
       );
       // 서버 응답에 new balance가 있으면 즉시 전역 프로필에 병합(시각적 지연 최소화)
       const newBal = res?.new_balance ?? res?.balance ?? res?.gold ?? res?.gold_balance ?? res?.cyber_token_balance;
@@ -515,8 +434,23 @@ export function ShopScreen({
         </motion.div>
 
         {/* 🛍️ 상점 아이템 그리드 (글래스메탈) */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-          {itemsToRender.map((item: any, index: number) => {
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="text-center">
+              <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+              <p className="text-muted-foreground">상점 로딩 중...</p>
+            </div>
+          </div>
+        ) : itemsToRender.length === 0 ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="text-center">
+              <Package className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+              <p className="text-muted-foreground">현재 판매 중인 상품이 없습니다.</p>
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+            {itemsToRender.map((item: any, index: number) => {
             const styles = getRarityStyles(item.rarity);
             const finalPrice = Math.floor(item.price * (1 - item.discount / 100));
             const canAfford = gold >= finalPrice;
@@ -615,10 +549,11 @@ export function ShopScreen({
               </motion.div>
             );
           })}
-  </div>
+          </div>
+        )}
 
-  {/* 🧾 최근 거래 히스토리 */}
-  <ShopPurchaseHistory />
+        {/* 🧾 최근 거래 히스토리 */}
+        <ShopPurchaseHistory />
       </div>
 
       {/* 🔮 구매 확인 모달 (글래스메탈) */}

@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎰 Casino-Club F2P - 수동 테스트</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            min-height: 100vh;
+        }
+        .container {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+        }
+        h1 { text-align: center; margin-bottom: 30px; }
+        .section {
+            background: rgba(255,255,255,0.05);
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        button {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a24);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+            transition: transform 0.2s;
+        }
+        button:hover { transform: translateY(-2px); }
+        button:disabled { opacity: 0.5; transform: none; }
+        #results {
+            background: rgba(0,0,0,0.3);
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 15px;
+            font-family: monospace;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-weight: bold;
+        }
+        .success { background: rgba(46, 213, 115, 0.3); }
+        .error { background: rgba(231, 76, 60, 0.3); }
+        .info { background: rgba(52, 152, 219, 0.3); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎰 Casino-Club F2P 통합 테스트</h1>
+        
+        <div class="section">
+            <h2>🔐 인증 테스트</h2>
+            <button onclick="testLogin()">로그인 테스트</button>
+            <button onclick="testLogout()">로그아웃 테스트</button>
+            <div id="authStatus" class="status info">인증 상태: 로그아웃</div>
+        </div>
+
+        <div class="section">
+            <h2>🛒 상점 구매 테스트</h2>
+            <button onclick="testShopPurchase()" id="purchaseBtn" disabled>상점 구매 테스트</button>
+            <button onclick="getShopItems()">상점 아이템 조회</button>
+            <div id="shopStatus" class="status info">로그인 후 이용 가능</div>
+        </div>
+
+        <div class="section">
+            <h2>📊 시스템 상태 테스트</h2>
+            <button onclick="testBackendHealth()">백엔드 헬스체크</button>
+            <button onclick="testFrontendHealth()">프론트엔드 상태 확인</button>
+            <button onclick="testAllAPIs()">전체 API 테스트</button>
+        </div>
+
+        <div class="section">
+            <h2>📝 테스트 결과</h2>
+            <button onclick="clearResults()">결과 지우기</button>
+            <pre id="results">테스트를 실행하면 여기에 결과가 표시됩니다...</pre>
+        </div>
+    </div>
+
+    <script>
+        let authToken = null;
+        let userId = null;
+
+        function log(message, type = 'info') {
+            const results = document.getElementById('results');
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = `[${timestamp}] ${message}\n`;
+            results.textContent += logEntry;
+            results.scrollTop = results.scrollHeight;
+            
+            console.log(message);
+        }
+
+        function updateAuthStatus(loggedIn, user = null) {
+            const authStatus = document.getElementById('authStatus');
+            const shopStatus = document.getElementById('shopStatus');
+            const purchaseBtn = document.getElementById('purchaseBtn');
+            
+            if (loggedIn) {
+                authStatus.textContent = `인증 상태: 로그인 (User ID: ${user?.id || userId})`;
+                authStatus.className = 'status success';
+                shopStatus.textContent = '상점 이용 가능';
+                shopStatus.className = 'status success';
+                purchaseBtn.disabled = false;
+            } else {
+                authStatus.textContent = '인증 상태: 로그아웃';
+                authStatus.className = 'status info';
+                shopStatus.textContent = '로그인 후 이용 가능';
+                shopStatus.className = 'status info';
+                purchaseBtn.disabled = true;
+            }
+        }
+
+        async function testLogin() {
+            log('🔐 로그인 테스트 시작...');
+            
+            try {
+                const response = await fetch('http://localhost:8000/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        site_id: 'user001',
+                        password: '123455'
+                    })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    authToken = data.access_token;
+                    userId = data.user.id;
+                    
+                    log(`✅ 로그인 성공! User ID: ${userId}`);
+                    log(`🎫 Access Token: ${authToken.substring(0, 50)}...`);
+                    updateAuthStatus(true, data.user);
+                } else {
+                    const error = await response.json();
+                    log(`❌ 로그인 실패: ${response.status} - ${JSON.stringify(error)}`);
+                    updateAuthStatus(false);
+                }
+            } catch (error) {
+                log(`❌ 로그인 오류: ${error.message}`);
+                updateAuthStatus(false);
+            }
+        }
+
+        async function testLogout() {
+            log('🚪 로그아웃 테스트 시작...');
+            authToken = null;
+            userId = null;
+            updateAuthStatus(false);
+            log('✅ 로그아웃 완료');
+        }
+
+        async function testShopPurchase() {
+            if (!authToken) {
+                log('❌ 로그인이 필요합니다.');
+                return;
+            }
+
+            log('🛒 상점 구매 테스트 시작...');
+            
+            try {
+                const purchaseData = {
+                    user_id: userId,
+                    product_id: 'test_product_' + Math.random().toString(36).substr(2, 8),
+                    amount: 1000,
+                    quantity: 1,
+                    kind: 'item',
+                    payment_method: 'tokens'
+                };
+
+                log(`📦 구매 요청: ${JSON.stringify(purchaseData, null, 2)}`);
+
+                const response = await fetch('http://localhost:8000/api/shop/buy', {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify(purchaseData)
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    log(`✅ 구매 성공! ${JSON.stringify(data, null, 2)}`);
+                    
+                    const shopStatus = document.getElementById('shopStatus');
+                    shopStatus.textContent = `✅ 최근 구매: ${data.product_id}`;
+                    shopStatus.className = 'status success';
+                } else {
+                    const error = await response.json();
+                    log(`❌ 구매 실패: ${response.status} - ${JSON.stringify(error)}`);
+                }
+            } catch (error) {
+                log(`❌ 구매 오류: ${error.message}`);
+            }
+        }
+
+        async function getShopItems() {
+            log('🏪 상점 아이템 조회 중...');
+            
+            try {
+                const headers = { 'Content-Type': 'application/json' };
+                if (authToken) {
+                    headers['Authorization'] = `Bearer ${authToken}`;
+                }
+
+                const response = await fetch('http://localhost:8000/api/shop/products', {
+                    method: 'GET',
+                    headers
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    log(`✅ 상점 아이템 조회 성공: ${data.length || 0}개 아이템`);
+                    if (data.length > 0) {
+                        log(`📋 첫 번째 아이템: ${JSON.stringify(data[0], null, 2)}`);
+                    }
+                } else {
+                    log(`⚠️ 상점 조회 응답: ${response.status}`);
+                }
+            } catch (error) {
+                log(`❌ 상점 조회 오류: ${error.message}`);
+            }
+        }
+
+        async function testBackendHealth() {
+            log('🏥 백엔드 헬스체크 중...');
+            
+            try {
+                const response = await fetch('http://localhost:8000/health');
+                if (response.ok) {
+                    const data = await response.json();
+                    log(`✅ 백엔드 정상: ${JSON.stringify(data, null, 2)}`);
+                } else {
+                    log(`❌ 백엔드 오류: ${response.status}`);
+                }
+            } catch (error) {
+                log(`❌ 백엔드 연결 실패: ${error.message}`);
+            }
+        }
+
+        async function testFrontendHealth() {
+            log('🌐 프론트엔드 상태 확인 중...');
+            
+            try {
+                const response = await fetch('http://localhost:3000/health');
+                if (response.ok) {
+                    log(`✅ 프론트엔드 정상: ${response.status}`);
+                } else {
+                    log(`⚠️ 프론트엔드 응답: ${response.status}`);
+                }
+            } catch (error) {
+                log(`❌ 프론트엔드 연결 실패: ${error.message}`);
+            }
+        }
+
+        async function testAllAPIs() {
+            log('🚀 전체 API 테스트 시작...');
+            log('=' * 50);
+            
+            await testBackendHealth();
+            await testFrontendHealth();
+            
+            if (!authToken) {
+                await testLogin();
+            }
+            
+            if (authToken) {
+                await getShopItems();
+                await testShopPurchase();
+            }
+            
+            log('🎯 전체 테스트 완료!');
+            log('=' * 50);
+        }
+
+        function clearResults() {
+            document.getElementById('results').textContent = '테스트를 실행하면 여기에 결과가 표시됩니다...';
+        }
+
+        // 페이지 로드 시 자동 헬스체크
+        window.onload = function() {
+            log('🎰 Casino-Club F2P 테스트 도구 로드됨');
+            log('💡 브라우저에서 CORS 오류가 발생하면 --disable-web-security 옵션으로 실행하세요');
+            testBackendHealth();
+        };
+    </script>
+</body>
+</html>

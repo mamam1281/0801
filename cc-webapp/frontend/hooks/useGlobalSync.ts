@@ -56,7 +56,23 @@ export function useGlobalSync() {
     const syncProfile = useCallback(async (): Promise<boolean> => {
         try {
             const response = await api.get(AUTHORITY_ENDPOINTS.USER_PROFILE);
+            
+            // 🔧 null 체크 강화
+            if (!response) {
+                console.warn('[GlobalSync] API 응답이 null입니다');
+                return false;
+            }
+            
             const profile = response.data || response;
+
+            console.log('[GlobalSync] Profile data received:', profile);
+
+            // 🎯 디버깅을 위한 로그 추가
+            console.log('[GlobalSync] Experience fields check:', {
+                experience: profile.experience,
+                experience_points: profile.experience_points,
+                level: profile.level
+            });
 
             if (profile) {
                 dispatch({
@@ -64,12 +80,23 @@ export function useGlobalSync() {
                     profile: {
                         id: profile.id || profile.user_id,
                         nickname: profile.nickname || profile.username,
-                        goldBalance: profile.cyber_tokens || profile.gold_balance || 0,
+                        goldBalance: profile.cyber_token_balance || profile.gold_balance || profile.cyber_tokens || 0,
                         level: profile.level || 1,
-                        xp: profile.xp || 0,
+                        // 🎯 experience_points를 우선으로 사용
+                        xp: profile.experience_points ?? profile.experience ?? profile.xp ?? 0,
+                        // 🎯 experience_points 필드도 명시적으로 추가
+                        experience_points: profile.experience_points ?? profile.experience ?? 0,
+                        daily_streak: profile.daily_streak ?? 0,
                         vip_tier: profile.vip_tier,
-                        battlepass_level: profile.battlepass_level
+                        battlepass_level: profile.battlepass_level || 1
                     }
+                });
+                
+                // 🎯 매핑 후 결과 확인
+                console.log('[GlobalSync] Mapped profile:', {
+                    xp: profile.experience_points ?? profile.experience ?? profile.xp ?? 0,
+                    experience_points: profile.experience_points ?? profile.experience ?? 0,
+                    level: profile.level || 1
                 });
                 lastSyncTimes.current.profile = Date.now();
                 return true;
@@ -89,8 +116,10 @@ export function useGlobalSync() {
             const response = await api.get(AUTHORITY_ENDPOINTS.USER_BALANCE);
             const balanceData = response.data || response;
 
+            console.log('[GlobalSync] Balance data received:', balanceData);
+
             if (balanceData) {
-                const goldBalance = balanceData.cyber_token_balance ?? balanceData.gold ?? 0;
+                const goldBalance = balanceData.cyber_token_balance ?? balanceData.gold ?? balanceData.cyber_tokens ?? 0;
 
                 // 현재 잔액과 비교
                 const currentGold = state.profile?.goldBalance ?? 0;
@@ -121,17 +150,97 @@ export function useGlobalSync() {
      */
     const syncGameStats = useCallback(async (): Promise<boolean> => {
         try {
+            console.log('[GlobalSync] syncGameStats 호출됨 - 엔드포인트:', AUTHORITY_ENDPOINTS.GAME_STATS);
+            console.log('[GlobalSync] API 인스턴스:', api);
             const response = await api.get(AUTHORITY_ENDPOINTS.GAME_STATS);
+            console.log('[GlobalSync] Game stats API 응답:', response);
+            
             // 단일 포맷: { success: boolean, stats: {...} }
             const raw = (response as any)?.data ?? response;
-            if (!raw || typeof raw !== 'object' || !('stats' in (raw as any))) {
-                console.warn('[GlobalSync] Unexpected stats format; expected {success, stats}. Got:', raw);
+            console.log('[GlobalSync] Game stats raw response:', raw);
+            
+            if (!raw || typeof raw !== 'object') {
+                console.warn('[GlobalSync] 잘못된 응답 형식:', raw);
                 return false;
             }
-            const statsRoot = (raw as any).stats;
+            
+            // 우리 백엔드 응답 형식에 맞게 처리
+            if (raw.success && raw.stats) {
+                console.log('[GlobalSync] 백엔드 응답 처리 중...');
+                // normalizeGameStatsResponse 함수 사용하여 변환
+                const { normalizeGameStatsResponse } = await import('@/utils/gameStatsNormalizer');
+                const normalizedStats = normalizeGameStatsResponse(raw);
+                console.log('[GlobalSync] Normalized stats:', normalizedStats);
+                
+                if (Object.keys(normalizedStats).length > 0) {
+                    // 🎯 게임별로 분리하여 저장 (useGameTileStats와 일치)
+                    const breakdown = normalizedStats.game_breakdown || {};
+                    
+                    // 각 게임별 통계를 개별적으로 저장
+                    const gameUpdates = {
+                        slot: {
+                            spins: breakdown.slot?.plays || 0,
+                            wins: breakdown.slot?.wins || 0,
+                            losses: breakdown.slot?.losses || 0,
+                            max_win: breakdown.slot?.max_win || 0,
+                            total_games: breakdown.slot?.plays || 0
+                        },
+                        rps: {
+                            plays: breakdown.rps?.plays || 0,
+                            wins: breakdown.rps?.wins || 0,
+                            losses: breakdown.rps?.losses || 0,
+                            ties: breakdown.rps?.ties || 0,
+                            total_games: breakdown.rps?.plays || 0
+                        },
+                        crash: {
+                            bets: breakdown.crash?.plays || 0,
+                            wins: breakdown.crash?.wins || 0,
+                            losses: breakdown.crash?.losses || 0,
+                            max_win: breakdown.crash?.max_win || 0,
+                            max_multiplier: breakdown.crash?.max_multiplier || null,
+                            total_games: breakdown.crash?.plays || 0
+                        },
+                        gacha: {
+                            spins: breakdown.gacha?.plays || 0,
+                            rare_wins: breakdown.gacha?.rare_wins || 0,
+                            ultra_rare_wins: breakdown.gacha?.ultra_rare_wins || 0,
+                            max_win: breakdown.gacha?.max_win || 0,
+                            total_games: breakdown.gacha?.plays || 0
+                        }
+                    };
+                    
+                    // SET_GAME_STATS로 전체 게임 통계를 한번에 교체
+                    dispatch({ 
+                        type: 'SET_GAME_STATS', 
+                        gameStats: {
+                            ...gameUpdates,
+                            // 전역 통계도 함께 저장
+                            _global: {
+                                total_games_played: normalizedStats.total_games_played || 0,
+                                total_wins: normalizedStats.total_wins || 0,
+                                total_losses: normalizedStats.total_losses || 0,
+                                overall_max_win: normalizedStats.overall_max_win || 0,
+                                win_rate: normalizedStats.win_rate || 0
+                            }
+                        }
+                    });
+                    
+                    lastSyncTimes.current.stats = Date.now();
+                    console.log('[GlobalSync] Game stats synced with breakdown:', gameUpdates);
+                    return true;
+                } else {
+                    console.warn('[GlobalSync] 정규화된 통계가 비어있음');
+                    return false;
+                }
+            } else {
+                console.warn('[GlobalSync] 응답에 success 또는 stats가 없음:', raw);
+                return false;
+            }
 
+            const statsRoot = (raw as any).stats;
             const gameStats: Record<string, any> = {};
 
+            // 기존 로직 유지 (다른 형식 지원)
             // 1) 배열 형태 (예: { game_stats: [...] } 또는 바로 [...])
             const arr = Array.isArray((statsRoot as any)?.game_stats)
                 ? (statsRoot as any).game_stats
@@ -224,12 +333,15 @@ export function useGlobalSync() {
             console.log('[GlobalSync] Starting full sync...');
 
             // 병렬로 모든 데이터 동기화
+            console.log('[GlobalSync] syncAll - 개별 sync 함수 호출 시작');
+            console.log('[GlobalSync] syncProfile, syncBalance, syncGameStats 병렬 실행...');
             const results = await Promise.allSettled([
                 syncProfile(),
                 syncBalance(),
                 syncGameStats()
             ]);
 
+            console.log('[GlobalSync] syncAll - Promise.allSettled 결과:', results);
             const successes = results.filter(r => r.status === 'fulfilled' && r.value).length;
             const success = successes >= 2; // 최소 2개 이상 성공하면 OK
 

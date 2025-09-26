@@ -40,6 +40,19 @@ export function AdminLoginScreen({
   const [attempts, setAttempts] = useState(0);
   const [isLocked, setIsLocked] = useState(false);
   const [lockdownTime, setLockdownTime] = useState(0);
+  const [isClient, setIsClient] = useState(false);
+  const [floatingElements, setFloatingElements] = useState([]);
+
+  // Client-side only initialization to prevent hydration mismatch
+  useEffect(() => {
+    setIsClient(true);
+    // Initialize floating elements positions on client side only
+    const elements = [...Array(8)].map(() => ({
+      x: Math.random() * (typeof window !== 'undefined' ? window.innerWidth : 1920),
+      y: Math.random() * (typeof window !== 'undefined' ? window.innerHeight : 1080)
+    }));
+    setFloatingElements(elements);
+  }, []);
 
   // Security lockdown timer
   useEffect(() => {
@@ -121,13 +134,13 @@ export function AdminLoginScreen({
         />
         
         {/* Floating Security Elements */}
-        {[...Array(8)].map((_, i) => (
+        {isClient && floatingElements.map((element: any, i: number) => (
           <motion.div
             key={i}
             initial={{ 
               opacity: 0,
-              x: Math.random() * window.innerWidth,
-              y: Math.random() * window.innerHeight
+              x: element.x,
+              y: element.y
             }}
             animate={{ 
               opacity: [0, 0.3, 0],
@@ -292,6 +305,9 @@ export function AdminLoginScreen({
                   disabled={isSubmitting || isLoading || isLocked}
                 />
                 <button
+                  aria-label={showPassword ? '비밀번호 숨기기' : '비밀번호 보이기'}
+                  title={showPassword ? '비밀번호 숨기기' : '비밀번호 보이기'}
+                  aria-pressed={showPassword}
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-error transition-colors"

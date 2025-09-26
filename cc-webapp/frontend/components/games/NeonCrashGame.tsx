@@ -33,8 +33,9 @@ import { Slider } from '../ui/slider';
 import { api } from '@/lib/unifiedApi';
 import { useWithReconcile } from '@/lib/sync';
 import { useUserGold } from '@/hooks/useSelectors';
-import { useGlobalStore, mergeProfile, mergeGameStats } from '@/store/globalStore';
+import { useGlobalStore, mergeProfile } from '@/store/globalStore';
 import { useGlobalSync } from '@/hooks/useGlobalSync';
+import { useGameTileStats } from '@/hooks/useGameStats';
 
 interface NeonCrashGameProps {
   user: User;
@@ -49,6 +50,7 @@ export function NeonCrashGame({
   onUpdateUser,
   onAddNotification,
 }: NeonCrashGameProps) {
+  const crashStats = useGameTileStats('crash', user.gameStats?.crash);
   const withReconcile = useWithReconcile();
   const gold = useUserGold();
   const { dispatch } = useGlobalStore();
@@ -175,14 +177,9 @@ export function NeonCrashGame({
       animationRef.current = requestAnimationFrame(updateGame);
 
       // 통계는 별도 fetch, 잔액은 withReconcile 후 하이드레이트에 위임
-      // 통계 병합(표시용 캐시). 최종 값은 syncAfterGame으로 서버 권위 반영
-      mergeGameStats(dispatch, 'crash', {
-        totalBets: 1,
-        totalWagered: betAmount,
-        totalWins: winAmount > 0 ? 1 : 0,
-        totalProfit: winAmount - betAmount,
-        highestMultiplier: finalMultiplier,
-      });
+      // 🎯 중요: mergeGameStats 제거 - 누적 버그 방지, 서버 권위 동기화만 사용
+      // mergeGameStats(dispatch, 'crash', { ... }); // 제거됨
+      
       // 서버잔액 포함되었더라도 후처리 스냅샷 동기화
       await syncAfterGame();
       fetchAuthoritativeStats();
@@ -409,15 +406,24 @@ export function NeonCrashGame({
 
     // 서버에 캐시아웃 요청(필요 시). 현재 백엔드에 별도 캐시아웃 엔드포인트가 존재하면 사용
     try {
+      console.log('[NeonCrashGame] 캐시아웃 요청 시작:', {
+        multiplier,
+        game_id: 'crash',
+        endpoint: 'games/crash/cashout'
+      });
+      
       // 우선 멱등+재동기화만 수행하여 최종 잔액 일치 보장
       await withReconcile(async (idemKey: string) =>
         api.post<any>(
           'games/crash/cashout',
-          { multiplier },
+          { multiplier, game_id: 'crash' },
           { headers: { 'X-Idempotency-Key': idemKey } }
         )
       );
+      
+      console.log('[NeonCrashGame] 캐시아웃 요청 성공');
     } catch (e) {
+      console.error('[NeonCrashGame] 캐시아웃 요청 실패:', e);
       // 캐시아웃 실패 시 오류 표시 + 재시도 유도
       const msg =
         (e as any)?.message ||
@@ -439,15 +445,11 @@ export function NeonCrashGame({
       ...prev,
     ]);
 
-    // 통계 병합(캐시아웃 성공 이벤트)
-    mergeGameStats(dispatch, 'crash', {
-      totalWins: 1,
-      totalProfit: winnings,
-      highestMultiplier: Math.max(multiplier, (authoritativeStats?.highest_multiplier ?? 0)),
-    });
+    // 🎯 중요: mergeGameStats 제거 - 누적 버그 방지, 서버 권위 동기화만 사용
+    // mergeGameStats(dispatch, 'crash', { ... }); // 제거됨
 
-  await syncAfterGame();
-  fetchAuthoritativeStats();
+    await syncAfterGame();
+    fetchAuthoritativeStats();
 
     // 알림
     onAddNotification(`${winnings} 골드를 획득했습니다! (${multiplier.toFixed(2)}x)`);
@@ -551,14 +553,14 @@ export function NeonCrashGame({
         className="p-4 flex items-center justify-between"
       >
         <div className="flex items-center space-x-2">
-          <Button variant="ghost" size="icon" onClick={onBack} className="rounded-full">
+          <Button variant="ghost" size="icon" onClick={onBack} className="rounded-full" aria-label="뒤로가기">
             <ArrowLeft className="h-6 w-6" />
           </Button>
           <h1 className="text-2xl font-bold text-gradient-primary">네온 크래시</h1>
         </div>
 
         <div className="flex items-center space-x-4">
-          <Button variant="ghost" size="icon" onClick={toggleSound} className="rounded-full">
+          <Button variant="ghost" size="icon" onClick={toggleSound} className="rounded-full" aria-label="사운드 토글">
             {soundEnabled ? <Volume2 className="h-6 w-6" /> : <VolumeX className="h-6 w-6" />}
           </Button>
           <Button
@@ -566,6 +568,7 @@ export function NeonCrashGame({
             size="icon"
             onClick={() => setShowGraph(!showGraph)}
             className="rounded-full"
+            aria-label="그래프 표시 토글"
           >
             <BarChart2
               className={`h-6 w-6 ${showGraph ? 'text-primary' : 'text-muted-foreground'}`}
@@ -576,6 +579,7 @@ export function NeonCrashGame({
             size="icon"
             onClick={() => setShowAdvancedSettings(!showAdvancedSettings)}
             className="rounded-full"
+            aria-label="고급 설정 열기"
           >
             <Settings
               className={`h-6 w-6 ${

@@ -4,6 +4,7 @@ import * as React from "react";
 import { Slot } from "@radix-ui/react-slot";
 import { VariantProps, cva } from "class-variance-authority";
 import { PanelLeftIcon } from "lucide-react";
+import { useGlobalProfile } from '@/store/globalStore';
 
 import { useIsMobile } from "./use-mobile";
 import { cn } from "../utils";
@@ -424,6 +425,8 @@ function SidebarGroupAction({
     <Comp
       data-slot="sidebar-group-action"
       data-sidebar="group-action"
+      aria-label={props['aria-label'] || '사이드바 그룹 액션'}
+      title={props.title || '사이드바 그룹 액션'}
       className={cn(
         "text-sidebar-foreground ring-sidebar-ring hover:bg-sidebar-accent hover:text-sidebar-accent-foreground absolute top-3.5 right-3 flex aspect-square w-5 items-center justify-center rounded-md p-0 outline-hidden transition-transform focus-visible:ring-2 [&>svg]:size-4 [&>svg]:shrink-0",
         // Increases the hit area of the button on mobile.
@@ -502,9 +505,11 @@ function SidebarMenuButton({
   tooltip,
   className,
   ...props
-}: any) {
-  const Comp = asChild ? Slot : "button";
-  const { isMobile, state } = useSidebar();
+  }: any) {
+    const Comp = asChild ? Slot : "button";
+    const { isMobile, state } = useSidebar();
+    // 전역 프로필에서 streak 표시 (존재 시)
+    const globalProfile = useGlobalProfile();
 
   const button = (
     <Comp
@@ -600,6 +605,7 @@ function SidebarMenuSkeleton({
   const width = React.useMemo(() => {
     return `${Math.floor(Math.random() * 40) + 50}%`;
   }, []);
+  const globalProfile = useGlobalProfile();
 
   return (
     <div
@@ -615,14 +621,16 @@ function SidebarMenuSkeleton({
         />
       )}
       <Skeleton
-        className="h-4 max-w-(--skeleton-width) flex-1"
+        className="h-4 flex-1"
         data-sidebar="menu-skeleton-text"
-        style={
-          {
-            "--skeleton-width": width,
-          } as any
-        }
+        style={{ width }}
       />
+      {/* 연속출석일 표시 (globalProfile.daily_streak) */}
+      {typeof globalProfile?.daily_streak === 'number' && (
+        <div className="px-4 py-2 text-xs text-primary font-bold">
+          🔥 {Math.max(1, globalProfile.daily_streak)}일 연속 출석
+        </div>
+      )}
     </div>
   );
 }

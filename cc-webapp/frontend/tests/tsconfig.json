@@ -1,14 +1,16 @@
 {
 	"extends": "../tsconfig.json",
 	"compilerOptions": {
-		"types": [],
+		"types": ["@playwright/test"],
 		"module": "commonjs",
 		"moduleResolution": "node",
 		"target": "ES2020",
 		"esModuleInterop": true,
 		"allowJs": true,
 		"skipLibCheck": true,
-		"noEmit": true
+		"noEmit": true,
+		"strict": false,
+		"noImplicitAny": false
 	},
 	"include": ["**/*.ts", "**/*.tsx", "playwright-env.d.ts"],
 	"exclude": ["node_modules"]

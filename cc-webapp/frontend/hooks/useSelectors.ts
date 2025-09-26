@@ -3,7 +3,8 @@
 "use client";
 
 import { useMemo } from "react";
-import { useGlobalProfile } from "@/store/globalStore";
+import { useGlobalProfile, useGlobalStore } from "@/store/globalStore";
+import { useGlobalTotalGames } from "./useGameStats";
 
 export function useUserProfile() {
 	// null 가능성 유지: 비로그인/미하이드레이트 상태 처리
@@ -17,8 +18,8 @@ export function useUserGold() {
 
 export function useUserLevel() {
 	const p = useGlobalProfile();
-	// level이 없을 수 있으므로 0 기본값
-	return (p as any)?.level ?? 0;
+	// level 또는 experience_points 기반 레벨 계산
+	return (p as any)?.level ?? Math.floor(((p as any)?.experience_points ?? 0) / 500) + 1;
 }
 
 export function useIsAdmin() {
@@ -28,15 +29,75 @@ export function useIsAdmin() {
 
 export function useUserSummary() {
 	const p = useGlobalProfile() as any;
+	const { state } = useGlobalStore();
+	const globalTotalGames = useGlobalTotalGames();
+	
+	// 전역 게임 통계에서 승리수와 연승수 계산
+	const gameStats = state?.gameStats || {};
+	const allStatsEntries = Object.values(gameStats);
+	
+	// 각 게임별 승리수 합계 계산
+	const totalWins = useMemo(() => {
+		return allStatsEntries.reduce((total: number, entry: any) => {
+			const normalizedEntry = entry && typeof entry === 'object' 
+				? ('data' in entry && entry.data ? entry.data : entry)
+				: {};
+			const wins = normalizedEntry?.total_wins ?? normalizedEntry?.wins ?? normalizedEntry?.totalWins ?? 0;
+			return total + (typeof wins === 'number' && !Number.isNaN(wins) ? wins : 0);
+		}, 0);
+	}, [allStatsEntries]);
+
+	// 현재 연승수 계산 (가장 높은 값 사용)
+	const currentWinStreak = useMemo(() => {
+		const streaks = allStatsEntries.map((entry: any) => {
+			const normalizedEntry = entry && typeof entry === 'object' 
+				? ('data' in entry && entry.data ? entry.data : entry)
+				: {};
+			return normalizedEntry?.current_win_streak ?? normalizedEntry?.currentWinStreak ?? normalizedEntry?.winStreak ?? 0;
+		});
+		return Math.max(0, ...streaks);
+	}, [allStatsEntries]);
+
+	// 연속보상 경험치 반영: streak에서 받은 포인트를 경험치에 합산
+	const streakRewardXp = (() => {
+		const streak = state?.streak || {};
+		// streak.reward_points 또는 streak.xp_reward 등 다양한 필드 지원
+		const xp = streak.reward_points ?? streak.xp_reward ?? streak.xp ?? 0;
+		return typeof xp === 'number' && xp > 0 ? xp : 0;
+	})();
+
+	// dailyStreak: 0일차는 1일차로 보정
+	const dailyStreak = Math.max(1, p?.daily_streak ?? p?.dailyStreak ?? 1);
+
+	// 경험치: 프로필 경험치 + streak 보상 경험치
+	const experiencePoints = (p?.experience_points ?? p?.xp ?? 0) + streakRewardXp;
+
 	return useMemo(
 		() => ({
 			nickname: p?.nickname ?? "",
 			gold: p?.goldBalance ?? 0,
-			level: p?.level ?? 0,
-			dailyStreak: p?.dailyStreak ?? 0,
+			level: p?.level ?? Math.floor((experiencePoints / 500) + 1),
+			dailyStreak,
+			experiencePoints,
+			totalGamesPlayed: globalTotalGames,
+			totalGamesWon: totalWins,
+			totalGamesLost: Math.max(0, globalTotalGames - totalWins),
+			winRate: globalTotalGames > 0 ? (totalWins / globalTotalGames) * 100 : 0,
+			currentWinStreak: currentWinStreak,
 			isAdmin: !!(p?.isAdmin || p?.is_admin),
 		}),
-		[p?.nickname, p?.goldBalance, p?.level, p?.dailyStreak, p?.isAdmin, p?.is_admin]
+		[
+			p?.nickname, 
+			p?.goldBalance, 
+			p?.level, 
+			dailyStreak,
+			experiencePoints,
+			globalTotalGames,
+			totalWins,
+			currentWinStreak,
+			p?.isAdmin, 
+			p?.is_admin
+		]
 	);
 }
 

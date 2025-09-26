@@ -30,13 +30,13 @@ export function useRealtimeSync() {
         // 가벼운 재조정 트리거(스로틀은 RealtimeSyncProvider/서버에서 조절)
         reconcileBalance(dispatch).catch(()=>{});
       }
-      // 통계는 stats_update 케이스에서 병합
-      const keys = Object.keys(s.stats || {});
-      if (keys.length) {
-        for (const k of keys) {
-          mergeGameStats(dispatch, k, (s.stats as any)[k]?.data || {});
-        }
-      }
+      // 통계는 서버 권위 동기화만 사용 (실시간 병합 비활성화로 중복 누적 방지)
+      // const keys = Object.keys(s.stats || {});
+      // if (keys.length) {
+      //   for (const k of keys) {
+      //     mergeGameStats(dispatch, k, (s.stats as any)[k]?.data || {});
+      //   }
+      // }
     }, 1500);
 
     return () => clearInterval(unsub);

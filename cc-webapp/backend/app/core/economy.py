@@ -33,6 +33,9 @@ def _coerce_bool(val: Any) -> bool:
         return False
     return False
 
+# Crash game economic constants
+CRASH_HOUSE_EDGE_ADJUST = 0.05  # 5% house edge adjustment
+
 def is_v2_active(settings) -> bool:  # settings: app.core.config.settings
     # Order: explicit env var beats settings attribute
     env_val = os.getenv("ECONOMY_V2")
@@ -41,4 +44,4 @@ def is_v2_active(settings) -> bool:  # settings: app.core.config.settings
     attr = getattr(settings, "ECONOMY_V2", None)
     return _coerce_bool(attr)
 
-__all__ = ["is_v2_active"]
+__all__ = ["is_v2_active", "CRASH_HOUSE_EDGE_ADJUST"]

@@ -20,7 +20,7 @@ import { Button } from '../ui/button';
 import { useWithReconcile } from '@/lib/sync';
 import { useGlobalSync } from '@/hooks/useGlobalSync';
 import { useGlobalStore, useGlobalProfile } from '@/store/globalStore';
-import { mergeGameStats } from '@/store/globalStore';
+import { useGameTileStats } from '@/hooks/useGameStats';
 
 interface RockPaperScissorsGameProps {
   user: User;
@@ -70,6 +70,7 @@ export function RockPaperScissorsGame({
   onUpdateUser,
   onAddNotification,
 }: RockPaperScissorsGameProps) {
+  const rpsStats = useGameTileStats('rps', user.gameStats?.rps);
   const [playerChoice, setPlayerChoice] = useState(null as Choice | null);
   const [aiChoice, setAiChoice] = useState(null as Choice | null);
   const [gameResult, setGameResult] = useState(null as GameResult | null);
@@ -180,7 +181,7 @@ export function RockPaperScissorsGame({
         // 백엔드 스키마 준수: choice + bet_amount 필수
         const res = await api.post<any>(
           'games/rps/play',
-          { choice, bet_amount: betAmount },
+          { choice, bet_amount: betAmount, game_id: 'rps' },
           { headers: { 'X-Idempotency-Key': idemKey } }
         );
         // 서버 결과를 화면 연출에 사용하되, 잔액은 재동기화에 위임
@@ -197,14 +198,17 @@ export function RockPaperScissorsGame({
         };
         setRoundHistory((prev: GameRound[]) => [round, ...prev.slice(0, 9)]);
         // 통계 병합(표시용 캐시) — 최종 값은 syncAfterGame으로 서버 권위 반영
-        mergeGameStats(dispatch, 'rps', {
-          totalGames: 1,
+        const statsDelta = {
+          total_games: 1,
+          plays: 1,
           wins: result === 'win' ? 1 : 0,
           losses: result === 'lose' ? 1 : 0,
           draws: result === 'draw' ? 1 : 0,
-          totalBet: betAmount,
-          totalPayout: winnings,
-        });
+          totalBet: betAmount || 0,
+          totalPayout: winnings || 0,
+        };
+        // 🎯 중요: mergeGameStats 제거 - 누적 버그 방지, 서버 권위 동기화만 사용
+        // mergeGameStats(dispatch, 'rps', statsDelta); // 제거됨
         // 게임 후 전역 동기화 (권위 반영)
         await syncAfterGame();
         return res;
@@ -404,6 +408,25 @@ export function RockPaperScissorsGame({
           </div>
 
           <div className="flex items-center gap-4">
+            <div className="hidden sm:flex items-center gap-4">
+              <div className="glass-effect rounded-xl p-3 border border-primary/20">
+                <div className="text-center">
+                  <div className="text-xs text-muted-foreground">총 플레이</div>
+                  <div className="text-lg font-bold text-primary">
+                    {rpsStats.playCount.toLocaleString()}
+                  </div>
+                </div>
+              </div>
+              <div className="glass-effect rounded-xl p-3 border border-gold/20">
+                <div className="text-center">
+                  <div className="text-xs text-muted-foreground">최대 승리</div>
+                  <div className="text-lg font-bold text-gradient-gold">
+                    {rpsStats.bestScore.toLocaleString()}G
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <Button
               variant="outline"
               size="icon"

@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shop Purchase Test</title>
+</head>
+<body>
+    <h1>상점 구매 테스트</h1>
+    <div id="status"></div>
+    <button id="testBtn">상점 구매 테스트 시작</button>
+    <pre id="result"></pre>
+
+    <script>
+        const statusEl = document.getElementById('status');
+        const resultEl = document.getElementById('result');
+        const testBtn = document.getElementById('testBtn');
+
+        async function testShopPurchase() {
+            try {
+                statusEl.textContent = '로그인 중...';
+                
+                // 1. 로그인
+                const loginRes = await fetch('http://localhost:8000/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        site_id: 'user001',
+                        password: '123455'
+                    })
+                });
+
+                if (!loginRes.ok) {
+                    throw new Error(`로그인 실패: ${loginRes.status}`);
+                }
+
+                const loginData = await loginRes.json();
+                const token = loginData.access_token;
+                const userId = loginData.user.id;
+
+                statusEl.textContent = `로그인 성공! User ID: ${userId}`;
+
+                // 2. 상점 구매 - 올바른 형식
+                statusEl.textContent = '상점 구매 중...';
+                
+                const purchaseRes = await fetch('http://localhost:8000/api/shop/buy', {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        user_id: userId,
+                        product_id: 'test_product_12345',
+                        amount: 1000,
+                        quantity: 1,
+                        kind: 'item',
+                        payment_method: 'tokens'
+                    })
+                });
+
+                const purchaseData = await purchaseRes.json();
+                
+                if (purchaseRes.ok) {
+                    statusEl.textContent = '구매 성공!';
+                    resultEl.textContent = JSON.stringify(purchaseData, null, 2);
+                } else {
+                    statusEl.textContent = '구매 실패!';
+                    resultEl.textContent = JSON.stringify(purchaseData, null, 2);
+                }
+
+            } catch (error) {
+                statusEl.textContent = `에러: ${error.message}`;
+                resultEl.textContent = error.stack;
+            }
+        }
+
+        testBtn.addEventListener('click', testShopPurchase);
+    </script>
+</body>
+</html>

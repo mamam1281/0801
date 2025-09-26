@@ -84,33 +84,57 @@ export function ToastProvider(props: ToastProviderProps) {
     if (lastKeyRef.current === key && now - lastAtRef.current < 1500) return;
     lastKeyRef.current = key;
     lastAtRef.current = now;
-    const id = `${now}-${Math.random().toString(36).slice(2, 8)}`;
-    setToasts((prev: Toast[]) => [{ id, message, type }, ...prev].slice(0, 4));
-    setTimeout(() => setToasts((prev: Toast[]) => prev.filter((t: Toast) => t.id !== id)), 3500);
+    // 추가 dedupe: 이미 같은 메시지/타입이 toasts에 있으면 추가하지 않음
+    setToasts((prev: Toast[]) => {
+      if (prev.some(t => t.message === message && (t.type ?? 'info') === (type ?? 'info'))) {
+        return prev;
+      }
+      const id = `${now}-${Math.random().toString(36).slice(2, 8)}`;
+      setTimeout(() => setToasts((p: Toast[]) => p.filter((tt: Toast) => tt.id !== id)), 3500);
+      return [{ id, message, type }, ...prev].slice(0, 4);
+    });
   }, []);
 
   useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent<any>).detail ?? {};
-      const type = typeof detail === 'object' && 'type' in detail ? (detail as any).type : 'info';
-      const msg =
-        typeof detail === 'object' && 'payload' in detail
-          ? JSON.stringify((detail as any).payload)
-          : String(detail ?? '');
+      const type = typeof detail === 'object' && detail && 'type' in detail ? (detail as any).type : 'info';
+      // 우선순위: detail.message(string | number) → detail.payload(JSON stringify) → 전체 detail toString
+      let msg: string;
+      if (typeof detail === 'object' && detail && 'message' in detail) {
+        const m = (detail as any).message;
+        msg = typeof m === 'string' ? m : String(m);
+      } else if (typeof detail === 'object' && detail && 'payload' in detail) {
+        try {
+          msg = JSON.stringify((detail as any).payload);
+        } catch {
+          msg = String((detail as any).payload);
+        }
+      } else {
+        msg = String(detail ?? '');
+      }
       push(msg, type);
     };
     window.addEventListener('app:notification', handler as EventListener);
     return () => window.removeEventListener('app:notification', handler as EventListener);
   }, [push]);
 
+  // children 안전 처리: React 요소/문자/숫자만 통과
+  const safeChildren = React.useMemo(() => {
+    return React.Children.toArray(children).filter((c: any) => {
+      return React.isValidElement(c) || typeof c === 'string' || typeof c === 'number';
+    });
+  }, [children]);
+
   return (
     <ToastContext.Provider value={{ push }}>
-      {children}
+      {safeChildren}
       {/* 컨테이너 */}
       <div className="fixed top-4 right-4 z-50 flex flex-col gap-2">
         {toasts.map((t: Toast) => (
           <div
             key={t.id}
+            data-testid="toast"
             className={`min-w-[220px] max-w-[360px] rounded border px-3 py-2 text-sm shadow-md ${
               t.type === 'error'
                 ? 'bg-red-900/70 border-red-500/50 text-white'

@@ -34,7 +34,7 @@ import sys
 from typing import Sequence, List, Tuple
 from sqlalchemy import create_engine, text
 
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql+psycopg://cc_user:cc_pass@postgres:5432/cc_webapp")
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql+psycopg://cc_user:cc_password@postgres:5432/cc_webapp")
 SEED_PATTERNS = ["admin", "seed", "system"]  # simple heuristics
 
 

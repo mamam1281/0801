@@ -9,7 +9,7 @@
  * - 개발 환경 로깅(console.groupCollapsed)
  */
 
-import { getTokens, setTokens, clearTokens } from '../utils/tokenStorage';
+import { clearTokens, getTokens, setTokens } from '../utils/tokenStorage';
 
 // 간단 토큰 유무 확인 유틸
 export function hasAccessToken(): boolean {
@@ -47,11 +47,20 @@ function resolveOrigin(): string {
     if (envOrigin && /^https?:\/\//.test(envOrigin)) return envOrigin.replace(/\/$/, '');
     return 'http://backend:8000';
   }
-
-  if (envOrigin && /^https?:\/\//.test(envOrigin)) return envOrigin.replace(/\/$/, '');
-  const fallback = (window.location.port === '3000' || window.location.port === '3001') ? 'http://localhost:8000' : `${window.location.origin}`;
-  if (!envOrigin) console.warn('[unifiedApi] NEXT_PUBLIC_API_ORIGIN 미설정 → fallback:', fallback);
-  return fallback.replace(/\/$/, '');
+  // 클라이언트 사이드: Next.js rewrite를 통한 프록시 사용을 위해 빈 문자열 반환
+  // 이렇게 하면 /api/* 요청이 Next.js에서 backend:8000으로 프록시됨
+  if (typeof window !== 'undefined') {
+    // 상대경로 사용 안내 로그(로그 게이트에 따름)
+    try { if (__logGateEnabled()) console.log('[unifiedApi] 클라이언트 사이드 → using Next.js rewrite proxy'); } catch {}
+    return '';
+  }
+  // Fallback (방어적): 상대경로 사용
+  return '';
+  
+  // if (envOrigin && /^https?:\/\//.test(envOrigin)) return envOrigin.replace(/\/$/, '');
+  // const fallback = (window.location.port === '3000' || window.location.port === '3001') ? 'http://localhost:8000' : `${window.location.origin}`;
+  // if (!envOrigin) console.warn('[unifiedApi] NEXT_PUBLIC_API_ORIGIN 미설정 → fallback:', fallback);
+  // return fallback.replace(/\/$/, '');
 }
 
 const ORIGIN = resolveOrigin();
@@ -87,6 +96,22 @@ function __uuidv4() {
   });
 }
 
+// refresh 성공 토스트 디바운스(중복 억제)를 위한 마지막 알림 시간
+let __lastRefreshToast = 0;
+const REFRESH_TOAST_DEBOUNCE_MS = 5 * 60 * 1000; // 5분
+
+function __notifyRefreshSuccess() {
+  if (typeof window === 'undefined') return;
+  const now = Date.now();
+  if (now - __lastRefreshToast < REFRESH_TOAST_DEBOUNCE_MS) return;
+  __lastRefreshToast = now;
+  try {
+    window.dispatchEvent(new CustomEvent('app:notification', {
+      detail: { type: 'system', message: '세션이 자동 연장되었습니다.' }
+    }));
+  } catch {}
+}
+
 async function refreshOnce(): Promise<boolean> {
   try {
     const tokens = getTokens();
@@ -100,6 +125,7 @@ async function refreshOnce(): Promise<boolean> {
     const data = await res.json().catch(()=>null);
     if (data?.access_token) {
       setTokens({ access_token: data.access_token, refresh_token: data.refresh_token || tokens.refresh_token });
+      __notifyRefreshSuccess();
       return true;
     }
     return false;
@@ -171,7 +197,9 @@ export async function apiCall<T=any>(path: string, opts: UnifiedRequestOptions<T
     // 무토큰 인증 상황 보정: auth=true인데 토큰이 없으면 네트워크 호출 자체를 생략
     // - GET: 조용히 null 반환 (호출 측에서 data null 처리)
     // - 쓰기 계열: 표준화 에러(code/status 포함) 던짐
-    if (auth && !tokens?.access_token) {
+    // - 예외: 관리자 로그인은 토큰이 없어도 허용
+    const isAdminLogin = path.includes('auth/admin/login');
+    if (auth && !tokens?.access_token && !isAdminLogin) {
       const upper = method.toUpperCase();
       const logEnabled = __logGateEnabled();
       if (upper === 'GET') {
@@ -218,18 +246,32 @@ export async function apiCall<T=any>(path: string, opts: UnifiedRequestOptions<T
         credentials: 'include',
       });
     } catch (networkErr:any) {
+      // 네트워크 레벨 예외(예: CORS, DNS, 연결 끊김)인 경우 재시도 로직 적용 후
+      // 마지막 실패 시 사용자 친화적이고 디버깅 가능한 Error 객체를 던진다.
       if (attempt < retry) {
         const delay = backoffBaseMs * Math.pow(2, attempt);
         await new Promise(r=>setTimeout(r, delay));
         attempt++; continue;
       }
-      throw networkErr;
+      const enhanced = new Error('[unifiedApi] NetworkError: Failed to fetch or connect to API');
+      // 포함: 원본 메시지와 호출 URL, 시도 횟수
+      try { (enhanced as any).original = networkErr?.message || String(networkErr); } catch {}
+      (enhanced as any).url = url;
+      (enhanced as any).attempts = attempt + 1;
+      throw enhanced;
     }
 
     if (response.status === 401 && auth && !didRefresh) {
       const refreshed = await refreshOnce();
       didRefresh = true;
       if (refreshed) { attempt++; continue; }
+      // refresh 실패 → 토큰 제거 전 UX 알림 디스패치
+      try {
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('app:notification', { detail: { type: 'warning', message: '세션이 만료되었습니다. 다시 로그인 해주세요.' } }));
+          window.dispatchEvent(new CustomEvent('app:session-expired', { detail: { at: Date.now() } }));
+        }
+      } catch {}
       clearTokens();
     }
 
@@ -263,9 +305,21 @@ export async function apiCall<T=any>(path: string, opts: UnifiedRequestOptions<T
       // @ts-ignore
       return (await response.text()) as T;
     }
-    const json = await response.json().catch(()=>null);
-    // @ts-ignore
-    return transform ? transform(json) : json;
+    
+    const responseText = await response.text();
+    console.log('[unifiedApi] 응답 텍스트:', responseText);
+    
+    try {
+      const json = JSON.parse(responseText);
+      console.log('[unifiedApi] JSON 파싱 성공:', json);
+      // @ts-ignore
+      return transform ? transform(json) : json;
+    } catch (parseError) {
+      console.error('[unifiedApi] JSON 파싱 실패:', parseError);
+      console.error('[unifiedApi] 원본 응답 텍스트:', responseText);
+      // @ts-ignore
+      return null as T;
+    }
   }
 }
 

@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>게임 이력 API 테스트</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: white;
+        }
+        .test-section {
+            background: #2a2a2a;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        button {
+            background: #0066cc;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0088ff;
+        }
+        pre {
+            background: #1a1a1a;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+        }
+        .error {
+            background: #cc4444;
+            color: white;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .success {
+            background: #44cc44;
+            color: white;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎮 게임 이력 API 테스트</h1>
+    
+    <div class="test-section">
+        <h2>API 테스트</h2>
+        <button onclick="testGameHistory()">게임 이력 조회</button>
+        <button onclick="testUserStats()">사용자 통계 조회</button>
+        <button onclick="testAuthStatus()">인증 상태 확인</button>
+    </div>
+
+    <div id="results"></div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000/api';
+        
+        function getAuthToken() {
+            // 로컬 스토리지에서 토큰 가져오기
+            return localStorage.getItem('access_token') || localStorage.getItem('casino-auth-token');
+        }
+        
+        async function makeApiCall(endpoint, options = {}) {
+            const token = getAuthToken();
+            const headers = {
+                'Content-Type': 'application/json',
+                ...options.headers
+            };
+            
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}${endpoint}`, {
+                    ...options,
+                    headers
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                return { success: true, data, status: response.status };
+            } catch (error) {
+                return { success: false, error: error.message };
+            }
+        }
+        
+        function showResult(title, result) {
+            const resultsDiv = document.getElementById('results');
+            const resultHtml = `
+                <div class="test-section">
+                    <h3>${title}</h3>
+                    ${result.success 
+                        ? `<div class="success">✅ 성공 (상태: ${result.status})</div>`
+                        : `<div class="error">❌ 실패: ${result.error}</div>`
+                    }
+                    <pre>${JSON.stringify(result, null, 2)}</pre>
+                </div>
+            `;
+            resultsDiv.innerHTML = resultHtml + resultsDiv.innerHTML;
+        }
+        
+        async function testGameHistory() {
+            const result = await makeApiCall('/games/history?limit=10&offset=0');
+            showResult('🎮 게임 이력 조회', result);
+            
+            if (result.success && result.data.items) {
+                console.log('게임 이력 아이템 수:', result.data.items.length);
+                console.log('게임 이력 상세:', result.data.items);
+            }
+        }
+        
+        async function testUserStats() {
+            const result = await makeApiCall('/games/stats/me');
+            showResult('📊 사용자 게임 통계', result);
+        }
+        
+        async function testAuthStatus() {
+            const token = getAuthToken();
+            if (!token) {
+                showResult('🔐 인증 상태', { 
+                    success: false, 
+                    error: '토큰 없음 - 로그인이 필요합니다' 
+                });
+                return;
+            }
+            
+            const result = await makeApiCall('/auth/me');
+            showResult('🔐 인증 상태', result);
+        }
+        
+        // 페이지 로드 시 토큰 상태 확인
+        window.addEventListener('load', function() {
+            const token = getAuthToken();
+            if (token) {
+                console.log('인증 토큰 발견:', token.substring(0, 20) + '...');
+            } else {
+                console.log('인증 토큰 없음 - 로그인 필요');
+            }
+        });
+    </script>
+</body>
+</html>

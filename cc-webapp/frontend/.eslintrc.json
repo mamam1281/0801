@@ -54,6 +54,15 @@
               "**/hooks/game/useApiClient"
             ],
             "message": "레거시 API 클라이언트 경로는 금지되었습니다. '@/lib/unifiedApi'를 사용하세요."
+          },
+          {
+            "group": [
+              "./store/globalStore",
+              "../store/globalStore",
+              "**/store/globalStore.ts",
+              "**/store/globalStore.tsx"
+            ],
+            "message": "전역 스토어는 반드시 '@/store/globalStore' 별칭으로 임포트하세요. 상대 경로 금지."
           }
         ]
       }

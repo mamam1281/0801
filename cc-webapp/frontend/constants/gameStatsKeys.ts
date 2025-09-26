@@ -7,6 +7,10 @@ export const TOTAL_KEYS_GLOBAL = [
   'games',
   'plays',
   'spins',
+  'slot_spins',
+  'crash_games',
+  'gacha_pulls',
+  'rps_games',
 ] as const;
 
 export const GAME_ID_ALIASES: Record<string, string[]> = {
@@ -20,10 +24,10 @@ export const GAME_ID_ALIASES: Record<string, string[]> = {
 
 export const PLAY_COUNT_KEYS_BY_GAME: Record<string, string[]> = {
   // total_spins/sin_count 등의 스네이크/다양 키도 추적
-  slot: ['totalSpins', 'total_spins', 'spin_count', 'spins', 'plays', 'games', 'total_games'],
-  rps: ['totalGames', 'matches', 'games', 'plays'],
-  gacha: ['totalPulls', 'pulls', 'plays'],
-  crash: ['totalGames', 'games', 'plays'],
+  slot: ['totalSpins', 'total_spins', 'spin_count', 'spins', 'plays', 'games', 'total_games', 'slot_spins'],
+  rps: ['totalGames', 'matches', 'games', 'plays', 'rps_games'],
+  gacha: ['totalPulls', 'pulls', 'plays', 'gacha_pulls'],
+  crash: ['totalGames', 'games', 'plays', 'crash_games', 'bets', 'total_bets'], // bets 키 추가
 };
 
 export const BEST_SCORE_KEYS_BY_GAME: Record<string, string[]> = {

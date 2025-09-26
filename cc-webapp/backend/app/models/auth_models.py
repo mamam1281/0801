@@ -1,7 +1,7 @@
 """인증 관련 데이터베이스 모델"""
 from datetime import datetime
 from typing import Optional
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, Text, ForeignKey
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, Text, ForeignKey, Numeric
 from sqlalchemy.orm import relationship, synonym
 from ..database import Base
 
@@ -19,6 +19,19 @@ class User(Base):
     gold_balance = Column(Integer, default=1000, nullable=False)  # 신규 가입 시 1000 골드 지급
     # VIP 포인트 (일일 VIP 보상 전용 포인트)
     vip_points = Column(Integer, default=0, nullable=False)
+    
+    # 게임 통계 관련 필드들 (DB 스키마와 동기화)
+    level = Column(Integer, default=1, nullable=False)
+    experience_points = Column(Integer, default=0, nullable=False)
+    total_games_played = Column(Integer, default=0, nullable=False)
+    total_games_won = Column(Integer, default=0, nullable=False)  # total_wins와 동일
+    total_games_lost = Column(Integer, default=0, nullable=False)  # total_losses와 동일
+    daily_streak = Column(Integer, default=0, nullable=False)
+    # 추가 통계 필드들 (nullable로 설정된 것들)
+    total_wins = Column(Integer, default=0, nullable=True)
+    total_losses = Column(Integer, default=0, nullable=True)
+    win_rate = Column("win_rate", Numeric(5,4), default=0.0000, nullable=True)  # 승률 (0.0000 형태의 decimal)
+    
     is_active = Column(Boolean, default=True)
     is_admin = Column(Boolean, default=False)  # 관리자 여부
     # DB의 컬럼명은 'vip_tier' 이므로 name='vip_tier'로 매핑 (기존 'rank' 예약어 사용 회피)

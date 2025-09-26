@@ -15,7 +15,7 @@ import { useGlobalStore, useGlobalProfile } from '@/store/globalStore';
 import { validateNickname } from '@/utils/securityUtils';
 import { getTokens, setTokens } from '../utils/tokenStorage';
 import { useRealtimeProfile, useRealtimeStats } from '@/hooks/useRealtimeData';
-import ActionHistory from '@/components/profile/ActionHistory';
+import { TOTAL_KEYS_GLOBAL } from '../constants/gameStatsKeys';
 
 interface ProfileScreenProps {
   onBack: () => void;
@@ -42,6 +42,8 @@ export function ProfileScreen({
   const globalProfile = useGlobalProfile();
   const { state } = useGlobalStore();
   const storeGameStats = state.gameStats || {};
+  // 경험치/레벨 전역 셀렉터 사용
+  const userSummary = require('@/hooks/useSelectors').useUserSummary();
 
   // 초기 동기화
   useEffect(() => {
@@ -49,12 +51,24 @@ export function ProfileScreen({
       syncAll({ showToast: false });
     }
   }, [isHydrated, syncAll]);
+
+  // 전역 프로필과 로컬 user 상태 동기화
+  useEffect(() => {
+    if (globalProfile) {
+      setUser(globalProfile);
+      setLoading(false);
+      setAuthChecked(true);
+    }
+  }, [globalProfile]);
+  
   // 쓰기 후 재동기화 유틸 (멱등 포함)
   const withReconcile = useWithReconcile();
   // Realtime 전역 상태 구독(골드 등 핵심 값은 전역 프로필 우선 사용)
   const { profile: rtProfile, refresh: refreshRtProfile } = useRealtimeProfile();
   const { allStats: rtAllStats } = useRealtimeStats();
-  const [user, setUser] = useState(null);
+  
+  // 로컬 상태 - 전역 프로필과 동기화
+  const [user, setUser] = useState(globalProfile);
   const [stats, setStats] = useState(null);
   const [balance, setBalance] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -81,15 +95,13 @@ export function ProfileScreen({
 
       const profileData: any = {
         ...rawProfile,
-        experience: (rawProfile as any).experience ?? (rawProfile as any).xp ?? 0,
+        experience: (rawProfile as any).experience ?? (rawProfile as any).experience_points ?? (rawProfile as any).xp ?? 0,
+        experience_points: (rawProfile as any).experience_points ?? (rawProfile as any).experience ?? (rawProfile as any).xp ?? 0,
         maxExperience:
           (rawProfile as any).maxExperience ?? (rawProfile as any).max_experience ?? 1000,
         dailyStreak:
-          (rawProfile as any).dailyStreak ||
-          (rawProfile as any).daily_streak ||
-          (rawProfile as any).streak ||
-          0,
-        level: (rawProfile as any).level ?? (rawProfile as any).lvl ?? 1,
+          (rawProfile as any).dailyStreak ?? (rawProfile as any).daily_streak ?? (rawProfile as any).streak ?? 1,
+        level: (rawProfile as any).level ?? (rawProfile as any).battlepass_level ?? (rawProfile as any).lvl ?? 1,
         gameStats: (rawProfile as any).gameStats || (rawProfile as any).game_stats || {},
       };
       const statsData: any = {
@@ -433,17 +445,15 @@ export function ProfileScreen({
     );
   }
 
-  // 안전한 계산을 위한 체크
-  const progressToNext =
-    user?.experience && user?.maxExperience ? (user.experience / user.maxExperience) * 100 : 0;
+  // 전역 프로필에서 XP, maxExperience, daily_streak, level을 직접 읽어 UI에 반영
+  const authoritativeXp = userSummary.experiencePoints;
+  const authoritativeMaxXp = (globalProfile as any)?.maxExperience ?? (globalProfile as any)?.max_experience ?? 1000;
+  const progressToNext = authoritativeMaxXp ? (authoritativeXp / authoritativeMaxXp) * 100 : 0;
+  const authoritativeLevel = userSummary.level;
+  const authoritativeDailyStreak = Math.max(1, userSummary.dailyStreak ?? 1);
 
-  // GOLD 표시값: Realtime 전역 상태(우선) → 공용 상태 → 로컬 balance 폴백
-  const displayGold: number | string =
-    (globalProfile?.goldBalance as any) ??
-    (rtProfile?.gold as any) ??
-    (sharedUser?.goldBalance as any) ??
-    (balance?.cyber_token_balance as any) ??
-    0;
+  // GOLD 표시값: 전역 프로필 우선
+  const displayGold: number | string = (globalProfile?.goldBalance as any) ?? 0;
 
   // 실시간 통계 파생값: 전역 stats 우선, 없으면 기존 로컬 stats 사용
   const pickNumber = (obj: Record<string, any> | undefined, keys: string[]): number => {
@@ -457,22 +467,24 @@ export function ProfileScreen({
   const computeRtTotals = (): { totalGames?: number; totalWins?: number } => {
     try {
       // 전역 store 게임 통계를 우선 사용, 폴백으로 기존 실시간/로컬 사용
-      const primaryEntries = Object.values(storeGameStats || {}) as Array<
-        { data?: Record<string, any> } | Record<string, any>
-      >;
+      // _global 제외하고 개별 게임 통계만 계산 (중복 방지)
+      const primaryEntries = Object.entries(storeGameStats || {})
+        .filter(([key, entry]) => key !== '_global' && entry && Object.keys(entry).length > 0)
+        .map(([, entry]) => entry);
+      
       const entries = primaryEntries.length
         ? primaryEntries
         : (Object.values(rtAllStats || {}) as Array<{ data?: Record<string, any> }>);
       if (!entries?.length) return {};
       const getData = (e: any) => (e?.data ? e.data : e);
       const totalGames = entries.reduce(
-        (acc, e) =>
+        (acc: number, e) =>
           acc +
-          pickNumber(getData(e), ['total_games_played', 'total_games', 'games', 'plays', 'spins']),
+          pickNumber(getData(e), [...TOTAL_KEYS_GLOBAL]),
         0
       );
       const totalWins = entries.reduce(
-        (acc, e) => acc + pickNumber(getData(e), ['total_wins', 'wins']),
+        (acc: number, e) => acc + pickNumber(getData(e), ['total_wins', 'wins']),
         0
       );
       return { totalGames, totalWins };
@@ -483,6 +495,9 @@ export function ProfileScreen({
   const rtTotals = computeRtTotals();
   const displayTotalGames = (rtTotals.totalGames ?? 0) || (stats?.total_games_played ?? 0) || 0;
   const displayTotalWins = (rtTotals.totalWins ?? 0) || (stats?.total_wins ?? 0) || 0;
+
+  // 연속일(스트릭) 권위값 우선: globalProfile.daily_streak
+  // 이미 위에서 선언됨
 
   // 게임별 요약: 전역 store.gameStats 우선, legacy user.gameStats 폴백
   const pickFromEntry = (entry: any, keys: string[]) => {
@@ -503,6 +518,10 @@ export function ProfileScreen({
     pickFromEntry(slotEntry, ['biggestWin', 'max_win', 'highest_win']) ??
     (user as any)?.gameStats?.slot?.biggestWin ??
     0;
+  const slotSpins =
+    pickFromEntry(slotEntry, ['totalSpins', 'total_spins', 'spin_count', 'spins', 'plays', 'games', 'total_games', 'slot_spins']) ??
+    (user as any)?.gameStats?.slot?.totalSpins ??
+    0;
   const rpsMatches =
     pickFromEntry(rpsEntry, ['totalGames', 'matches', 'games', 'plays']) ??
     (user as any)?.gameStats?.rps?.matches ??
@@ -513,7 +532,7 @@ export function ProfileScreen({
     (user as any)?.gameStats?.rps?.winStreak ??
     0;
   const crashGames =
-    pickFromEntry(crashEntry, ['totalGames', 'games', 'plays']) ??
+    pickFromEntry(crashEntry, ['totalGames', 'games', 'plays', 'bets', 'total_bets', 'crash_games']) ??
     (user as any)?.gameStats?.crash?.games ??
     0;
   const crashBiggestWin =
@@ -591,48 +610,13 @@ export function ProfileScreen({
                     <h2 className="text-4xl font-black text-gradient-primary">
                       {globalProfile?.nickname || user?.nickname || '사용자'}
                     </h2>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="glass-effect hover:bg-primary/10"
-                      onClick={async () => {
-                        try {
-                          const current = (
-                            globalProfile?.nickname ||
-                            user?.nickname ||
-                            ''
-                          ).toString();
-                          const next = window.prompt('새 닉네임을 입력하세요', current)?.trim();
-                          if (!next || next === current) return;
-                          const { isValid, error } = validateNickname(next);
-                          if (!isValid) {
-                            onAddNotification(error || '닉네임 형식이 올바르지 않습니다.');
-                            return;
-                          }
-                          // 금지 리터럴('users/profile')을 코드에 직접 쓰지 않기 위해 조합
-                          const PROFILE_UPDATE = ['users', 'profile'].join('/');
-                          await withReconcile(async () => {
-                            await unifiedApi.put(PROFILE_UPDATE, { nickname: next });
-                            return { ok: true } as any;
-                          });
-                          onAddNotification('닉네임이 변경되었습니다.');
-                          // 하이드레이트로 덮어쓰기를 기다리되, 즉시성 확보를 위해 로컬 표시값 폴백 최소화
-                        } catch (e) {
-                          // eslint-disable-next-line no-console
-                          console.error('[ProfileScreen] 닉네임 변경 실패', e);
-                          onAddNotification('닉네임 변경 중 오류가 발생했습니다.');
-                        }
-                      }}
-                    >
-                      닉네임 수정
-                    </Button>
                   </div>
 
                   {/* 🎯 연속출석일만 표시 */}
                   <div className="flex justify-center">
                     <Badge className="bg-success/20 text-success border-success/30 px-4 py-2 text-lg">
                       <Flame className="w-5 h-5 mr-2" />
-                      {user?.dailyStreak || 0}일 연속 출석
+                      {Math.max(1, globalProfile?.daily_streak ?? 1)}일 연속 출석
                     </Badge>
                   </div>
                 </div>
@@ -642,21 +626,20 @@ export function ProfileScreen({
                   <div className="flex items-center justify-between text-lg">
                     <span className="font-medium">경험치 진행도</span>
                     <span className="font-bold">
-                      {user?.experience?.toLocaleString() || 0} /{' '}
-                      {user?.maxExperience?.toLocaleString() || 1000} XP
+                      {userSummary.experiencePoints.toLocaleString()} / {(globalProfile?.maxExperience ?? globalProfile?.max_experience ?? 1000).toLocaleString()} XP
                     </span>
                   </div>
                   <div className="relative">
-                    <Progress value={progressToNext} className="h-4 bg-secondary/50" />
+                    <Progress value={(userSummary.experiencePoints / (globalProfile?.maxExperience ?? globalProfile?.max_experience ?? 1000)) * 100} className="h-4 bg-secondary/50" />
                     <motion.div
                       initial={{ width: 0 }}
-                      animate={{ width: `${progressToNext}%` }}
+                      animate={{ width: `${(userSummary.experiencePoints / (globalProfile?.maxExperience ?? globalProfile?.max_experience ?? 1000)) * 100}%` }}
                       transition={{ duration: 1.5, delay: 0.5 }}
                       className="absolute top-0 left-0 h-full bg-gradient-to-r from-primary to-gold rounded-full"
                     />
                   </div>
                   <div className="text-center text-lg text-muted-foreground">
-                    다음 레벨까지 {progressToNext.toFixed(1)}%
+                    다음 레벨까지 {(userSummary.experiencePoints / (globalProfile?.maxExperience ?? globalProfile?.max_experience ?? 1000) * 100).toFixed(1)}%
                   </div>
                 </div>
 
@@ -704,10 +687,7 @@ export function ProfileScreen({
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="text-lg font-bold text-primary">{displayTotalGames}회</div>
-                      <div className="text-xs text-gold">
-                        최고: {Number(slotBiggestWin).toLocaleString()}G
-                      </div>
+                      <div className="text-lg font-bold text-primary">{slotSpins}회</div>
                     </div>
                   </div>
 
@@ -735,9 +715,6 @@ export function ProfileScreen({
                     </div>
                     <div className="text-right">
                       <div className="text-lg font-bold text-error">{crashGames}회</div>
-                      <div className="text-xs text-gold">
-                        최고: {Number(crashBiggestWin).toLocaleString()}G
-                      </div>
                     </div>
                   </div>
 
@@ -777,11 +754,11 @@ export function ProfileScreen({
                     <div className="text-center p-4 rounded-lg bg-gold/5 border border-gold/10">
                       <div
                         className="text-2xl font-bold text-gradient-gold"
-                        data-testid="stats-total-wins"
+                        data-testid="stats-win-streak"
                       >
-                        {displayTotalWins} 승
+                        🔥 {stats?.current_win_streak || 0}
                       </div>
-                      <div className="text-sm text-muted-foreground">총 수익</div>
+                      <div className="text-sm text-muted-foreground">연승 스트릭</div>
                     </div>
 
                     <div className="text-center p-4 rounded-lg bg-success/5 border border-success/10">
@@ -816,7 +793,7 @@ export function ProfileScreen({
                           <div className="text-xs text-muted-foreground">레벨 10 달성하기</div>
                         </div>
                         <Badge className="bg-muted/20 text-muted-foreground border-muted/30 text-xs">
-                          {user?.level || 0}/10
+                          {userSummary.level || 0}/10
                         </Badge>
                       </div>
 
@@ -835,16 +812,6 @@ export function ProfileScreen({
                 </div>
               </div>
             </Card>
-          </motion.div>
-
-          {/* 세 번째 카드: 서버 권위 액션 이력 (페이지네이션) */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-          >
-            {/* 주의: WS recent_purchases는 경량 배지/알림용. 리스트는 반드시 서버 API 기반으로 표시해 중복/순서 오류 방지 */}
-            <ActionHistory pageSize={10} />
           </motion.div>
         </div>
       </div>

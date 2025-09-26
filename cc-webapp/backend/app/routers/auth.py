@@ -1,11 +1,13 @@
 """Authentication API Router (clean)
 
-Provides signup, login, admin login, refresh, and logout endpoints.
+Provides signup, login, admin login, refresh, and logout functions.
 Delegates business logic to services.auth_service.AuthService.
 """
 
 import logging
+from sqlalchemy import func
 import os
+from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status, Body, Request
 from pydantic import BaseModel, Field
 from fastapi.security import HTTPAuthorizationCredentials
@@ -65,19 +67,47 @@ def _build_user_response(user: User) -> UserResponse:
     level = getattr(user, "battlepass_level", 1) or 1
     max_exp = 1000 + (level - 1) * 100  # keep existing simple progression
 
+    # streak 보상 경험치 합산
+    from sqlalchemy.orm import Session
+    from app.models.game_models import UserReward
+    from datetime import datetime  # datetime import 추가
+    db = None
+    try:
+        import inspect
+        frame = inspect.currentframe()
+        while frame:
+            if "db" in frame.f_locals:
+                db = frame.f_locals["db"]
+                break
+            frame = frame.f_back
+    except Exception:
+        db = None
+    streak_xp = 0
+    if db:
+        today = datetime.utcnow().date()
+        rewards = db.query(UserReward).filter(
+            UserReward.user_id == user.id,
+            UserReward.reward_type == "STREAK_DAILY",
+            func.date(UserReward.claimed_at) == today
+        ).all()
+        streak_xp = sum([r.xp_amount or 0 for r in rewards])
+    total_xp = int(total_exp) if isinstance(total_exp, (int, float)) else 0
+    total_xp += streak_xp
     return UserResponse(
-        id=user.id,
-        site_id=user.site_id,
-        nickname=user.nickname,
-        phone_number=getattr(user, "phone_number", None),
-        created_at=user.created_at,
-        last_login=user.last_login or user.created_at,
+        id=getattr(user, "id", 0),
+        site_id=getattr(user, "site_id", ""),
+        nickname=getattr(user, "nickname", ""),
+        phone_number=getattr(user, "phone_number", None) or "",
+        created_at=getattr(user, "created_at", datetime.utcnow()),
+        last_login=getattr(user, "last_login", None) or getattr(user, "created_at", datetime.utcnow()),
         is_admin=getattr(user, "is_admin", False),
         is_active=getattr(user, "is_active", True),
         gold_balance=getattr(user, "gold_balance", 0),
-    vip_points=getattr(user, "vip_points", 0),
+        vip_points=getattr(user, "vip_points", 0),
         battlepass_level=level,
-        experience=int(total_exp) if isinstance(total_exp, (int, float)) else 0,
+        experience=total_xp,
+        experience_points=total_xp,
+        level=level,
         max_experience=int(max_exp),
     )
 
@@ -121,12 +151,12 @@ async def minimal_register(req: _RegisterRequest, db: Session = Depends(get_db))
         refresh_token = None
         if hasattr(AuthService, 'create_refresh_token'):
             try:
-                refresh_token = AuthService.create_refresh_token({"sub": user.site_id, "user_id": user.id})
+                refresh_token = AuthService.create_refresh_token({"sub": getattr(user, "site_id", ""), "user_id": getattr(user, "id", 0)})
             except Exception:
                 refresh_token = None
         return _RegisterResponse(
-            user_id=user.id,
-            nickname=user.nickname,
+            user_id=getattr(user, "id", 0),
+            nickname=getattr(user, "nickname", ""),
             access_token=access_token,
             refresh_token=refresh_token,
             gold_balance=getattr(user, 'gold_balance', 0)
@@ -307,7 +337,7 @@ async def signup(data: UserCreate, request: Request, db: Session = Depends(get_d
         try:
             ip = request.client.host if request and request.client else None
             ua = request.headers.get("User-Agent") if request else None
-            refresh_token = TokenManager.create_refresh_token(user_id=user.id, ip_address=ip or "", user_agent=ua or "", db=db)
+            refresh_token = TokenManager.create_refresh_token(user_id=getattr(user, "id", 0), ip_address=ip or "", user_agent=ua or "", db=db)
         except Exception:
             logger.exception("refresh_token create/save failed (signup) - continuing without refresh_token")
             refresh_token = None
@@ -393,10 +423,11 @@ async def login(data: UserLogin, request: Request, db: Session = Depends(get_db)
         except Exception:
             logger.exception("create_session (login) failed (non-fatal)")
         # DB 기반 리프레시 토큰 발급 및 저장
+        refresh_token = None  # 기본값 설정
         try:
             ip = request.client.host if request and request.client else None
             ua = request.headers.get("User-Agent") if request else None
-            refresh_token = TokenManager.create_refresh_token(user_id=user.id, ip_address=ip or "", user_agent=ua or "", db=db)
+            refresh_token = TokenManager.create_refresh_token(user_id=getattr(user, "id", 0), ip_address=ip or "", user_agent=ua or "", db=db)
         except Exception:
             logger.exception("refresh_token create/save failed (login) - continuing without refresh_token")
             refresh_token = None
@@ -435,7 +466,6 @@ async def refresh(
     # Body로 {"refresh_token": "..."} 를 받는 것도 허용 (FE 호환)
     refresh_token: str | None = Body(default=None, embed=True),
     credentials: HTTPAuthorizationCredentials = Depends(security),
-    request: Request = None,
     db: Session = Depends(get_db),
 ):
     try:
@@ -446,8 +476,8 @@ async def refresh(
         # 1) DB 리프레시 토큰 경로 시도
         user = None
         try:
-            req_ip = request.client.host if request and request.client else ""
-            req_ua = request.headers.get("User-Agent") if request else ""
+            req_ip = ""
+            req_ua = ""
             ok, uid, err = TokenManager.verify_refresh_token(provided_token, req_ip, req_ua, db)
             if err == "REVOKED":
                 # Reuse of a revoked/rotated refresh token → security response: revoke everything and deny
@@ -479,9 +509,9 @@ async def refresh(
         # 리프레시 토큰 회전(있으면), 실패 시 기존 토큰 유지
         new_refresh_token = None
         try:
-            req_ip = request.client.host if request and request.client else ""
-            req_ua = request.headers.get("User-Agent") if request else ""
-            new_refresh_token = TokenManager.rotate_refresh_token(provided_token, user.id, req_ip, req_ua, db)
+            req_ip = ""
+            req_ua = ""
+            new_refresh_token = TokenManager.rotate_refresh_token(provided_token, getattr(user, "id", 0), req_ip, req_ua, db)
         except Exception:
             logger.exception("refresh_token rotation failed; returning provided token")
         return Token(access_token=new_access_token, token_type="bearer", user=_build_user_response(user), refresh_token=(new_refresh_token or provided_token))
@@ -517,8 +547,8 @@ async def logout_all(credentials: HTTPAuthorizationCredentials = Depends(securit
     token_data = AuthService.verify_token(credentials.credentials, db=db)
     try:
         AuthService.blacklist_token(db, credentials.credentials, reason="logout_all", by_user_id=token_data.user_id)
-        AuthService.revoke_all_sessions(db, token_data.user_id)
-        TokenManager.revoke_all_refresh_tokens(token_data.user_id, db)
+        AuthService.revoke_all_sessions(db, token_data.user_id or 0)
+        TokenManager.revoke_all_refresh_tokens(token_data.user_id or 0, db)
     except Exception:
         logger.exception("logout_all failed")
     return {"message": "Logged out from all sessions"}

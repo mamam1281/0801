@@ -1,3 +1,4 @@
+
 import logging
 """인증 관련 서비스"""
 import os
@@ -95,6 +96,32 @@ class AuthService:
                 logging.info(f"create_access_token: key_masked={masked} calc_sig_prefix={calc_sig[:10].decode('utf-8')} provided_sig_prefix={parts[2][:10]}")
         except Exception as e:
             logging.warning(f"create_access_token debug failed: {e}")
+        return encoded_jwt
+
+    @staticmethod
+    def create_refresh_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
+        """리프레시 토큰 생성 (정적 메서드)
+
+        - payload에 token_type="refresh"를 부여
+        - 기본 만료는 환경변수 REFRESH_TOKEN_EXPIRE_DAYS 기준으로 설정
+        """
+        to_encode = data.copy()
+        now = datetime.utcnow()
+        if expires_delta is not None:
+            expire = now + expires_delta
+        else:
+            # 기본 30일
+            days = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "30"))
+            expire = now + timedelta(days=days)
+        to_encode.update({
+            "exp": int(expire.timestamp()),
+            "iat": int(now.timestamp()),
+            "jti": str(uuid.uuid4()),
+            "token_type": "refresh",
+        })
+        from app.core.config import settings
+        headers = {"kid": getattr(settings, "KEY_ROTATION_VERSION", "v1")}
+        encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM, headers=headers)
         return encoded_jwt
     
     @staticmethod
@@ -200,9 +227,13 @@ class AuthService:
                         status_code=status.HTTP_401_UNAUTHORIZED,
                         detail="세션이 만료되었거나 로그아웃되었습니다"
                     )
-        site_id: str = payload.get("sub")
-        user_id: int = payload.get("user_id")
-        is_admin: bool = payload.get("is_admin", False)
+        site_id: str = str(payload.get("sub") or "")
+        user_id_raw = payload.get("user_id")
+        try:
+            user_id: int = int(user_id_raw) if user_id_raw is not None else 0
+        except Exception:
+            user_id = 0
+        is_admin: bool = bool(payload.get("is_admin", False))
         if site_id is None or user_id is None:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -229,7 +260,7 @@ class AuthService:
             except Exception:
                 # DB 백엔드 차이/호환 문제 시 단순 반복 필터
                 user = db.query(User).filter(User.nickname == site_id).first()
-        if not user or not AuthService.verify_password(password, user.password_hash):
+        if not user or not AuthService.verify_password(password, getattr(user, "password_hash", "")):
             return None
         return user
 
@@ -311,7 +342,7 @@ class AuthService:
             User.site_id == site_id,
             User.is_admin == True
         ).first()
-        if not user or not AuthService.verify_password(password, user.password_hash):
+        if not user or not AuthService.verify_password(password, getattr(user, "password_hash", "")):
             return None
         return user
     
@@ -439,7 +470,11 @@ class AuthService:
     @staticmethod
     def update_last_login(db: Session, user: User) -> None:
         """마지막 로그인 시간 업데이트"""
-        user.last_login = datetime.utcnow()
+        # assign via setattr for SQLAlchemy Column type compatibility
+        try:
+            setattr(user, "last_login", datetime.utcnow())
+        except Exception:
+            pass
         db.commit()
         db.refresh(user)
     
@@ -459,7 +494,7 @@ class AuthService:
     def get_current_admin(db: Session, credentials: HTTPAuthorizationCredentials) -> User:
         """현재 관리자 가져오기"""
         user = AuthService.get_current_user(db, credentials)
-        if not user.is_admin:
+        if not bool(getattr(user, "is_admin", False)):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="관리자 권한이 필요합니다"
@@ -506,7 +541,10 @@ class AuthService:
         # Enforce single-session if configured
         if MAX_CONCURRENT_SESSIONS <= 1:
             for s in db.query(UserSession).filter(UserSession.user_id == user.id, UserSession.is_active == True).all():
-                s.is_active = False
+                try:
+                    setattr(s, "is_active", False)
+                except Exception:
+                    pass
         session = UserSession(
             user_id=user.id,
             session_token=payload.get("jti", str(uuid.uuid4())),
@@ -524,7 +562,10 @@ class AuthService:
         """Deactivate all sessions for user (soft)."""
         cnt = 0
         for s in db.query(UserSession).filter(UserSession.user_id == user_id, UserSession.is_active == True).all():
-            s.is_active = False
+            try:
+                setattr(s, "is_active", False)
+            except Exception:
+                pass
             cnt += 1
         if cnt:
             db.commit()

@@ -100,12 +100,15 @@ async def update_user_profile(
 async def get_user_balance(
     current_user: User = Depends(get_current_user)
 ):
-    """사용자 잔액 조회"""
+    """사용자 잔액 조회 - 전역동기화 핵심 엔드포인트"""
     logger.info(f"API: GET /api/users/balance - user_id={current_user.id}")
     return {
+        "gold_balance": current_user.gold_balance,  # 핵심: gold_balance 반환
         "cyber_token_balance": current_user.cyber_token_balance,
         "user_id": current_user.id,
-        "nickname": current_user.nickname
+        "nickname": current_user.nickname,
+        "daily_streak": getattr(current_user, 'daily_streak', 0),
+        "experience_points": getattr(current_user, 'experience_points', 0)
     }
 
 @router.get("/info")

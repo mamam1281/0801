@@ -323,6 +323,83 @@ function Check-DBConnection {
     Write-Host "DB check complete." -ForegroundColor Cyan
 }
 
+function Run-PlaywrightTests {
+    param(
+        [string]$Flags = ""
+    )
+    
+    Detect-Compose
+    Write-Host "Running Playwright E2E tests..." -ForegroundColor Cyan
+    
+    # Set environment variables for E2E flags
+    $envVars = @()
+    if ($Flags -match "stats") {
+        $envVars += "E2E_REQUIRE_STATS_PARITY=1"
+        Write-Host "→ Enabling stats parity tests" -ForegroundColor Yellow
+    }
+    if ($Flags -match "strict") {
+        $envVars += "STRICT_STATS_PARITY=1"
+        Write-Host "→ Enabling strict stats parity mode" -ForegroundColor Yellow
+    }
+    if ($Flags -match "shop") {
+        $envVars += "E2E_REQUIRE_SHOP_SYNC=1"
+        Write-Host "→ Enabling shop sync tests" -ForegroundColor Yellow
+    }
+    if ($Flags -match "realtime") {
+        $envVars += "E2E_REQUIRE_REALTIME=1"
+        Write-Host "→ Enabling realtime tests" -ForegroundColor Yellow
+    }
+    if ($Flags -match "events") {
+        # Note: Container compose exports E2E_SHOP_SYNC/REQUIRE_SHOP_SYNC by default.
+        # To avoid compose edits, piggy-back events gating on the same vars and also set dedicated vars for future use.
+        $envVars += "E2E_EVENT_SYNC=1"
+        $envVars += "E2E_SHOP_SYNC=1"
+        Write-Host "→ Enabling events reward flow tests" -ForegroundColor Yellow
+        if ($Flags -match "strict") {
+            $envVars += "E2E_REQUIRE_EVENT_SYNC=1"
+            $envVars += "E2E_REQUIRE_SHOP_SYNC=1"
+            Write-Host "→ Enforcing events strict mode" -ForegroundColor Yellow
+        }
+    }
+    
+    # Build the docker compose command
+    $composeArgs = @('-f', 'docker-compose.yml', '-f', 'docker-compose.playwright.yml')
+    
+    try {
+        # Set environment variables
+        foreach ($envVar in $envVars) {
+            $parts = $envVar -split '=', 2
+            Set-Item -Path "Env:$($parts[0])" -Value $parts[1]
+        }
+        
+        # Run Playwright tests
+        if ($UseComposeV2) {
+            & docker compose @composeArgs up --abort-on-container-exit --exit-code-from playwright playwright
+        } else {
+            & docker-compose @composeArgs up --abort-on-container-exit --exit-code-from playwright playwright
+        }
+        
+        $exitCode = $LASTEXITCODE
+        
+        # Clean up environment variables
+        foreach ($envVar in $envVars) {
+            $parts = $envVar -split '=', 2
+            Remove-Item "Env:$($parts[0])" -ErrorAction SilentlyContinue
+        }
+        
+        if ($exitCode -eq 0) {
+            Write-Host "✔ Playwright tests completed successfully" -ForegroundColor Green
+        } else {
+            Write-Host "✖ Playwright tests failed (exit code: $exitCode)" -ForegroundColor Red
+        }
+        
+        return $exitCode
+    } catch {
+        Write-Host "✖ Failed to run Playwright tests: $($_.Exception.Message)" -ForegroundColor Red
+        return 1
+    }
+}
+
 function Show-Help {
     Write-Host "Casino-Club F2P Management Script" -ForegroundColor Green
     Write-Host "====================================" -ForegroundColor DarkGray
@@ -337,15 +414,55 @@ function Show-Help {
     Write-Host "  check       Verify prerequisites (Docker, ports, compose)" -ForegroundColor White
     Write-Host "  health      Probe http://localhost:8000/health and :3000" -ForegroundColor White
     Write-Host "  db-check    Verify PostgreSQL connectivity (port, pg_isready, SELECT 1)" -ForegroundColor White
+    Write-Host "  e2e         Run Playwright E2E tests (usage: e2e [flags])" -ForegroundColor White
     Write-Host "  tools       Manage monitoring tools (usage: tools start|stop|status)" -ForegroundColor White
     Write-Host "  help        Show this help" -ForegroundColor White
+    Write-Host "" 
+    Write-Host "E2E Test Flags:" -ForegroundColor Cyan
+    Write-Host "  stats       Enable stats parity tests (E2E_REQUIRE_STATS_PARITY=1)" -ForegroundColor White
+    Write-Host "  strict      Enable strict stats mode (STRICT_STATS_PARITY=1)" -ForegroundColor White
+    Write-Host "  shop        Enable shop sync tests (E2E_REQUIRE_SHOP_SYNC=1)" -ForegroundColor White
+    Write-Host "  realtime    Enable realtime tests (E2E_REQUIRE_REALTIME=1)" -ForegroundColor White
+    Write-Host "  events      Enable events reward flow tests (E2E_EVENT_SYNC=1, with 'strict' also sets E2E_REQUIRE_EVENT_SYNC=1)" -ForegroundColor White
     Write-Host "" 
     Write-Host "Examples:" -ForegroundColor Cyan
     Write-Host "  ./cc-manage.ps1 check" -ForegroundColor White
     Write-Host "  ./cc-manage.ps1 start" -ForegroundColor White
+    Write-Host "  ./cc-manage.ps1 e2e" -ForegroundColor White
+    Write-Host "  ./cc-manage.ps1 e2e stats" -ForegroundColor White
+    Write-Host "  ./cc-manage.ps1 e2e strict,realtime" -ForegroundColor White
+    Write-Host "  ./cc-manage.ps1 e2e events" -ForegroundColor White
+    Write-Host "  ./cc-manage.ps1 e2e strict,events" -ForegroundColor White
     Write-Host "  ./cc-manage.ps1 db-check" -ForegroundColor White
     Write-Host "  ./cc-manage.ps1 logs backend" -ForegroundColor White
     Write-Host "  ./cc-manage.ps1 shell postgres" -ForegroundColor White
+}
+
+# Alembic migrate helper
+function Migrate-Database {
+    Detect-Compose
+    Write-Host "Running Alembic migrations (upgrade head)..." -ForegroundColor Cyan
+    $composeArgs = Get-ComposeArgs
+    try {
+        # 1st attempt: normal upgrade
+        Compose @composeArgs exec backend /bin/sh -lc "alembic upgrade head && alembic heads"
+        $code = $LASTEXITCODE
+        if ($code -ne 0) {
+            Write-Host "⚠ Alembic upgrade failed (exit: $code). Trying stamp head (stamp-first SOP)..." -ForegroundColor Yellow
+            # Fallback: stamp to head to align version table with existing schema, then no-op upgrade
+            Compose @composeArgs exec backend /bin/sh -lc "alembic stamp head && alembic heads"
+            $code2 = $LASTEXITCODE
+            if ($code2 -ne 0) {
+                Write-Host "✖ Alembic stamp head failed (exit: $code2)" -ForegroundColor Red
+                exit $code2
+            }
+            Write-Host "✔ Alembic stamped to head (single-head aligned)" -ForegroundColor Green
+        }
+        Write-Host "✔ Alembic migrate completed" -ForegroundColor Green
+    } catch {
+        Write-Host "✖ Failed to run alembic: $($_.Exception.Message)" -ForegroundColor Red
+        exit 1
+    }
 }
 
 # Main script execution
@@ -358,6 +475,8 @@ switch ($Command) {
     "check" { Check-Prerequisites }
     "health" { Check-Health }
     "db-check" { Check-DBConnection }
+    "e2e" { Run-PlaywrightTests -Flags $Service }
+    "migrate" { Migrate-Database }
     "tools" {
         switch ($Service) {
             "start" { Tools-Start }

@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Admin User Creation Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .container { max-width: 600px; margin: 0 auto; }
+        .section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .result { background: #f5f5f5; padding: 10px; margin: 10px 0; border-radius: 3px; }
+        .error { background: #ffe6e6; border-color: #ff9999; }
+        .success { background: #e6ffe6; border-color: #99ff99; }
+        button { padding: 10px 20px; margin: 5px; background: #007bff; color: white; border: none; border-radius: 3px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        input, textarea { width: 100%; padding: 8px; margin: 5px 0; border: 1px solid #ddd; border-radius: 3px; }
+        label { display: block; margin-top: 10px; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Admin User Creation Test</h1>
+        
+        <div class="section">
+            <h3>1. Admin Login First</h3>
+            <button onclick="adminLogin()">Admin Login</button>
+            <div id="loginResult" class="result"></div>
+        </div>
+
+        <div class="section">
+            <h3>2. Create User</h3>
+            <label>Site ID:</label>
+            <input type="text" id="siteId" value="testuser123" placeholder="Enter site ID">
+            
+            <label>Nickname:</label>
+            <input type="text" id="nickname" value="Test User" placeholder="Enter nickname">
+            
+            <label>Phone Number:</label>
+            <input type="text" id="phoneNumber" value="01012345678" placeholder="Enter phone number">
+            
+            <label>Password:</label>
+            <input type="password" id="password" value="test1234" placeholder="Enter password">
+            
+            <label>
+                <input type="checkbox" id="isAdmin"> Is Admin
+            </label>
+            
+            <button onclick="createUser()">Create User</button>
+            <div id="createResult" class="result"></div>
+        </div>
+
+        <div class="section">
+            <h3>3. Debug Info</h3>
+            <button onclick="checkToken()">Check Token</button>
+            <button onclick="testBackendHealth()">Test Backend Health</button>
+            <div id="debugResult" class="result"></div>
+        </div>
+    </div>
+
+    <script>
+        let authToken = '';
+
+        async function adminLogin() {
+            const loginResult = document.getElementById('loginResult');
+            
+            try {
+                const response = await fetch('http://localhost:8000/api/auth/admin/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        site_id: 'admin',
+                        password: 'admin123'
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    authToken = data.access_token;
+                    loginResult.className = 'result success';
+                    loginResult.innerHTML = `
+                        <strong>✅ Admin Login Success</strong><br>
+                        Token: ${authToken.substring(0, 20)}...<br>
+                        Type: ${data.token_type}
+                    `;
+                } else {
+                    loginResult.className = 'result error';
+                    loginResult.innerHTML = `
+                        <strong>❌ Login Failed</strong><br>
+                        Status: ${response.status}<br>
+                        Error: ${JSON.stringify(data, null, 2)}
+                    `;
+                }
+            } catch (error) {
+                loginResult.className = 'result error';
+                loginResult.innerHTML = `
+                    <strong>❌ Network Error</strong><br>
+                    ${error.message}
+                `;
+            }
+        }
+
+        async function createUser() {
+            const createResult = document.getElementById('createResult');
+            
+            if (!authToken) {
+                createResult.className = 'result error';
+                createResult.innerHTML = '<strong>❌ Please login first</strong>';
+                return;
+            }
+
+            const siteId = document.getElementById('siteId').value;
+            const nickname = document.getElementById('nickname').value;
+            const phoneNumber = document.getElementById('phoneNumber').value;
+            const password = document.getElementById('password').value;
+            const isAdmin = document.getElementById('isAdmin').checked;
+
+            try {
+                const response = await fetch('http://localhost:8000/api/admin/users', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify({
+                        site_id: siteId,
+                        nickname: nickname,
+                        phone_number: phoneNumber,
+                        password: password,
+                        is_admin: isAdmin,
+                        is_active: true
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    createResult.className = 'result success';
+                    createResult.innerHTML = `
+                        <strong>✅ User Created Successfully</strong><br>
+                        ID: ${data.id}<br>
+                        Site ID: ${data.site_id}<br>
+                        Nickname: ${data.nickname}<br>
+                        Is Admin: ${data.is_admin}<br>
+                        Created: ${data.created_at}
+                    `;
+                } else {
+                    createResult.className = 'result error';
+                    createResult.innerHTML = `
+                        <strong>❌ User Creation Failed</strong><br>
+                        Status: ${response.status}<br>
+                        Error: ${JSON.stringify(data, null, 2)}
+                    `;
+                }
+            } catch (error) {
+                createResult.className = 'result error';
+                createResult.innerHTML = `
+                    <strong>❌ Network Error</strong><br>
+                    ${error.message}
+                `;
+            }
+        }
+
+        async function checkToken() {
+            const debugResult = document.getElementById('debugResult');
+            
+            debugResult.innerHTML = `
+                <strong>🔍 Debug Info:</strong><br>
+                Current Token: ${authToken ? authToken.substring(0, 50) + '...' : 'None'}<br>
+                Token Length: ${authToken.length}<br>
+                Browser: ${navigator.userAgent}
+            `;
+        }
+
+        async function testBackendHealth() {
+            const debugResult = document.getElementById('debugResult');
+            
+            try {
+                const response = await fetch('http://localhost:8000/health');
+                const data = await response.text();
+                
+                debugResult.innerHTML = `
+                    <strong>🏥 Backend Health:</strong><br>
+                    Status: ${response.status}<br>
+                    Response: ${data}
+                `;
+            } catch (error) {
+                debugResult.innerHTML = `
+                    <strong>❌ Backend Health Check Failed:</strong><br>
+                    ${error.message}
+                `;
+            }
+        }
+    </script>
+</body>
+</html>
