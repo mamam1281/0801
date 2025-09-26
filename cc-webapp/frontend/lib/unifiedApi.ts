@@ -47,17 +47,11 @@ function resolveOrigin(): string {
     if (envOrigin && /^https?:\/\//.test(envOrigin)) return envOrigin.replace(/\/$/, '');
     return 'http://backend:8000';
   }
-  // 클라이언트 사이드: 가능한 경우 환경변수 사용, 아니면 상대경로(/api) 사용하여
-  // CORS 문제와 로컬/컨테이너 네트워크 혼선 가능성을 줄인다.
-  // - NEXT_PUBLIC_API_ORIGIN이 설정되어 있으면 그것을 사용
-  // - 아니면 빈 문자열을 반환하여 apiCall에서 상대경로(`/api/...`)을 사용하게 함
-  if (envOrigin && /^https?:\/\//.test(envOrigin)) {
-    if (envOrigin) console.log('[unifiedApi] 클라이언트 사이드 → using NEXT_PUBLIC_API_ORIGIN', envOrigin);
-    return envOrigin.replace(/\/$/, '');
-  }
+  // 클라이언트 사이드: Next.js rewrite를 통한 프록시 사용을 위해 빈 문자열 반환
+  // 이렇게 하면 /api/* 요청이 Next.js에서 backend:8000으로 프록시됨
   if (typeof window !== 'undefined') {
     // 상대경로 사용 안내 로그(로그 게이트에 따름)
-    try { if (__logGateEnabled()) console.log('[unifiedApi] 클라이언트 사이드 → using relative /api path'); } catch {}
+    try { if (__logGateEnabled()) console.log('[unifiedApi] 클라이언트 사이드 → using Next.js rewrite proxy'); } catch {}
     return '';
   }
   // Fallback (방어적): 상대경로 사용
