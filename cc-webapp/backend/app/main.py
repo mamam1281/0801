@@ -16,6 +16,7 @@ from datetime import datetime
 from typing import Optional, List, Dict, Any
 
 from fastapi import FastAPI, HTTPException, Depends, status, WebSocket, WebSocketDisconnect
+from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 import asyncio
 from fastapi.middleware.cors import CORSMiddleware
@@ -440,6 +441,18 @@ print("✅ Using integrated games router with improved JSON responses")
 
 # ===== Core API Endpoints =====
 
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    """Simple WebSocket endpoint for testing"""
+    await websocket.accept()
+    try:
+        await websocket.send_text("Connected to WebSocket")
+        while True:
+            data = await websocket.receive_text()
+            await websocket.send_text(f"Echo: {data}")
+    except WebSocketDisconnect:
+        pass
+
 @app.get("/", tags=["Root"])
 async def root():
     """Root endpoint"""
@@ -449,6 +462,16 @@ async def root():
         "status": "running",
         "docs": "/docs"
     }
+
+# ===== Static Files (Development Test Pages) =====
+import os
+if os.getenv("ENVIRONMENT", "development") == "development":
+    # Mount static files for test pages in development only
+    try:
+        app.mount("/test", StaticFiles(directory="static"), name="static")
+        print("🧪 Test pages mounted at /test (development mode)")
+    except Exception as e:
+        print(f"⚠️  Static files not mounted: {e}")
 
 @app.get("/health", response_model=HealthResponse, tags=["Health"])
 async def health_check():

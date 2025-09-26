@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>풀스택 동기화 테스트</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #1a1a1a; color: #fff; }
+        .section { margin: 20px 0; padding: 15px; border: 1px solid #333; border-radius: 8px; }
+        .success { border-color: #4CAF50; background: #1b2f1b; }
+        .error { border-color: #f44336; background: #2f1b1b; }
+        .warning { border-color: #ff9800; background: #2f1f1b; }
+        button { padding: 10px 20px; margin: 5px; background: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #1976D2; }
+        button:disabled { background: #555; cursor: not-allowed; }
+        pre { background: #333; padding: 10px; border-radius: 4px; overflow-x: auto; max-height: 300px; }
+        .status { margin: 10px 0; padding: 5px; border-radius: 4px; }
+        input, select { padding: 8px; margin: 5px; border: 1px solid #555; background: #2a2a2a; color: #fff; border-radius: 4px; }
+        .iframe-container { border: 2px solid #555; border-radius: 8px; margin: 10px 0; }
+        iframe { width: 100%; height: 400px; border: none; border-radius: 6px; }
+        .sync-indicator { 
+            display: inline-block; 
+            width: 12px; 
+            height: 12px; 
+            border-radius: 50%; 
+            margin-right: 5px;
+        }
+        .sync-ok { background: #4CAF50; }
+        .sync-error { background: #f44336; }
+        .sync-warning { background: #ff9800; }
+        .test-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .frontend-preview { border: 1px solid #444; border-radius: 8px; padding: 10px; }
+    </style>
+</head>
+<body>
+    <h1>🔄 풀스택 동기화 테스트 (백엔드 + 프론트엔드)</h1>
+    
+    <!-- 시스템 상태 대시보드 -->
+    <div class="section">
+        <h2>📊 실시간 시스템 상태</h2>
+        <div id="system-status">
+            <p><span class="sync-indicator sync-warning"></span>백엔드: 확인 중...</p>
+            <p><span class="sync-indicator sync-warning"></span>프론트엔드: 확인 중...</p>
+            <p><span class="sync-indicator sync-warning"></span>동기화: 확인 중...</p>
+        </div>
+        <button onclick="refreshSystemStatus()">상태 새로고침</button>
+        <button onclick="testWebSocketConnection()">WebSocket 연결 테스트</button>
+        <button onclick="startRealTimeMonitoring()">실시간 모니터링 시작</button>
+        <button onclick="stopRealTimeMonitoring()">모니터링 중지</button>
+    </div>
+
+    <!-- 프론트엔드 직접 테스트 -->
+    <div class="section">
+        <h2>🌐 프론트엔드 직접 테스트</h2>
+        <div class="test-grid">
+            <!-- 백엔드 API 테스트 -->
+            <div>
+                <h3>⚡ 백엔드 API</h3>
+                <button onclick="testBackendLogin()">백엔드 로그인</button>
+                <button onclick="testBackendShop()">백엔드 상점</button>
+                <button onclick="testBackendEvents()">백엔드 이벤트</button>
+                <pre id="backend-result"></pre>
+            </div>
+            
+            <!-- 프론트엔드 페이지 테스트 -->
+            <div>
+                <h3>🎨 프론트엔드 페이지</h3>
+                <button onclick="testFrontendLogin()">프론트 로그인 페이지</button>
+                <button onclick="testFrontendShop()">프론트 상점 페이지</button>
+                <button onclick="testFrontendAdmin()">프론트 어드민 페이지</button>
+                <pre id="frontend-result"></pre>
+            </div>
+        </div>
+    </div>
+
+    <!-- 동기화 시나리오 테스트 -->
+    <div class="section">
+        <h2>🔄 동기화 시나리오 테스트</h2>
+        <div>
+            <h3>💰 구매 → 잔액 동기화</h3>
+            <button onclick="runPurchaseSync()">구매 동기화 테스트</button>
+            <div class="sync-flow">
+                <p>1. 백엔드에서 구매 실행</p>
+                <p>2. 프론트엔드에서 잔액 확인</p>
+                <p>3. WebSocket으로 실시간 업데이트 확인</p>
+            </div>
+        </div>
+        
+        <div>
+            <h3>🎯 이벤트 → 보상 동기화</h3>
+            <button onclick="runEventSync()">이벤트 동기화 테스트</button>
+            <div class="sync-flow">
+                <p>1. 백엔드에서 이벤트 참여</p>
+                <p>2. 프론트엔드에서 진행상황 확인</p>
+                <p>3. 보상 수령 후 동기화 확인</p>
+            </div>
+        </div>
+        
+        <div>
+            <h3>👑 어드민 → 사용자 동기화</h3>
+            <button onclick="runAdminSync()">어드민 동기화 테스트</button>
+            <div class="sync-flow">
+                <p>1. 어드민에서 사용자 정보 수정</p>
+                <p>2. 사용자 프론트엔드에서 변경사항 확인</p>
+                <p>3. 실시간 반영 여부 확인</p>
+            </div>
+        </div>
+        
+        <div id="sync-status" class="status"></div>
+        <pre id="sync-result"></pre>
+    </div>
+
+    <!-- 프론트엔드 임베드 프리뷰 -->
+    <div class="section">
+        <h2>👀 프론트엔드 실시간 프리뷰</h2>
+        <div class="frontend-preview">
+            <h3>메인 페이지</h3>
+            <iframe id="main-preview" src="http://localhost:3000"></iframe>
+            <button onclick="refreshPreview('main-preview', 'http://localhost:3000')">새로고침</button>
+            <button onclick="openInNewTab('http://localhost:3000')">새 탭에서 열기</button>
+        </div>
+        
+        <div class="frontend-preview">
+            <h3>상점 페이지</h3>
+            <iframe id="shop-preview" src="http://localhost:3000/shop"></iframe>
+            <button onclick="refreshPreview('shop-preview', 'http://localhost:3000/shop')">새로고침</button>
+            <button onclick="openInNewTab('http://localhost:3000/shop')">새 탭에서 열기</button>
+        </div>
+        
+        <div class="frontend-preview">
+            <h3>어드민 페이지</h3>
+            <iframe id="admin-preview" src="http://localhost:3000/admin"></iframe>
+            <button onclick="refreshPreview('admin-preview', 'http://localhost:3000/admin')">새로고침</button>
+            <button onclick="openInNewTab('http://localhost:3000/admin')">새 탭에서 열기</button>
+        </div>
+    </div>
+
+    <!-- 전체 테스트 실행 -->
+    <div class="section">
+        <h2>🚀 전체 풀스택 테스트</h2>
+        <button onclick="runFullStackTest()" id="full-test-btn">전체 풀스택 테스트 실행</button>
+        <button onclick="runSyncDiagnosis()">동기화 문제 진단</button>
+        <button onclick="exportTestResults()">테스트 결과 내보내기</button>
+        
+        <div id="full-test-progress" style="display: none;">
+            <p>🔄 테스트 진행 중...</p>
+            <div id="progress-details"></div>
+        </div>
+        
+        <div id="full-test-status" class="status"></div>
+        <pre id="full-test-result"></pre>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000';
+        const FRONTEND_BASE = 'http://localhost:3000';
+        let authToken = null;
+        let adminToken = null;
+        let monitoringInterval = null;
+
+        // 시스템 상태 확인
+        async function refreshSystemStatus() {
+            const statusEl = document.getElementById('system-status');
+            if (!statusEl) {
+                console.error('system-status 요소를 찾을 수 없습니다');
+                return;
+            }
+            
+            // 백엔드 상태
+            try {
+                const backendResponse = await fetch(`${API_BASE}/health`);
+                const backendStatus = backendResponse.ok ? 'sync-ok' : 'sync-error';
+                if (statusEl.children[0]) {
+                    statusEl.children[0].innerHTML = `<span class="sync-indicator ${backendStatus}"></span>백엔드: ${backendResponse.ok ? '정상' : '오류'}`;
+                }
+            } catch (error) {
+                if (statusEl.children[0]) {
+                    statusEl.children[0].innerHTML = `<span class="sync-indicator sync-error"></span>백엔드: 연결 실패`;
+                }
+            }
+            
+            // 프론트엔드 상태
+            try {
+                console.log('Checking frontend health:', `${FRONTEND_BASE}/api/health`);
+                const frontendResponse = await fetch(`${FRONTEND_BASE}/api/health`, {
+                    method: 'GET',
+                    mode: 'cors',
+                    credentials: 'omit'
+                });
+                console.log('Frontend health response:', frontendResponse.status, frontendResponse.ok);
+                const frontendStatus = frontendResponse.ok ? 'sync-ok' : 'sync-warning';
+                if (statusEl.children[1]) {
+                    statusEl.children[1].innerHTML = `<span class="sync-indicator ${frontendStatus}"></span>프론트엔드: ${frontendResponse.ok ? '정상' : '확인 필요'}`;
+                }
+            } catch (error) {
+                console.log('Frontend health check failed:', error.message);
+                // 프론트엔드는 헬스체크 엔드포인트가 없을 수 있음
+                try {
+                    console.log('Trying frontend main page:', `${FRONTEND_BASE}/`);
+                    const mainPageResponse = await fetch(`${FRONTEND_BASE}/`, { 
+                        method: 'HEAD',
+                        mode: 'cors',
+                        redirect: 'manual'  // 리디렉션을 수동으로 처리
+                    });
+                    console.log('Frontend main page response:', mainPageResponse.status, mainPageResponse.type);
+                    
+                    // 200 OK 또는 307 Redirect (로그인 페이지)면 정상 작동
+                    const isWorking = mainPageResponse.ok || mainPageResponse.status === 307;
+                    const frontendStatus = isWorking ? 'sync-ok' : 'sync-warning';
+                    
+                    let statusText = '정상';
+                    if (mainPageResponse.status === 307) {
+                        statusText = '정상 (로그인 필요)';
+                    } else if (!mainPageResponse.ok) {
+                        statusText = '확인 필요';
+                    }
+                    
+                    if (statusEl.children[1]) {
+                        statusEl.children[1].innerHTML = `<span class="sync-indicator ${frontendStatus}"></span>프론트엔드: ${statusText}`;
+                    }
+                } catch (error) {
+                    console.log('Frontend main page check also failed:', error.message);
+                    if (statusEl.children[1]) {
+                        statusEl.children[1].innerHTML = `<span class="sync-indicator sync-error"></span>프론트엔드: 연결 실패 (${error.message})`;
+                    }
+                }
+            }
+            
+            // 동기화 상태 (API 기반 동기화 확인)
+            if (statusEl.children[2]) {
+                // 백엔드와 프론트엔드가 모두 정상이면 동기화도 가능한 것으로 판단
+                const backendOk = statusEl.children[0] && statusEl.children[0].textContent.includes('정상');
+                const frontendOk = statusEl.children[1] && statusEl.children[1].textContent.includes('정상');
+                
+                if (backendOk && frontendOk) {
+                    statusEl.children[2].innerHTML = `<span class="sync-indicator sync-ok"></span>동기화: API 기반 동기화 가능`;
+                } else if (backendOk) {
+                    statusEl.children[2].innerHTML = `<span class="sync-indicator sync-warning"></span>동기화: 백엔드만 가능`;
+                } else {
+                    statusEl.children[2].innerHTML = `<span class="sync-indicator sync-error"></span>동기화: 동기화 불가`;
+                }
+            }
+        }
+
+        // WebSocket 연결 테스트
+        async function testWebSocketConnection() {
+            try {
+                const ws = new WebSocket('ws://localhost:8000/ws');
+                let connected = false;
+                
+                return new Promise((resolve) => {
+                    ws.onopen = function() {
+                        connected = true;
+                        showResult('websocket', true, { message: 'WebSocket 연결 성공' });
+                        ws.send('test sync message');
+                    };
+                    
+                    ws.onmessage = function(event) {
+                        showResult('websocket', true, { message: `WebSocket 응답: ${event.data}` });
+                        ws.close();
+                        resolve(true);
+                    };
+                    
+                    ws.onerror = function(error) {
+                        showResult('websocket', false, { message: 'WebSocket 연결 실패 - HTTP 폴링으로 대체' });
+                        resolve(false);
+                    };
+                    
+                    ws.onclose = function() {
+                        if (connected) {
+                            showResult('websocket', true, { message: 'WebSocket 연결 정상 종료' });
+                        }
+                    };
+                    
+                    // 3초 타임아웃
+                    setTimeout(() => {
+                        if (ws.readyState === WebSocket.CONNECTING) {
+                            ws.close();
+                            showResult('websocket', false, { message: 'WebSocket 연결 타임아웃' });
+                            resolve(false);
+                        }
+                    }, 3000);
+                });
+            } catch (error) {
+                showResult('websocket', false, { message: `WebSocket 오류: ${error.message}` });
+                return false;
+            }
+        }
+
+        // 실시간 모니터링
+        function startRealTimeMonitoring() {
+            if (monitoringInterval) clearInterval(monitoringInterval);
+            monitoringInterval = setInterval(refreshSystemStatus, 5000);
+            showResult('system', true, { message: '실시간 모니터링 시작됨 (5초 간격)' });
+        }
+
+        function stopRealTimeMonitoring() {
+            if (monitoringInterval) {
+                clearInterval(monitoringInterval);
+                monitoringInterval = null;
+                showResult('system', true, { message: '실시간 모니터링 중지됨' });
+            }
+        }
+
+        // 백엔드 테스트
+        async function testBackendLogin() {
+            try {
+                const response = await fetch(`${API_BASE}/api/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        site_id: 'testuser20250926012525',
+                        password: '1234'
+                    })
+                });
+                const data = await response.json();
+                if (data.access_token) {
+                    authToken = data.access_token;
+                    data._token_stored = true;
+                }
+                document.getElementById('backend-result').textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                document.getElementById('backend-result').textContent = `오류: ${error.message}`;
+            }
+        }
+
+        async function testBackendShop() {
+            try {
+                const response = await fetch(`${API_BASE}/api/shop/catalog`);
+                const data = await response.json();
+                document.getElementById('backend-result').textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                document.getElementById('backend-result').textContent = `오류: ${error.message}`;
+            }
+        }
+
+        async function testBackendEvents() {
+            if (!authToken) {
+                document.getElementById('backend-result').textContent = '먼저 로그인을 해주세요';
+                return;
+            }
+            try {
+                const response = await fetch(`${API_BASE}/api/events/`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const data = await response.json();
+                document.getElementById('backend-result').textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                document.getElementById('backend-result').textContent = `오류: ${error.message}`;
+            }
+        }
+
+        // 프론트엔드 테스트
+        async function testFrontendLogin() {
+            try {
+                const response = await fetch(`${FRONTEND_BASE}/login`, { method: 'HEAD' });
+                const result = {
+                    status: response.status,
+                    statusText: response.statusText,
+                    success: response.ok,
+                    url: `${FRONTEND_BASE}/login`
+                };
+                document.getElementById('frontend-result').textContent = JSON.stringify(result, null, 2);
+            } catch (error) {
+                document.getElementById('frontend-result').textContent = `오류: ${error.message}`;
+            }
+        }
+
+        async function testFrontendShop() {
+            try {
+                const response = await fetch(`${FRONTEND_BASE}/shop`, { method: 'HEAD' });
+                const result = {
+                    status: response.status,
+                    statusText: response.statusText,
+                    success: response.ok,
+                    url: `${FRONTEND_BASE}/shop`
+                };
+                document.getElementById('frontend-result').textContent = JSON.stringify(result, null, 2);
+            } catch (error) {
+                document.getElementById('frontend-result').textContent = `오류: ${error.message}`;
+            }
+        }
+
+        async function testFrontendAdmin() {
+            try {
+                const response = await fetch(`${FRONTEND_BASE}/admin`, { method: 'HEAD' });
+                const result = {
+                    status: response.status,
+                    statusText: response.statusText,
+                    success: response.ok,
+                    url: `${FRONTEND_BASE}/admin`
+                };
+                document.getElementById('frontend-result').textContent = JSON.stringify(result, null, 2);
+            } catch (error) {
+                document.getElementById('frontend-result').textContent = `오류: ${error.message}`;
+            }
+        }
+
+        // 동기화 테스트
+        async function runPurchaseSync() {
+            showResult('sync', true, { message: '구매 동기화 테스트 시작...' });
+            
+            const results = [];
+            
+            // 1. 백엔드에서 잔액 확인
+            if (!authToken) await testBackendLogin();
+            
+            try {
+                const beforeBalance = await fetch(`${API_BASE}/api/users/balance`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const beforeData = await beforeBalance.json();
+                results.push({ step: '구매_전_잔액', backend: beforeData });
+                
+                // 2. 구매 실행 (올바른 스키마 사용)
+                const purchase = await fetch(`${API_BASE}/api/shop/buy`, {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}` 
+                    },
+                    body: JSON.stringify({
+                        user_id: 23,  // JWT에서 추출된 user_id 사용
+                        product_id: 1001,  // 골드 상품 ID
+                        quantity: 1
+                    })
+                });
+                const purchaseData = await purchase.json();
+                results.push({ step: '구매_실행', backend: purchaseData });
+                
+                // 3. 잠시 대기 후 잔액 재확인
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                
+                const afterBalance = await fetch(`${API_BASE}/api/users/balance`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const afterData = await afterBalance.json();
+                results.push({ step: '구매_후_잔액', backend: afterData });
+                
+                // 4. 프론트엔드에서도 확인 (iframe 새로고침으로 상태 확인)
+                refreshPreview('shop-preview', `${FRONTEND_BASE}/shop`);
+                results.push({ step: '프론트엔드_새로고침', message: '상점 페이지 새로고침됨' });
+                
+                showResult('sync', true, { purchase_sync_results: results });
+                
+            } catch (error) {
+                showResult('sync', false, { error: error.message, results });
+            }
+        }
+
+        async function runEventSync() {
+            showResult('sync', true, { message: '이벤트 동기화 테스트 시작...' });
+            
+            const results = [];
+            
+            if (!authToken) await testBackendLogin();
+            
+            try {
+                // 1. 이벤트 목록 조회
+                const events = await fetch(`${API_BASE}/api/events/`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const eventsData = await events.json();
+                results.push({ step: '이벤트_목록', backend: eventsData });
+                
+                if (eventsData.length > 0) {
+                    const eventId = eventsData[0].id;
+                    
+                    // 2. 이벤트 참여
+                    const join = await fetch(`${API_BASE}/api/events/join`, {
+                        method: 'POST',
+                        headers: { 
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${authToken}` 
+                        },
+                        body: JSON.stringify({ event_id: eventId })
+                    });
+                    const joinData = await join.json();
+                    results.push({ step: '이벤트_참여', backend: joinData });
+                    
+                    // 3. 프론트엔드 이벤트 페이지 새로고침
+                    refreshPreview('main-preview', `${FRONTEND_BASE}/events`);
+                    results.push({ step: '프론트엔드_새로고침', message: '이벤트 페이지 새로고침됨' });
+                }
+                
+                showResult('sync', true, { event_sync_results: results });
+                
+            } catch (error) {
+                showResult('sync', false, { error: error.message, results });
+            }
+        }
+
+        async function runAdminSync() {
+            showResult('sync', true, { message: '어드민 동기화 테스트 시작...' });
+            
+            const results = [];
+            
+            try {
+                // 1. 어드민 로그인
+                const adminLogin = await fetch(`${API_BASE}/api/auth/admin/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        site_id: 'admin',
+                        password: 'admin123'
+                    })
+                });
+                const adminData = await adminLogin.json();
+                if (adminData.access_token) {
+                    adminToken = adminData.access_token;
+                }
+                results.push({ step: '어드민_로그인', backend: adminData });
+                
+                // 2. 사용자 목록 조회
+                const users = await fetch(`${API_BASE}/api/admin/users?limit=5`, {
+                    headers: { 'Authorization': `Bearer ${adminToken}` }
+                });
+                const usersData = await users.json();
+                results.push({ step: '사용자_목록', backend: usersData });
+                
+                // 3. 어드민 페이지 새로고침
+                refreshPreview('admin-preview', `${FRONTEND_BASE}/admin`);
+                results.push({ step: '어드민_페이지_새로고침', message: '어드민 페이지 새로고침됨' });
+                
+                showResult('sync', true, { admin_sync_results: results });
+                
+            } catch (error) {
+                showResult('sync', false, { error: error.message, results });
+            }
+        }
+
+        // 전체 풀스택 테스트
+        async function runFullStackTest() {
+            const btn = document.getElementById('full-test-btn');
+            const progress = document.getElementById('full-test-progress');
+            const progressDetails = document.getElementById('progress-details');
+            
+            btn.disabled = true;
+            progress.style.display = 'block';
+            
+            const allResults = [];
+            
+            const tests = [
+                { name: '시스템_상태_확인', fn: refreshSystemStatus },
+                { name: '백엔드_로그인', fn: testBackendLogin },
+                { name: '백엔드_상점', fn: testBackendShop },
+                { name: '백엔드_이벤트', fn: testBackendEvents },
+                { name: '프론트엔드_로그인_페이지', fn: testFrontendLogin },
+                { name: '프론트엔드_상점_페이지', fn: testFrontendShop },
+                { name: '프론트엔드_어드민_페이지', fn: testFrontendAdmin },
+                { name: '구매_동기화', fn: runPurchaseSync },
+                { name: '이벤트_동기화', fn: runEventSync },
+                { name: '어드민_동기화', fn: runAdminSync }
+            ];
+            
+            for (let i = 0; i < tests.length; i++) {
+                const test = tests[i];
+                progressDetails.innerHTML = `🔄 진행 중: ${test.name} (${i + 1}/${tests.length})`;
+                
+                try {
+                    await test.fn();
+                    allResults.push({ test: test.name, success: true, timestamp: new Date().toISOString() });
+                } catch (error) {
+                    allResults.push({ test: test.name, success: false, error: error.message, timestamp: new Date().toISOString() });
+                }
+                
+                await new Promise(resolve => setTimeout(resolve, 2000));
+            }
+            
+            // 결과 정리
+            const summary = {
+                total: allResults.length,
+                passed: allResults.filter(r => r.success).length,
+                failed: allResults.filter(r => !r.success).length,
+                completion_time: new Date().toISOString()
+            };
+            
+            showResult('full-test', true, { 
+                message: '전체 풀스택 테스트 완료!',
+                summary: summary,
+                detailed_results: allResults
+            });
+            
+            btn.disabled = false;
+            progress.style.display = 'none';
+        }
+
+        // 동기화 문제 진단
+        async function runSyncDiagnosis() {
+            showResult('full-test', true, { message: '동기화 문제 진단 시작...' });
+            
+            const diagnosis = {
+                backend_apis: [],
+                frontend_pages: [],
+                sync_points: [],
+                recommendations: []
+            };
+            
+            // 백엔드 API 상태 체크
+            const backendEndpoints = [
+                '/health',
+                '/api/auth/login',
+                '/api/shop/catalog',
+                '/api/events/',
+                '/api/admin/users'
+            ];
+            
+            for (const endpoint of backendEndpoints) {
+                try {
+                    const response = await fetch(`${API_BASE}${endpoint}`, { method: 'HEAD' });
+                    diagnosis.backend_apis.push({
+                        endpoint: endpoint,
+                        status: response.status,
+                        working: response.ok
+                    });
+                } catch (error) {
+                    diagnosis.backend_apis.push({
+                        endpoint: endpoint,
+                        status: 0,
+                        working: false,
+                        error: error.message
+                    });
+                }
+            }
+            
+            // 프론트엔드 페이지 상태 체크
+            const frontendPages = [
+                '/',
+                '/login',
+                '/shop',
+                '/events',
+                '/admin'
+            ];
+            
+            for (const page of frontendPages) {
+                try {
+                    const response = await fetch(`${FRONTEND_BASE}${page}`, { method: 'HEAD' });
+                    diagnosis.frontend_pages.push({
+                        page: page,
+                        status: response.status,
+                        working: response.ok
+                    });
+                } catch (error) {
+                    diagnosis.frontend_pages.push({
+                        page: page,
+                        status: 0,
+                        working: false,
+                        error: error.message
+                    });
+                }
+            }
+            
+            // 동기화 포인트 체크
+            diagnosis.sync_points.push({
+                type: 'WebSocket',
+                description: 'WebSocket 실시간 통신 확인 필요',
+                status: 'manual_check_required'
+            });
+            
+            diagnosis.sync_points.push({
+                type: 'Token_Persistence',
+                description: '로그인 토큰 localStorage 저장 확인 필요',
+                status: 'manual_check_required'
+            });
+            
+            diagnosis.sync_points.push({
+                type: 'State_Management',
+                description: '프론트엔드 전역 상태 관리 확인 필요',
+                status: 'manual_check_required'
+            });
+            
+            // 권장사항 생성
+            const failedBackend = diagnosis.backend_apis.filter(api => !api.working);
+            const failedFrontend = diagnosis.frontend_pages.filter(page => !page.working);
+            
+            if (failedBackend.length > 0) {
+                diagnosis.recommendations.push(`백엔드 API 문제: ${failedBackend.map(api => api.endpoint).join(', ')} 확인 필요`);
+            }
+            
+            if (failedFrontend.length > 0) {
+                diagnosis.recommendations.push(`프론트엔드 페이지 문제: ${failedFrontend.map(page => page.page).join(', ')} 확인 필요`);
+            }
+            
+            if (failedBackend.length === 0 && failedFrontend.length === 0) {
+                diagnosis.recommendations.push('API와 페이지는 정상, 실시간 동기화 로직 확인 필요');
+                diagnosis.recommendations.push('브라우저 개발자 도구에서 WebSocket 연결 상태 확인');
+                diagnosis.recommendations.push('localStorage의 auth_token 및 전역 상태 확인');
+            }
+            
+            showResult('full-test', true, { 
+                message: '동기화 문제 진단 완료',
+                diagnosis: diagnosis
+            });
+        }
+
+        // 프리뷰 관련 함수
+        function refreshPreview(iframeId, url) {
+            const iframe = document.getElementById(iframeId);
+            iframe.src = url + '?t=' + Date.now(); // 캐시 방지
+        }
+
+        function openInNewTab(url) {
+            window.open(url, '_blank');
+        }
+
+        // 결과 표시 헬퍼
+        function showResult(sectionId, success, data) {
+            const statusEl = document.getElementById(`${sectionId}-status`);
+            const resultEl = document.getElementById(`${sectionId}-result`);
+            
+            if (statusEl) {
+                statusEl.className = `status ${success ? 'success' : 'error'}`;
+                statusEl.textContent = success ? '✅ 성공' : '❌ 실패';
+            }
+            
+            if (resultEl) {
+                resultEl.textContent = JSON.stringify(data, null, 2);
+            }
+        }
+
+        // 테스트 결과 내보내기
+        function exportTestResults() {
+            const results = {
+                timestamp: new Date().toISOString(),
+                backend_result: document.getElementById('backend-result')?.textContent || '',
+                frontend_result: document.getElementById('frontend-result')?.textContent || '',
+                sync_result: document.getElementById('sync-result')?.textContent || '',
+                full_test_result: document.getElementById('full-test-result')?.textContent || ''
+            };
+            
+            const blob = new Blob([JSON.stringify(results, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `fullstack_test_results_${new Date().toISOString().slice(0,19).replace(/:/g, '-')}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // 페이지 로드 시 초기 상태 확인
+        window.addEventListener('load', () => {
+            refreshSystemStatus();
+            
+            // iframe 로드 에러 처리
+            const iframes = document.querySelectorAll('iframe');
+            iframes.forEach(iframe => {
+                iframe.addEventListener('error', () => {
+                    console.warn(`iframe 로드 실패: ${iframe.src}`);
+                });
+            });
+        });
+    </script>
+</body>
+</html>

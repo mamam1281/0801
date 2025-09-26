@@ -1,0 +1,1034 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>시스템 격리 테스트</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #1a1a1a; color: #fff; }
+        .section { margin: 20px 0; padding: 15px; border: 1px solid #333; border-radius: 8px; }
+        .success { border-color: #4CAF50; background: #1b2f1b; }
+        .error { border-color: #f44336; background: #2f1b1b; }
+        button { padding: 10px 20px; margin: 5px; background: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #1976D2; }
+        pre { background: #333; padding: 10px; border-radius: 4px; overflow-x: auto; }
+        .status { margin: 10px 0; padding: 5px; border-radius: 4px; }
+        input, select { padding: 8px; margin: 5px; border: 1px solid #555; background: #2a2a2a; color: #fff; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Casino-Club F2P 시스템 격리 테스트</h1>
+    
+    <!-- 인증 섹션 -->
+    <div class="section" id="auth-section">
+        <h2>🔐 1. 인증 시스템</h2>
+        <div>
+            <input type="text" id="nickname" placeholder="닉네임" value="debug_user">
+            <input type="email" id="email" placeholder="이메일" value="debug@test.com">
+            <input type="password" id="password" placeholder="비밀번호" value="password123">
+            <input type="text" id="invite_code" placeholder="초대코드" value="DEBUG2024">
+            <button onclick="testSignup()">회원가입 테스트</button>
+            <button onclick="testLogin()">로그인 테스트</button>
+        </div>
+        <div id="auth-status" class="status"></div>
+        <pre id="auth-result"></pre>
+    </div>
+
+    <!-- 상점 시스템 섹션 -->
+    <div class="section" id="shop-section">
+        <h2>🛍️ 2. 상점 시스템 (격리 테스트)</h2>
+        <div>
+            <button onclick="testShopCatalog()">카탈로그 조회</button>
+            <button onclick="testShopProducts()">상품 목록</button>
+            <button onclick="testUserBalance()">잔액 조회</button>
+            <button onclick="testShopBuy()">구매 테스트 (인증 필요)</button>
+        </div>
+        <div id="shop-status" class="status"></div>
+        <pre id="shop-result"></pre>
+    </div>
+
+    <!-- 이벤트/미션 시스템 섹션 -->
+    <div class="section" id="event-section">
+        <h2>🎯 3. 이벤트/미션 시스템 (격리 테스트)</h2>
+        <div>
+            <button onclick="testEventsList()">이벤트 목록</button>
+            <button onclick="testMissionsList()">미션 목록</button>
+            <button onclick="testEventJoin()">이벤트 참여</button>
+            <button onclick="testMissionClaim()">미션 보상 수령</button>
+        </div>
+        <div id="event-status" class="status"></div>
+        <pre id="event-result"></pre>
+    </div>
+
+    <!-- 어드민 시스템 섹션 -->
+    <div class="section" id="admin-section">
+        <h2>⚙️ 4. 어드민 시스템 (전체 기능 테스트)</h2>
+        
+        <!-- 어드민 인증 -->
+        <div style="border: 1px solid #444; padding: 10px; margin: 10px 0; border-radius: 5px;">
+            <h4>🔐 어드민 인증</h4>
+            <input type="text" id="admin_nickname" placeholder="어드민 닉네임" value="admin">
+            <input type="password" id="admin_password" placeholder="어드민 비밀번호" value="admin123">
+            <button onclick="testAdminLogin()">어드민 로그인</button>
+        </div>
+
+        <!-- 사용자 관리 -->
+        <div style="border: 1px solid #444; padding: 10px; margin: 10px 0; border-radius: 5px;">
+            <h4>👥 사용자 관리</h4>
+            <button onclick="testAdminUsers()">사용자 목록</button>
+            <button onclick="testAdminUserCreate()">사용자 생성</button>
+            <button onclick="testAdminUserDetail()">사용자 상세</button>
+            <button onclick="testAdminUserElevate()">권한 승격</button>
+            <button onclick="testAdminUserBan()">사용자 차단</button>
+            <button onclick="testAdminUserTokens()">토큰 지급</button>
+        </div>
+
+        <!-- 상점 관리 -->
+        <div style="border: 1px solid #444; padding: 10px; margin: 10px 0; border-radius: 5px;">
+            <h4>🛍️ 상점 관리</h4>
+            <button onclick="testAdminShopProducts()">상품 목록</button>
+            <button onclick="testAdminShopCreate()">상품 생성</button>
+            <button onclick="testAdminShopUpdate()">상품 수정</button>
+            <button onclick="testAdminShopActivate()">상품 활성화</button>
+            <button onclick="testAdminShopStats()">상점 통계</button>
+            <button onclick="testAdminShopCategories()">카테고리 목록</button>
+        </div>
+
+        <!-- 이벤트 관리 -->
+        <div style="border: 1px solid #444; padding: 10px; margin: 10px 0; border-radius: 5px;">
+            <h4>🎯 이벤트 관리</h4>
+            <button onclick="testAdminEvents()">이벤트 목록</button>
+            <button onclick="testAdminEventCreate()">이벤트 생성</button>
+            <button onclick="testAdminEventUpdate()">이벤트 수정</button>
+            <button onclick="testAdminEventParticipations()">참여자 목록</button>
+            <button onclick="testAdminEventForceClaim()">강제 보상</button>
+        </div>
+
+        <!-- 콘텐츠 관리 -->
+        <div style="border: 1px solid #444; padding: 10px; margin: 10px 0; border-radius: 5px;">
+            <h4>📝 콘텐츠 관리</h4>
+            <button onclick="testAdminContentEvents()">콘텐츠 이벤트</button>
+            <button onclick="testAdminMissionTemplates()">미션 템플릿</button>
+            <button onclick="testAdminRewardCatalog()">리워드 카탈로그</button>
+            <button onclick="testAdminRewardAudit()">리워드 감사</button>
+        </div>
+
+        <!-- 시스템 관리 -->
+        <div style="border: 1px solid #444; padding: 10px; margin: 10px 0; border-radius: 5px;">
+            <h4>🔧 시스템 관리</h4>
+            <button onclick="testAdminStats()">시스템 통계</button>
+            <button onclick="testAdminAuditLogs()">감사 로그</button>
+            <button onclick="testAdminTransactions()">거래 내역</button>
+            <button onclick="testAdminLimitedPackages()">한정 패키지</button>
+            <button onclick="testAdminGachaConfig()">가챠 설정</button>
+        </div>
+
+        <div id="admin-status" class="status"></div>
+        <pre id="admin-result"></pre>
+    </div>
+
+    <!-- 통합 동기화 테스트 섹션 -->
+    <div class="section">
+        <h3>🔄 통합 동기화 테스트</h3>
+        <div style="border: 1px solid #444; padding: 10px; margin: 10px 0; border-radius: 5px;">
+            <h4>💰 구매-잔액 동기화</h4>
+            <button onclick="testPurchaseSync()">구매 동기화 테스트</button>
+            <button onclick="testEventSync()">이벤트 동기화 테스트</button>
+            <button onclick="runSyncIntegrationTest()">전체 동기화 테스트</button>
+        </div>
+        
+        <div style="border: 1px solid #444; padding: 10px; margin: 10px 0; border-radius: 5px;">
+            <h4>👥 어드민 통합</h4>
+            <button onclick="runAdminIntegrationTest()">어드민 통합 테스트</button>
+            <button onclick="testAdminWorkflow()">어드민 워크플로우</button>
+        </div>
+        
+        <div id="integration-status" class="status"></div>
+        <pre id="integration-result"></pre>
+    </div>
+
+    <!-- 프론트엔드 연계 테스트 섹션 -->
+    <div class="section">
+        <h3>🌐 프론트엔드 연계 테스트</h3>
+        <div style="border: 1px solid #444; padding: 10px; margin: 10px 0; border-radius: 5px;">
+            <h4>📄 페이지 접근성</h4>
+            <button onclick="testFrontendPages()">모든 페이지 체크</button>
+            <button onclick="testFrontendAuth()">프론트 인증 체크</button>
+            <button onclick="testFrontendSync()">프론트 동기화 가이드</button>
+            <button onclick="window.open('http://localhost:3000', '_blank')">프론트엔드 열기</button>
+        </div>
+        
+        <div id="frontend-status" class="status"></div>
+        <pre id="frontend-result"></pre>
+    </div>
+
+    <!-- 시스템 전체 테스트 섹션 -->
+    <div class="section">
+        <h3>🎯 전체 시스템 테스트</h3>
+        <div style="border: 1px solid #444; padding: 10px; margin: 10px 0; border-radius: 5px;">
+            <h4>⚡ 빠른 액션</h4>
+            <button onclick="runFullSystemTest()">전체 시스템 테스트</button>
+            <button onclick="clearResults()">결과 초기화</button>
+            <button onclick="exportResults()">결과 내보내기</button>
+            <button onclick="location.reload()">페이지 새로고침</button>
+        </div>
+        
+        <div id="system-status" class="status"></div>
+        <pre id="system-result"></pre>
+    </div>
+
+    <!-- 통합 테스트 섹션 -->
+    <div class="section" id="integration-section">
+        <h2>🔄 5. 실시간 동기화 & 전체 통합 테스트</h2>
+        
+        <!-- 실시간 동기화 -->
+        <div style="border: 1px solid #444; padding: 10px; margin: 10px 0; border-radius: 5px;">
+            <h4>📡 실시간 동기화</h4>
+            <button onclick="testWebSocket()">WebSocket 연결</button>
+            <button onclick="testSyncFlow()">동기화 플로우 테스트</button>
+            <button onclick="testPurchaseSync()">구매-잔액 동기화</button>
+            <button onclick="testEventSync()">이벤트-보상 동기화</button>
+        </div>
+
+        <!-- 전체 통합 테스트 -->
+        <div style="border: 1px solid #444; padding: 10px; margin: 10px 0; border-radius: 5px;">
+            <h4>🚀 전체 통합 테스트</h4>
+            <button onclick="runFullIntegrationTest()">전체 시스템 테스트</button>
+            <button onclick="runAdminIntegrationTest()">어드민 전체 테스트</button>
+            <button onclick="runSyncIntegrationTest()">동기화 전체 테스트</button>
+        </div>
+
+        <!-- 프론트엔드 통합 -->
+        <div style="border: 1px solid #444; padding: 10px; margin: 10px 0; border-radius: 5px;">
+            <h4>🌐 프론트엔드 통합</h4>
+            <button onclick="testFrontendPages()">페이지 접근 테스트</button>
+            <button onclick="testFrontendAuth()">프론트 인증 플로우</button>
+            <button onclick="testFrontendSync()">프론트 상태 동기화</button>
+        </div>
+
+        <div id="integration-status" class="status"></div>
+        <pre id="integration-result"></pre>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000';
+        let authToken = null;
+        let adminToken = null;
+
+        // 결과 표시 헬퍼
+        function showResult(sectionId, success, data) {
+            const statusEl = document.getElementById(`${sectionId}-status`);
+            const resultEl = document.getElementById(`${sectionId}-result`);
+            
+            statusEl.className = `status ${success ? 'success' : 'error'}`;
+            statusEl.textContent = success ? '✅ 성공' : '❌ 실패';
+            resultEl.textContent = JSON.stringify(data, null, 2);
+        }
+
+        // API 호출 헬퍼
+        async function apiCall(endpoint, options = {}) {
+            const url = `${API_BASE}${endpoint}`;
+            const headers = { 'Content-Type': 'application/json', ...options.headers };
+            
+            if (authToken && !options.noAuth) {
+                headers['Authorization'] = `Bearer ${authToken}`;
+            }
+            
+            try {
+                const response = await fetch(url, {
+                    ...options,
+                    headers
+                });
+                
+                const data = await response.json();
+                return { success: response.ok, data, status: response.status };
+            } catch (error) {
+                return { success: false, data: { error: error.message }, status: 0 };
+            }
+        }
+
+        // 1. 인증 시스템 테스트
+        async function testSignup() {
+            const result = await apiCall('/api/auth/signup', {
+                method: 'POST',
+                body: JSON.stringify({
+                    site_id: `test_${Date.now()}`,
+                    nickname: document.getElementById('nickname').value,
+                    phone_number: '01012345678',
+                    invite_code: '5858',
+                    password: document.getElementById('password').value
+                }),
+                noAuth: true
+            });
+            
+            showResult('auth', result.success, result.data);
+        }
+
+        async function testLogin() {
+            const result = await apiCall('/api/auth/login', {
+                method: 'POST',
+                body: JSON.stringify({
+                    site_id: 'testuser20250926012525',  // 이미 생성된 테스트 계정 사용
+                    password: '1234'
+                }),
+                noAuth: true
+            });
+            
+            if (result.success && result.data.access_token) {
+                authToken = result.data.access_token;
+                result.data._token_stored = true;
+            }
+            
+            showResult('auth', result.success, result.data);
+        }
+
+        // 2. 상점 시스템 테스트
+        async function testShopCatalog() {
+            const result = await apiCall('/api/shop/catalog', { noAuth: true });
+            showResult('shop', result.success, result.data);
+        }
+
+        async function testShopProducts() {
+            const result = await apiCall('/api/shop/products', { noAuth: true });
+            showResult('shop', result.success, result.data);
+        }
+
+        async function testUserBalance() {
+            const result = await apiCall('/api/users/balance');
+            showResult('shop', result.success, result.data);
+        }
+
+        async function testShopBuy() {
+            if (!authToken) {
+                showResult('shop', false, { error: '로그인이 필요합니다' });
+                return;
+            }
+
+            const result = await apiCall('/api/shop/buy', {
+                method: 'POST',
+                body: JSON.stringify({
+                    product_id: '1001',
+                    amount: 100,
+                    quantity: 1,
+                    payment_method: 'tokens'
+                })
+            });
+            showResult('shop', result.success, result.data);
+        }
+
+        // 3. 이벤트/미션 시스템 테스트
+        async function testEventsList() {
+            const result = await apiCall('/api/events/');
+            showResult('event', result.success, result.data);
+        }
+
+        async function testMissionsList() {
+            const result = await apiCall('/api/missions/');
+            showResult('event', result.success, result.data);
+        }
+
+        async function testEventJoin() {
+            const result = await apiCall('/api/events/join', {
+                method: 'POST',
+                body: JSON.stringify({ event_id: 1 })
+            });
+            showResult('event', result.success, result.data);
+        }
+
+        async function testMissionClaim() {
+            const result = await apiCall('/api/missions/1/claim', { method: 'POST' });
+            showResult('event', result.success, result.data);
+        }
+
+        // 4. 어드민 시스템 테스트
+        async function testAdminLogin() {
+            const result = await apiCall('/api/auth/admin/login', {
+                method: 'POST',
+                body: JSON.stringify({
+                    site_id: document.getElementById('admin_nickname').value,
+                    password: document.getElementById('admin_password').value
+                }),
+                noAuth: true
+            });
+            
+            if (result.success && result.data.access_token) {
+                adminToken = result.data.access_token;
+                result.data._admin_token_stored = true;
+            }
+            
+            showResult('admin', result.success, result.data);
+        }
+
+        // 사용자 관리 테스트
+        async function testAdminUsers() {
+            const result = await apiCall('/api/admin/users', {
+                headers: adminToken ? { 'Authorization': `Bearer ${adminToken}` } : {},
+                noAuth: true
+            });
+            showResult('admin', result.success, result.data);
+        }
+
+        async function testAdminUserCreate() {
+            const result = await apiCall('/api/admin/users', {
+                method: 'POST',
+                body: JSON.stringify({
+                    nickname: 'test_admin_user',
+                    email: 'admin_test@test.com',
+                    password: 'password123',
+                    site_id: 'casino-club',
+                    phone_number: '+821087654321'
+                }),
+                headers: adminToken ? { 'Authorization': `Bearer ${adminToken}` } : {},
+                noAuth: true
+            });
+            showResult('admin', result.success, result.data);
+        }
+
+        async function testAdminUserDetail() {
+            const result = await apiCall('/api/admin/users/1', {
+                headers: adminToken ? { 'Authorization': `Bearer ${adminToken}` } : {},
+                noAuth: true
+            });
+            showResult('admin', result.success, result.data);
+        }
+
+        async function testAdminUserElevate() {
+            const result = await apiCall('/api/admin/users/elevate', {
+                method: 'POST',
+                body: JSON.stringify({
+                    nickname: 'test_admin_user',
+                    new_rank: 'VIP'
+                }),
+                headers: adminToken ? { 'Authorization': `Bearer ${adminToken}` } : {},
+                noAuth: true
+            });
+            showResult('admin', result.success, result.data);
+        }
+
+        async function testAdminUserBan() {
+            const result = await apiCall('/api/admin/users/1/ban', {
+                method: 'POST',
+                body: JSON.stringify({
+                    reason: '테스트 차단',
+                    duration_hours: 1
+                }),
+                headers: adminToken ? { 'Authorization': `Bearer ${adminToken}` } : {},
+                noAuth: true
+            });
+            showResult('admin', result.success, result.data);
+        }
+
+        async function testAdminUserTokens() {
+            const result = await apiCall('/api/admin/users/1/tokens/add', {
+                method: 'POST',
+                body: JSON.stringify({
+                    amount: 1000,
+                    reason: '테스트 토큰 지급'
+                }),
+                headers: adminToken ? { 'Authorization': `Bearer ${adminToken}` } : {},
+                noAuth: true
+            });
+            showResult('admin', result.success, result.data);
+        }
+
+        // 상점 관리 테스트
+        async function testAdminShopProducts() {
+            const result = await apiCall('/api/admin/shop/products', {
+                headers: adminToken ? { 'Authorization': `Bearer ${adminToken}` } : {},
+                noAuth: true
+            });
+            showResult('admin', result.success, result.data);
+        }
+
+        async function testAdminShopCreate() {
+            const result = await apiCall('/api/admin/shop/products', {
+                method: 'POST',
+                body: JSON.stringify({
+                    name: '테스트 상품',
+                    description: '어드민에서 생성한 테스트 상품',
+                    price: 1000,
+                    category: 'test',
+                    is_active: true
+                }),
+                headers: adminToken ? { 'Authorization': `Bearer ${adminToken}` } : {},
+                noAuth: true
+            });
+            showResult('admin', result.success, result.data);
+        }
+
+        async function testAdminShopUpdate() {
+            const result = await apiCall('/api/admin/shop/products/1', {
+                method: 'PUT',
+                body: JSON.stringify({
+                    name: '수정된 테스트 상품',
+                    price: 1500
+                }),
+                headers: adminToken ? { 'Authorization': `Bearer ${adminToken}` } : {},
+                noAuth: true
+            });
+            showResult('admin', result.success, result.data);
+        }
+
+        async function testAdminShopActivate() {
+            const result = await apiCall('/api/admin/shop/products/1/activate', {
+                method: 'POST',
+                headers: adminToken ? { 'Authorization': `Bearer ${adminToken}` } : {},
+                noAuth: true
+            });
+            showResult('admin', result.success, result.data);
+        }
+
+        async function testAdminShopStats() {
+            const result = await apiCall('/api/admin/shop/stats', {
+                headers: adminToken ? { 'Authorization': `Bearer ${adminToken}` } : {},
+                noAuth: true
+            });
+            showResult('admin', result.success, result.data);
+        }
+
+        async function testAdminShopCategories() {
+            const result = await apiCall('/api/admin/shop/categories', {
+                headers: adminToken ? { 'Authorization': `Bearer ${adminToken}` } : {},
+                noAuth: true
+            });
+            showResult('admin', result.success, result.data);
+        }
+
+        // 이벤트 관리 테스트
+        async function testAdminEvents() {
+            const result = await apiCall('/api/admin/events/', {
+                headers: adminToken ? { 'Authorization': `Bearer ${adminToken}` } : {},
+                noAuth: true
+            });
+            showResult('admin', result.success, result.data);
+        }
+
+        async function testAdminEventCreate() {
+            const result = await apiCall('/api/admin/events/', {
+                method: 'POST',
+                body: JSON.stringify({
+                    title: '테스트 이벤트',
+                    description: '어드민에서 생성한 테스트 이벤트',
+                    event_type: 'limited_time',
+                    start_date: new Date().toISOString(),
+                    end_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+                    rewards: { gold: 1000, exp: 500 },
+                    requirements: { level: 1 }
+                }),
+                headers: adminToken ? { 'Authorization': `Bearer ${adminToken}` } : {},
+                noAuth: true
+            });
+            showResult('admin', result.success, result.data);
+        }
+
+        async function testAdminEventUpdate() {
+            const result = await apiCall('/api/admin/events/1', {
+                method: 'PUT',
+                body: JSON.stringify({
+                    title: '수정된 테스트 이벤트',
+                    description: '수정된 설명'
+                }),
+                headers: adminToken ? { 'Authorization': `Bearer ${adminToken}` } : {},
+                noAuth: true
+            });
+            showResult('admin', result.success, result.data);
+        }
+
+        async function testAdminEventParticipations() {
+            const result = await apiCall('/api/admin/events/1/participations', {
+                headers: adminToken ? { 'Authorization': `Bearer ${adminToken}` } : {},
+                noAuth: true
+            });
+            showResult('admin', result.success, result.data);
+        }
+
+        async function testAdminEventForceClaim() {
+            const result = await apiCall('/api/admin/events/1/force-claim/1', {
+                method: 'POST',
+                headers: adminToken ? { 'Authorization': `Bearer ${adminToken}` } : {},
+                noAuth: true
+            });
+            showResult('admin', result.success, result.data);
+        }
+
+        // 콘텐츠 관리 테스트
+        async function testAdminContentEvents() {
+            const result = await apiCall('/api/admin/content/events', {
+                headers: adminToken ? { 'Authorization': `Bearer ${adminToken}` } : {},
+                noAuth: true
+            });
+            showResult('admin', result.success, result.data);
+        }
+
+        async function testAdminMissionTemplates() {
+            const result = await apiCall('/api/admin/content/missions/templates', {
+                headers: adminToken ? { 'Authorization': `Bearer ${adminToken}` } : {},
+                noAuth: true
+            });
+            showResult('admin', result.success, result.data);
+        }
+
+        async function testAdminRewardCatalog() {
+            const result = await apiCall('/api/admin/content/rewards/catalog', {
+                headers: adminToken ? { 'Authorization': `Bearer ${adminToken}` } : {},
+                noAuth: true
+            });
+            showResult('admin', result.success, result.data);
+        }
+
+        async function testAdminRewardAudit() {
+            const result = await apiCall('/api/admin/content/rewards/audit', {
+                headers: adminToken ? { 'Authorization': `Bearer ${adminToken}` } : {},
+                noAuth: true
+            });
+            showResult('admin', result.success, result.data);
+        }
+
+        // 시스템 관리 테스트
+        async function testAdminStats() {
+            const result = await apiCall('/api/admin/stats', {
+                headers: adminToken ? { 'Authorization': `Bearer ${adminToken}` } : {},
+                noAuth: true
+            });
+            showResult('admin', result.success, result.data);
+        }
+
+        async function testAdminAuditLogs() {
+            const result = await apiCall('/api/admin/audit/logs', {
+                headers: adminToken ? { 'Authorization': `Bearer ${adminToken}` } : {},
+                noAuth: true
+            });
+            showResult('admin', result.success, result.data);
+        }
+
+        async function testAdminTransactions() {
+            const result = await apiCall('/api/admin/transactions', {
+                headers: adminToken ? { 'Authorization': `Bearer ${adminToken}` } : {},
+                noAuth: true
+            });
+            showResult('admin', result.success, result.data);
+        }
+
+        async function testAdminLimitedPackages() {
+            const result = await apiCall('/api/admin/limited-packages/upsert', {
+                method: 'POST',
+                body: JSON.stringify({
+                    package_id: 'test_limited',
+                    name: '테스트 한정 패키지',
+                    price: 5000,
+                    contents: { gold: 10000, gems: 100 }
+                }),
+                headers: adminToken ? { 'Authorization': `Bearer ${adminToken}` } : {},
+                noAuth: true
+            });
+            showResult('admin', result.success, result.data);
+        }
+
+        async function testAdminGachaConfig() {
+            const result = await apiCall('/api/admin/gacha/config', {
+                method: 'POST',
+                body: JSON.stringify({
+                    rates: { common: 0.7, rare: 0.25, epic: 0.05 },
+                    pity_threshold: 10
+                }),
+                headers: adminToken ? { 'Authorization': `Bearer ${adminToken}` } : {},
+                noAuth: true
+            });
+            showResult('admin', result.success, result.data);
+        }
+
+        // 5. 실시간 동기화 테스트
+        let ws = null;
+
+        async function testWebSocket() {
+            try {
+                if (ws) ws.close();
+                
+                ws = new WebSocket('ws://localhost:8000/ws');
+                ws.onopen = () => showResult('integration', true, { message: 'WebSocket 연결됨' });
+                ws.onmessage = (event) => {
+                    const data = JSON.parse(event.data);
+                    showResult('integration', true, { type: 'message', data });
+                };
+                ws.onerror = (error) => showResult('integration', false, { error: 'WebSocket 오류', details: error });
+                ws.onclose = () => showResult('integration', false, { message: 'WebSocket 연결 종료' });
+            } catch (error) {
+                showResult('integration', false, { error: error.message });
+            }
+        }
+
+        async function testSyncFlow() {
+            // 1. 구매 → 2. 잔액 동기화 → 3. 실시간 이벤트 확인
+            const results = [];
+            
+            // 구매 테스트
+            const buyResult = await testShopBuy();
+            results.push({ step: 'purchase', result: buyResult });
+            
+            // 잠시 대기
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            // 잔액 조회
+            const balanceResult = await testUserBalance();
+            results.push({ step: 'balance_check', result: balanceResult });
+            
+            showResult('integration', true, { sync_flow_results: results });
+        }
+
+        async function runFullIntegrationTest() {
+            const results = [];
+            
+            // 순차적으로 모든 테스트 실행 (어드민 포함)
+            const tests = [
+                { name: '사용자_로그인', fn: testLogin },
+                { name: '어드민_로그인', fn: testAdminLogin },
+                { name: '상점_카탈로그', fn: testShopCatalog },
+                { name: '잔액_조회', fn: testUserBalance },
+                { name: '이벤트_목록', fn: testEventsList },
+                { name: '미션_목록', fn: testMissionsList },
+                { name: '어드민_사용자관리', fn: testAdminUsers },
+                { name: '어드민_상점관리', fn: testAdminShopProducts },
+                { name: '어드민_이벤트관리', fn: testAdminEvents },
+                { name: '어드민_시스템통계', fn: testAdminStats }
+            ];
+            
+            for (const test of tests) {
+                try {
+                    await test.fn();
+                    results.push({ test: test.name, success: true });
+                } catch (error) {
+                    results.push({ test: test.name, success: false, error: error.message });
+                }
+                await new Promise(resolve => setTimeout(resolve, 1000)); // 어드민 테스트는 조금 더 여유
+            }
+            
+            showResult('integration', true, { full_test_results: results });
+        }
+
+        // 어드민 워크플로우 테스트
+        async function testAdminWorkflow() {
+            if (!adminToken) {
+                await testAdminLogin();
+            }
+
+            const workflow = [];
+            
+            // 1. 사용자 생성
+            const createUser = await apiCall('/api/admin/users', {
+                method: 'POST',
+                body: JSON.stringify({
+                    nickname: `test_user_${Date.now()}`,
+                    email: `test${Date.now()}@test.com`,
+                    vip_tier: 'STANDARD'
+                }),
+                headers: { 'Authorization': `Bearer ${adminToken}` }
+            });
+            workflow.push({ step: '사용자_생성', result: createUser });
+            
+            if (createUser.success) {
+                const userId = createUser.data.id;
+                
+                // 2. 사용자 잔액 조회
+                const balance = await apiCall(`/api/admin/users/${userId}`, {
+                    headers: { 'Authorization': `Bearer ${adminToken}` }
+                });
+                workflow.push({ step: '잔액_조회', result: balance });
+                
+                // 3. 토큰 지급
+                const addTokens = await apiCall(`/api/admin/users/${userId}/add-tokens`, {
+                    method: 'POST',
+                    body: JSON.stringify({ amount: 1000, reason: 'test_workflow' }),
+                    headers: { 'Authorization': `Bearer ${adminToken}` }
+                });
+                workflow.push({ step: '토큰_지급', result: addTokens });
+                
+                // 4. 이벤트 생성
+                const createEvent = await apiCall('/api/admin/events', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        title: `Test Event ${Date.now()}`,
+                        description: 'Test workflow event',
+                        event_type: 'GENERAL',
+                        start_date: new Date().toISOString(),
+                        end_date: new Date(Date.now() + 86400000).toISOString() // 24시간 후
+                    }),
+                    headers: { 'Authorization': `Bearer ${adminToken}` }
+                });
+                workflow.push({ step: '이벤트_생성', result: createEvent });
+            }
+            
+            showResult('integration', true, { admin_workflow: workflow });
+        }
+
+        // 추가 통합 테스트 함수들
+        async function testPurchaseSync() {
+            if (!authToken) {
+                showResult('integration', false, { error: '로그인이 필요합니다' });
+                return;
+            }
+
+            const results = [];
+            
+            // 1. 구매 전 잔액 조회
+            const beforeBalance = await apiCall('/api/users/balance');
+            results.push({ step: '구매_전_잔액', result: beforeBalance });
+            
+            // 2. 구매 실행
+            const purchase = await apiCall('/api/shop/buy', {
+                method: 'POST',
+                body: JSON.stringify({
+                    product_id: '1001',
+                    amount: 100,
+                    quantity: 1,
+                    payment_method: 'tokens'
+                })
+            });
+            results.push({ step: '구매_실행', result: purchase });
+            
+            // 3. 잠시 대기 후 잔액 재조회
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            const afterBalance = await apiCall('/api/users/balance');
+            results.push({ step: '구매_후_잔액', result: afterBalance });
+            
+            showResult('integration', true, { purchase_sync_results: results });
+        }
+
+        async function testEventSync() {
+            if (!authToken) {
+                showResult('integration', false, { error: '로그인이 필요합니다' });
+                return;
+            }
+
+            const results = [];
+            
+            // 1. 이벤트 목록 조회
+            const events = await apiCall('/api/events/');
+            results.push({ step: '이벤트_목록', result: events });
+            
+            // 2. 이벤트 참여 (있다면)
+            if (events.success && events.data.length > 0) {
+                const eventId = events.data[0].id;
+                const join = await apiCall('/api/events/join', {
+                    method: 'POST',
+                    body: JSON.stringify({ event_id: eventId })
+                });
+                results.push({ step: '이벤트_참여', result: join });
+                
+                // 3. 진행상황 업데이트
+                const progress = await apiCall(`/api/events/progress/${eventId}`, {
+                    method: 'PUT',
+                    body: JSON.stringify({ progress: { step1: true } })
+                });
+                results.push({ step: '진행상황_업데이트', result: progress });
+            }
+            
+            showResult('integration', true, { event_sync_results: results });
+        }
+
+        async function runAdminIntegrationTest() {
+            if (!adminToken) {
+                await testAdminLogin();
+            }
+            
+            const results = [];
+            
+            const adminTests = [
+                { name: '어드민_통계', fn: testAdminStats },
+                { name: '사용자_목록', fn: testAdminUsers },
+                { name: '상점_관리', fn: testAdminShopProducts },
+                { name: '이벤트_관리', fn: testAdminEvents },
+                { name: '감사_로그', fn: testAdminAuditLogs }
+            ];
+            
+            for (const test of adminTests) {
+                try {
+                    await test.fn();
+                    results.push({ test: test.name, success: true });
+                } catch (error) {
+                    results.push({ test: test.name, success: false, error: error.message });
+                }
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+            
+            showResult('integration', true, { admin_integration_results: results });
+        }
+
+        async function runSyncIntegrationTest() {
+            const results = [];
+            
+            // 1. WebSocket 연결 테스트
+            try {
+                await testWebSocket();
+                results.push({ test: 'WebSocket_연결', success: true });
+            } catch (error) {
+                results.push({ test: 'WebSocket_연결', success: false, error: error.message });
+            }
+            
+            // 2. 구매-잔액 동기화
+            try {
+                await testPurchaseSync();
+                results.push({ test: '구매_동기화', success: true });
+            } catch (error) {
+                results.push({ test: '구매_동기화', success: false, error: error.message });
+            }
+            
+            // 3. 이벤트-보상 동기화
+            try {
+                await testEventSync();
+                results.push({ test: '이벤트_동기화', success: true });
+            } catch (error) {
+                results.push({ test: '이벤트_동기화', success: false, error: error.message });
+            }
+            
+            showResult('integration', true, { sync_integration_results: results });
+        }
+
+        async function testFrontendPages() {
+            const pages = [
+                'http://localhost:3000',
+                'http://localhost:3000/shop',
+                'http://localhost:3000/events',
+                'http://localhost:3000/admin',
+                'http://localhost:3000/admin/shop',
+                'http://localhost:3000/admin/events'
+            ];
+            
+            const results = [];
+            
+            for (const page of pages) {
+                try {
+                    const response = await fetch(page, { method: 'HEAD' });
+                    results.push({ 
+                        page: page.replace('http://localhost:3000', ''), 
+                        status: response.status,
+                        success: response.status < 400 
+                    });
+                } catch (error) {
+                    results.push({ 
+                        page: page.replace('http://localhost:3000', ''), 
+                        success: false, 
+                        error: error.message 
+                    });
+                }
+            }
+            
+            showResult('integration', true, { frontend_pages_results: results });
+        }
+
+        async function testFrontendAuth() {
+            const results = [];
+            
+            // 프론트엔드 로그인 페이지 테스트
+            try {
+                const loginPage = await fetch('http://localhost:3000/login');
+                results.push({ test: '로그인_페이지', status: loginPage.status, success: loginPage.ok });
+            } catch (error) {
+                results.push({ test: '로그인_페이지', success: false, error: error.message });
+            }
+            
+            // 어드민 페이지 접근 테스트
+            try {
+                const adminPage = await fetch('http://localhost:3000/admin');
+                results.push({ test: '어드민_페이지', status: adminPage.status, success: adminPage.ok });
+            } catch (error) {
+                results.push({ test: '어드민_페이지', success: false, error: error.message });
+            }
+            
+            showResult('integration', true, { frontend_auth_results: results });
+        }
+
+        async function testFrontendSync() {
+            // 프론트엔드의 전역 상태 동기화 테스트는 브라우저 콘솔에서 확인
+            const instructions = {
+                message: '프론트엔드 동기화 테스트는 브라우저에서 직접 확인하세요',
+                steps: [
+                    '1. http://localhost:3000 에서 F12를 눌러 개발자 도구 열기',
+                    '2. Console 탭에서 다음 명령어 실행:',
+                    '   window.__GLOBAL_STORE__ (전역 상태 확인)',
+                    '   localStorage.getItem("auth_token") (토큰 확인)',
+                    '3. 상점에서 구매 후 잔액 변화 관찰',
+                    '4. 이벤트 참여 후 상태 변화 관찰'
+                ]
+            };
+            
+            showResult('integration', true, instructions);
+        }
+
+        // 초기화 시 상점 카탈로그 테스트
+        window.addEventListener('load', () => {
+            testShopCatalog();
+            
+            // 5초 후 자동으로 헬스체크 실행
+            setTimeout(() => {
+                const status = document.createElement('div');
+                status.innerHTML = '<h3>🏥 자동 헬스체크 결과</h3>';
+                document.body.appendChild(status);
+                
+                Promise.all([
+                    fetch('http://localhost:8000/health'),
+                    fetch('http://localhost:3000/api/health').catch(() => ({ ok: false, statusText: 'Frontend API 없음' }))
+                ]).then(([backend, frontend]) => {
+                    status.innerHTML += `
+                        <p>백엔드: ${backend.ok ? '✅ 정상' : '❌ 오류'} (${backend.status})</p>
+                        <p>프론트엔드: ${frontend.ok ? '✅ 정상' : '❌ 오류'} (${frontend.statusText})</p>
+                        <p>시작 시간: ${new Date().toLocaleString()}</p>
+                    `;
+                });
+            }, 5000);
+        });
+
+        // 추가 유틸리티 함수들
+        function clearResults() {
+            document.getElementById('results-content').innerHTML = '';
+        }
+
+        function exportResults() {
+            const results = document.getElementById('results-content').innerHTML;
+            const blob = new Blob([results], { type: 'text/html' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `test_results_${new Date().toISOString().slice(0,19).replace(/:/g, '-')}.html`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        async function runFullSystemTest() {
+            clearResults();
+            showResult('system', true, { message: '전체 시스템 테스트 시작...', timestamp: new Date().toISOString() });
+            
+            const tests = [
+                { name: '헬스체크', fn: () => testHealth() },
+                { name: '사용자_인증', fn: () => testUserLogin() },
+                { name: '어드민_인증', fn: () => testAdminLogin() },
+                { name: '상점_기능', fn: () => testShopCatalog() },
+                { name: '이벤트_기능', fn: () => testEventsList() },
+                { name: 'WebSocket', fn: () => testWebSocket() },
+                { name: '구매_동기화', fn: () => testPurchaseSync() },
+                { name: '프론트엔드_페이지', fn: () => testFrontendPages() }
+            ];
+            
+            const results = [];
+            for (const test of tests) {
+                try {
+                    await test.fn();
+                    results.push({ test: test.name, success: true, timestamp: new Date().toISOString() });
+                } catch (error) {
+                    results.push({ test: test.name, success: false, error: error.message, timestamp: new Date().toISOString() });
+                }
+                await new Promise(resolve => setTimeout(resolve, 2000)); // 2초 대기
+            }
+            
+            showResult('system', true, { 
+                message: '전체 시스템 테스트 완료', 
+                results: results,
+                summary: {
+                    total: results.length,
+                    passed: results.filter(r => r.success).length,
+                    failed: results.filter(r => !r.success).length
+                }
+            });
+        }
+    </script>
+</body>
+</html>

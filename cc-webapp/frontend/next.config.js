@@ -21,11 +21,13 @@ const nextConfig = {
   useFileSystemPublicRoutes: true,
   pageExtensions: ['tsx', 'ts', 'jsx', 'js'],
   async rewrites() {
-    // Proxy frontend /api/* to real backend API to support tests like page.request('/api/...')
-    // Prefer internal URL for server-side access inside Docker; fallback to public origin, then localhost
+    // Proxy frontend /api/* to real backend API
+    // Use proxy target for server-side (Docker internal network), public origin for client-side hints
+    const proxyTarget = process.env.NEXT_PUBLIC_API_PROXY_TARGET;
     const internal = process.env.NEXT_PUBLIC_API_URL_INTERNAL;
     const publicOrigin = process.env.NEXT_PUBLIC_API_ORIGIN;
-    const base = internal || publicOrigin || 'http://localhost:8000';
+    const base = proxyTarget || internal || publicOrigin || 'http://localhost:8000';
+    console.log(`[next.config] API rewrite target: ${base}`);
     return [
       {
         source: '/api/:path*',
